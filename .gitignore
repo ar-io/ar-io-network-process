@@ -1,6 +1,5 @@
 key.json
 node_modules
-.vscode
 .luarocks
 **/coverage/*
 !.gitkeep
