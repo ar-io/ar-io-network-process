@@ -76,7 +76,7 @@ end
 
 function epochs.getPrescribedNamesForEpoch(epochNumber)
 	return epochs.getEpoch(epochNumber).prescribedNames or {}
-end	
+end
 
 function epochs.getReportsForEpoch(epochNumber)
 	return epochs.getEpoch(epochNumber).observations.reports or {}

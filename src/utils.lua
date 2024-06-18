@@ -116,11 +116,11 @@ function utils.getHashFromBase64URL(str)
 end
 
 function utils.splitString(str, delimiter)
-    local result = {}
-    for match in (str..delimiter):gmatch("(.-)"..delimiter) do
-        result[#result + 1] = match
-    end
-    return result
+	local result = {}
+	for match in (str .. delimiter):gmatch("(.-)" .. delimiter) do
+		result[#result + 1] = match
+	end
+	return result
 end
 
 return utils
