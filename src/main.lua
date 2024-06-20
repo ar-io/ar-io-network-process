@@ -45,6 +45,7 @@ local ActionMap = {
 	Records = "Records",
 	ReservedNames = "ReservedNames",
 	ReservedName = "ReservedName",
+	TokenCost = "TokenCost",
 	-- GATEWAY REGISTRY READ APIS
 	Gateway = "Gateway",
 	Gateways = "Gateways",
@@ -55,7 +56,7 @@ local ActionMap = {
 	IncreaseVault = "IncreaseVault",
 	BuyRecord = "BuyRecord",
 	ExtendLease = "ExtendLease",
-	IncreaseUndernameCount = "IncreaseUndernameCount",
+	IncreaseundernameLimit = "IncreaseundernameLimit",
 	JoinNetwork = "JoinNetwork",
 	LeaveNetwork = "LeaveNetwork",
 	IncreaseOperatorStake = "IncreaseOperatorStake",
@@ -280,13 +281,6 @@ Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.I
 end)
 
 Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRecord), function(msg)
-	-- assert name is a string
-	assert(type(msg.Tags.Name) == "string", "Invalid name")
-	-- assert purchase type is a string
-	assert(type(msg.Tags.PurchaseType) == "string", "Invalid purchase type")
-	-- assert years is a positive number and less than 5
-	assert(tonumber(msg.Tags.Years) > 0 and tonumber(msg.Tags.Years) < 5, "Invalid years")
-
 	local checkAssertions = function()
 		assert(type(msg.Tags.Name) == "string", "Invalid name")
 		assert(type(msg.Tags.PurchaseType) == "string", "Invalid purchase type")
@@ -308,7 +302,7 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 		arns.buyRecord,
 		msg.Tags.Name,
 		msg.Tags.PurchaseType,
-		msg.Tags.Years,
+		tonumber(msg.Tags.Years),
 		msg.From,
 		msg.Timestamp,
 		msg.Tags.ProcessId
@@ -333,10 +327,21 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 end)
 
 Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.ExtendLease), function(msg)
-	-- assert name is a string
-	assert(type(msg.Tags.Name) == "string", "Invalid name")
-	-- assert years is a positive number and less than 5
-	assert(tonumber(msg.Tags.Years) > 0 and tonumber(msg.Tags.Years) < 5, "Invalid years")
+	local checkAssertions = function()
+		assert(type(msg.Tags.Name) == "string", "Invalid name")
+		assert(tonumber(msg.Tags.Years) > 0 and tonumber(msg.Tags.Years) < 5, "Invalid years")
+	end
+
+	local inputStatus, inputResult = pcall(checkAssertions)
+
+	if not inputStatus then
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-Extend-Lease", Error = "Bad-Input" },
+			Data = tostring(inputResult),
+		})
+		return
+	end
 
 	local status, result = pcall(arns.extendLease, msg.From, msg.Tags.Name, msg.Tags.Years, msg.Timestamp)
 	if not status then
@@ -355,14 +360,27 @@ Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.Ext
 end)
 
 Handlers.add(
-	ActionMap.IncreaseUndernameCount,
-	utils.hasMatchingTag("Action", ActionMap.IncreaseUndernameCount),
+	ActionMap.IncreaseundernameLimit,
+	utils.hasMatchingTag("Action", ActionMap.IncreaseundernameLimit),
 	function(msg)
-		assert(type(msg.Tags.Name) == "string", "Invalid name")
-		assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
+		local checkAssertions = function()
+			assert(type(msg.Tags.Name) == "string", "Invalid name")
+			assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
+		end
+
+		local inputStatus, inputResult = pcall(checkAssertions)
+
+		if not inputStatus then
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-Undername-Increase", Error = "Bad-Input" },
+				Data = tostring(inputResult),
+			})
+			return
+		end
 
 		local status, result =
-			pcall(arns.increaseUndernameCount, msg.From, msg.Tags.Name, msg.Tags.Quantity, msg.Timestamp)
+			pcall(arns.increaseundernameLimit, msg.From, msg.Tags.Name, msg.Tags.Quantity, msg.Timestamp)
 		if not status then
 			ao.send({
 				Target = msg.From,
@@ -378,6 +396,53 @@ Handlers.add(
 		end
 	end
 )
+
+Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.TokenCost), function(msg)
+	local checkAssertions = function()
+		assert(
+			type(msg.Tags.Intent) == "string",
+			-- assert is one of those three interactions
+			msg.Tags.Intent == ActionMap.BuyRecord
+				or msg.Tags.Intent == ActionMap.ExtendLease
+				or msg.Tags.Intent == ActionMap.IncreaseundernameLimit,
+			"Intent must be valid registry interaction (e.g. BuyRecord, ExtendLease, IncreaseUndernameLimit). Provided intent: "
+					.. msg.Tags.Intent
+				or "nil"
+		)
+	end
+
+	local inputStatus, inputResult = pcall(checkAssertions)
+
+	if not inputStatus then
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-Token-Cost", Error = "Bad-Input" },
+			Data = tostring(inputResult),
+		})
+		return
+	end
+
+	local status, result = pcall(arns.getTokenCost, {
+		intent = msg.Tags.Intent,
+		name = msg.Tags.Name,
+		years = tonumber(msg.Tags.Years) or 1,
+		quantity = tonumber(msg.Tags.Quantity),
+		purchaseType = msg.Tags.PurchaseType or "lease",
+	})
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-Token-Cost", Error = "Invalid-Token-Cost" },
+			Data = tostring(result),
+		})
+	else
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Valid-Token-Cost", TokenCost = tostring(result) },
+			Data = tostring(json.encode(result)),
+		})
+	end
+end)
 
 Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.JoinNetwork), function(msg)
 	local updatedSettings = {

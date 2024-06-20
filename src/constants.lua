@@ -5,12 +5,12 @@ constants.DEFAULT_UNDERNAME_COUNT = 10
 constants.DEADLINE_DURATION_MS = 60 * 60 * 1000 -- One hour of miliseconds
 constants.oneYearSeconds = 60 * 60 * 24 * 365
 constants.thirtyDaysSeconds = 60 * 60 * 24 * 30
-constants.defaultUndernameCount = 10
+constants.defaultundernameLimit = 10
 
 -- ARNS
 constants.DEFAULT_UNDERNAME_COUNT = 10
 constants.DEADLINE_DURATION_MS = 60 * 60 * 1000 -- One hour of miliseconds
-constants.PERMABUY_LEASE_FEE_LENGTH = 10
+constants.PERMABUY_LEASE_FEE_LENGTH = 20
 constants.ANNUAL_PERCENTAGE_FEE = 0.2
 constants.ARNS_NAME_DOES_NOT_EXIST_MESSAGE = "Name does not exist in the ArNS Registry!"
 constants.ARNS_MAX_UNDERNAME_MESSAGE = "Name has reached undername limit of 10000"

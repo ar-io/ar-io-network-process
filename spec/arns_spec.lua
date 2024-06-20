@@ -21,13 +21,20 @@ describe("arns", function()
 		it("should add a valid lease buyRecord to records object and transfer balance to the protocol", function()
 			local demandBefore = demand.getCurrentPeriodRevenue()
 			local purchasesBefore = demand.getCurrentPeriodPurchases()
-			local status, result =
-				pcall(arns.buyRecord, "test-name", "lease", 1, "test-this-is-valid-arweave-wallet-address-1", timestamp, testProcessId)
+			local status, result = pcall(
+				arns.buyRecord,
+				"test-name",
+				"lease",
+				1,
+				"test-this-is-valid-arweave-wallet-address-1",
+				timestamp,
+				testProcessId
+			)
 			assert.is_true(status)
 			assert.are.same({
 				purchasePrice = 1500,
 				type = "lease",
-				undernameCount = 10,
+				undernameLimit = 10,
 				processId = testProcessId,
 				startTimestamp = 0,
 				endTimestamp = timestamp + constants.oneYearMs * 1,
@@ -36,7 +43,7 @@ describe("arns", function()
 				["test-name"] = {
 					purchasePrice = 1500,
 					type = "lease",
-					undernameCount = 10,
+					undernameLimit = 10,
 					processId = testProcessId,
 					startTimestamp = 0,
 					endTimestamp = timestamp + constants.oneYearMs * 1,
@@ -51,13 +58,20 @@ describe("arns", function()
 		it("should default lease to 1 year and lease when not values are not provided", function()
 			local demandBefore = demand.getCurrentPeriodRevenue()
 			local purchasesBefore = demand.getCurrentPeriodPurchases()
-			local status, result =
-				pcall(arns.buyRecord, "test-name", nil, nil, "test-this-is-valid-arweave-wallet-address-1", timestamp, testProcessId)
+			local status, result = pcall(
+				arns.buyRecord,
+				"test-name",
+				nil,
+				nil,
+				"test-this-is-valid-arweave-wallet-address-1",
+				timestamp,
+				testProcessId
+			)
 			assert.is_true(status)
 			assert.are.same({
 				purchasePrice = 1500,
 				type = "lease",
-				undernameCount = 10,
+				undernameLimit = 10,
 				processId = testProcessId,
 				startTimestamp = 0,
 				endTimestamp = timestamp + constants.oneYearMs,
@@ -65,7 +79,7 @@ describe("arns", function()
 			assert.are.same({
 				purchasePrice = 1500,
 				type = "lease",
-				undernameCount = 10,
+				undernameLimit = 10,
 				processId = testProcessId,
 				startTimestamp = 0,
 				endTimestamp = timestamp + constants.oneYearMs,
@@ -99,11 +113,18 @@ describe("arns", function()
 				purchasePrice = 1500,
 				startTimestamp = 0,
 				type = "lease",
-				undernameCount = 10,
+				undernameLimit = 10,
 			}
 			NameRegistry.records["test-name"] = existingRecord
-			local status, result =
-				pcall(arns.buyRecord, "test-name", "lease", 1, "test-this-is-valid-arweave-wallet-address-1", timestamp, testProcessId)
+			local status, result = pcall(
+				arns.buyRecord,
+				"test-name",
+				"lease",
+				1,
+				"test-this-is-valid-arweave-wallet-address-1",
+				timestamp,
+				testProcessId
+			)
 			assert.is_false(status)
 			assert.match("Name is already registered", result)
 			assert.are.same(existingRecord, NameRegistry.records["test-name"])
@@ -115,8 +136,15 @@ describe("arns", function()
 				endTimestamp = 1000,
 			}
 			NameRegistry.reserved["test-name"] = reservedName
-			local status, result =
-				pcall(arns.buyRecord, "test-name", "lease", 1, "test-this-is-valid-arweave-wallet-address-1", timestamp, testProcessId)
+			local status, result = pcall(
+				arns.buyRecord,
+				"test-name",
+				"lease",
+				1,
+				"test-this-is-valid-arweave-wallet-address-1",
+				timestamp,
+				testProcessId
+			)
 			assert.is_false(status)
 			assert.match("Name is reserved", result)
 			assert.are.same({}, arns.getRecords())
@@ -130,15 +158,22 @@ describe("arns", function()
 				target = "test-this-is-valid-arweave-wallet-address-1",
 				endTimestamp = 1000,
 			}
-			local status, result =
-				pcall(arns.buyRecord, "test-name", "lease", 1, "test-this-is-valid-arweave-wallet-address-1", timestamp, testProcessId)
+			local status, result = pcall(
+				arns.buyRecord,
+				"test-name",
+				"lease",
+				1,
+				"test-this-is-valid-arweave-wallet-address-1",
+				timestamp,
+				testProcessId
+			)
 			local expectation = {
 				endTimestamp = timestamp + constants.oneYearMs,
 				processId = testProcessId,
 				purchasePrice = 1500,
 				startTimestamp = 0,
 				type = "lease",
-				undernameCount = 10,
+				undernameLimit = 10,
 			}
 			assert.is_true(status)
 			assert.are.same(expectation, result)
@@ -153,18 +188,30 @@ describe("arns", function()
 
 		it("should throw an error if the user does not have enough balance", function()
 			Balances["test-this-is-valid-arweave-wallet-address-1"] = 0
-			local status, result =
-				pcall(arns.buyRecord, "test-name", "lease", 1, "test-this-is-valid-arweave-wallet-address-1", timestamp, testProcessId)
+			local status, result = pcall(
+				arns.buyRecord,
+				"test-name",
+				"lease",
+				1,
+				"test-this-is-valid-arweave-wallet-address-1",
+				timestamp,
+				testProcessId
+			)
 			assert.is_false(status)
 			assert.match("Insufficient balance", result)
 			assert.are.same({}, arns.getRecords())
 		end)
 	end)
 
-	describe("increaseUndernameCount", function()
+	describe("increaseundernameLimit", function()
 		it("should throw an error if name is not active", function()
-			local status, error =
-				pcall(arns.increaseUndernameCount, "test-this-is-valid-arweave-wallet-address-1", "test-name", 50, timestamp)
+			local status, error = pcall(
+				arns.increaseundernameLimit,
+				"test-this-is-valid-arweave-wallet-address-1",
+				"test-name",
+				50,
+				timestamp
+			)
 			assert.is_false(status)
 			assert.match("Name is not registered", error)
 		end)
@@ -177,11 +224,16 @@ describe("arns", function()
 				purchasePrice = 1500,
 				startTimestamp = 0,
 				type = "lease",
-				undernameCount = 10,
+				undernameLimit = 10,
 			}
 			Balances["test-this-is-valid-arweave-wallet-address-1"] = 0
-			local status, error =
-				pcall(arns.increaseUndernameCount, "test-this-is-valid-arweave-wallet-address-1", "test-name", 50, timestamp)
+			local status, error = pcall(
+				arns.increaseundernameLimit,
+				"test-this-is-valid-arweave-wallet-address-1",
+				"test-name",
+				50,
+				timestamp
+			)
 			assert.is_false(status)
 			assert.match("Insufficient balance", error)
 		end)
@@ -193,9 +245,15 @@ describe("arns", function()
 				purchasePrice = 1500,
 				startTimestamp = 0,
 				type = "lease",
-				undernameCount = constants.MAX_ALLOWED_UNDERNAMES,
+				undernameLimit = constants.MAX_ALLOWED_UNDERNAMES,
 			}
-			local status, error = pcall(arns.increaseUndernameCount, "test-this-is-valid-arweave-wallet-address-1", "test-name", 1, timestamp)
+			local status, error = pcall(
+				arns.increaseundernameLimit,
+				"test-this-is-valid-arweave-wallet-address-1",
+				"test-name",
+				1,
+				timestamp
+			)
 			assert.is_false(status)
 			assert.match(constants.ARNS_MAX_UNDERNAME_MESSAGE, error)
 		end)
@@ -207,10 +265,10 @@ describe("arns", function()
 				purchasePrice = 1500,
 				startTimestamp = 0,
 				type = "lease",
-				undernameCount = 10,
+				undernameLimit = 10,
 			}
 			local status, error = pcall(
-				arns.increaseUndernameCount,
+				arns.increaseundernameLimit,
 				"test-this-is-valid-arweave-wallet-address-1",
 				"test-name",
 				1,
@@ -227,28 +285,33 @@ describe("arns", function()
 				purchasePrice = 1500,
 				startTimestamp = 0,
 				type = "lease",
-				undernameCount = 10,
+				undernameLimit = 10,
 			}
 			local demandBefore = demand.getCurrentPeriodRevenue()
 			local purchasesBefore = demand.getCurrentPeriodPurchases()
-			local status, result =
-				pcall(arns.increaseUndernameCount, "test-this-is-valid-arweave-wallet-address-1", "test-name", 50, timestamp)
+			local status, result = pcall(
+				arns.increaseundernameLimit,
+				"test-this-is-valid-arweave-wallet-address-1",
+				"test-name",
+				50,
+				timestamp
+			)
 			local expectation = {
 				endTimestamp = timestamp + constants.oneYearMs,
 				processId = testProcessId,
 				purchasePrice = 1500,
 				startTimestamp = 0,
 				type = "lease",
-				undernameCount = 60,
+				undernameLimit = 60,
 			}
 			assert.is_true(status)
 			assert.are.same(expectation, result)
 			assert.are.same({ ["test-name"] = expectation }, arns.getRecords())
 			assert.are.same({
-				["test-this-is-valid-arweave-wallet-address-1"] = 4999937.5,
-				[_G.ao.id] = 62.5,
+				["test-this-is-valid-arweave-wallet-address-1"] = 4999938,
+				[_G.ao.id] = 62,
 			}, balances.getBalances())
-			assert.are.equal(demandBefore + 62.5, demand.getCurrentPeriodRevenue())
+			assert.are.equal(demandBefore + 62, demand.getCurrentPeriodRevenue())
 			assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 		end)
 	end)
@@ -267,7 +330,7 @@ describe("arns", function()
 				purchasePrice = 1500,
 				startTimestamp = 0,
 				type = "lease",
-				undernameCount = 10,
+				undernameLimit = 10,
 			}
 			local status, error = pcall(
 				arns.extendLease,
@@ -287,9 +350,10 @@ describe("arns", function()
 				purchasePrice = 1500,
 				startTimestamp = 0,
 				type = "permabuy",
-				undernameCount = 10,
+				undernameLimit = 10,
 			}
-			local status, error = pcall(arns.extendLease, "test-this-is-valid-arweave-wallet-address-1", "test-name", 1, timestamp)
+			local status, error =
+				pcall(arns.extendLease, "test-this-is-valid-arweave-wallet-address-1", "test-name", 1, timestamp)
 			assert.is_false(status)
 			assert.match("Name is permabought and cannot be extended", error)
 		end)
@@ -302,10 +366,11 @@ describe("arns", function()
 				purchasePrice = 1500,
 				startTimestamp = 0,
 				type = "lease",
-				undernameCount = 10,
+				undernameLimit = 10,
 			}
 			Balances["test-this-is-valid-arweave-wallet-address-1"] = 0
-			local status, error = pcall(arns.extendLease, "test-this-is-valid-arweave-wallet-address-1", "test-name", 1, timestamp)
+			local status, error =
+				pcall(arns.extendLease, "test-this-is-valid-arweave-wallet-address-1", "test-name", 1, timestamp)
 			assert.is_false(status)
 			assert.match("Insufficient balance", error)
 		end)
@@ -318,11 +383,12 @@ describe("arns", function()
 				purchasePrice = 1500,
 				startTimestamp = 0,
 				type = "lease",
-				undernameCount = 10,
+				undernameLimit = 10,
 			}
 			local demandBefore = demand.getCurrentPeriodRevenue()
 			local purchasesBefore = demand.getCurrentPeriodPurchases()
-			local status, result = pcall(arns.extendLease, "test-this-is-valid-arweave-wallet-address-1", "test-name", 4, timestamp)
+			local status, result =
+				pcall(arns.extendLease, "test-this-is-valid-arweave-wallet-address-1", "test-name", 4, timestamp)
 			assert.is_true(status)
 			assert.are.same({
 				endTimestamp = timestamp + constants.oneYearMs * 5,
@@ -330,7 +396,7 @@ describe("arns", function()
 				purchasePrice = 1500,
 				startTimestamp = 0,
 				type = "lease",
-				undernameCount = 10,
+				undernameLimit = 10,
 			}, result)
 			assert.are.same({
 				["test-name"] = {
@@ -339,7 +405,7 @@ describe("arns", function()
 					purchasePrice = 1500,
 					startTimestamp = 0,
 					type = "lease",
-					undernameCount = 10,
+					undernameLimit = 10,
 				},
 			}, arns.getRecords())
 			assert.are.same({
@@ -358,9 +424,10 @@ describe("arns", function()
 				purchasePrice = 1500,
 				startTimestamp = 0,
 				type = "lease",
-				undernameCount = 10,
+				undernameLimit = 10,
 			}
-			local status, error = pcall(arns.extendLease, "test-this-is-valid-arweave-wallet-address-1", "test-name", 6, timestamp)
+			local status, error =
+				pcall(arns.extendLease, "test-this-is-valid-arweave-wallet-address-1", "test-name", 6, timestamp)
 			assert.is_false(status)
 			assert.match("Cannot extend lease beyond 5 years", error)
 		end)
