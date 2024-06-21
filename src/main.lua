@@ -839,12 +839,47 @@ end)
 
 Handlers.add(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Record), function(msg)
 	local record = arns.getRecord(msg.Tags.Name)
-	ao.send({ Target = msg.From, Name = msg.Tags.Name, Data = json.encode(record) })
+
+	local recordNotice = {
+		Target = msg.From,
+		Action = 'Record-Notice',
+		Name = msg.Tags.Name,
+		Data = json.encode(record)
+	}
+
+      -- Add forwarded tags to the credit and debit notice messages
+      for tagName, tagValue in pairs(msg) do
+        -- Tags beginning with "X-" are forwarded
+        if string.sub(tagName, 1, 2) == "X-" then
+          recordNotice[tagName] = tagValue
+        end
+      end
+
+      -- Send Record-Notice
+      ao.send(recordNotice)
+
 end)
 
 Handlers.add(ActionMap.Records, utils.hasMatchingTag("Action", ActionMap.Records), function(msg)
 	local records = arns.getRecords()
-	ao.send({ Target = msg.From, Data = json.encode(records) })
+
+	-- Credit-Notice message template, that is sent to the Recipient of the transfer
+	local recordsNotice = {
+		Target = msg.From,
+		Action = 'Records-Notice',
+		Data = json.encode(records)
+	}
+
+      -- Add forwarded tags to the records notice messages
+      for tagName, tagValue in pairs(msg) do
+        -- Tags beginning with "X-" are forwarded
+        if string.sub(tagName, 1, 2) == "X-" then
+          recordsNotice[tagName] = tagValue
+        end
+      end
+
+      -- Send Records-Notice
+      ao.send(recordsNotice)
 end)
 
 Handlers.add(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
