@@ -839,7 +839,7 @@ end)
 
 Handlers.add(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Record), function(msg)
 	local record = arns.getRecord(msg.Tags.Name)
-	ao.send({ Target = msg.From, Data = json.encode(record) })
+	ao.send({ Target = msg.From, Name = msg.Tags.Name, Data = json.encode(record) })
 end)
 
 Handlers.add(ActionMap.Records, utils.hasMatchingTag("Action", ActionMap.Records), function(msg)
