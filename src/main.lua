@@ -343,7 +343,7 @@ Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.Ext
 		return
 	end
 
-	local status, result = pcall(arns.extendLease, msg.From, msg.Tags.Name, msg.Tags.Years, msg.Timestamp)
+	local status, result = pcall(arns.extendLease, msg.From, msg.Tags.Name, tonumber(msg.Tags.Years), msg.Timestamp)
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -380,7 +380,7 @@ Handlers.add(
 		end
 
 		local status, result =
-			pcall(arns.increaseundernameLimit, msg.From, msg.Tags.Name, msg.Tags.Quantity, msg.Timestamp)
+			pcall(arns.increaseundernameLimit, msg.From, msg.Tags.Name, tonumber(msg.Tags.Quantity), msg.Timestamp)
 		if not status then
 			ao.send({
 				Target = msg.From,
@@ -428,6 +428,7 @@ Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.Token
 		years = tonumber(msg.Tags.Years) or 1,
 		quantity = tonumber(msg.Tags.Quantity),
 		purchaseType = msg.Tags.PurchaseType or "lease",
+		currentTimestamp = msg.Timestamp,
 	})
 	if not status then
 		ao.send({
