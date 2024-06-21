@@ -80,7 +80,7 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = ActionMap.Transfer, Error = "Transfer-Error" },
+			Tags = { Error = "Transfer-Error" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -721,10 +721,10 @@ Handlers.add(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMa
 	local status, result = pcall(epochs.saveObservations, msg.From, reportTxId, failedGateways, msg.Timestamp)
 	if status then
 		-- TODO: add tags for successfull save observation
-		ao.send({ Target = msg.From, Action = ActionMap.SaveObservations, Data = json.encode(result) })
+		ao.send({ Target = msg.From, Data = json.encode(result) })
 	else
 		-- TODO: add additional tags for error
-		ao.send({ Target = msg.From, Error = "Invalid-Saved-Observations", Action = ActionMap.SaveObservations, Data = json.encode(result) })
+		ao.send({ Target = msg.From, Error = "Invalid-Saved-Observations", Data = json.encode(result) })
 	end
 end)
 
@@ -758,7 +758,7 @@ Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
 		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height
 		local status, result = pcall(tickState, epochDistributionTimestamp, msg["Block-Height"], msg["Hash-Chain"])
 		if status then
-			ao.send({ Target = msg.From, Action = "Tick", Data = json.encode(result) })
+			ao.send({ Target = msg.From, Data = json.encode(result) })
 			LastTickedEpoch = i -- update the last ticked state
 		else
 			-- reset the state to previous state
@@ -768,7 +768,7 @@ Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
 			NameRegistry = previousState.NameRegistry
 			Epochs = previousState.Epochs
 			DemandFactor = previousState.DemandFactor
-			ao.send({ Target = msg.From, Action = "Tick", Data = json.encode(result) })
+			ao.send({ Target = msg.From, Data = json.encode(result) })
 		end
 	end
 end)
@@ -778,7 +778,6 @@ end)
 Handlers.add(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", ActionMap.Info), function(msg)
 	ao.send({
 		Target = msg.From,
-		Action = ActionMap.Info,
 		Tags = { Name = Name, Ticker = Ticker, Logo = Logo, Denomination = tostring(Denomination) },
 	})
 end)
@@ -786,7 +785,6 @@ end)
 Handlers.add(ActionMap.State, Handlers.utils.hasMatchingTag("Action", ActionMap.State), function(msg)
 	ao.send({
 		Target = msg.From,
-		Action = ActionMap.State,
 		Data = json.encode({
 			Name = Name,
 			Ticker = Ticker,
@@ -805,7 +803,6 @@ Handlers.add(ActionMap.Gateways, Handlers.utils.hasMatchingTag("Action", ActionM
 	local gateways = gar.getGateways()
 	ao.send({
 		Target = msg.From,
-		Action = ActionMap.Gateways,
 		Data = json.encode(gateways),
 	})
 end)
@@ -814,7 +811,6 @@ Handlers.add(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", ActionMa
 	local gateway = gar.getGateway(msg.Tags.Address or msg.From)
 	ao.send({
 		Target = msg.From,
-		Action = ActionMap.Gateway,
 		Data = json.encode(gateway),
 	})
 end)
@@ -822,7 +818,6 @@ end)
 Handlers.add(ActionMap.Balances, Handlers.utils.hasMatchingTag("Action", ActionMap.Balances), function(msg)
 	ao.send({
 		Target = msg.From,
-		Action = ActionMap.Balances,
 		Data = json.encode(Balances),
 	})
 end)
@@ -833,7 +828,6 @@ Handlers.add(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMa
 	-- must adhere to token.lua spec for arconnect compatibility
 	ao.send({
 		Target = msg.From,
-		Action = ActionMap.Balance,
 		Data = balance,
 		Balance = balance,
 		Ticker = Ticker,
@@ -844,20 +838,20 @@ Handlers.add(ActionMap.DemandFactor, utils.hasMatchingTag("Action", ActionMap.De
 	-- wrap in a protected call, and return the result or error accoringly to sender
 	local status, result = pcall(demand.getDemandFactor)
 	if status then
-		ao.send({ Target = msg.From, Action = ActionMap.DemandFactor, Data = tostring(result) })
+		ao.send({ Target = msg.From, Data = tostring(result) })
 	else
-		ao.send({ Target = msg.From, Action = ActionMap.DemandFactor, Data = json.encode(result) })
+		ao.send({ Target = msg.From, Data = json.encode(result) })
 	end
 end)
 
 Handlers.add(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Record), function(msg)
 	local record = arns.getRecord(msg.Tags.Name)
-	ao.send({ Target = msg.From, Action = ActionMap.Record, Name = msg.Tags.Name, Data = json.encode(record) })
+	ao.send({ Target = msg.From, Data = json.encode(record) })
 end)
 
 Handlers.add(ActionMap.Records, utils.hasMatchingTag("Action", ActionMap.Records), function(msg)
 	local records = arns.getRecords()
-	ao.send({ Target = msg.From, Action = ActionMap.Records, Data = json.encode(records) })
+	ao.send({ Target = msg.From, Data = json.encode(records) })
 end)
 
 Handlers.add(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
@@ -880,12 +874,12 @@ Handlers.add(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), f
 	local epochIndex = tonumber(msg.Tags.EpochIndex)
 		or epochs.getEpochIndexForTimestamp(tonumber(msg.Tags.Timestamp or msg.Timestamp))
 	local epoch = epochs.getEpoch(epochIndex)
-	ao.send({ Target = msg.From, Action = ActionMap.Epoch, Data = json.encode(epoch) })
+	ao.send({ Target = msg.From, Data = json.encode(epoch) })
 end)
 
 Handlers.add(ActionMap.Epochs, utils.hasMatchingTag("Action", ActionMap.Epochs), function(msg)
 	local epochs = epochs.getEpochs()
-	ao.send({ Target = msg.From, Action = ActionMap.Epochs, Data = json.encode(epochs) })
+	ao.send({ Target = msg.From, Data = json.encode(epochs) })
 end)
 
 Handlers.add(ActionMap.PrescribedObservers, utils.hasMatchingTag("Action", ActionMap.PrescribedObservers), function(msg)
@@ -907,7 +901,7 @@ Handlers.add(ActionMap.PrescribedObservers, utils.hasMatchingTag("Action", Actio
 
 	local epochIndex = tonumber(msg.Tags.EpochIndex) or epochs.getEpochIndexFromTimestamp(tonumber(msg.Timestamp))
 	local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
-	ao.send({ Target = msg.From, Action = ActionMap.PrescribedObservers, Data = json.encode(prescribedObservers) })
+	ao.send({ Target = msg.From, Data = json.encode(prescribedObservers) })
 end)
 
 Handlers.add(ActionMap.Observations, utils.hasMatchingTag("Action", ActionMap.Observations), function(msg)
@@ -930,7 +924,7 @@ Handlers.add(ActionMap.Observations, utils.hasMatchingTag("Action", ActionMap.Ob
 	local epochIndex = tonumber(msg.Tags.EpochIndex)
 		or epochs.getEpochIndexFromTimestamp(tonumber(msg.Timestamp or msg.Tags.Timestamp))
 	local observations = epochs.getObservationsForEpoch(epochIndex)
-	ao.send({ Target = msg.From, Action = ActionMap.Observations, Data = json.encode(observations) })
+	ao.send({ Target = msg.From, Data = json.encode(observations) })
 end)
 
 Handlers.add(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", ActionMap.PrescribedNames), function(msg)
@@ -953,7 +947,7 @@ Handlers.add(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", ActionMap
 	local epochIndex = tonumber(msg.Tags.EpochIndex)
 		or epochs.getEpochIndexForTimestamp(tonumber(msg.Timestamp or msg.Tags.Timestamp))
 	local prescribedNames = epochs.getPrescribedNamesForEpoch(epochIndex)
-	ao.send({ Target = msg.From, Action = ActionMap.PrescribedNames, Data = json.encode(prescribedNames) })
+	ao.send({ Target = msg.From, Data = json.encode(prescribedNames) })
 end)
 
 Handlers.add(ActionMap.Distributions, utils.hasMatchingTag("Action", ActionMap.Distributions), function(msg)
@@ -976,17 +970,17 @@ Handlers.add(ActionMap.Distributions, utils.hasMatchingTag("Action", ActionMap.D
 	local epochIndex = tonumber(msg.Tags.EpochIndex)
 		or epochs.getEpochIndexFromTimestamp(tonumber(msg.Timestamp or msg.Tags.Timestamp))
 	local distributions = epochs.getDistributionsForEpoch(epochIndex)
-	ao.send({ Target = msg.From, Action = ActionMap.Distributions, Data = json.encode(distributions) })
+	ao.send({ Target = msg.From, Data = json.encode(distributions) })
 end)
 
 Handlers.add(ActionMap.ReservedNames, utils.hasMatchingTag("Action", ActionMap.ReservedNames), function(msg)
 	local reservedNames = arns.getReservedNames()
-	ao.send({ Target = msg.From, Action = ActionMap.ReservedNames, Data = json.encode(reservedNames) })
+	ao.send({ Target = msg.From, Data = json.encode(reservedNames) })
 end)
 
 Handlers.add(ActionMap.ReservedName, utils.hasMatchingTag("Action", ActionMap.ReservedName), function(msg)
 	local reservedName = arns.getReservedName(msg.Tags.Name)
-	ao.send({ Target = msg.From, Action = ActionMap.ReservedName, Data = json.encode(reservedName) })
+	ao.send({ Target = msg.From, Data = json.encode(reservedName) })
 end)
 
 -- END READ HANDLERS
