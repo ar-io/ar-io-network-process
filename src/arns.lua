@@ -332,8 +332,10 @@ function arns.getTokenCost(intendedAction)
 	elseif intendedAction.intent == "IncreaseUndernameLimit" then
 		local name = intendedAction.name
 		local qty = intendedAction.quantity
+		local currentTimestamp = intendedAction.currentTimestamp
 		assert(type(name) == "string", "Name is required and must be a string.")
 		assert(qty >= 1 and qty <= 9990, "Quantity is invalid, must be between 1 and 9990")
+		assert(currentTimestamp, "CurrentTimestamp is required")
 		local record = arns.getRecord(intendedAction.name)
 		if not record then
 			error("Name is not registered")
@@ -341,7 +343,7 @@ function arns.getTokenCost(intendedAction)
 		local qty = intendedAction.quantity
 		local yearsRemaining = constants.PERMABUY_LEASE_FEE_LENGTH
 		if record.type == "lease" then
-			yearsRemaining = arns.calculateYearsBetweenTimestamps(intendedAction.currentTimestamp, record.endTimestamp)
+			yearsRemaining = arns.calculateYearsBetweenTimestamps(currentTimestamp, record.endTimestamp)
 		end
 		local baseFee = demand.getFees()[#intendedAction.name]
 		tokenCost = arns.calculateUndernameCost(baseFee, qty, record.type, yearsRemaining, demand.getDemandFactor())
