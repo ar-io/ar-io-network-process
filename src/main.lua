@@ -6,9 +6,10 @@ Ticker = "dIO"
 Logo = "Sie_26dvgyok0PZD_-iQAFOhOd5YxDTkczOLoqTTL_A"
 Denomination = 6
 DemandFactor = DemandFactor or {}
-Balances = Balances or {
-	[ao.id] = 1000000000 * 1000000,
-}
+Balances = Balances or {}
+if Balances[ao.id] == nil and #Balances == 0 then -- initialize the balance for the process id
+	Balances[ao.id] = 1000000000 * 1000000
+end
 Vaults = Vaults or {}
 GatewayRegistry = GatewayRegistry or {}
 NameRegistry = NameRegistry or {}
@@ -56,7 +57,7 @@ local ActionMap = {
 	IncreaseVault = "IncreaseVault",
 	BuyRecord = "BuyRecord",
 	ExtendLease = "ExtendLease",
-	IncreaseundernameLimit = "IncreaseundernameLimit",
+	IncreaseUndernameLimit = "IncreaseUndernameLimit",
 	JoinNetwork = "JoinNetwork",
 	LeaveNetwork = "LeaveNetwork",
 	IncreaseOperatorStake = "IncreaseOperatorStake",
@@ -360,8 +361,8 @@ Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.Ext
 end)
 
 Handlers.add(
-	ActionMap.IncreaseundernameLimit,
-	utils.hasMatchingTag("Action", ActionMap.IncreaseundernameLimit),
+	ActionMap.IncreaseUndernameLimit,
+	utils.hasMatchingTag("Action", ActionMap.IncreaseUndernameLimit),
 	function(msg)
 		local checkAssertions = function()
 			assert(type(msg.Tags.Name) == "string", "Invalid name")
@@ -404,7 +405,7 @@ Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.Token
 			-- assert is one of those three interactions
 			msg.Tags.Intent == ActionMap.BuyRecord
 				or msg.Tags.Intent == ActionMap.ExtendLease
-				or msg.Tags.Intent == ActionMap.IncreaseundernameLimit,
+				or msg.Tags.Intent == ActionMap.IncreaseUndernameLimit,
 			"Intent must be valid registry interaction (e.g. BuyRecord, ExtendLease, IncreaseUndernameLimit). Provided intent: "
 					.. msg.Tags.Intent
 				or "nil"
