@@ -6,9 +6,10 @@ Ticker = "dIO"
 Logo = "Sie_26dvgyok0PZD_-iQAFOhOd5YxDTkczOLoqTTL_A"
 Denomination = 6
 DemandFactor = DemandFactor or {}
-Balances = Balances or {
-	[ao.id] = 1000000000 * 1000000,
-}
+Balances = Balances or {}
+if Balances[ao.id] == nil and #Balances == 0 then -- initialize the balance for the process id
+	Balances[ao.id] = 1000000000 * 1000000
+end
 Vaults = Vaults or {}
 GatewayRegistry = GatewayRegistry or {}
 NameRegistry = NameRegistry or {}
