@@ -12,3 +12,4 @@ wallet.json
 luacov-html
 .luacov
 *.gz
+dist
