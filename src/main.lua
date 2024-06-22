@@ -96,42 +96,35 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 		})
 	else
 		if msg.Cast then
-			-- Send Debit-Notice to the Sender
-			ao.send({
+			-- Debit-Notice message template, that is sent to the Sender of the transfer
+			local debitNotice = {
 				Target = msg.From,
-				Action = "Debit-Notice",
-				Recipient = msg.Tags.Recipient,
-				Quantity = tostring(msg.Tags.Quantity),
-				Data = "You transferred " .. msg.Tags.Quantity .. " to " .. msg.Tags.Recipient,
-			})
-			if msg.Tags.Function and msg.Tags.Parameters then
-				-- Send Credit-Notice to the Recipient and include the function and parameters tags
-				ao.send({
-					Target = msg.Tags.Recipient,
-					Action = "Credit-Notice",
-					Sender = msg.From,
-					Quantity = tostring(msg.Tags.Quantity),
-					Function = tostring(msg.Tags.Function),
-					Parameters = msg.Tags.Parameters,
-					Data = "You received "
-						.. msg.Tags.Quantity
-						.. " from "
-						.. msg.Tags.Recipient
-						.. " with the instructions for function "
-						.. msg.Tags.Function
-						.. " with the parameters "
-						.. msg.Tags.Parameters,
-				})
-			else
-				-- Send Credit-Notice to the Recipient
-				ao.send({
-					Target = msg.Tags.Recipient,
-					Action = "Credit-Notice",
-					Sender = msg.From,
-					Quantity = tostring(msg.Tags.Quantity),
-					Data = "You received " .. msg.Tags.Quantity .. " from " .. msg.Tags.Recipient,
-				})
+				Action = 'Debit-Notice',
+				Recipient = msg.Recipient,
+				Quantity = msg.Quantity,
+				Data = "You transferred " .. msg.Quantity .. " to " .. msg.Recipient
+			}
+			-- Credit-Notice message template, that is sent to the Recipient of the transfer
+			local creditNotice = {
+				Target = msg.Recipient,
+				Action = 'Credit-Notice',
+				Sender = msg.From,
+				Quantity = msg.Quantity,
+				Data = "You received " .. msg.Quantity .. " from " .. msg.From
+			}
+
+			-- Add forwarded tags to the credit and debit notice messages
+			for tagName, tagValue in pairs(msg) do
+				-- Tags beginning with "X-" are forwarded
+				if string.sub(tagName, 1, 2) == "X-" then
+				debitNotice[tagName] = tagValue
+				creditNotice[tagName] = tagValue
+				end
 			end
+
+			-- Send Debit-Notice and Credit-Notice
+			ao.send(debitNotice)
+			ao.send(creditNotice)
 		end
 	end
 end)
@@ -848,12 +841,47 @@ end)
 
 Handlers.add(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Record), function(msg)
 	local record = arns.getRecord(msg.Tags.Name)
-	ao.send({ Target = msg.From, Data = json.encode(record) })
+
+	local recordNotice = {
+		Target = msg.From,
+		Action = 'Record-Notice',
+		Name = msg.Tags.Name,
+		Data = json.encode(record)
+	}
+
+      -- Add forwarded tags to the credit and debit notice messages
+      for tagName, tagValue in pairs(msg) do
+        -- Tags beginning with "X-" are forwarded
+        if string.sub(tagName, 1, 2) == "X-" then
+          recordNotice[tagName] = tagValue
+        end
+      end
+
+      -- Send Record-Notice
+      ao.send(recordNotice)
+
 end)
 
 Handlers.add(ActionMap.Records, utils.hasMatchingTag("Action", ActionMap.Records), function(msg)
 	local records = arns.getRecords()
-	ao.send({ Target = msg.From, Data = json.encode(records) })
+
+	-- Credit-Notice message template, that is sent to the Recipient of the transfer
+	local recordsNotice = {
+		Target = msg.From,
+		Action = 'Records-Notice',
+		Data = json.encode(records)
+	}
+
+      -- Add forwarded tags to the records notice messages
+      for tagName, tagValue in pairs(msg) do
+        -- Tags beginning with "X-" are forwarded
+        if string.sub(tagName, 1, 2) == "X-" then
+          recordsNotice[tagName] = tagValue
+        end
+      end
+
+      -- Send Records-Notice
+      ao.send(recordsNotice)
 end)
 
 Handlers.add(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
