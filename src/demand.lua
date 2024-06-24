@@ -5,7 +5,7 @@ local demand = {}
 
 DemandFactor = DemandFactor
 	or {
-		startTimestamp = 0, -- TODO: The timestamp at which the contract was initialized
+		startTimestamp = 1719381600000, -- 06-26-2024
 		currentPeriod = 0,
 		trailingPeriodPurchases = { 0, 0, 0, 0, 0, 0, 0 }, -- Acts as a ring buffer of trailing period purchase counts
 		trailingPeriodRevenues = { 0, 0, 0, 0, 0, 0 }, -- Acts as a ring buffer of trailing period revenues
