@@ -81,7 +81,7 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Error = "Transfer-Error" },
+			Tags = { Action = "Invalid-Transfer-Notice", Error = "Transfer-Error" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -91,7 +91,7 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 	if not status then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = ActionMap.Transfer, Error = "Transfer-Error" },
+			Tags = { Action = "Invalid-Transfer-Notice", Error = "Transfer-Error" },
 			Data = tostring(result),
 		})
 	else
@@ -140,7 +140,7 @@ Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.Cre
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-Create-Vault", Error = "Bad-Input" },
+			Tags = { Action = "Invalid-Create-Vault-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -150,7 +150,7 @@ Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.Cre
 	if err then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-Create-Vault", Error = "Invalid-Create-Vault" },
+			Tags = { Action = "Invalid-Create-Vault-Notice", Error = "Invalid-Create-Vault" },
 			Data = tostring(err),
 		})
 	else
@@ -174,7 +174,7 @@ Handlers.add(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-Vaulted-Transfer", Error = "Bad-Input" },
+			Tags = { Action = "Invalid-Vaulted-Transfer-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -219,7 +219,7 @@ Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.Ext
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-Extend-Vault", Error = "Bad-Input" },
+			Tags = { Action = "Invalid-Extend-Vault-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -229,13 +229,13 @@ Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.Ext
 	if err then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-Extend-Vault", Error = "Invalid-Extend-Vault" },
+			Tags = { Action = "Invalid-Extend-Vault-Notice", Error = "Invalid-Extend-Vault" },
 			Data = tostring(err),
 		})
 	else
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Vault-Extended" },
+			Tags = { Action = "Vault-Extended-Notice" },
 			Data = tostring(json.encode(result)),
 		})
 	end
@@ -252,7 +252,7 @@ Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.I
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-Increase-Vault", Error = "Bad-Input" },
+			Tags = { Action = "Invalid-Increase-Vault-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -262,13 +262,13 @@ Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.I
 	if err then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-Increase-Vault", Error = "Invalid-Increase-Vault" },
+			Tags = { Action = "Invalid-Increase-Vault-Notice", Error = "Invalid-Increase-Vault" },
 			Data = tostring(err),
 		})
 	else
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Vault-Increased" },
+			Tags = { Action = "Vault-Increased-Notice" },
 			Data = tostring(json.encode(result)),
 		})
 	end
@@ -286,7 +286,7 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "ArNS-Invalid-Buy-Record-Notice", Error = "Bad-Input" },
+			Tags = { Action = "Invalid-Buy-Record-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -305,7 +305,7 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 		ao.send({
 			Target = msg.From,
 			Tags = {
-				Action = "ArNS-Invalid-Buy-Record-Notice",
+				Action = "Invalid-Buy-Record-Notice",
 				Error = "Invalid-Buy-Record",
 			},
 			Data = tostring(result),
@@ -314,7 +314,7 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 	else
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "ArNS-Purchase-Notice" },
+			Tags = { Action = "Buy-Record-Notice" },
 			Data = tostring(json.encode(result)),
 		})
 	end
@@ -331,7 +331,7 @@ Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.Ext
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-Extend-Lease", Error = "Bad-Input" },
+			Tags = { Action = "Invalid-Extend-Lease-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -341,13 +341,13 @@ Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.Ext
 	if not status then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-Extend-Lease", Error = "Invalid-Extend-Lease" },
+			Tags = { Action = "Invalid-Extend-Lease-Notice", Error = "Invalid-Extend-Lease" },
 			Data = tostring(result),
 		})
 	else
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Lease-Extended" },
+			Tags = { Action = "Extend-Lease-Notice" },
 			Data = tostring(json.encode(result)),
 		})
 	end
@@ -367,7 +367,7 @@ Handlers.add(
 		if not inputStatus then
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Invalid-Undername-Increase", Error = "Bad-Input" },
+				Tags = { Action = "Invalid-Increase-Undername-Limit-Notice", Error = "Bad-Input" },
 				Data = tostring(inputResult),
 			})
 			return
@@ -378,13 +378,13 @@ Handlers.add(
 		if not status then
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Invalid-Undername-Increase", Error = "Invalid-Undername-Increase" },
+				Tags = { Action = "Invalid-Increase-Undername-Limit-Notice", Error = "Invalid-Undername-Increase" },
 				Data = tostring(result),
 			})
 		else
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Undername-Quantity-Increased" },
+				Tags = { Action = "Increase-Undername-Limit-Notice" },
 				Data = tostring(json.encode(result)),
 			})
 		end
@@ -410,7 +410,7 @@ Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.Token
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-Token-Cost", Error = "Bad-Input" },
+			Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -427,13 +427,13 @@ Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.Token
 	if not status then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-Token-Cost", Error = "Invalid-Token-Cost" },
+			Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Invalid-Token-Cost" },
 			Data = tostring(result),
 		})
 	else
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Valid-Token-Cost", TokenCost = tostring(result) },
+			Tags = { Action = "Token-Cost-Notice", TokenCost = tostring(result) },
 			Data = tostring(json.encode(result)),
 		})
 	end
@@ -465,13 +465,13 @@ Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.Joi
 	if not status then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "GAR-Invalid-Network-Join", Error = "Invalid-Network-Join" },
+			Tags = { Action = "Invalid-Join-Network-Notice", Error = "Invalid-Join-Network" },
 			Data = tostring(result),
 		})
 	else
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "GAR-Joined-Network" },
+			Tags = { Action = "Join-Network-Notice" },
 			Data = tostring(json.encode(result)),
 		})
 	end
@@ -482,13 +482,13 @@ Handlers.add(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", ActionMap.Le
 	if not status then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "GAR-Invalid-Network-Leave", Error = "Invalid-Network-Leave" },
+			Tags = { Action = "Invalid-Leave-Network-Notice", Error = "Invalid-Leave-Network" },
 			Data = tostring(result),
 		})
 	else
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "GAR-Leaving-Network" },
+			Tags = { Action = "Leave-Network-Notice" },
 			Data = tostring(json.encode(result)),
 		})
 	end
@@ -507,7 +507,7 @@ Handlers.add(
 		if not inputStatus then
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "GAR-Invalid-Stake-Increase", Error = "Bad-Input" },
+				Tags = { Action = "Invalid-Increase-Operator-Stake-Notice", Error = "Bad-Input" },
 				Data = tostring(inputResult),
 			})
 			return
@@ -517,13 +517,13 @@ Handlers.add(
 		if err then
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "GAR-Invalid-Stake-Increase" },
+				Tags = { Action = "Invalid-Increase-Operator-Stake-Notice" },
 				Data = tostring(err),
 			})
 		else
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "GAR-Stake-Increased" },
+				Tags = { Action = "Increase-Operator-Stake-Notice" },
 				Data = tostring(json.encode(result)),
 			})
 		end
@@ -543,7 +543,7 @@ Handlers.add(
 		if not inputStatus then
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "GAR-Invalid-Stake-Decrease", Error = "Bad-Input" },
+				Tags = { Action = "Invalid-Decrease-Operator-Stake-Notice", Error = "Bad-Input" },
 				Data = tostring(inputResult),
 			})
 			return
@@ -553,13 +553,13 @@ Handlers.add(
 		if not status then
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "GAR-Invalid-Stake-Decrease", Error = "Invalid-Stake-Decrease" },
+				Tags = { Action = "Invalid-Decrease-Operator-Stake-Notice", Error = "Invalid-Stake-Decrease" },
 				Data = tostring(result),
 			})
 		else
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "GAR-Stake-Decreased" },
+				Tags = { Action = "Decrease-Operator-Stake-Notice" },
 				Data = tostring(json.encode(result)),
 			})
 		end
@@ -577,7 +577,7 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Error = "Bad-Input", Action = ActionMap.DelegateStake },
+			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Bad-Input",  },
 			Data = tostring(inputResult),
 		})
 		return
@@ -588,13 +588,13 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 	if not status then
 		ao.send({
 			Target = msg.From,
-			Tags = { Error = "GAR-Invalid-Delegate-Stake-Increase", Action = ActionMap.DelegateStake, Message = result },
+			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Invalid-Delegate-Stake", Message = result },
 			Data = tostring(json.encode(result)),
 		})
 	else
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "GAR-Delegate-Stake-Increased" },
+			Tags = { Action = "Delegate-Stake-Notice" },
 			Data = tostring(json.encode(result)),
 		})
 	end
@@ -614,7 +614,7 @@ Handlers.add(
 		if not inputStatus then
 			ao.send({
 				Target = msg.From,
-				Tags = { Error = "Bad-Input", Action = ActionMap.DecreaseDelegateStake },
+				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Bad-Input",  },
 				Data = tostring(inputResult),
 			})
 			return
@@ -631,13 +631,13 @@ Handlers.add(
 		if not status then
 			ao.send({
 				Target = msg.From,
-				Tags = { Error = "GAR-Invalid-Delegate-Stake-Decrease", Action = ActionMap.DecreaseDelegateStake },
+				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Invalid-Decrease-Delegate-Stake" },
 				Data = tostring(result),
 			})
 		else
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "GAR-Delegate-Stake-Decreased" },
+				Tags = { Action = "Decrease-Delegate-Stake-Notice" },
 				Data = json.encode(result),
 			})
 		end
@@ -652,7 +652,7 @@ Handlers.add(
 		if not gateway then
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "GAR-Invalid-Update-Gateway-Settings", Error = "Failed-Update-Gateway-Settings" },
+				Tags = { Action = "Invalid-Update-Gateway-Settings-Notice", Error = "Failed-Update-Gateway-Settings" },
 				Data = "Gateway not found",
 			})
 			return
@@ -679,13 +679,13 @@ Handlers.add(
 		if not status then
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "GAR-Invalid-Update-Gateway-Settings", Error = "Failed-Update-Gateway-Settings" },
+				Tags = { Action = "Invalid-Update-Gateway-Settings-Notice", Error = "Failed-Update-Gateway-Settings" },
 				Data = tostring(result),
 			})
 		else
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "GAR-Gateway-Settings-Updated" },
+				Tags = { Action = "Update-Gateway-Settings-Notice" },
 				Data = json.encode(result),
 			})
 		end
@@ -707,7 +707,7 @@ Handlers.add(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMa
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Error = "Invalid-Save-Observations", Action = ActionMap.SaveObservations },
+			Tags = { Action = "Invalid-Save-Observations-Notice", Error = "Invalid-Save-Observations" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -716,10 +716,10 @@ Handlers.add(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMa
 	local status, result = pcall(epochs.saveObservations, msg.From, reportTxId, failedGateways, msg.Timestamp)
 	if status then
 		-- TODO: add tags for successfull save observation
-		ao.send({ Target = msg.From, Data = json.encode(result) })
+		ao.send({ Target = msg.From, Action = "Save-Observations-Notice", Data = json.encode(result) })
 	else
 		-- TODO: add additional tags for error
-		ao.send({ Target = msg.From, Error = "Invalid-Saved-Observations", Data = json.encode(result) })
+		ao.send({ Target = msg.From, Action = "Invalid-Save-Observations-Notice", Error = "Invalid-Saved-Observations", Data = json.encode(result) })
 	end
 end)
 
@@ -753,7 +753,7 @@ Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
 		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height
 		local status, result = pcall(tickState, epochDistributionTimestamp, msg["Block-Height"], msg["Hash-Chain"])
 		if status then
-			ao.send({ Target = msg.From, Data = json.encode(result) })
+			ao.send({ Target = msg.From, Action = "Tick-Notice", Data = json.encode(result) })
 			LastTickedEpoch = i -- update the last ticked state
 		else
 			-- reset the state to previous state
@@ -763,7 +763,7 @@ Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
 			NameRegistry = previousState.NameRegistry
 			Epochs = previousState.Epochs
 			DemandFactor = previousState.DemandFactor
-			ao.send({ Target = msg.From, Data = json.encode(result) })
+			ao.send({ Target = msg.From, Action = "Invalid-Tick-Notice", Error = "Invalid-Tick", Data = json.encode(result) })
 		end
 	end
 end)
@@ -773,6 +773,7 @@ end)
 Handlers.add(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", ActionMap.Info), function(msg)
 	ao.send({
 		Target = msg.From,
+		Action = "Info-Notice",
 		Tags = { Name = Name, Ticker = Ticker, Logo = Logo, Denomination = tostring(Denomination) },
 	})
 end)
@@ -780,6 +781,7 @@ end)
 Handlers.add(ActionMap.State, Handlers.utils.hasMatchingTag("Action", ActionMap.State), function(msg)
 	ao.send({
 		Target = msg.From,
+		Action = "State-Notice",
 		Data = json.encode({
 			Name = Name,
 			Ticker = Ticker,
@@ -798,6 +800,7 @@ Handlers.add(ActionMap.Gateways, Handlers.utils.hasMatchingTag("Action", ActionM
 	local gateways = gar.getGateways()
 	ao.send({
 		Target = msg.From,
+		Action = "Gateways-Notice",
 		Data = json.encode(gateways),
 	})
 end)
@@ -806,6 +809,7 @@ Handlers.add(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", ActionMa
 	local gateway = gar.getGateway(msg.Tags.Address or msg.From)
 	ao.send({
 		Target = msg.From,
+		Action = "Gateway-Notice",
 		Data = json.encode(gateway),
 	})
 end)
@@ -813,6 +817,7 @@ end)
 Handlers.add(ActionMap.Balances, Handlers.utils.hasMatchingTag("Action", ActionMap.Balances), function(msg)
 	ao.send({
 		Target = msg.From,
+		Action = "Balances-Notice",
 		Data = json.encode(Balances),
 	})
 end)
@@ -823,6 +828,7 @@ Handlers.add(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMa
 	-- must adhere to token.lua spec for arconnect compatibility
 	ao.send({
 		Target = msg.From,
+		Action = "Balance-Notice",
 		Data = balance,
 		Balance = balance,
 		Ticker = Ticker,
@@ -833,9 +839,9 @@ Handlers.add(ActionMap.DemandFactor, utils.hasMatchingTag("Action", ActionMap.De
 	-- wrap in a protected call, and return the result or error accoringly to sender
 	local status, result = pcall(demand.getDemandFactor)
 	if status then
-		ao.send({ Target = msg.From, Data = tostring(result) })
+		ao.send({ Target = msg.From, Action = "Demand-Factor-Notice", Data = tostring(result) })
 	else
-		ao.send({ Target = msg.From, Data = json.encode(result) })
+		ao.send({ Target = msg.From, Action = "Invalid-Demand-Factor-Notice", Error = "Invalid-Demand-Factor", Data = json.encode(result) })
 	end
 end)
 
@@ -895,7 +901,7 @@ Handlers.add(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), f
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Error = "Bad-Input", Action = ActionMap.Epoch },
+			Tags = { Action = "Invalid-Epoch-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -904,12 +910,12 @@ Handlers.add(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), f
 	local epochIndex = tonumber(msg.Tags.EpochIndex)
 		or epochs.getEpochIndexForTimestamp(tonumber(msg.Tags.Timestamp or msg.Timestamp))
 	local epoch = epochs.getEpoch(epochIndex)
-	ao.send({ Target = msg.From, Data = json.encode(epoch) })
+	ao.send({ Target = msg.From, Action = "Epoch-Notice", Data = json.encode(epoch) })
 end)
 
 Handlers.add(ActionMap.Epochs, utils.hasMatchingTag("Action", ActionMap.Epochs), function(msg)
 	local epochs = epochs.getEpochs()
-	ao.send({ Target = msg.From, Data = json.encode(epochs) })
+	ao.send({ Target = msg.From, Action = "Epochs-Notice", Data = json.encode(epochs) })
 end)
 
 Handlers.add(ActionMap.PrescribedObservers, utils.hasMatchingTag("Action", ActionMap.PrescribedObservers), function(msg)
@@ -923,7 +929,7 @@ Handlers.add(ActionMap.PrescribedObservers, utils.hasMatchingTag("Action", Actio
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Error = "Bad-Input", Action = ActionMap.PrescribedObservers },
+			Tags = { Action = "Invalid-Prescribed-Observers-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -931,7 +937,7 @@ Handlers.add(ActionMap.PrescribedObservers, utils.hasMatchingTag("Action", Actio
 
 	local epochIndex = tonumber(msg.Tags.EpochIndex) or epochs.getEpochIndexFromTimestamp(tonumber(msg.Timestamp))
 	local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
-	ao.send({ Target = msg.From, Data = json.encode(prescribedObservers) })
+	ao.send({ Target = msg.From, Action = "Prescribed-Observers-Notice", Data = json.encode(prescribedObservers) })
 end)
 
 Handlers.add(ActionMap.Observations, utils.hasMatchingTag("Action", ActionMap.Observations), function(msg)
@@ -945,7 +951,7 @@ Handlers.add(ActionMap.Observations, utils.hasMatchingTag("Action", ActionMap.Ob
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Error = "Bad-Input", Action = ActionMap.Observations },
+			Tags = { Action = "Invalid-Observations-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -954,7 +960,7 @@ Handlers.add(ActionMap.Observations, utils.hasMatchingTag("Action", ActionMap.Ob
 	local epochIndex = tonumber(msg.Tags.EpochIndex)
 		or epochs.getEpochIndexFromTimestamp(tonumber(msg.Timestamp or msg.Tags.Timestamp))
 	local observations = epochs.getObservationsForEpoch(epochIndex)
-	ao.send({ Target = msg.From, Data = json.encode(observations) })
+	ao.send({ Target = msg.From, Action = "Observations-Notice", Data = json.encode(observations) })
 end)
 
 Handlers.add(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", ActionMap.PrescribedNames), function(msg)
@@ -968,7 +974,7 @@ Handlers.add(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", ActionMap
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Error = "Bad-Input", Action = ActionMap.PrescribedNames },
+			Tags = { Action = "Invalid-Prescribed-Names-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -977,7 +983,7 @@ Handlers.add(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", ActionMap
 	local epochIndex = tonumber(msg.Tags.EpochIndex)
 		or epochs.getEpochIndexForTimestamp(tonumber(msg.Timestamp or msg.Tags.Timestamp))
 	local prescribedNames = epochs.getPrescribedNamesForEpoch(epochIndex)
-	ao.send({ Target = msg.From, Data = json.encode(prescribedNames) })
+	ao.send({ Target = msg.From, Action = "Prescribed-Names-Notice", Data = json.encode(prescribedNames) })
 end)
 
 Handlers.add(ActionMap.Distributions, utils.hasMatchingTag("Action", ActionMap.Distributions), function(msg)
@@ -991,7 +997,7 @@ Handlers.add(ActionMap.Distributions, utils.hasMatchingTag("Action", ActionMap.D
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Error = "Bad-Input", Action = ActionMap.Distributions },
+			Tags = { Action = "Invalid-Distributions-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -1000,17 +1006,17 @@ Handlers.add(ActionMap.Distributions, utils.hasMatchingTag("Action", ActionMap.D
 	local epochIndex = tonumber(msg.Tags.EpochIndex)
 		or epochs.getEpochIndexFromTimestamp(tonumber(msg.Timestamp or msg.Tags.Timestamp))
 	local distributions = epochs.getDistributionsForEpoch(epochIndex)
-	ao.send({ Target = msg.From, Data = json.encode(distributions) })
+	ao.send({ Target = msg.From, Action = "Distributions-Notice", Data = json.encode(distributions) })
 end)
 
 Handlers.add(ActionMap.ReservedNames, utils.hasMatchingTag("Action", ActionMap.ReservedNames), function(msg)
 	local reservedNames = arns.getReservedNames()
-	ao.send({ Target = msg.From, Data = json.encode(reservedNames) })
+	ao.send({ Target = msg.From, Action = "Reserved-Names-Notice", Data = json.encode(reservedNames) })
 end)
 
 Handlers.add(ActionMap.ReservedName, utils.hasMatchingTag("Action", ActionMap.ReservedName), function(msg)
 	local reservedName = arns.getReservedName(msg.Tags.Name)
-	ao.send({ Target = msg.From, Data = json.encode(reservedName) })
+	ao.send({ Target = msg.From, Action = "Reserved-Name-Notice", Data = json.encode(reservedName) })
 end)
 
 -- END READ HANDLERS
