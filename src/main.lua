@@ -388,8 +388,8 @@ Handlers.add(
 			assert(type(msg.Tags.Name) == "string", "Invalid name")
 			assert(
 				tonumber(msg.Tags.Quantity) > 0
-					and tonumber(msg.tags.Quantity) < 9990
-					and utils.isInteger(msg.tags.Quantity),
+					and tonumber(msg.Tags.Quantity) < 9990
+					and utils.isInteger(msg.Tags.Quantity),
 				"Invalid quantity. Must be an integer value greater than 0 and less than 9990"
 			)
 		end
@@ -463,7 +463,7 @@ Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.Token
 		years = tonumber(msg.Tags.Years) or 1,
 		quantity = tonumber(msg.Tags.Quantity),
 		purchaseType = msg.Tags.PurchaseType or "lease",
-		currentTimestamp = msg.Timestamp,
+		currentTimestamp = tonumber(msg.Timestamp),
 	})
 	if not status then
 		ao.send({
@@ -891,12 +891,12 @@ Handlers.add(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Record),
 	}
 
 	-- Add forwarded tags to the credit and debit notice messages
-	for tagName, tagValue in pairs(msg) do
-		-- Tags beginning with "X-" are forwarded
-		if string.sub(tagName, 1, 2) == "X-" then
-			recordNotice[tagName] = tagValue
-		end
-	end
+	-- for tagName, tagValue in pairs(msg) do
+	-- 	-- Tags beginning with "X-" are forwarded
+	-- 	if string.sub(tagName, 1, 2) == "X-" then
+	-- 		recordNotice[tagName] = tagValue
+	-- 	end
+	-- end
 
 	-- Send Record-Notice
 	ao.send(recordNotice)
