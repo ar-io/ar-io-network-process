@@ -5,21 +5,7 @@ local balances = require("balances")
 local arns = require("arns")
 local epochs = {}
 
-Epochs = Epochs
-	or {
-		[0] = {
-			startTimestamp = 0,
-			endTimestamp = 0,
-			distributionTimestamp = 0,
-			startBlockHeight = 0,
-			observations = {
-				failureSummaries = {},
-				reports = {},
-			},
-			prescribedObservers = {},
-			distributions = {},
-		},
-	}
+Epochs = Epochs or {}
 
 local epochSettings = {
 	prescribedNameCount = 5,
