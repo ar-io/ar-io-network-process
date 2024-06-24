@@ -197,6 +197,8 @@ Handlers.add(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap
 	else
 		ao.send({
 			Target = msg.From,
+			Recipient = msg.Tags.Recipient,
+			Quantity = msg.Tags.Quantity,
 			Tags = { Action = "Debit-Notice" },
 			Data = tostring(json.encode(result)),
 		})
@@ -314,7 +316,7 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 	else
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Buy-Record-Notice" },
+			Tags = { Action = "Buy-Record-Notice", Name = msg.Tags.Name },
 			Data = tostring(json.encode(result)),
 		})
 	end
@@ -347,7 +349,7 @@ Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.Ext
 	else
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Extend-Lease-Notice" },
+			Tags = { Action = "Extend-Lease-Notice", Name = msg.Tags.Name },
 			Data = tostring(json.encode(result)),
 		})
 	end
@@ -384,7 +386,7 @@ Handlers.add(
 		else
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Increase-Undername-Limit-Notice" },
+				Tags = { Action = "Increase-Undername-Limit-Notice", Name = msg.Tags.Name },
 				Data = tostring(json.encode(result)),
 			})
 		end
@@ -594,7 +596,7 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 	else
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Delegate-Stake-Notice" },
+			Tags = { Action = "Delegate-Stake-Notice", Gateway = msg.Tags.Target },
 			Data = tostring(json.encode(result)),
 		})
 	end
@@ -637,7 +639,7 @@ Handlers.add(
 		else
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Decrease-Delegate-Stake-Notice" },
+				Tags = { Action = "Decrease-Delegate-Stake-Notice", Gateway = msg.Tags.Target },
 				Data = json.encode(result),
 			})
 		end
@@ -715,10 +717,8 @@ Handlers.add(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMa
 
 	local status, result = pcall(epochs.saveObservations, msg.From, reportTxId, failedGateways, msg.Timestamp)
 	if status then
-		-- TODO: add tags for successfull save observation
 		ao.send({ Target = msg.From, Action = "Save-Observations-Notice", Data = json.encode(result) })
 	else
-		-- TODO: add additional tags for error
 		ao.send({ Target = msg.From, Action = "Invalid-Save-Observations-Notice", Error = "Invalid-Saved-Observations", Data = json.encode(result) })
 	end
 end)
@@ -810,6 +810,7 @@ Handlers.add(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", ActionMa
 	ao.send({
 		Target = msg.From,
 		Action = "Gateway-Notice",
+		Gateway = msg.Tags.Address or msg.From,
 		Data = json.encode(gateway),
 	})
 end)
@@ -832,6 +833,7 @@ Handlers.add(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMa
 		Data = balance,
 		Balance = balance,
 		Ticker = Ticker,
+		Address = msg.Tags.Target or msg.Tags.Address or msg.From
 	})
 end)
 
@@ -960,7 +962,7 @@ Handlers.add(ActionMap.Observations, utils.hasMatchingTag("Action", ActionMap.Ob
 	local epochIndex = tonumber(msg.Tags.EpochIndex)
 		or epochs.getEpochIndexFromTimestamp(tonumber(msg.Timestamp or msg.Tags.Timestamp))
 	local observations = epochs.getObservationsForEpoch(epochIndex)
-	ao.send({ Target = msg.From, Action = "Observations-Notice", Data = json.encode(observations) })
+	ao.send({ Target = msg.From, Action = "Observations-Notice", EpochIndex = tostring(epochIndex), Data = json.encode(observations) })
 end)
 
 Handlers.add(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", ActionMap.PrescribedNames), function(msg)
@@ -1016,7 +1018,7 @@ end)
 
 Handlers.add(ActionMap.ReservedName, utils.hasMatchingTag("Action", ActionMap.ReservedName), function(msg)
 	local reservedName = arns.getReservedName(msg.Tags.Name)
-	ao.send({ Target = msg.From, Action = "Reserved-Name-Notice", Data = json.encode(reservedName) })
+	ao.send({ Target = msg.From, Action = "Reserved-Name-Notice", ReservedName = msg.Tags.Name, Data = json.encode(reservedName) })
 end)
 
 -- END READ HANDLERS
