@@ -9,20 +9,18 @@ local garSettings = {
 	observers = {
 		maxPerEpoch = 50,
 		tenureWeightDays = 180,
-		tenureWeightPeriod = 180 * 24 * 60 * 60 * 1000,
+		tenureWeightPeriod = 180 * 24 * 60 * 60 * 1000, -- aproximately 2 years
 		maxTenureWeight = 4,
 	},
 	operators = {
-		minStake = 10000 * 1000000, -- 10,000 IO
+		minStake = 50000 * 1000000, -- 50,000 IO
 		withdrawLengthMs = 30 * 24 * 60 * 60 * 1000, -- 30 days to lower operator stake
 		maxDelegates = 10000,
 		leaveLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days that balance will be vaulted
 	},
 	delegates = {
-		minStake = 50 * 1000000, -- 50 IO
+		minStake = 500 * 1000000, -- 500 IO
 		withdrawLengthMs = 30 * 24 * 60 * 60 * 1000, -- 30 days
-		minLockLengthMs = 24 * 60 * 60 * 1000, -- 1 day
-		maxLockLengthMs = 3 * 365 * 24 * 60 * 60 * 1000, -- 3 years
 	},
 }
 

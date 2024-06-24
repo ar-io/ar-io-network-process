@@ -6,7 +6,7 @@ local demand = {}
 DemandFactor = DemandFactor
 	or {
 		startTimestamp = 0, -- TODO: The timestamp at which the contract was initialized
-		currentPeriod = 0, -- TODO: the # of days since the last demand factor adjustment
+		currentPeriod = 0,
 		trailingPeriodPurchases = { 0, 0, 0, 0, 0, 0, 0 }, -- Acts as a ring buffer of trailing period purchase counts
 		trailingPeriodRevenues = { 0, 0, 0, 0, 0, 0 }, -- Acts as a ring buffer of trailing period revenues
 		purchasesThisPeriod = 0,
@@ -18,7 +18,7 @@ DemandFactor = DemandFactor
 
 local demandFactorSettings = {
 	movingAvgPeriodCount = 7,
-	periodLengthMs = 60 * 1000 * 24, -- one day
+	periodLengthMs = 60 * 60 * 1000 * 24, -- one day in milseconds
 	demandFactorBaseValue = 1,
 	demandFactorMin = 0.5,
 	demandFactorUpAdjustment = 0.05,

@@ -3,7 +3,6 @@ local crypto = require("crypto.init")
 local utils = require("utils")
 local balances = require("balances")
 local arns = require("arns")
-local json = require("json")
 local epochs = {}
 
 Epochs = Epochs
@@ -23,13 +22,12 @@ Epochs = Epochs
 	}
 
 local epochSettings = {
-	-- TODO: make these configurable
 	prescribedNameCount = 5,
-	rewardPercentage = 0.0025, -- 0.25%
+	rewardPercentage = 0.0005, -- 0.05%
 	maxObservers = 50,
-	epochZeroStartTimestamp = 0,
+	epochZeroStartTimestamp = 1719900000000, -- July 2nd, 00:00:00 UTC
 	durationMs = 60 * 1000 * 60 * 24, -- 24 hours
-	distributionDelayMs = 60 * 1000 * 2 * 15, -- 15 blocks / 30 minutes
+	distributionDelayMs = 60 * 1000 * 30, -- 15 blocks / 30 minutes
 }
 
 function epochs.getEpochs()
