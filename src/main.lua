@@ -891,12 +891,12 @@ Handlers.add(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Record),
 	}
 
 	-- Add forwarded tags to the credit and debit notice messages
-	-- for tagName, tagValue in pairs(msg) do
-	-- 	-- Tags beginning with "X-" are forwarded
-	-- 	if string.sub(tagName, 1, 2) == "X-" then
-	-- 		recordNotice[tagName] = tagValue
-	-- 	end
-	-- end
+	for tagName, tagValue in pairs(msg) do
+		-- Tags beginning with "X-" are forwarded
+		if string.sub(tagName, 1, 2) == "X-" then
+			recordNotice[tagName] = tagValue
+		end
+	end
 
 	-- Send Record-Notice
 	ao.send(recordNotice)
