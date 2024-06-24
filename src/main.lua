@@ -136,7 +136,7 @@ end)
 Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.CreateVault), function(msg)
 	local function checkAssertions()
 		assert(
-			tonumber(msg.Tags.LockLength) > 0 and utils.isInteger(tonumber(msg.Tags.LockLength)),
+			tonumber(msg.Tags["Lock-Length"]) > 0 and utils.isInteger(tonumber(msg.Tags.LockLength)),
 			"Invalid lock length. Must be integer greater than 0"
 		)
 		assert(
@@ -156,7 +156,8 @@ Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.Cre
 		return
 	end
 
-	local result, err = balances.createVault(msg.From, msg.Tags.Quantity, msg.Tags.LockLength, msg.Timestamp, msg.Id)
+	local result, err =
+		balances.createVault(msg.From, msg.Tags.Quantity, tonumber(msg.Tags["Lock-Length"]), msg.Timestamp, msg.Id)
 	if err then
 		ao.send({
 			Target = msg.From,
@@ -176,7 +177,7 @@ Handlers.add(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap
 	local function checkAssertions()
 		assert(utils.isValidArweaveAddress(msg.Tags.Recipient), "Invalid recipient")
 		assert(
-			tonumber(msg.Tags.LockLength) > 0 and utils.isInteger(tonumber(msg.Tags.LockLength)),
+			tonumber(msg.Tags["Lock-Length"]) > 0 and utils.isInteger(tonumber(msg.Tags["Lock-Length"])),
 			"Invalid lock length. Must be integer greater than 0"
 		)
 		assert(
@@ -199,8 +200,8 @@ Handlers.add(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap
 	local result, err = balances.vaultedTransfer(
 		msg.From,
 		msg.Tags.Recipient,
-		msg.Tags.Quantity,
-		msg.Tags.LockLength,
+		tonumber(msg.Tags.Quantity),
+		tonumber(msg.Tags.LockLength),
 		msg.Timestamp,
 		msg.Id
 	)
@@ -262,7 +263,7 @@ end)
 
 Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.IncreaseVault), function(msg)
 	local function checkAssertions()
-		assert(utils.isValidArweaveAddress(msg.Tags.VaultId), "Invalid vault id")
+		assert(utils.isValidArweaveAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
 		assert(
 			tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
 			"Invalid quantity. Must be integer greater than 0"
@@ -280,7 +281,7 @@ Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.I
 		return
 	end
 
-	local result, err = balances.increaseVault(msg.From, msg.Tags.Quantity, msg.Tags.VaultId, msg.Timestamp)
+	local result, err = balances.increaseVault(msg.From, msg.Tags.Quantity, msg.Tags["Vault-Id"], msg.Timestamp)
 	if err then
 		ao.send({
 			Target = msg.From,
@@ -299,7 +300,8 @@ end)
 Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRecord), function(msg)
 	local checkAssertions = function()
 		assert(type(msg.Tags.Name) == "string", "Invalid name")
-		assert(type(msg.Tags.PurchaseType) == "string", "Invalid purchase type")
+		assert(type(msg.Tags["Purchase-Type"]) == "string", "Invalid purchase type")
+		assert(utils.isValidArweaveAddress(msg.Tags["Process-Id"]), "Invalid process id")
 		assert(
 			tonumber(msg.Tags.Years) > 0 and tonumber(msg.Tags.Years) < 5 and utils.isInteger(tonumber(msg.Tags.Years)),
 			"Invalid years. Must be integer between 1 and 5"
@@ -320,11 +322,11 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 	local status, result = pcall(
 		arns.buyRecord,
 		msg.Tags.Name,
-		msg.Tags.PurchaseType,
+		msg.Tags["Purchase-Type"],
 		tonumber(msg.Tags.Years),
 		msg.From,
 		msg.Timestamp,
-		msg.Tags.ProcessId
+		msg.Tags["Process-Id"]
 	)
 	if not status then
 		ao.send({
@@ -463,7 +465,7 @@ Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.Token
 		name = msg.Tags.Name,
 		years = tonumber(msg.Tags.Years) or 1,
 		quantity = tonumber(msg.Tags.Quantity),
-		purchaseType = msg.Tags.PurchaseType or "lease",
+		purchaseType = msg.Tags["Purchase-Type"] or "lease",
 		currentTimestamp = tonumber(msg.Timestamp),
 	})
 	if not status then
@@ -488,18 +490,18 @@ Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.Joi
 		fqdn = msg.Tags.FQDN,
 		port = tonumber(msg.Tags.Port) or 443,
 		protocol = msg.Tags.Protocol or "https",
-		allowDelegatedStaking = msg.Tags.AllowDelegatedStaking == "true",
-		minDelegatedStake = tonumber(msg.Tags.MinDelegatedStake),
-		delegateRewardShareRatio = tonumber(msg.Tags.DelegateRewardShareRatio) or 0,
+		allowDelegatedStaking = msg.Tags["Allow-Delegated-Staking"] == "true",
+		minDelegatedStake = tonumber(msg.Tags["Min-Delegated-Stake"]),
+		delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"]) or 0,
 		properties = msg.Tags.Properties or "FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44",
-		autoStake = msg.Tags.AutoStake == "true",
+		autoStake = msg.Tags["Auto-Stake"] == "true",
 	}
-	local observerAddress = msg.Tags.ObserverAddress or msg.Tags.From
+	local observerAddress = msg.Tags["Observer-Address"] or msg.Tags.From
 
 	local status, result = pcall(
 		gar.joinNetwork,
 		msg.From,
-		tonumber(msg.Tags.OperatorStake),
+		tonumber(msg.Tags["Operator-Stake"]),
 		updatedSettings,
 		observerAddress,
 		msg.Timestamp
@@ -542,6 +544,10 @@ Handlers.add(
 	function(msg)
 		local checkAssertions = function()
 			assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
+			assert(
+				utils.isInteger(tonumber(msg.Tags.Quantity) and tonumber(msg.Tags.Quantity) > 0),
+				"Invalid quantity. Must be integer greater than 0"
+			)
 		end
 
 		local inputStatus, inputResult = pcall(checkAssertions)
@@ -577,7 +583,10 @@ Handlers.add(
 	utils.hasMatchingTag("Action", ActionMap.DecreaseOperatorStake),
 	function(msg)
 		local checkAssertions = function()
-			assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
+			assert(
+				utils.isInteger(tonumber(msg.Tags.Quantity) and tonumber(msg.Tags.Quantity) > 0),
+				"Invalid quantity. Must be integer greater than 0"
+			)
 		end
 
 		local inputStatus, inputResult = pcall(checkAssertions)
@@ -630,7 +639,11 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 	if not status then
 		ao.send({
 			Target = msg.From,
-			Tags = { Error = "GAR-Invalid-Delegate-Stake-Increase", Action = ActionMap.DelegateStake, Message = result },
+			Tags = {
+				Error = "GAR-Invalid-Delegate-Stake-Increase",
+				Action = ActionMap.DelegateStake,
+				Message = result,
+			},
 			Data = tostring(json.encode(result)),
 		})
 	else
@@ -707,15 +720,15 @@ Handlers.add(
 			fqdn = msg.Tags.FQDN or gateway.settings.fqdn,
 			port = tonumber(msg.Tags.Port) or gateway.settings.port,
 			protocol = msg.Tags.Protocol or gateway.settings.protocol,
-			allowDelegatedStaking = not msg.Tags.AllowDelegatedStaking and gateway.settings.allowDelegatedStaking
-				or msg.Tags.AllowDelegatedStaking == "true",
-			minDelegatedStake = tonumber(msg.Tags.MinDelegatedStake) or gateway.settings.minDelegatedStake,
-			delegateRewardShareRatio = tonumber(msg.Tags.DelegateRewardShareRatio)
+			allowDelegatedStaking = not msg.Tags["Allow-Delegated-Staking"] and gateway.settings.allowDelegatedStaking
+				or msg.Tags["Allow-Delegated-Staking"] == "true",
+			minDelegatedStake = tonumber(msg.Tags["Min-Delegated-Stake"]) or gateway.settings.minDelegatedStake,
+			delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"])
 				or gateway.settings.delegateRewardShareRatio,
 			properties = msg.Tags.Properties or gateway.settings.properties,
-			autoStake = msg.Tags.AutoStake == "true" or gateway.settings.autoStake,
+			autoStake = msg.Tags["Auto-Stkae"] == "true" or gateway.settings.autoStake,
 		}
-		local observerAddress = msg.Tags.ObserverAddress or gateway.observerAddress
+		local observerAddress = msg.Tags["Observer-Address"] or gateway.observerAddress
 		local status, result =
 			pcall(gar.updateGatewaySettings, msg.From, updatedSettings, observerAddress, msg.Timestamp, msg.Id)
 		if not status then
@@ -735,8 +748,8 @@ Handlers.add(
 )
 
 Handlers.add(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
-	local reportTxId = msg.Tags.ReportTxId
-	local failedGateways = utils.splitString(msg.Tags.FailedGateways, ",")
+	local reportTxId = msg.Tags["Report-Tx-Id"]
+	local failedGateways = utils.splitString(msg.Tags["Failed-Gateways"], ",")
 	local checkAssertions = function()
 		assert(utils.isValidArweaveAddress(reportTxId), "Invalid report tx id")
 		for _, gateway in ipairs(failedGateways) do
