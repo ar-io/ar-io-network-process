@@ -1,14 +1,19 @@
 -- Adjust package.path to include the current directory
 local process = { _version = "0.0.1" }
+local constants = require("constants")
 
-Name = "Devnet IO"
-Ticker = "dIO"
+Name = Name or "Testnet IO"
+Ticker = Ticker or "tIO"
 Logo = "Sie_26dvgyok0PZD_-iQAFOhOd5YxDTkczOLoqTTL_A"
 Denomination = 6
 DemandFactor = DemandFactor or {}
+Owner = Owner or ao.env.Process.Owner
 Balances = Balances or {}
-if Balances[ao.id] == nil and #Balances == 0 then -- initialize the balance for the process id
-	Balances[ao.id] = 1000000000 * 1000000
+if #Balances == 0 then -- initialize the balance for the process id
+	Balances = {
+		[ao.id] = math.floor(50000000 * 1000000), -- 50M IO
+		[Owner] = math.floor(constants.totalTokenSupply - (50000000 * 1000000)), -- 950M IO
+	}
 end
 Vaults = Vaults or {}
 GatewayRegistry = GatewayRegistry or {}
@@ -1110,6 +1115,9 @@ Handlers.add("addGateway", utils.hasMatchingTag("Action", "AddGateway"), functio
 		return
 	end
 	local status, result = pcall(gar.addGateway, msg.Tags.Address, json.decode(msg.Data))
+	-- TODO: deduct balance from owner when adding a gateway
+	-- reduce the owner balance when a gateway is added
+	balances.reduceBalance(Owner, 50000000000)
 	if status then
 		ao.send({ Target = msg.From, Data = json.encode(result) })
 	else

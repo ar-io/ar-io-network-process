@@ -6,6 +6,7 @@ constants.DEADLINE_DURATION_MS = 60 * 60 * 1000 -- One hour of miliseconds
 constants.oneYearSeconds = 60 * 60 * 24 * 365
 constants.thirtyDaysSeconds = 60 * 60 * 24 * 30
 constants.defaultundernameLimit = 10
+constants.totalTokenSupply = 1000000000 * 1000000 -- 1 billion tokens
 
 -- ARNS
 constants.DEFAULT_UNDERNAME_COUNT = 10
