@@ -485,14 +485,25 @@ function gar.assertValidGatewayParameters(from, stake, settings, observerAddress
 	assert(type(settings) == "table", "settings is required and must be a table!")
 	assert(type(observerAddress) == "string", "observerAddress is required and must be a string!")
 	assert(type(settings.allowDelegatedStaking) == "boolean", "allowDelegatedStaking must be a boolean")
-	assert(type(settings.minDelegatedStake) == "number", "minDelegatedStake must be a number")
 	assert(type(settings.label) == "string", "label is required and must be a string")
 	assert(type(settings.fqdn) == "string", "fqdn is required and must be a string")
 	assert(type(settings.protocol) == "string", "protocol is required and must be a string")
-	assert(type(settings.port) == "number", "port is required and must be a number")
+	assert(
+		type(settings.port) == "number"
+			and utils.isInteger(settings.port)
+			and settings.port >= 0
+			and settings.port <= 65535,
+		"port is required and must be an integer between 0 and 65535"
+	)
 	assert(type(settings.properties) == "string", "properties is required and must be a string")
 	if settings.delegateRewardShareRatio ~= nil then
-		assert(type(settings.delegateRewardShareRatio) == "number", "delegateRewardShareRatio must be a number")
+		assert(
+			type(settings.delegateRewardShareRatio) == "number"
+				and utils.isInteger(settings.delegateRewardShareRatio)
+				and settings.delegateRewardShareRatio >= 0
+				and settings.delegateRewardShareRatio <= 100,
+			"delegateRewardShareRatio must be an integer between 0 and 100"
+		)
 	end
 	if settings.autoStake ~= nil then
 		assert(type(settings.autoStake) == "boolean", "autoStake must be a boolean")
@@ -501,7 +512,10 @@ function gar.assertValidGatewayParameters(from, stake, settings, observerAddress
 		assert(type(settings.properties) == "string", "properties must be a table")
 	end
 	if settings.minDelegatedStake ~= nil then
-		assert(type(settings.minDelegatedStake) == "number", "minDelegatedStake must be a number")
+		assert(
+			type(settings.minDelegatedStake) == "number" and utils.isInteger(settings.minDelegatedStake),
+			"minDelegatedStake must be an integer and "
+		)
 	end
 end
 

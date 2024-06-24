@@ -6,7 +6,7 @@ const {
   DEFAULT_HANDLE_OPTIONS,
 } = require('../tools/constants');
 
-describe('aos ARNS', async () => {
+describe('ArNS', async () => {
   const { handle: originalHandle, memory: startMemory } =
     await createAntAosLoader();
 
@@ -25,7 +25,7 @@ describe('aos ARNS', async () => {
     const buyUndernameResult = await handle({
       Tags: [
         { name: 'Action', value: 'BuyRecord' },
-        { name: 'Name', value: 'timmy' },
+        { name: 'Name', value: 'test-name' },
         { name: 'PurchaseType', value: 'lease' },
         { name: 'Years', value: '1' },
         { name: 'ProcessId', value: ''.padEnd(43, 'a') },
@@ -35,22 +35,112 @@ describe('aos ARNS', async () => {
       {
         Tags: [
           { name: 'Action', value: 'IncreaseUndernameLimit' },
-          { name: 'Name', value: 'timmy' },
+          { name: 'Name', value: 'test-name' },
           { name: 'Quantity', value: '1' },
         ],
       },
       buyUndernameResult.Memory,
     );
-
-    const recordsResult = await handle(
+    const result = await handle(
       {
-        Tags: [{ name: 'Action', value: 'Records' }],
+        Tags: [
+          { name: 'Action', value: 'Record' },
+          { name: 'Name', value: 'test-name' },
+        ],
       },
       increaseUndernameResult.Memory,
     );
-    const arnsRecords = JSON.parse(recordsResult.Messages[0].Data);
-    assert.equal(Object.keys(arnsRecords).includes('timmy'), true);
-    //console.dir(recordResult, { depth: null });
-    assert.equal(arnsRecords['timmy'].undernameLimit, 11);
+    const record = JSON.parse(result.Messages[0].Data);
+    assert.equal(record.undernameLimit, 11);
   });
+
+  //Reference: https://ardriveio.sharepoint.com/:x:/s/AR.IOLaunch/Ec3L8aX0wuZOlG7yRtlQoJgB39wCOoKu02PE_Y4iBMyu7Q?e=ZG750l
+  it('should get the costs buy record correctly', async () => {
+    const result = await handle({
+      Tags: [
+        { name: 'Action', value: 'TokenCost' },
+        { name: 'Intent', value: 'BuyRecord' },
+        { name: 'Name', value: 'test-name' },
+        { name: 'PurchaseType', value: 'lease' },
+        { name: 'Years', value: '1' },
+        { name: 'ProcessId', value: ''.padEnd(43, 'a') },
+      ],
+    });
+    const tokenCost = JSON.parse(result.Messages[0].Data);
+    assert.equal(tokenCost, 600000000);
+  });
+
+  it('should get the costs increase undername correctly', async () => {
+    const buyUndernameResult = await handle({
+      Tags: [
+        { name: 'Action', value: 'BuyRecord' },
+        { name: 'Name', value: 'test-name' },
+        { name: 'PurchaseType', value: 'lease' },
+        { name: 'Years', value: '1' },
+        { name: 'ProcessId', value: ''.padEnd(43, 'a') },
+      ],
+    });
+    const result = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'TokenCost' },
+          { name: 'Intent', value: 'IncreaseUndernameLimit' },
+          { name: 'Name', value: 'test-name' },
+          { name: 'Quantity', value: '1' },
+        ],
+      },
+      buyUndernameResult.Memory,
+    );
+    const tokenCost = JSON.parse(result.Messages[0].Data);
+    const expectedPrice = 500000000 * 0.001 * 1 * 1;
+    assert.equal(tokenCost, expectedPrice);
+  });
+
+  it('should get the cost of increasing a lease correctly', async () => {
+    const buyUndernameResult = await handle({
+      Tags: [
+        { name: 'Action', value: 'BuyRecord' },
+        { name: 'Name', value: 'test-name' },
+        { name: 'PurchaseType', value: 'lease' },
+        { name: 'Years', value: '1' },
+        { name: 'ProcessId', value: ''.padEnd(43, 'a') },
+      ],
+    });
+    const recordResultBefore = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Record' },
+          { name: 'Name', value: 'test-name' },
+        ],
+      },
+      buyUndernameResult.Memory,
+    );
+    const recordBefore = JSON.parse(recordResultBefore.Messages[0].Data);
+    const extendResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'ExtendLease' },
+          { name: 'Name', value: 'test-name' },
+          { name: 'Years', value: '1' },
+        ],
+      },
+      buyUndernameResult.Memory,
+    );
+    const recordResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Record' },
+          { name: 'Name', value: 'test-name' },
+        ],
+      },
+      extendResult.Memory,
+    );
+    const record = JSON.parse(recordResult.Messages[0].Data);
+    assert.equal(
+      record.endTimestamp,
+      recordBefore.endTimestamp + 60 * 1000 * 60 * 24 * 365,
+    );
+  });
+
+  // TODO: add several error scenarios
 });

@@ -237,6 +237,8 @@ function arns.calculateUndernameCost(baseFee, increaseQty, registrationType, yea
 		undernamePercentageFee = constants.UNDERNAME_LEASE_FEE_PERCENTAGE
 	elseif registrationType == "permabuy" then
 		undernamePercentageFee = constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE
+	else
+		error("Invalid registration type")
 	end
 
 	local totalFeeForQtyAndYears = baseFee * undernamePercentageFee * increaseQty * years
@@ -340,7 +342,6 @@ function arns.getTokenCost(intendedAction)
 		if not record then
 			error("Name is not registered")
 		end
-		local qty = intendedAction.quantity
 		local yearsRemaining = constants.PERMABUY_LEASE_FEE_LENGTH
 		if record.type == "lease" then
 			yearsRemaining = arns.calculateYearsBetweenTimestamps(currentTimestamp, record.endTimestamp)

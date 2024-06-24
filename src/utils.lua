@@ -21,6 +21,13 @@ function utils.isValidBase64Url(url)
 	return url
 end
 
+function utils.isInteger(value)
+	if type(value) == "string" then
+		value = tonumber(value)
+	end
+	return value % 1 == 0
+end
+
 function utils.isValidArweaveAddress(address)
 	local isValidArweaveAddress = #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
 
