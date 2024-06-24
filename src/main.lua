@@ -41,7 +41,6 @@ local ActionMap = {
 	PrescribedNames = "Epoch-Prescribed-Names",
 	Observations = "Epoch-Observations",
 	Distributions = "Epoch-Distributions",
-	-- hypenated for all of these
 	-- NAME REGISTRY READ APIS
 	Record = "Record",
 	Records = "Records",
@@ -136,7 +135,7 @@ end)
 Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.CreateVault), function(msg)
 	local function checkAssertions()
 		assert(
-			tonumber(msg.Tags["Lock-Length"]) > 0 and utils.isInteger(tonumber(msg.Tags.LockLength)),
+			tonumber(msg.Tags["Lock-Length"]) > 0 and utils.isInteger(tonumber(msg.Tags["Lock-Length"])),
 			"Invalid lock length. Must be integer greater than 0"
 		)
 		assert(
@@ -201,7 +200,7 @@ Handlers.add(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap
 		msg.From,
 		msg.Tags.Recipient,
 		tonumber(msg.Tags.Quantity),
-		tonumber(msg.Tags.LockLength),
+		tonumber(msg.Tags["Lock-Length"]),
 		msg.Timestamp,
 		msg.Id
 	)
@@ -622,7 +621,10 @@ Handlers.add(
 Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.DelegateStake), function(msg)
 	local checkAssertions = function()
 		assert(utils.isValidArweaveAddress(msg.Tags.Target), "Invalid target address")
-		assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
+		assert(
+			tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+			"Invalid quantity. Must be integer greater than 0"
+		)
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -630,7 +632,7 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Bad-Input",  },
+			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -659,7 +661,10 @@ Handlers.add(
 	function(msg)
 		local checkAssertions = function()
 			assert(utils.isValidArweaveAddress(msg.Tags.Target), "Invalid target address")
-			assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
+			assert(
+				tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+				"Invalid quantity. Must be integer greater than 0"
+			)
 		end
 
 		local inputStatus, inputResult = pcall(checkAssertions)
@@ -667,7 +672,7 @@ Handlers.add(
 		if not inputStatus then
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Bad-Input",  },
+				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Bad-Input" },
 				Data = tostring(inputResult),
 			})
 			return
@@ -770,7 +775,12 @@ Handlers.add(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMa
 	if status then
 		ao.send({ Target = msg.From, Action = "Save-Observations-Notice", Data = json.encode(result) })
 	else
-		ao.send({ Target = msg.From, Action = "Invalid-Save-Observations-Notice", Error = "Invalid-Saved-Observations", Data = json.encode(result) })
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-Save-Observations-Notice",
+			Error = "Invalid-Saved-Observations",
+			Data = json.encode(result),
+		})
 	end
 end)
 
@@ -814,7 +824,12 @@ Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
 			NameRegistry = previousState.NameRegistry
 			Epochs = previousState.Epochs
 			DemandFactor = previousState.DemandFactor
-			ao.send({ Target = msg.From, Action = "Invalid-Tick-Notice", Error = "Invalid-Tick", Data = json.encode(result) })
+			ao.send({
+				Target = msg.From,
+				Action = "Invalid-Tick-Notice",
+				Error = "Invalid-Tick",
+				Data = json.encode(result),
+			})
 		end
 	end
 end)
@@ -884,7 +899,7 @@ Handlers.add(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMa
 		Data = balance,
 		Balance = balance,
 		Ticker = Ticker,
-		Address = msg.Tags.Target or msg.Tags.Address or msg.From
+		Address = msg.Tags.Target or msg.Tags.Address or msg.From,
 	})
 end)
 
@@ -894,7 +909,12 @@ Handlers.add(ActionMap.DemandFactor, utils.hasMatchingTag("Action", ActionMap.De
 	if status then
 		ao.send({ Target = msg.From, Action = "Demand-Factor-Notice", Data = tostring(result) })
 	else
-		ao.send({ Target = msg.From, Action = "Invalid-Demand-Factor-Notice", Error = "Invalid-Demand-Factor", Data = json.encode(result) })
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-Demand-Factor-Notice",
+			Error = "Invalid-Demand-Factor",
+			Data = json.encode(result),
+		})
 	end
 end)
 
@@ -945,7 +965,7 @@ end)
 Handlers.add(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local checkAssertions = function()
-		assert(msg.Tags.EpochIndex or msg.Tags.Timestamp or msg.Timestamp, "Epoch index or timestamp is required")
+		assert(msg.Tags["Epoch-Index"] or msg.Tags.Timestamp or msg.Timestamp, "Epoch index or timestamp is required")
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -959,7 +979,7 @@ Handlers.add(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), f
 		return
 	end
 
-	local epochIndex = tonumber(msg.Tags.EpochIndex)
+	local epochIndex = tonumber(msg.Tags["Epoch-Index"])
 		or epochs.getEpochIndexForTimestamp(tonumber(msg.Tags.Timestamp or msg.Timestamp))
 	local epoch = epochs.getEpoch(epochIndex)
 	ao.send({ Target = msg.From, Action = "Epoch-Notice", Data = json.encode(epoch) })
@@ -973,7 +993,7 @@ end)
 Handlers.add(ActionMap.PrescribedObservers, utils.hasMatchingTag("Action", ActionMap.PrescribedObservers), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local checkAssertions = function()
-		assert(msg.Tags.EpochIndex or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
+		assert(msg.Tags["Epoch-Index"] or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -987,7 +1007,7 @@ Handlers.add(ActionMap.PrescribedObservers, utils.hasMatchingTag("Action", Actio
 		return
 	end
 
-	local epochIndex = tonumber(msg.Tags.EpochIndex) or epochs.getEpochIndexFromTimestamp(tonumber(msg.Timestamp))
+	local epochIndex = tonumber(msg.Tags["Epoch-Index"]) or epochs.getEpochIndexFromTimestamp(tonumber(msg.Timestamp))
 	local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
 	ao.send({ Target = msg.From, Action = "Prescribed-Observers-Notice", Data = json.encode(prescribedObservers) })
 end)
@@ -995,7 +1015,7 @@ end)
 Handlers.add(ActionMap.Observations, utils.hasMatchingTag("Action", ActionMap.Observations), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local checkAssertions = function()
-		assert(msg.Tags.EpochIndex or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
+		assert(msg.Tags["Epoch-Index"] or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -1009,16 +1029,21 @@ Handlers.add(ActionMap.Observations, utils.hasMatchingTag("Action", ActionMap.Ob
 		return
 	end
 
-	local epochIndex = tonumber(msg.Tags.EpochIndex)
+	local epochIndex = tonumber(msg.Tags["Epoch-Index"])
 		or epochs.getEpochIndexFromTimestamp(tonumber(msg.Timestamp or msg.Tags.Timestamp))
 	local observations = epochs.getObservationsForEpoch(epochIndex)
-	ao.send({ Target = msg.From, Action = "Observations-Notice", EpochIndex = tostring(epochIndex), Data = json.encode(observations) })
+	ao.send({
+		Target = msg.From,
+		Action = "Observations-Notice",
+		EpochIndex = tostring(epochIndex),
+		Data = json.encode(observations),
+	})
 end)
 
 Handlers.add(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", ActionMap.PrescribedNames), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local checkAssertions = function()
-		assert(msg.Tags.EpochIndex or msg.Tags.Timestamp or msg.Timestamp, "Epoch index or timestamp is required")
+		assert(msg.Tags["Epoch-Index"] or msg.Tags.Timestamp or msg.Timestamp, "Epoch index or timestamp is required")
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -1032,7 +1057,7 @@ Handlers.add(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", ActionMap
 		return
 	end
 
-	local epochIndex = tonumber(msg.Tags.EpochIndex)
+	local epochIndex = tonumber(msg.Tags["Epoch-Index"])
 		or epochs.getEpochIndexForTimestamp(tonumber(msg.Timestamp or msg.Tags.Timestamp))
 	local prescribedNames = epochs.getPrescribedNamesForEpoch(epochIndex)
 	ao.send({ Target = msg.From, Action = "Prescribed-Names-Notice", Data = json.encode(prescribedNames) })
@@ -1041,7 +1066,7 @@ end)
 Handlers.add(ActionMap.Distributions, utils.hasMatchingTag("Action", ActionMap.Distributions), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local checkAssertions = function()
-		assert(msg.Tags.EpochIndex or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
+		assert(msg.Tags["Epoch-Index"] or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -1055,7 +1080,7 @@ Handlers.add(ActionMap.Distributions, utils.hasMatchingTag("Action", ActionMap.D
 		return
 	end
 
-	local epochIndex = tonumber(msg.Tags.EpochIndex)
+	local epochIndex = tonumber(msg.Tags["Epoch-Index"])
 		or epochs.getEpochIndexFromTimestamp(tonumber(msg.Timestamp or msg.Tags.Timestamp))
 	local distributions = epochs.getDistributionsForEpoch(epochIndex)
 	ao.send({ Target = msg.From, Action = "Distributions-Notice", Data = json.encode(distributions) })
@@ -1068,7 +1093,12 @@ end)
 
 Handlers.add(ActionMap.ReservedName, utils.hasMatchingTag("Action", ActionMap.ReservedName), function(msg)
 	local reservedName = arns.getReservedName(msg.Tags.Name)
-	ao.send({ Target = msg.From, Action = "Reserved-Name-Notice", ReservedName = msg.Tags.Name, Data = json.encode(reservedName) })
+	ao.send({
+		Target = msg.From,
+		Action = "Reserved-Name-Notice",
+		ReservedName = msg.Tags.Name,
+		Data = json.encode(reservedName),
+	})
 end)
 
 -- END READ HANDLERS
