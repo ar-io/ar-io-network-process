@@ -152,7 +152,8 @@ describe("gar", function()
 				},
 			}
 
-			local status, result = pcall(gar.leaveNetwork, "test-this-is-valid-arweave-wallet-address-1", startTimestamp, "msgId")
+			local status, result =
+				pcall(gar.leaveNetwork, "test-this-is-valid-arweave-wallet-address-1", startTimestamp, "msgId")
 			assert.is_true(status)
 			assert.are.same(result, {
 				operatorStake = 0,
@@ -266,8 +267,13 @@ describe("gar", function()
 				status = "joined",
 				observerAddress = "observerAddress",
 			}
-			local status, result =
-				pcall(gar.decreaseOperatorStake, "test-this-is-valid-arweave-wallet-address-1", 1000, startTimestamp, "msgId")
+			local status, result = pcall(
+				gar.decreaseOperatorStake,
+				"test-this-is-valid-arweave-wallet-address-1",
+				1000,
+				startTimestamp,
+				"msgId"
+			)
 			assert.is_true(status)
 			assert.are.same(result, {
 				operatorStake = gar.getSettings().operators.minStake,

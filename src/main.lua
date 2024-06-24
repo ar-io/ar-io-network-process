@@ -73,7 +73,10 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 	-- assert recipient is a valid arweave address
 	local function checkAssertions()
 		assert(utils.isValidArweaveAddress(msg.Tags.Recipient), "Invalid recipient")
-		assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
+		assert(
+			tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+			"Invalid quantity. Must be integer greater than 0"
+		)
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -99,26 +102,26 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 			-- Debit-Notice message template, that is sent to the Sender of the transfer
 			local debitNotice = {
 				Target = msg.From,
-				Action = 'Debit-Notice',
+				Action = "Debit-Notice",
 				Recipient = msg.Recipient,
 				Quantity = msg.Quantity,
-				Data = "You transferred " .. msg.Quantity .. " to " .. msg.Recipient
+				Data = "You transferred " .. msg.Quantity .. " to " .. msg.Recipient,
 			}
 			-- Credit-Notice message template, that is sent to the Recipient of the transfer
 			local creditNotice = {
 				Target = msg.Recipient,
-				Action = 'Credit-Notice',
+				Action = "Credit-Notice",
 				Sender = msg.From,
 				Quantity = msg.Quantity,
-				Data = "You received " .. msg.Quantity .. " from " .. msg.From
+				Data = "You received " .. msg.Quantity .. " from " .. msg.From,
 			}
 
 			-- Add forwarded tags to the credit and debit notice messages
 			for tagName, tagValue in pairs(msg) do
 				-- Tags beginning with "X-" are forwarded
 				if string.sub(tagName, 1, 2) == "X-" then
-				debitNotice[tagName] = tagValue
-				creditNotice[tagName] = tagValue
+					debitNotice[tagName] = tagValue
+					creditNotice[tagName] = tagValue
 				end
 			end
 
@@ -131,8 +134,14 @@ end)
 
 Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.CreateVault), function(msg)
 	local function checkAssertions()
-		assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
-		assert(tonumber(msg.Tags.LockLength) > 0, "Invalid lock length")
+		assert(
+			tonumber(msg.Tags.LockLength) > 0 and utils.isInteger(tonumber(msg.Tags.LockLength)),
+			"Invalid lock length. Must be integer greater than 0"
+		)
+		assert(
+			tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+			"Invalid quantity. Must be integer greater than 0"
+		)
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -165,8 +174,14 @@ end)
 Handlers.add(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap.VaultedTransfer), function(msg)
 	local function checkAssertions()
 		assert(utils.isValidArweaveAddress(msg.Tags.Recipient), "Invalid recipient")
-		assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
-		assert(tonumber(msg.Tags.LockLength) > 0, "Invalid lock length")
+		assert(
+			tonumber(msg.Tags.LockLength) > 0 and utils.isInteger(tonumber(msg.Tags.LockLength)),
+			"Invalid lock length. Must be integer greater than 0"
+		)
+		assert(
+			tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+			"Invalid quantity. Must be integer greater than 0"
+		)
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -210,8 +225,11 @@ end)
 
 Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.ExtendVault), function(msg)
 	local checkAssertions = function()
-		assert(tonumber(msg.Tags.ExtendLength) > 0, "Invalid extend length")
 		assert(utils.isValidArweaveAddress(msg.Tags.VaultId), "Invalid vault id")
+		assert(
+			tonumber(msg.Tags.ExtendLength) > 0 and utils.isInteger(tonumber(msg.Tags.ExtendLength)),
+			"Invalid extension length. Must be integer greater than 0"
+		)
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -243,8 +261,11 @@ end)
 
 Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.IncreaseVault), function(msg)
 	local function checkAssertions()
-		assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
 		assert(utils.isValidArweaveAddress(msg.Tags.VaultId), "Invalid vault id")
+		assert(
+			tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+			"Invalid quantity. Must be integer greater than 0"
+		)
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -278,7 +299,10 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 	local checkAssertions = function()
 		assert(type(msg.Tags.Name) == "string", "Invalid name")
 		assert(type(msg.Tags.PurchaseType) == "string", "Invalid purchase type")
-		assert(tonumber(msg.Tags.Years) > 0 and tonumber(msg.Tags.Years) < 5, "Invalid years")
+		assert(
+			tonumber(msg.Tags.Years) > 0 and tonumber(msg.Tags.Years) < 5 and utils.isInteger(tonumber(msg.Tags.Years)),
+			"Invalid years. Must be integer between 1 and 5"
+		)
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -323,7 +347,10 @@ end)
 Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.ExtendLease), function(msg)
 	local checkAssertions = function()
 		assert(type(msg.Tags.Name) == "string", "Invalid name")
-		assert(tonumber(msg.Tags.Years) > 0 and tonumber(msg.Tags.Years) < 5, "Invalid years")
+		assert(
+			tonumber(msg.Tags.Years) > 0 and tonumber(msg.Tags.Years) < 5 and utils.isInteger(tonumber(msg.Tags.Years)),
+			"Invalid years. Must be integer between 1 and 5"
+		)
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -359,7 +386,12 @@ Handlers.add(
 	function(msg)
 		local checkAssertions = function()
 			assert(type(msg.Tags.Name) == "string", "Invalid name")
-			assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
+			assert(
+				tonumber(msg.Tags.Quantity) > 0
+					and tonumber(msg.tags.Quantity) < 9990
+					and utils.isInteger(msg.tags.Quantity),
+				"Invalid quantity. Must be an integer value greater than 0 and less than 9990"
+			)
 		end
 
 		local inputStatus, inputResult = pcall(checkAssertions)
@@ -403,6 +435,15 @@ Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.Token
 					.. msg.Tags.Intent
 				or "nil"
 		)
+		-- if years is provided, assert it is a number and integer between 1 and 5
+		if msg.Tags.Years then
+			assert(utils.isInteger(tonumber(msg.Tags.Years)), "Invalid years. Must be integer between 1 and 5")
+		end
+
+		-- if quantity provided must be a number and integer greater than 0
+		if msg.Tags.Quantity then
+			assert(utils.isInteger(tonumber(msg.Tags.Quantity)), "Invalid quantity. Must be integer greater than 0")
+		end
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -844,22 +885,21 @@ Handlers.add(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Record),
 
 	local recordNotice = {
 		Target = msg.From,
-		Action = 'Record-Notice',
+		Action = "Record-Notice",
 		Name = msg.Tags.Name,
-		Data = json.encode(record)
+		Data = json.encode(record),
 	}
 
-      -- Add forwarded tags to the credit and debit notice messages
-      for tagName, tagValue in pairs(msg) do
-        -- Tags beginning with "X-" are forwarded
-        if string.sub(tagName, 1, 2) == "X-" then
-          recordNotice[tagName] = tagValue
-        end
-      end
+	-- Add forwarded tags to the credit and debit notice messages
+	for tagName, tagValue in pairs(msg) do
+		-- Tags beginning with "X-" are forwarded
+		if string.sub(tagName, 1, 2) == "X-" then
+			recordNotice[tagName] = tagValue
+		end
+	end
 
-      -- Send Record-Notice
-      ao.send(recordNotice)
-
+	-- Send Record-Notice
+	ao.send(recordNotice)
 end)
 
 Handlers.add(ActionMap.Records, utils.hasMatchingTag("Action", ActionMap.Records), function(msg)
@@ -868,20 +908,20 @@ Handlers.add(ActionMap.Records, utils.hasMatchingTag("Action", ActionMap.Records
 	-- Credit-Notice message template, that is sent to the Recipient of the transfer
 	local recordsNotice = {
 		Target = msg.From,
-		Action = 'Records-Notice',
-		Data = json.encode(records)
+		Action = "Records-Notice",
+		Data = json.encode(records),
 	}
 
-      -- Add forwarded tags to the records notice messages
-      for tagName, tagValue in pairs(msg) do
-        -- Tags beginning with "X-" are forwarded
-        if string.sub(tagName, 1, 2) == "X-" then
-          recordsNotice[tagName] = tagValue
-        end
-      end
+	-- Add forwarded tags to the records notice messages
+	for tagName, tagValue in pairs(msg) do
+		-- Tags beginning with "X-" are forwarded
+		if string.sub(tagName, 1, 2) == "X-" then
+			recordsNotice[tagName] = tagValue
+		end
+	end
 
-      -- Send Records-Notice
-      ao.send(recordsNotice)
+	-- Send Records-Notice
+	ao.send(recordsNotice)
 end)
 
 Handlers.add(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)

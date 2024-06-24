@@ -354,4 +354,21 @@ describe("arns", function()
 			assert.match("Cannot extend lease beyond 5 years", error)
 		end)
 	end)
+
+	describe("calculateLeaseFee", function()
+		it("should return the correct fee for a lease", function()
+			local name = "test-name" -- 9 character name
+			local baseFee = demand.getFees()[#name] -- base fee is 500 IO
+			local fee = arns.calculateRegistrationFee("lease", baseFee, 1, 1)
+			assert.are.equal(600000000, fee)
+		end)
+
+		it("should return the correct fee for a permabuy", function()
+			local name = "test-name" -- 9 character name
+			local baseFee = demand.getFees()[#name] -- base fee is 500 IO
+			local fee = arns.calculateRegistrationFee("permabuy", baseFee, 1, 1)
+			local expected = (baseFee * 0.2 * 20) + baseFee
+			assert.are.equal(expected, fee)
+		end)
+	end)
 end)
