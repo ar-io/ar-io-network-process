@@ -24,17 +24,17 @@ describe('ArNS', async () => {
   it('should increase the undernames', async () => {
     const buyUndernameResult = await handle({
       Tags: [
-        { name: 'Action', value: 'BuyRecord' },
+        { name: 'Action', value: 'Buy-Record' },
         { name: 'Name', value: 'test-name' },
-        { name: 'PurchaseType', value: 'lease' },
+        { name: 'Purchase-Type', value: 'lease' },
         { name: 'Years', value: '1' },
-        { name: 'ProcessId', value: ''.padEnd(43, 'a') },
+        { name: 'Process-Id', value: ''.padEnd(43, 'a') },
       ],
     });
     const increaseUndernameResult = await handle(
       {
         Tags: [
-          { name: 'Action', value: 'IncreaseUndernameLimit' },
+          { name: 'Action', value: 'Increase-Undername-Limit' },
           { name: 'Name', value: 'test-name' },
           { name: 'Quantity', value: '1' },
         ],
@@ -58,12 +58,12 @@ describe('ArNS', async () => {
   it('should get the costs buy record correctly', async () => {
     const result = await handle({
       Tags: [
-        { name: 'Action', value: 'TokenCost' },
-        { name: 'Intent', value: 'BuyRecord' },
+        { name: 'Action', value: 'Token-Cost' },
+        { name: 'Intent', value: 'Buy-Record' },
         { name: 'Name', value: 'test-name' },
-        { name: 'PurchaseType', value: 'lease' },
+        { name: 'Purchase-Type', value: 'lease' },
         { name: 'Years', value: '1' },
-        { name: 'ProcessId', value: ''.padEnd(43, 'a') },
+        { name: 'Process-Id', value: ''.padEnd(43, 'a') },
       ],
     });
     const tokenCost = JSON.parse(result.Messages[0].Data);
@@ -73,18 +73,18 @@ describe('ArNS', async () => {
   it('should get the costs increase undername correctly', async () => {
     const buyUndernameResult = await handle({
       Tags: [
-        { name: 'Action', value: 'BuyRecord' },
+        { name: 'Action', value: 'Buy-Record' },
         { name: 'Name', value: 'test-name' },
-        { name: 'PurchaseType', value: 'lease' },
+        { name: 'Purchase-Type', value: 'lease' },
         { name: 'Years', value: '1' },
-        { name: 'ProcessId', value: ''.padEnd(43, 'a') },
+        { name: 'Process-Id', value: ''.padEnd(43, 'a') },
       ],
     });
     const result = await handle(
       {
         Tags: [
-          { name: 'Action', value: 'TokenCost' },
-          { name: 'Intent', value: 'IncreaseUndernameLimit' },
+          { name: 'Action', value: 'Token-Cost' },
+          { name: 'Intent', value: 'Increase-Undername-Limit' },
           { name: 'Name', value: 'test-name' },
           { name: 'Quantity', value: '1' },
         ],
@@ -99,11 +99,11 @@ describe('ArNS', async () => {
   it('should get the cost of increasing a lease correctly', async () => {
     const buyUndernameResult = await handle({
       Tags: [
-        { name: 'Action', value: 'BuyRecord' },
+        { name: 'Action', value: 'Buy-Record' },
         { name: 'Name', value: 'test-name' },
-        { name: 'PurchaseType', value: 'lease' },
+        { name: 'Purchase-Type', value: 'lease' },
         { name: 'Years', value: '1' },
-        { name: 'ProcessId', value: ''.padEnd(43, 'a') },
+        { name: 'Process-Id', value: ''.padEnd(43, 'a') },
       ],
     });
     const recordResultBefore = await handle(
@@ -119,7 +119,7 @@ describe('ArNS', async () => {
     const extendResult = await handle(
       {
         Tags: [
-          { name: 'Action', value: 'ExtendLease' },
+          { name: 'Action', value: 'Extend-Lease' },
           { name: 'Name', value: 'test-name' },
           { name: 'Years', value: '1' },
         ],

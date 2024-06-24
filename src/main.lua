@@ -38,39 +38,39 @@ local ActionMap = {
 	Transfer = "Transfer",
 	Balance = "Balance",
 	Balances = "Balances",
-	DemandFactor = "DemandFactor",
+	DemandFactor = "Demand-Factor",
 	-- EPOCH READ APIS
 	Epochs = "Epochs",
 	Epoch = "Epoch",
-	PrescribedObservers = "EpochPrescribedObservers",
-	PrescribedNames = "EpochPrescribedNames",
-	Observations = "EpochObservations",
-	Distributions = "EpochDistributions",
+	PrescribedObservers = "Epoch-Prescribed-Observers",
+	PrescribedNames = "Epoch-Prescribed-Names",
+	Observations = "Epoch-Observations",
+	Distributions = "Epoch-Distributions",
 	-- NAME REGISTRY READ APIS
 	Record = "Record",
 	Records = "Records",
-	ReservedNames = "ReservedNames",
-	ReservedName = "ReservedName",
-	TokenCost = "TokenCost",
+	ReservedNames = "Reserved-Names",
+	ReservedName = "Reserved-Name",
+	TokenCost = "Token-Cost",
 	-- GATEWAY REGISTRY READ APIS
 	Gateway = "Gateway",
 	Gateways = "Gateways",
 	-- writes
-	CreateVault = "CreateVault",
-	VaultedTransfer = "VaultedTransfer",
-	ExtendVault = "ExtendVault",
-	IncreaseVault = "IncreaseVault",
-	BuyRecord = "BuyRecord",
-	ExtendLease = "ExtendLease",
-	IncreaseUndernameLimit = "IncreaseUndernameLimit",
-	JoinNetwork = "JoinNetwork",
-	LeaveNetwork = "LeaveNetwork",
-	IncreaseOperatorStake = "IncreaseOperatorStake",
-	DecreaseOperatorStake = "DecreaseOperatorStake",
-	UpdateGatewaySettings = "UpdateGatewaySettings",
-	SaveObservations = "SaveObservations",
-	DelegateStake = "DelegateStake",
-	DecreaseDelegateStake = "DecreaseDelegateStake",
+	CreateVault = "Create-Vault",
+	VaultedTransfer = "Vaulted-Transfer",
+	ExtendVault = "Extend-Vault",
+	IncreaseVault = "Increase-Vault",
+	BuyRecord = "Buy-Record",
+	ExtendLease = "Extend-Lease",
+	IncreaseUndernameLimit = "Increase-Undername-Limit",
+	JoinNetwork = "Join-Network",
+	LeaveNetwork = "Leave-Network",
+	IncreaseOperatorStake = "Increase-Operator-Stake",
+	DecreaseOperatorStake = "Decrease-Operator-Stake",
+	UpdateGatewaySettings = "Update-Gateway-Settings",
+	SaveObservations = "Save-Observations",
+	DelegateStake = "Delegate-Stake",
+	DecreaseDelegateStake = "Decrease-Delegate-Stake",
 }
 
 -- Write handlers
@@ -140,7 +140,7 @@ end)
 Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.CreateVault), function(msg)
 	local function checkAssertions()
 		assert(
-			tonumber(msg.Tags.LockLength) > 0 and utils.isInteger(tonumber(msg.Tags.LockLength)),
+			tonumber(msg.Tags["Lock-Length"]) > 0 and utils.isInteger(tonumber(msg.Tags["Lock-Length"])),
 			"Invalid lock length. Must be integer greater than 0"
 		)
 		assert(
@@ -160,7 +160,8 @@ Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.Cre
 		return
 	end
 
-	local result, err = balances.createVault(msg.From, msg.Tags.Quantity, msg.Tags.LockLength, msg.Timestamp, msg.Id)
+	local result, err =
+		balances.createVault(msg.From, msg.Tags.Quantity, tonumber(msg.Tags["Lock-Length"]), msg.Timestamp, msg.Id)
 	if err then
 		ao.send({
 			Target = msg.From,
@@ -180,7 +181,7 @@ Handlers.add(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap
 	local function checkAssertions()
 		assert(utils.isValidArweaveAddress(msg.Tags.Recipient), "Invalid recipient")
 		assert(
-			tonumber(msg.Tags.LockLength) > 0 and utils.isInteger(tonumber(msg.Tags.LockLength)),
+			tonumber(msg.Tags["Lock-Length"]) > 0 and utils.isInteger(tonumber(msg.Tags["Lock-Length"])),
 			"Invalid lock length. Must be integer greater than 0"
 		)
 		assert(
@@ -203,8 +204,8 @@ Handlers.add(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap
 	local result, err = balances.vaultedTransfer(
 		msg.From,
 		msg.Tags.Recipient,
-		msg.Tags.Quantity,
-		msg.Tags.LockLength,
+		tonumber(msg.Tags.Quantity),
+		tonumber(msg.Tags["Lock-Length"]),
 		msg.Timestamp,
 		msg.Id
 	)
@@ -268,7 +269,7 @@ end)
 
 Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.IncreaseVault), function(msg)
 	local function checkAssertions()
-		assert(utils.isValidArweaveAddress(msg.Tags.VaultId), "Invalid vault id")
+		assert(utils.isValidArweaveAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
 		assert(
 			tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
 			"Invalid quantity. Must be integer greater than 0"
@@ -286,7 +287,7 @@ Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.I
 		return
 	end
 
-	local result, err = balances.increaseVault(msg.From, msg.Tags.Quantity, msg.Tags.VaultId, msg.Timestamp)
+	local result, err = balances.increaseVault(msg.From, msg.Tags.Quantity, msg.Tags["Vault-Id"], msg.Timestamp)
 	if err then
 		ao.send({
 			Target = msg.From,
@@ -305,7 +306,8 @@ end)
 Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRecord), function(msg)
 	local checkAssertions = function()
 		assert(type(msg.Tags.Name) == "string", "Invalid name")
-		assert(type(msg.Tags.PurchaseType) == "string", "Invalid purchase type")
+		assert(type(msg.Tags["Purchase-Type"]) == "string", "Invalid purchase type")
+		assert(utils.isValidArweaveAddress(msg.Tags["Process-Id"]), "Invalid process id")
 		assert(
 			tonumber(msg.Tags.Years) > 0 and tonumber(msg.Tags.Years) < 5 and utils.isInteger(tonumber(msg.Tags.Years)),
 			"Invalid years. Must be integer between 1 and 5"
@@ -326,11 +328,11 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 	local status, result = pcall(
 		arns.buyRecord,
 		msg.Tags.Name,
-		msg.Tags.PurchaseType,
+		msg.Tags["Purchase-Type"],
 		tonumber(msg.Tags.Years),
 		msg.From,
 		msg.Timestamp,
-		msg.Tags.ProcessId
+		msg.Tags["Process-Id"]
 	)
 	if not status then
 		ao.send({
@@ -469,7 +471,7 @@ Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.Token
 		name = msg.Tags.Name,
 		years = tonumber(msg.Tags.Years) or 1,
 		quantity = tonumber(msg.Tags.Quantity),
-		purchaseType = msg.Tags.PurchaseType or "lease",
+		purchaseType = msg.Tags["Purchase-Type"] or "lease",
 		currentTimestamp = tonumber(msg.Timestamp),
 	})
 	if not status then
@@ -494,18 +496,18 @@ Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.Joi
 		fqdn = msg.Tags.FQDN,
 		port = tonumber(msg.Tags.Port) or 443,
 		protocol = msg.Tags.Protocol or "https",
-		allowDelegatedStaking = msg.Tags.AllowDelegatedStaking == "true",
-		minDelegatedStake = tonumber(msg.Tags.MinDelegatedStake),
-		delegateRewardShareRatio = tonumber(msg.Tags.DelegateRewardShareRatio) or 0,
+		allowDelegatedStaking = msg.Tags["Allow-Delegated-Staking"] == "true",
+		minDelegatedStake = tonumber(msg.Tags["Min-Delegated-Stake"]),
+		delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"]) or 0,
 		properties = msg.Tags.Properties or "FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44",
-		autoStake = msg.Tags.AutoStake == "true",
+		autoStake = msg.Tags["Auto-Stake"] == "true",
 	}
-	local observerAddress = msg.Tags.ObserverAddress or msg.Tags.From
+	local observerAddress = msg.Tags["Observer-Address"] or msg.Tags.From
 
 	local status, result = pcall(
 		gar.joinNetwork,
 		msg.From,
-		tonumber(msg.Tags.OperatorStake),
+		tonumber(msg.Tags["Operator-Stake"]),
 		updatedSettings,
 		observerAddress,
 		msg.Timestamp
@@ -548,6 +550,10 @@ Handlers.add(
 	function(msg)
 		local checkAssertions = function()
 			assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
+			assert(
+				utils.isInteger(tonumber(msg.Tags.Quantity) and tonumber(msg.Tags.Quantity) > 0),
+				"Invalid quantity. Must be integer greater than 0"
+			)
 		end
 
 		local inputStatus, inputResult = pcall(checkAssertions)
@@ -583,7 +589,10 @@ Handlers.add(
 	utils.hasMatchingTag("Action", ActionMap.DecreaseOperatorStake),
 	function(msg)
 		local checkAssertions = function()
-			assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
+			assert(
+				utils.isInteger(tonumber(msg.Tags.Quantity) and tonumber(msg.Tags.Quantity) > 0),
+				"Invalid quantity. Must be integer greater than 0"
+			)
 		end
 
 		local inputStatus, inputResult = pcall(checkAssertions)
@@ -617,7 +626,10 @@ Handlers.add(
 Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.DelegateStake), function(msg)
 	local checkAssertions = function()
 		assert(utils.isValidArweaveAddress(msg.Tags.Target), "Invalid target address")
-		assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
+		assert(
+			tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+			"Invalid quantity. Must be integer greater than 0"
+		)
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -625,7 +637,7 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 	if not inputStatus then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Bad-Input",  },
+			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
 		return
@@ -654,7 +666,10 @@ Handlers.add(
 	function(msg)
 		local checkAssertions = function()
 			assert(utils.isValidArweaveAddress(msg.Tags.Target), "Invalid target address")
-			assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
+			assert(
+				tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+				"Invalid quantity. Must be integer greater than 0"
+			)
 		end
 
 		local inputStatus, inputResult = pcall(checkAssertions)
@@ -662,7 +677,7 @@ Handlers.add(
 		if not inputStatus then
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Bad-Input",  },
+				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Bad-Input" },
 				Data = tostring(inputResult),
 			})
 			return
@@ -713,15 +728,15 @@ Handlers.add(
 			fqdn = msg.Tags.FQDN or gateway.settings.fqdn,
 			port = tonumber(msg.Tags.Port) or gateway.settings.port,
 			protocol = msg.Tags.Protocol or gateway.settings.protocol,
-			allowDelegatedStaking = not msg.Tags.AllowDelegatedStaking and gateway.settings.allowDelegatedStaking
-				or msg.Tags.AllowDelegatedStaking == "true",
-			minDelegatedStake = tonumber(msg.Tags.MinDelegatedStake) or gateway.settings.minDelegatedStake,
-			delegateRewardShareRatio = tonumber(msg.Tags.DelegateRewardShareRatio)
+			allowDelegatedStaking = not msg.Tags["Allow-Delegated-Staking"] and gateway.settings.allowDelegatedStaking
+				or msg.Tags["Allow-Delegated-Staking"] == "true",
+			minDelegatedStake = tonumber(msg.Tags["Min-Delegated-Stake"]) or gateway.settings.minDelegatedStake,
+			delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"])
 				or gateway.settings.delegateRewardShareRatio,
 			properties = msg.Tags.Properties or gateway.settings.properties,
-			autoStake = msg.Tags.AutoStake == "true" or gateway.settings.autoStake,
+			autoStake = msg.Tags["Auto-Stkae"] == "true" or gateway.settings.autoStake,
 		}
-		local observerAddress = msg.Tags.ObserverAddress or gateway.observerAddress
+		local observerAddress = msg.Tags["Observer-Address"] or gateway.observerAddress
 		local status, result =
 			pcall(gar.updateGatewaySettings, msg.From, updatedSettings, observerAddress, msg.Timestamp, msg.Id)
 		if not status then
@@ -741,8 +756,8 @@ Handlers.add(
 )
 
 Handlers.add(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
-	local reportTxId = msg.Tags.ReportTxId
-	local failedGateways = utils.splitString(msg.Tags.FailedGateways, ",")
+	local reportTxId = msg.Tags["Report-Tx-Id"]
+	local failedGateways = utils.splitString(msg.Tags["Failed-Gateways"], ",")
 	local checkAssertions = function()
 		assert(utils.isValidArweaveAddress(reportTxId), "Invalid report tx id")
 		for _, gateway in ipairs(failedGateways) do
@@ -765,7 +780,12 @@ Handlers.add(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMa
 	if status then
 		ao.send({ Target = msg.From, Action = "Save-Observations-Notice", Data = json.encode(result) })
 	else
-		ao.send({ Target = msg.From, Action = "Invalid-Save-Observations-Notice", Error = "Invalid-Saved-Observations", Data = json.encode(result) })
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-Save-Observations-Notice",
+			Error = "Invalid-Saved-Observations",
+			Data = json.encode(result),
+		})
 	end
 end)
 
@@ -809,7 +829,12 @@ Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
 			NameRegistry = previousState.NameRegistry
 			Epochs = previousState.Epochs
 			DemandFactor = previousState.DemandFactor
-			ao.send({ Target = msg.From, Action = "Invalid-Tick-Notice", Error = "Invalid-Tick", Data = json.encode(result) })
+			ao.send({
+				Target = msg.From,
+				Action = "Invalid-Tick-Notice",
+				Error = "Invalid-Tick",
+				Data = json.encode(result),
+			})
 		end
 	end
 end)
@@ -879,7 +904,7 @@ Handlers.add(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMa
 		Data = balance,
 		Balance = balance,
 		Ticker = Ticker,
-		Address = msg.Tags.Target or msg.Tags.Address or msg.From
+		Address = msg.Tags.Target or msg.Tags.Address or msg.From,
 	})
 end)
 
@@ -889,7 +914,12 @@ Handlers.add(ActionMap.DemandFactor, utils.hasMatchingTag("Action", ActionMap.De
 	if status then
 		ao.send({ Target = msg.From, Action = "Demand-Factor-Notice", Data = tostring(result) })
 	else
-		ao.send({ Target = msg.From, Action = "Invalid-Demand-Factor-Notice", Error = "Invalid-Demand-Factor", Data = json.encode(result) })
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-Demand-Factor-Notice",
+			Error = "Invalid-Demand-Factor",
+			Data = json.encode(result),
+		})
 	end
 end)
 
@@ -940,7 +970,7 @@ end)
 Handlers.add(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local checkAssertions = function()
-		assert(msg.Tags.EpochIndex or msg.Tags.Timestamp or msg.Timestamp, "Epoch index or timestamp is required")
+		assert(msg.Tags["Epoch-Index"] or msg.Tags.Timestamp or msg.Timestamp, "Epoch index or timestamp is required")
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -954,7 +984,7 @@ Handlers.add(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), f
 		return
 	end
 
-	local epochIndex = tonumber(msg.Tags.EpochIndex)
+	local epochIndex = tonumber(msg.Tags["Epoch-Index"])
 		or epochs.getEpochIndexForTimestamp(tonumber(msg.Tags.Timestamp or msg.Timestamp))
 	local epoch = epochs.getEpoch(epochIndex)
 	ao.send({ Target = msg.From, Action = "Epoch-Notice", Data = json.encode(epoch) })
@@ -968,7 +998,7 @@ end)
 Handlers.add(ActionMap.PrescribedObservers, utils.hasMatchingTag("Action", ActionMap.PrescribedObservers), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local checkAssertions = function()
-		assert(msg.Tags.EpochIndex or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
+		assert(msg.Tags["Epoch-Index"] or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -982,7 +1012,7 @@ Handlers.add(ActionMap.PrescribedObservers, utils.hasMatchingTag("Action", Actio
 		return
 	end
 
-	local epochIndex = tonumber(msg.Tags.EpochIndex) or epochs.getEpochIndexFromTimestamp(tonumber(msg.Timestamp))
+	local epochIndex = tonumber(msg.Tags["Epoch-Index"]) or epochs.getEpochIndexFromTimestamp(tonumber(msg.Timestamp))
 	local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
 	ao.send({ Target = msg.From, Action = "Prescribed-Observers-Notice", Data = json.encode(prescribedObservers) })
 end)
@@ -990,7 +1020,7 @@ end)
 Handlers.add(ActionMap.Observations, utils.hasMatchingTag("Action", ActionMap.Observations), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local checkAssertions = function()
-		assert(msg.Tags.EpochIndex or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
+		assert(msg.Tags["Epoch-Index"] or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -1004,16 +1034,21 @@ Handlers.add(ActionMap.Observations, utils.hasMatchingTag("Action", ActionMap.Ob
 		return
 	end
 
-	local epochIndex = tonumber(msg.Tags.EpochIndex)
+	local epochIndex = tonumber(msg.Tags["Epoch-Index"])
 		or epochs.getEpochIndexFromTimestamp(tonumber(msg.Timestamp or msg.Tags.Timestamp))
 	local observations = epochs.getObservationsForEpoch(epochIndex)
-	ao.send({ Target = msg.From, Action = "Observations-Notice", EpochIndex = tostring(epochIndex), Data = json.encode(observations) })
+	ao.send({
+		Target = msg.From,
+		Action = "Observations-Notice",
+		EpochIndex = tostring(epochIndex),
+		Data = json.encode(observations),
+	})
 end)
 
 Handlers.add(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", ActionMap.PrescribedNames), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local checkAssertions = function()
-		assert(msg.Tags.EpochIndex or msg.Tags.Timestamp or msg.Timestamp, "Epoch index or timestamp is required")
+		assert(msg.Tags["Epoch-Index"] or msg.Tags.Timestamp or msg.Timestamp, "Epoch index or timestamp is required")
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -1027,7 +1062,7 @@ Handlers.add(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", ActionMap
 		return
 	end
 
-	local epochIndex = tonumber(msg.Tags.EpochIndex)
+	local epochIndex = tonumber(msg.Tags["Epoch-Index"])
 		or epochs.getEpochIndexForTimestamp(tonumber(msg.Timestamp or msg.Tags.Timestamp))
 	local prescribedNames = epochs.getPrescribedNamesForEpoch(epochIndex)
 	ao.send({ Target = msg.From, Action = "Prescribed-Names-Notice", Data = json.encode(prescribedNames) })
@@ -1036,7 +1071,7 @@ end)
 Handlers.add(ActionMap.Distributions, utils.hasMatchingTag("Action", ActionMap.Distributions), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local checkAssertions = function()
-		assert(msg.Tags.EpochIndex or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
+		assert(msg.Tags["Epoch-Index"] or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
@@ -1050,7 +1085,7 @@ Handlers.add(ActionMap.Distributions, utils.hasMatchingTag("Action", ActionMap.D
 		return
 	end
 
-	local epochIndex = tonumber(msg.Tags.EpochIndex)
+	local epochIndex = tonumber(msg.Tags["Epoch-Index"])
 		or epochs.getEpochIndexFromTimestamp(tonumber(msg.Timestamp or msg.Tags.Timestamp))
 	local distributions = epochs.getDistributionsForEpoch(epochIndex)
 	ao.send({ Target = msg.From, Action = "Distributions-Notice", Data = json.encode(distributions) })
@@ -1063,7 +1098,12 @@ end)
 
 Handlers.add(ActionMap.ReservedName, utils.hasMatchingTag("Action", ActionMap.ReservedName), function(msg)
 	local reservedName = arns.getReservedName(msg.Tags.Name)
-	ao.send({ Target = msg.From, Action = "Reserved-Name-Notice", ReservedName = msg.Tags.Name, Data = json.encode(reservedName) })
+	ao.send({
+		Target = msg.From,
+		Action = "Reserved-Name-Notice",
+		ReservedName = msg.Tags.Name,
+		Data = json.encode(reservedName),
+	})
 end)
 
 -- END READ HANDLERS

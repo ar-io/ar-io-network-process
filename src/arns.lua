@@ -307,7 +307,7 @@ end
 
 function arns.getTokenCost(intendedAction)
 	local tokenCost = 0
-	if intendedAction.intent == "BuyRecord" then
+	if intendedAction.intent == "Buy-Record" then
 		local purchaseType = intendedAction.purchaseType
 		local years = intendedAction.years
 		local name = intendedAction.name
@@ -316,7 +316,7 @@ function arns.getTokenCost(intendedAction)
 		assert(type(name) == "string", "Name is required and must be a string.")
 		local baseFee = demand.getFees()[#name]
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
-	elseif intendedAction.intent == "ExtendLease" then
+	elseif intendedAction.intent == "Extend-Lease" then
 		local name = intendedAction.name
 		local years = intendedAction.years
 		assert(type(name) == "string", "Name is required and must be a string.")
@@ -331,7 +331,7 @@ function arns.getTokenCost(intendedAction)
 		local years = intendedAction.years
 		local baseFee = demand.getFees()[#intendedAction.name]
 		tokenCost = arns.calculateExtensionFee(baseFee, years, demand.getDemandFactor())
-	elseif intendedAction.intent == "IncreaseUndernameLimit" then
+	elseif intendedAction.intent == "Increase-Undername-Limit" then
 		local name = intendedAction.name
 		local qty = intendedAction.quantity
 		local currentTimestamp = intendedAction.currentTimestamp
