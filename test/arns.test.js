@@ -6,7 +6,7 @@ const {
   DEFAULT_HANDLE_OPTIONS,
 } = require('../tools/constants');
 
-describe('aos ARNS', async () => {
+describe('ArNS', async () => {
   const { handle: originalHandle, memory: startMemory } =
     await createAntAosLoader();
 
