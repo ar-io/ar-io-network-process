@@ -1,6 +1,16 @@
 -- Adjust package.path to include the current directory
 local process = { _version = "0.0.1" }
 
+local utils = require("utils")
+local json = require("json")
+local ao = ao or require("ao")
+local balances = require("balances")
+local arns = require("arns")
+local gar = require("gar")
+local demand = require("demand")
+local epochs = require("epochs")
+local vaults = require("vaults")
+
 Name = "Devnet IO"
 Ticker = "dIO"
 Logo = "Sie_26dvgyok0PZD_-iQAFOhOd5YxDTkczOLoqTTL_A"
@@ -15,16 +25,6 @@ GatewayRegistry = GatewayRegistry or {}
 NameRegistry = NameRegistry or {}
 Epochs = Epochs or {}
 LastTickedEpoch = LastTickedEpoch or 0
-
-local utils = require("utils")
-local json = require("json")
-local ao = ao or require("ao")
-local balances = require("balances")
-local arns = require("arns")
-local gar = require("gar")
-local demand = require("demand")
-local epochs = require("epochs")
-local vaults = require("vaults")
 
 local ActionMap = {
 	-- reads
@@ -99,26 +99,26 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 			-- Debit-Notice message template, that is sent to the Sender of the transfer
 			local debitNotice = {
 				Target = msg.From,
-				Action = 'Debit-Notice',
+				Action = "Debit-Notice",
 				Recipient = msg.Recipient,
 				Quantity = msg.Quantity,
-				Data = "You transferred " .. msg.Quantity .. " to " .. msg.Recipient
+				Data = "You transferred " .. msg.Quantity .. " to " .. msg.Recipient,
 			}
 			-- Credit-Notice message template, that is sent to the Recipient of the transfer
 			local creditNotice = {
 				Target = msg.Recipient,
-				Action = 'Credit-Notice',
+				Action = "Credit-Notice",
 				Sender = msg.From,
 				Quantity = msg.Quantity,
-				Data = "You received " .. msg.Quantity .. " from " .. msg.From
+				Data = "You received " .. msg.Quantity .. " from " .. msg.From,
 			}
 
 			-- Add forwarded tags to the credit and debit notice messages
 			for tagName, tagValue in pairs(msg) do
 				-- Tags beginning with "X-" are forwarded
 				if string.sub(tagName, 1, 2) == "X-" then
-				debitNotice[tagName] = tagValue
-				creditNotice[tagName] = tagValue
+					debitNotice[tagName] = tagValue
+					creditNotice[tagName] = tagValue
 				end
 			end
 
@@ -844,22 +844,21 @@ Handlers.add(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Record),
 
 	local recordNotice = {
 		Target = msg.From,
-		Action = 'Record-Notice',
+		Action = "Record-Notice",
 		Name = msg.Tags.Name,
-		Data = json.encode(record)
+		Data = json.encode(record),
 	}
 
-      -- Add forwarded tags to the credit and debit notice messages
-      for tagName, tagValue in pairs(msg) do
-        -- Tags beginning with "X-" are forwarded
-        if string.sub(tagName, 1, 2) == "X-" then
-          recordNotice[tagName] = tagValue
-        end
-      end
+	-- Add forwarded tags to the credit and debit notice messages
+	for tagName, tagValue in pairs(msg) do
+		-- Tags beginning with "X-" are forwarded
+		if string.sub(tagName, 1, 2) == "X-" then
+			recordNotice[tagName] = tagValue
+		end
+	end
 
-      -- Send Record-Notice
-      ao.send(recordNotice)
-
+	-- Send Record-Notice
+	ao.send(recordNotice)
 end)
 
 Handlers.add(ActionMap.Records, utils.hasMatchingTag("Action", ActionMap.Records), function(msg)
@@ -868,20 +867,20 @@ Handlers.add(ActionMap.Records, utils.hasMatchingTag("Action", ActionMap.Records
 	-- Credit-Notice message template, that is sent to the Recipient of the transfer
 	local recordsNotice = {
 		Target = msg.From,
-		Action = 'Records-Notice',
-		Data = json.encode(records)
+		Action = "Records-Notice",
+		Data = json.encode(records),
 	}
 
-      -- Add forwarded tags to the records notice messages
-      for tagName, tagValue in pairs(msg) do
-        -- Tags beginning with "X-" are forwarded
-        if string.sub(tagName, 1, 2) == "X-" then
-          recordsNotice[tagName] = tagValue
-        end
-      end
+	-- Add forwarded tags to the records notice messages
+	for tagName, tagValue in pairs(msg) do
+		-- Tags beginning with "X-" are forwarded
+		if string.sub(tagName, 1, 2) == "X-" then
+			recordsNotice[tagName] = tagValue
+		end
+	end
 
-      -- Send Records-Notice
-      ao.send(recordsNotice)
+	-- Send Records-Notice
+	ao.send(recordsNotice)
 end)
 
 Handlers.add(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
