@@ -378,7 +378,8 @@ Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.Ext
 		return
 	end
 
-	local status, result = pcall(arns.extendLease, msg.From, msg.Tags.Name, tonumber(msg.Tags.Years), msg.Timestamp)
+	local status, result =
+		pcall(arns.extendLease, msg.From, string.lower(msg.Tags.Name), tonumber(msg.Tags.Years), msg.Timestamp)
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -388,7 +389,7 @@ Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.Ext
 	else
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Extend-Lease-Notice", Name = msg.Tags.Name },
+			Tags = { Action = "Extend-Lease-Notice", Name = string.lower(msg.Tags.Name) },
 			Data = json.encode(result),
 		})
 	end
@@ -419,8 +420,13 @@ Handlers.add(
 			return
 		end
 
-		local status, result =
-			pcall(arns.increaseundernameLimit, msg.From, msg.Tags.Name, tonumber(msg.Tags.Quantity), msg.Timestamp)
+		local status, result = pcall(
+			arns.increaseundernameLimit,
+			msg.From,
+			string.lower(msg.Tags.Name),
+			tonumber(msg.Tags.Quantity),
+			msg.Timestamp
+		)
 		if not status then
 			ao.send({
 				Target = msg.From,
@@ -430,7 +436,7 @@ Handlers.add(
 		else
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Increase-Undername-Limit-Notice", Name = msg.Tags.Name },
+				Tags = { Action = "Increase-Undername-Limit-Notice", Name = string.lower(msg.Tags.Name) },
 				Data = json.encode(result),
 			})
 		end
