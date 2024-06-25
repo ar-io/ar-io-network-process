@@ -5,24 +5,25 @@ local gar = {}
 
 GatewayRegistry = GatewayRegistry or {}
 -- TODO: any necessary state modifcations as we iterate go here
-local garSettings = {
-	observers = {
-		maxPerEpoch = 50,
-		tenureWeightDays = 180,
-		tenureWeightPeriod = 180 * 24 * 60 * 60 * 1000, -- aproximately 2 years
-		maxTenureWeight = 4,
-	},
-	operators = {
-		minStake = 50000 * 1000000, -- 50,000 IO
-		withdrawLengthMs = 30 * 24 * 60 * 60 * 1000, -- 30 days to lower operator stake
-		maxDelegates = 10000,
-		leaveLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days that balance will be vaulted
-	},
-	delegates = {
-		minStake = 500 * 1000000, -- 500 IO
-		withdrawLengthMs = 30 * 24 * 60 * 60 * 1000, -- 30 days
-	},
-}
+GatewayRegistrySettings = GatewayRegistrySettings
+	or {
+		observers = {
+			maxPerEpoch = 50,
+			tenureWeightDays = 180,
+			tenureWeightPeriod = 180 * 24 * 60 * 60 * 1000, -- aproximately 2 years
+			maxTenureWeight = 4,
+		},
+		operators = {
+			minStake = 50000 * 1000000, -- 50,000 IO
+			withdrawLengthMs = 30 * 24 * 60 * 60 * 1000, -- 30 days to lower operator stake
+			maxDelegates = 10000,
+			leaveLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days that balance will be vaulted
+		},
+		delegates = {
+			minStake = 500 * 1000000, -- 500 IO
+			withdrawLengthMs = 30 * 24 * 60 * 60 * 1000, -- 30 days
+		},
+	}
 
 function gar.joinNetwork(from, stake, settings, observerAddress, timeStamp)
 	gar.assertValidGatewayParameters(from, stake, settings, observerAddress)
@@ -338,7 +339,7 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 end
 
 function gar.getSettings()
-	return garSettings
+	return utils.deepCopy(GatewayRegistrySettings)
 end
 
 function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimestamp, messageId)
@@ -543,7 +544,7 @@ end
 
 -- for test purposes
 function gar.updateSettings(newSettings)
-	garSettings = newSettings
+	GatewayRegistrySettings = newSettings
 end
 
 function gar.pruneGateways(currentTimestamp)
