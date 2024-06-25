@@ -560,9 +560,8 @@ Handlers.add(
 	utils.hasMatchingTag("Action", ActionMap.IncreaseOperatorStake),
 	function(msg)
 		local checkAssertions = function()
-			assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
 			assert(
-				utils.isInteger(tonumber(msg.Tags.Quantity) and tonumber(msg.Tags.Quantity) > 0),
+				utils.isInteger(tonumber(msg.Tags.Quantity)) and tonumber(msg.Tags.Quantity) > 0,
 				"Invalid quantity. Must be integer greater than 0"
 			)
 		end
