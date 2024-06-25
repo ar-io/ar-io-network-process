@@ -1,7 +1,6 @@
 local epochs = require("epochs")
 local gar = require("gar")
 local balances = require("balances")
-local json = require("json")
 local testSettings = {
 	fqdn = "test.com",
 	protocol = "https",

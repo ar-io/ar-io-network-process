@@ -332,7 +332,7 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 
 	local status, result = pcall(
 		arns.buyRecord,
-		msg.Tags.Name,
+		string.lower(msg.Tags.Name),
 		msg.Tags["Purchase-Type"],
 		tonumber(msg.Tags.Years),
 		msg.From,
@@ -473,7 +473,7 @@ Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.Token
 
 	local status, result = pcall(arns.getTokenCost, {
 		intent = msg.Tags.Intent,
-		name = msg.Tags.Name,
+		name = string.lower(msg.Tags.Name),
 		years = tonumber(msg.Tags.Years) or 1,
 		quantity = tonumber(msg.Tags.Quantity),
 		purchaseType = msg.Tags["Purchase-Type"] or "lease",
@@ -1229,7 +1229,7 @@ Handlers.add("addRecord", utils.hasMatchingTag("Action", "AddRecord"), function(
 		ao.send({ Target = msg.From, Data = "Unauthorized" })
 		return
 	end
-	local status, result = pcall(arns.addRecord, msg.Tags.Name, json.decode(msg.Data))
+	local status, result = pcall(arns.addRecord, string.lower(msg.Tags.Name), json.decode(msg.Data))
 	if status then
 		ao.send({ Target = msg.From, Data = json.encode(result) })
 	else
@@ -1242,7 +1242,7 @@ Handlers.add("addReservedName", utils.hasMatchingTag("Action", "AddReservedName"
 		ao.send({ Target = msg.From, Data = "Unauthorized" })
 		return
 	end
-	local status, result = pcall(arns.addReservedName, msg.Tags.Name, json.decode(msg.Data))
+	local status, result = pcall(arns.addReservedName, string.lower(msg.Tags.Name), json.decode(msg.Data))
 	if status then
 		ao.send({ Target = msg.From, Data = json.encode(result) })
 	else
