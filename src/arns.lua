@@ -89,7 +89,7 @@ end
 
 function arns.calculateExtensionFee(baseFee, years, demandFactor)
 	local extensionFee = arns.calculateAnnualRenewalFee(baseFee, years)
-	return demandFactor * extensionFee
+	return math.floor(demandFactor * extensionFee)
 end
 
 function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
@@ -245,8 +245,9 @@ function arns.calculateUndernameCost(baseFee, increaseQty, registrationType, yea
 	return math.floor(demandFactor * totalFeeForQtyAndYears)
 end
 
+-- this is intended to be a float point number - TODO: protect against large decimals
 function arns.calculateYearsBetweenTimestamps(startTimestamp, endTimestamp)
-	local yearsRemainingFloat = math.floor((endTimestamp - startTimestamp) / constants.oneYearMs)
+	local yearsRemainingFloat = (endTimestamp - startTimestamp) / constants.oneYearMs
 	return yearsRemainingFloat
 end
 
@@ -333,11 +334,14 @@ function arns.getTokenCost(intendedAction)
 		tokenCost = arns.calculateExtensionFee(baseFee, years, demand.getDemandFactor())
 	elseif intendedAction.intent == "Increase-Undername-Limit" then
 		local name = intendedAction.name
-		local qty = intendedAction.quantity
+		local qty = tonumber(intendedAction.quantity)
 		local currentTimestamp = intendedAction.currentTimestamp
 		assert(type(name) == "string", "Name is required and must be a string.")
-		assert(qty >= 1 and qty <= 9990, "Quantity is invalid, must be between 1 and 9990")
-		assert(currentTimestamp, "CurrentTimestamp is required")
+		assert(
+			qty >= 1 and qty <= 9990 and utils.isInteger(qty),
+			"Quantity is invalid, must be an integer between 1 and 9990"
+		)
+		assert(type(currentTimestamp) == "number" and currentTimestamp > 0, "Timestamp is required")
 		local record = arns.getRecord(intendedAction.name)
 		if not record then
 			error("Name is not registered")
@@ -369,7 +373,7 @@ function arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
 		error("Name is expired")
 	end
 
-	if qty < 1 or qty > 9990 then
+	if qty < 1 or qty > 9990 or not utils.isInteger(qty) then
 		error("Qty is invalid")
 	end
 

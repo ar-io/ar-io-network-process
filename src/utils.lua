@@ -98,6 +98,11 @@ function utils.deepCopy(original)
 	if not original then
 		return nil
 	end
+
+	if type(original) ~= "table" then
+		return original
+	end
+
 	local copy = {}
 	for key, value in pairs(original) do
 		if type(value) == "table" then

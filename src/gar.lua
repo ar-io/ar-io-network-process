@@ -129,6 +129,8 @@ end
 
 function gar.increaseOperatorStake(from, qty)
 	assert(type(qty) == "number", "Quantity is required and must be a number!")
+	-- asssert it is an integer
+	assert(utils.isInteger(qty), "Quantity must be an integer!")
 	assert(qty > 0, "Quantity must be greater than 0")
 
 	local gateway = gar.getGateway(from)
