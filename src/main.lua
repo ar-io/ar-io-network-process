@@ -57,6 +57,7 @@ local ActionMap = {
 	-- GATEWAY REGISTRY READ APIS
 	Gateway = "Gateway",
 	Gateways = "Gateways",
+	GatewayRegistrySettings = "Gateway-Registry-Settings",
 	-- writes
 	CreateVault = "Create-Vault",
 	VaultedTransfer = "Vaulted-Transfer",
@@ -809,6 +810,19 @@ Handlers.add(
 			Target = msg.From,
 			Action = "Demand-Factor-Settings-Notice",
 			Data = json.encode(demandFactorSettings),
+		})
+	end
+)
+
+Handlers.add(
+	ActionMap.GatewayRegistrySettings,
+	utils.hasMatchingTag("Action", ActionMap.GatewayRegistrySettings),
+	function(msg)
+		local gatewayRegistrySettings = gar.getSettings()
+		ao.send({
+			Target = msg.From,
+			Action = "Gateway-Registry-Settings-Notice",
+			Data = json.encode(gatewayRegistrySettings),
 		})
 	end
 )
