@@ -312,7 +312,9 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 		assert(type(msg.Tags["Purchase-Type"]) == "string", "Invalid purchase type")
 		assert(utils.isValidArweaveAddress(msg.Tags["Process-Id"]), "Invalid process id")
 		assert(
-			tonumber(msg.Tags.Years) > 0 and tonumber(msg.Tags.Years) < 5 and utils.isInteger(tonumber(msg.Tags.Years)),
+			tonumber(msg.Tags.Years) >= 1
+				and tonumber(msg.Tags.Years) <= 5
+				and utils.isInteger(tonumber(msg.Tags.Years)),
 			"Invalid years. Must be integer between 1 and 5"
 		)
 	end
