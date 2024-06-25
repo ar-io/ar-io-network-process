@@ -86,12 +86,14 @@ function demand.updateDemandFactor(timestamp)
 	else
 		if demand.getDemandFactor() > settings.demandFactorMin then
 			local downAdjustment = settings.demandFactorDownAdjustment
-			local updatedDemandFactor = demand.getDemandFactor() * (1 - downAdjustment)
+			local updatedDemandFactor =
+				math.max(demand.getDemandFactor() * (1 - downAdjustment), settings.demandFactorMin)
+			-- increment consecutive periods with min demand factor
 			demand.setDemandFactor(updatedDemandFactor)
 		end
 	end
 
-	if demand.getDemandFactor() == settings.demandFactorMin then
+	if demand.getDemandFactor() <= settings.demandFactorMin then
 		if demand.getConsecutivePeriodsWithMinDemandFactor() >= settings.stepDownThreshold then
 			demand.resetConsecutivePeriodsWithMinimumDemandFactor()
 			demand.updateFees(settings.demandFactorMin)

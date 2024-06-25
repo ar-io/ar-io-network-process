@@ -91,7 +91,7 @@ describe("demand", function()
 		it(
 			"updateDemandFactor() adjust fees and reset demend factor parameters when consecutive periods at minimum threshold is hit",
 			function()
-				DemandFactor.currentDemandFactor = demand.getSettings().demandFactorMin
+				DemandFactor.currentDemandFactor = demand.getSettings().demandFactorMin - 0.1
 				DemandFactor.consecutivePeriodsWithMinDemandFactor = demand.getSettings().stepDownThreshold
 				DemandFactor.revenueThisPeriod = 0
 				DemandFactor.trailingPeriodRevenues = { 0, 10, 10, 10, 10, 10 }
