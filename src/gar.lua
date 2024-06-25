@@ -497,6 +497,10 @@ function gar.assertValidGatewayParameters(from, stake, settings, observerAddress
 		"port is required and must be an integer between 0 and 65535"
 	)
 	assert(type(settings.properties) == "string", "properties is required and must be a string")
+	assert(
+		stake >= gar.getSettings().operators.minStake,
+		"Operator stake must be greater than the minimum stake to join the network"
+	)
 	if settings.delegateRewardShareRatio ~= nil then
 		assert(
 			type(settings.delegateRewardShareRatio) == "number"
@@ -514,7 +518,9 @@ function gar.assertValidGatewayParameters(from, stake, settings, observerAddress
 	end
 	if settings.minDelegatedStake ~= nil then
 		assert(
-			type(settings.minDelegatedStake) == "number" and utils.isInteger(settings.minDelegatedStake),
+			type(settings.minDelegatedStake) == "number"
+				and utils.isInteger(settings.minDelegatedStake)
+				and settings.minDelegatedStake >= gar.getSettings().delegates.minStake,
 			"minDelegatedStake must be an integer and "
 		)
 	end
