@@ -9,7 +9,7 @@ Denomination = 6
 DemandFactor = DemandFactor or {}
 Owner = Owner or ao.env.Process.Owner
 Balances = Balances or {}
-if #Balances == 0 then -- initialize the balance for the process id
+if not Balances[ao.id] then -- initialize the balance for the process id
 	Balances = {
 		[ao.id] = math.floor(50000000 * 1000000), -- 50M IO
 		[Owner] = math.floor(constants.totalTokenSupply - (50000000 * 1000000)), -- 950M IO
@@ -19,7 +19,7 @@ Vaults = Vaults or {}
 GatewayRegistry = GatewayRegistry or {}
 NameRegistry = NameRegistry or {}
 Epochs = Epochs or {}
-LastTickedEpoch = LastTickedEpoch or 0
+LastTickedEpochIndex = LastTickedEpochIndex or -1
 
 local utils = require("utils")
 local json = require("json")
@@ -172,7 +172,7 @@ Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.Cre
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Vault-Created-Notice" },
-			Data = tostring(json.encode(result)),
+			Data = json.encode(result),
 		})
 	end
 end)
@@ -221,12 +221,12 @@ Handlers.add(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap
 			Recipient = msg.Tags.Recipient,
 			Quantity = msg.Tags.Quantity,
 			Tags = { Action = "Debit-Notice" },
-			Data = tostring(json.encode(result)),
+			Data = json.encode(result),
 		})
 		ao.send({
 			Target = msg.Tags.Recipient,
 			Tags = { Action = "Vaulted-Credit-Notice" },
-			Data = tostring(json.encode(result)),
+			Data = json.encode(result),
 		})
 	end
 end)
@@ -262,7 +262,7 @@ Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.Ext
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Vault-Extended-Notice" },
-			Data = tostring(json.encode(result)),
+			Data = json.encode(result),
 		})
 	end
 end)
@@ -298,7 +298,7 @@ Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.I
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Vault-Increased-Notice" },
-			Data = tostring(json.encode(result)),
+			Data = json.encode(result),
 		})
 	end
 end)
@@ -348,7 +348,7 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Buy-Record-Notice", Name = msg.Tags.Name },
-			Data = tostring(json.encode(result)),
+			Data = json.encode(result),
 		})
 	end
 end)
@@ -384,7 +384,7 @@ Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.Ext
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Extend-Lease-Notice", Name = msg.Tags.Name },
-			Data = tostring(json.encode(result)),
+			Data = json.encode(result),
 		})
 	end
 end)
@@ -426,7 +426,7 @@ Handlers.add(
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Increase-Undername-Limit-Notice", Name = msg.Tags.Name },
-				Data = tostring(json.encode(result)),
+				Data = json.encode(result),
 			})
 		end
 	end
@@ -472,7 +472,7 @@ Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.Token
 		years = tonumber(msg.Tags.Years) or 1,
 		quantity = tonumber(msg.Tags.Quantity),
 		purchaseType = msg.Tags["Purchase-Type"] or "lease",
-		currentTimestamp = tonumber(msg.Timestamp),
+		currentTimestamp = tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp),
 	})
 	if not status then
 		ao.send({
@@ -483,8 +483,8 @@ Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.Token
 	else
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Token-Cost-Notice", TokenCost = tostring(result) },
-			Data = tostring(json.encode(result)),
+			Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(result) },
+			Data = json.encode(result),
 		})
 	end
 end)
@@ -522,7 +522,7 @@ Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.Joi
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Join-Network-Notice" },
-			Data = tostring(json.encode(result)),
+			Data = json.encode(result),
 		})
 	end
 end)
@@ -539,7 +539,7 @@ Handlers.add(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", ActionMap.Le
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Leave-Network-Notice" },
-			Data = tostring(json.encode(result)),
+			Data = json.encode(result),
 		})
 	end
 end)
@@ -578,7 +578,7 @@ Handlers.add(
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Increase-Operator-Stake-Notice" },
-				Data = tostring(json.encode(result)),
+				Data = json.encode(result),
 			})
 		end
 	end
@@ -617,7 +617,7 @@ Handlers.add(
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Decrease-Operator-Stake-Notice" },
-				Data = tostring(json.encode(result)),
+				Data = json.encode(result),
 			})
 		end
 	end
@@ -649,13 +649,13 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Invalid-Delegate-Stake", Message = result },
-			Data = tostring(json.encode(result)),
+			Data = json.encode(result),
 		})
 	else
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Delegate-Stake-Notice", Gateway = msg.Tags.Target },
-			Data = tostring(json.encode(result)),
+			Data = json.encode(result),
 		})
 	end
 end)
@@ -789,24 +789,80 @@ Handlers.add(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMa
 	end
 end)
 
+Handlers.add("Epoch-Settings", utils.hasMatchingTag("Action", "Epoch-Settings"), function(msg)
+	local epochSettings = epochs.getSettings()
+	ao.send({
+		Target = msg.From,
+		Action = "Epoch-Settings-Notice",
+		Data = json.encode(epochSettings),
+	})
+end)
+
 -- TICK HANDLER
 Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
-	local timestamp = tonumber(msg.Timestamp)
-	-- TODO: how do we make this update atomic so that the state is changed all or nothing (should we?)
-	local lastTickedEpochIndex = LastTickedEpoch
-	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	local function tickState(timestamp, blockHeight, hashchain)
+	-- assert this is a write interaction and we have a timetsamp
+	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
+	-- tick the things that only require timestamp and don't need to happen for every epoch
+	local function tickState(timestamp)
 		arns.pruneRecords(timestamp)
 		arns.pruneReservedNames(timestamp)
 		vaults.pruneVaults(timestamp)
 		gar.pruneGateways(timestamp)
+	end
+
+	local previousState = {
+		Balances = utils.deepCopy(Balances),
+		Vaults = utils.deepCopy(Vaults),
+		GatewayRegistry = utils.deepCopy(GatewayRegistry),
+		NameRegistry = utils.deepCopy(NameRegistry),
+		Epochs = utils.deepCopy(Epochs),
+		DemandFactor = utils.deepCopy(DemandFactor),
+		LastTickedEpochIndex = utils.deepCopy(LastTickedEpochIndex),
+	}
+	local msgTimestamp = tonumber(msg.Timestamp)
+
+	-- tick the state and demand factor using just the timestamp
+	local stateStatus, stateResult = pcall(tickState, msgTimestamp)
+	if not stateStatus then
+		-- reset the state to previous state
+		Balances = previousState.Balances
+		Vaults = previousState.Vaults
+		GatewayRegistry = previousState.GatewayRegistry
+		NameRegistry = previousState.NameRegistry
+		Epochs = previousState.Epochs
+		DemandFactor = previousState.DemandFactor
+		LastTickedEpochIndex = previousState.LastTickedEpochIndex
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-Tick-Notice",
+			Error = "Invalid-Tick",
+			Data = json.encode(stateResult),
+		})
+	end
+
+	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
+	local function tickEpochs(timestamp, blockHeight, hashchain)
+		-- update demand factor if necessary
 		demand.updateDemandFactor(timestamp)
 		epochs.distributeRewardsForEpoch(timestamp)
 		epochs.createEpoch(timestamp, tonumber(blockHeight), hashchain)
 	end
 
+	local lastTickedEpochIndex = LastTickedEpochIndex
+	local currentEpochIndex = epochs.getEpochIndexForTimestamp(msgTimestamp)
+	-- if epoch index is -1 then we are before the genesis epoch and we should not tick
+	if currentEpochIndex < 0 then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-Tick-Notice",
+			Error = "Invalid-Tick",
+			Data = json.encode("Cannot tick before genesis epoch"),
+		})
+	end
+
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
-	for i = lastTickedEpochIndex + 1, currentEpochIndex - 1 do
+	for i = lastTickedEpochIndex + 1, currentEpochIndex do
+		print("Ticking epoch: " .. i)
 		local previousState = {
 			Balances = utils.deepCopy(Balances),
 			Vaults = utils.deepCopy(Vaults),
@@ -814,13 +870,24 @@ Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
 			NameRegistry = utils.deepCopy(NameRegistry),
 			Epochs = utils.deepCopy(Epochs),
 			DemandFactor = utils.deepCopy(DemandFactor),
+			LastTickedEpochIndex = utils.deepCopy(LastTickedEpochIndex),
 		}
 		local _, _, epochDistributionTimestamp = epochs.getEpochTimestampsForIndex(i)
-		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height
-		local status, result = pcall(tickState, epochDistributionTimestamp, msg["Block-Height"], msg["Hash-Chain"])
+		-- use the minimum of the msg timestamp or the epoch distribution timestamp, this ensures an epoch gets created for the genesis block and that we don't try and distribute before an epoch is created
+		local tickTimestamp = math.min(msgTimestamp or 0, epochDistributionTimestamp)
+		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height, we should set the prescribed observers and names to empty arrays and distribute rewards accordingly
+		local status, result = pcall(tickEpochs, tickTimestamp, msg["Block-Height"], msg["Hash-Chain"])
 		if status then
-			ao.send({ Target = msg.From, Action = "Tick-Notice", Data = json.encode(result) })
-			LastTickedEpoch = i -- update the last ticked state
+			if tickTimestamp == epochDistributionTimestamp then
+				-- if we are distributing rewards, we should update the last ticked epoch index to the current epoch index
+				LastTickedEpochIndex = i
+			end
+			ao.send({
+				Target = msg.From,
+				Action = "Tick-Notice",
+				LastTickedEpochIndex = LastTickedEpochIndex,
+				Data = json.encode(result),
+			})
 		else
 			-- reset the state to previous state
 			Balances = previousState.Balances
@@ -829,6 +896,7 @@ Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
 			NameRegistry = previousState.NameRegistry
 			Epochs = previousState.Epochs
 			DemandFactor = previousState.DemandFactor
+			LastTickedEpochIndex = previousState.LastTickedEpochIndex
 			ao.send({
 				Target = msg.From,
 				Action = "Invalid-Tick-Notice",

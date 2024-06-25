@@ -15,6 +15,7 @@ describe("demand", function()
 			fees = constants.genesisFees,
 		}
 		demand.updateSettings({
+			periodZeroStartTimestamp = 0,
 			movingAvgPeriodCount = 7,
 			periodLengthMs = 60 * 1000 * 24, -- one day
 			demandFactorBaseValue = 1,
@@ -112,6 +113,7 @@ describe("demand", function()
 	describe("purchase count criteria", function()
 		before_each(function()
 			demand.updateSettings({
+				periodZeroStartTimestamp = 0,
 				movingAvgPeriodCount = 7,
 				periodLengthMs = 60 * 1000 * 24, -- one day
 				demandFactorBaseValue = 1,

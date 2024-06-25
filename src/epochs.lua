@@ -6,15 +6,15 @@ local arns = require("arns")
 local epochs = {}
 
 Epochs = Epochs or {}
-
-local epochSettings = {
-	prescribedNameCount = 5,
-	rewardPercentage = 0.0005, -- 0.05%
-	maxObservers = 50,
-	epochZeroStartTimestamp = 1719900000000, -- July 2nd, 00:00:00 UTC
-	durationMs = 60 * 1000 * 60 * 24, -- 24 hours
-	distributionDelayMs = 60 * 1000 * 30, -- 15 blocks / 30 minutes
-}
+EpochSettings = EpochSettings
+	or {
+		prescribedNameCount = 5,
+		rewardPercentage = 0.0005, -- 0.05%
+		maxObservers = 50,
+		epochZeroStartTimestamp = 1719900000000, -- July 2nd, 00:00:00 UTC
+		durationMs = 60 * 1000 * 60 * 24, -- 24 hours
+		distributionDelayMs = 60 * 1000 * 30, -- 15 blocks / 30 minutes
+	}
 
 function epochs.getEpochs()
 	local epochs = utils.deepCopy(Epochs) or {}
@@ -31,7 +31,7 @@ function epochs.getObservers()
 end
 
 function epochs.getSettings()
-	return utils.deepCopy(epochSettings)
+	return utils.deepCopy(EpochSettings)
 end
 
 function epochs.getObservations()
@@ -371,7 +371,7 @@ end
 
 -- for testing purposes
 function epochs.updateEpochSettings(newSettings)
-	epochSettings = newSettings
+	EpochSettings = newSettings
 end
 
 -- Steps

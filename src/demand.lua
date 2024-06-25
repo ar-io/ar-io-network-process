@@ -1,11 +1,9 @@
 local constants = require("constants")
 local utils = require("utils")
-local json = require("json")
 local demand = {}
 
 DemandFactor = DemandFactor
 	or {
-		startTimestamp = 1719381600000, -- 06-26-2024
 		currentPeriod = 0,
 		trailingPeriodPurchases = { 0, 0, 0, 0, 0, 0, 0 }, -- Acts as a ring buffer of trailing period purchase counts
 		trailingPeriodRevenues = { 0, 0, 0, 0, 0, 0 }, -- Acts as a ring buffer of trailing period revenues
@@ -16,16 +14,18 @@ DemandFactor = DemandFactor
 		fees = constants.genesisFees,
 	}
 
-local demandFactorSettings = {
-	movingAvgPeriodCount = 7,
-	periodLengthMs = 60 * 60 * 1000 * 24, -- one day in milseconds
-	demandFactorBaseValue = 1,
-	demandFactorMin = 0.5,
-	demandFactorUpAdjustment = 0.05,
-	demandFactorDownAdjustment = 0.025,
-	stepDownThreshold = 3,
-	criteria = "revenue",
-}
+DemandFactorSettings = DemandFactorSettings
+	or {
+		periodZeroStartTimestamp = 1719381600000, -- 06/26/2025 @ 12:00am (UTC)
+		movingAvgPeriodCount = 7,
+		periodLengthMs = 60 * 60 * 1000 * 24, -- one day in milseconds
+		demandFactorBaseValue = 1,
+		demandFactorMin = 0.5,
+		demandFactorUpAdjustment = 0.05,
+		demandFactorDownAdjustment = 0.025,
+		stepDownThreshold = 3,
+		criteria = "revenue",
+	}
 
 function demand.tallyNamePurchase(qty)
 	demand.incrementPurchasesThisPeriodRevenue(1)
@@ -53,6 +53,13 @@ end
 function demand.isDemandIncreasing()
 	local currentPeriod = demand.getCurrentPeriod()
 	local settings = demand.getSettings()
+
+	-- check that we have settings
+	if not settings then
+		print("No settings found")
+		return false
+	end
+
 	local purchasesLastPeriod = demand.getTrailingPeriodPurchases()[currentPeriod] or 0
 	local revenueInLastPeriod = demand.getTrailingPeriodRevenues()[currentPeriod] or 0
 	local mvgAvgOfTrailingNamePurchases = demand.mvgAvgTrailingPurchaseCounts()
@@ -68,7 +75,14 @@ end
 -- update at the end of the demand if the current timestamp results in a period greater than our current state
 function demand.shouldUpdateDemandFactor(currentTimestamp)
 	local settings = demand.getSettings()
-	local calculatedPeriod = math.floor((currentTimestamp - DemandFactor.startTimestamp) / settings.periodLengthMs) + 1
+
+	if not settings or not settings.periodZeroStartTimestamp then
+		return false
+	end
+
+	local calculatedPeriod = math.floor(
+		(currentTimestamp - settings.periodZeroStartTimestamp) / settings.periodLengthMs
+	) + 1
 	return calculatedPeriod > demand.getCurrentPeriod()
 end
 
@@ -79,6 +93,12 @@ function demand.updateDemandFactor(timestamp)
 	end
 
 	local settings = demand.getSettings()
+
+	-- check that we have settings
+	if not settings then
+		print("No settings found")
+		return
+	end
 
 	if demand.isDemandIncreasing() then
 		local upAdjustment = settings.demandFactorUpAdjustment
@@ -146,7 +166,7 @@ function demand.getFees()
 end
 
 function demand.getSettings()
-	return demandFactorSettings
+	return utils.deepCopy(DemandFactorSettings)
 end
 
 function demand.getConsecutivePeriodsWithMinDemandFactor()
@@ -160,11 +180,14 @@ function demand.getCurrentPeriod()
 end
 
 function demand.updateSettings(settings)
-	demandFactorSettings = settings
+	if not settings then
+		return
+	end
+	DemandFactorSettings = settings
 end
 
 function demand.updateStartTimestamp(timestamp)
-	DemandFactor.startTimestamp = timestamp
+	DemandFactorSettings.periodZeroStartTimestamp = timestamp
 end
 
 function demand.updateCurrentPeriod(period)
