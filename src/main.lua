@@ -39,9 +39,11 @@ local ActionMap = {
 	Balance = "Balance",
 	Balances = "Balances",
 	DemandFactor = "Demand-Factor",
+	DemandFactorSettings = "Demand-Factor-Settings",
 	-- EPOCH READ APIS
 	Epochs = "Epochs",
 	Epoch = "Epoch",
+	EpochSettings = "Epoch-Settings",
 	PrescribedObservers = "Epoch-Prescribed-Observers",
 	PrescribedNames = "Epoch-Prescribed-Names",
 	Observations = "Epoch-Observations",
@@ -789,7 +791,7 @@ Handlers.add(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMa
 	end
 end)
 
-Handlers.add("Epoch-Settings", utils.hasMatchingTag("Action", "Epoch-Settings"), function(msg)
+Handlers.add(ActionMap.EpochSettings, utils.hasMatchingTag("Action", ActionMap.EpochSettings), function(msg)
 	local epochSettings = epochs.getSettings()
 	ao.send({
 		Target = msg.From,
@@ -797,6 +799,19 @@ Handlers.add("Epoch-Settings", utils.hasMatchingTag("Action", "Epoch-Settings"),
 		Data = json.encode(epochSettings),
 	})
 end)
+
+Handlers.add(
+	ActionMap.DemandFactorSettings,
+	utils.hasMatchingTag("Action", ActionMap.DemandFactorSettings),
+	function(msg)
+		local demandFactorSettings = demand.getSettings()
+		ao.send({
+			Target = msg.From,
+			Action = "Demand-Factor-Settings-Notice",
+			Data = json.encode(demandFactorSettings),
+		})
+	end
+)
 
 -- TICK HANDLER
 Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
