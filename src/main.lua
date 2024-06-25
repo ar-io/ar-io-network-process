@@ -1219,9 +1219,9 @@ Handlers.add("addGateway", utils.hasMatchingTag("Action", "AddGateway"), functio
 		ao.send({ Target = msg.From, Data = "Unauthorized" })
 		return
 	end
+	local operatorStake = tonumber(json.decode(msg.Data).operatorStake)
+	assert(operatorStake > 0, "Operator stake must be greater than 0")
 	local status, result = pcall(gar.addGateway, msg.Tags.Address, json.decode(msg.Data))
-
-	local operatorStake = json.decode(msg.Data).operatorStake
 	balances.reduceBalance(Owner, operatorStake)
 	if status then
 		ao.send({ Target = msg.From, Data = json.encode(result) })
