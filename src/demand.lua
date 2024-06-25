@@ -68,6 +68,10 @@ end
 -- update at the end of the demand if the current timestamp results in a period greater than our current state
 function demand.shouldUpdateDemandFactor(currentTimestamp)
 	local settings = demand.getSettings()
+	-- if current timestamp is before the start timestamp, return false
+	if currentTimestamp < DemandFactor.startTimestamp then
+		return false
+	end
 	local calculatedPeriod = math.floor((currentTimestamp - DemandFactor.startTimestamp) / settings.periodLengthMs) + 1
 	return calculatedPeriod > demand.getCurrentPeriod()
 end
