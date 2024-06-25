@@ -600,7 +600,7 @@ Handlers.add(
 	function(msg)
 		local checkAssertions = function()
 			assert(
-				utils.isInteger(tonumber(msg.Tags.Quantity) and tonumber(msg.Tags.Quantity) > 0),
+				utils.isInteger(tonumber(msg.Tags.Quantity)) and tonumber(msg.Tags.Quantity) > 0,
 				"Invalid quantity. Must be integer greater than 0"
 			)
 		end
