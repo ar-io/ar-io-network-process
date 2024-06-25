@@ -6,33 +6,74 @@ The implementation of the ar.io network contract is written in lua and deployed 
 
 ## Contract Spec
 
-### Arweave Name Service (ArNS)
+### General Structure
 
-- `BuyRecord` - buy a record
-- `ExtendLease` - extend the lease of a record
-- `IncreaseUndernameLimit` - increase the undername limit of a record
+Each handler is identified by an action name and it has required and optional tags for its input. The handlers can be categorized into "read" and "write" operations.
+
+### Handlers
+
+#### Balances
+
+| Action             | Required Tags                                                                                                     | Optional Tags                   | Result (the -Notice)                    |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------- | --------------------------------------- |
+| `Transfer`         | `Recipient`: Valid Arweave address<br>`Quantity`: Integer greater than 0                                          | `X-*`: Tags beginning with "X-" | `Debit-Notice`, `Credit-Notice`         |
+| `Create-Vault'`    | `Lock-Length`: Integer greater than 0<br>`Quantity`: Integer greater than 0                                       |                                 | `Vault-Created-Notice`                  |
+| `Vaulted-Transfer` | `Recipient`: Valid Arweave address<br>`Lock-Length`: Integer greater than 0<br>`Quantity`: Integer greater than 0 |                                 | `Debit-Notice`, `Vaulted-Credit-Notice` |
+| `Extend-Vault`     | `Vault-Id`: Valid Arweave address<br>`Extend-Length`: Integer greater than 0                                      |                                 | `Vault-Extended-Notice`                 |
+| `Increase-Vault`   | `Vault-Id`: Valid Arweave address<br>`Quantity`: Integer greater than 0                                           |                                 | `Vault-Increased-Notice`                |
+| `Balances`         |                                                                                                                   |                                 | `Balances-Notice`                       |
+| `Balance`          |                                                                                                                   |                                 | `Balance-Notice`                        |
+
+### ArNS Registry
+
+| Action                     | Required Tags                                                                                                        | Optional Tags                                                          | Result                            |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------- |
+| `Buy-Record`               | `Name`: String<br>`Purchase-Type`: String<br>`Process-Id`: Valid Arweave address<br>`Years`: Integer between 1 and 5 |                                                                        | `Buy-Record-Notice`               |
+| `Extend-Lease`             | `Name`: String<br>`Years`: Integer between 1 and 5                                                                   |                                                                        | `Extend-Lease-Notice`             |
+| `Increase-Undername-Limit` | `Name`: String<br>`Quantity`: Integer between 1 and 9990                                                             |                                                                        | `Increase-Undername-Limit-Notice` |
+| `Token-Cost`               | `Intent`: Must be valid registry interaction (e.g., BuyRecord, ExtendLease, IncreaseUndernameLimit)                  | `Years`: Integer between 1 and 5<br>`Quantity`: Integer greater than 0 | `Token-Cost-Notice`               |
+| `Demand-Factor-Settings`   |                                                                                                                      |                                                                        | `Demand-Factor-Settings-Notice`   |
+| `Demand-Factor`            |                                                                                                                      |                                                                        | `Demand-Factor-Notice`            |
+| `Record`                   |                                                                                                                      |                                                                        | `Record-Notice`                   |
+| `Records`                  |                                                                                                                      |                                                                        | `Records-Notice`                  |
+| `Reserved-Names`           |                                                                                                                      |                                                                        | `Reserved-Names-Notice`           |
+| `Reserved-Name`            |                                                                                                                      |                                                                        | `Reserved-Name-Notice`            |
 
 ### Gateway Registry
 
-- `JoinNetwork` - join a network
-- `LeaveNetwork` - leave a network
-- `UpdateGatewaySettings` - update a gateway settings
-- `IncreaseOperatorStake`- increase operator stake
-- `DecreaseOperatorStake` - decrease operator stake
-- `DelegateStake` - delegate stake to an existing gateway
-- `DecreaseDelegatedStake` - decrease delegated stake to an existing gateway
+| Action                      | Required Tags                                                                                                 | Optional Tags                                                                                                                                                                | Result (the -Notice)               |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `Join-Network`              | `Operator-Stake`: Quantity                                                                                    | `Label`, `Note`, `FQDN`, `Port`, `Protocol`, `Allow-Delegated-Staking`, `Min-Delegated-Stake`, `Delegate-Reward-Share-Ratio`, `Properties`, `Auto-Stake`, `Observer-Address` | `Join-Network-Notice`              |
+| `Leave-Network`             |                                                                                                               |                                                                                                                                                                              | `Leave-Network-Notice`             |
+| `Increase-Operator-Stake`   | `Quantity`: Integer greater than 0                                                                            |                                                                                                                                                                              | `Increase-Operator-Stake-Notice`   |
+| `Decrease-Operator-Stake`   | `Quantity`: Integer greater than 0                                                                            |                                                                                                                                                                              | `Decrease-Operator-Stake-Notice`   |
+| `Delegate-Stake`            | `Target`: Valid Arweave address<br>`Quantity`: Integer greater than 0                                         |                                                                                                                                                                              | `Delegate-Stake-Notice`            |
+| `Decrease-Delegate-Stake`   | `Target`: Valid Arweave address<br>`Quantity`: Integer greater than 0                                         |                                                                                                                                                                              | `Decrease-Delegate-Stake-Notice`   |
+| `Update-Gateway-Settings`   |                                                                                                               | `Label`, `Note`, `FQDN`, `Port`, `Protocol`, `Allow-Delegated-Staking`, `Min-Delegated-Stake`, `Delegate-Reward-Share-Ratio`, `Properties`, `Auto-Stake`, `Observer-Address` | `Update-Gateway-Settings-Notice`   |
+| `Save-Observations`         | `Report-Tx-Id`: Valid Arweave address<br>`Failed-Gateways`: Comma-separated string of valid Arweave addresses |                                                                                                                                                                              | `Save-Observations-Notice`         |
+| `Gateway-Registry-Settings` |                                                                                                               |                                                                                                                                                                              | `Gateway-Registry-Settings-Notice` |
+| `Gateways`                  |                                                                                                               |                                                                                                                                                                              | `Gateways-Notice`                  |
+| `Gateway`                   |                                                                                                               | `Address`: Valid Arweave address, `Target`: Valid Arweave address                                                                                                            | `Gateway-Notice`                   |
 
-### Observer Incentive Protocol (OIP)
+### Epochs
 
-- `SaveObservations` - save observations for a given epoch
-- `Observations` - get observations for a given Epoch
-- `PrescribedObservers` - get prescribed observers for a given Epoch
-- `PrescribedNames` - get prescribed names for a given Epoch
+| Action                       | Required Tags                | Optional Tags | Result (the -Notice)          |
+| ---------------------------- | ---------------------------- | ------------- | ----------------------------- |
+| `Epoch-Settings`             |                              |               | `Epoch-Settings-Notice`       |
+| `Epoch`                      | `Epoch-Index` or `Timestamp` |               | `Epoch-Notice`                |
+| `Epochs`                     |                              |               | `Epochs-Notice`               |
+| `Epoch-Prescribe-dObservers` | `Epoch-Index` or `Timestamp` |               | `Prescribed-Observers-Notice` |
+| `Epoch-Observations`         | `Epoch-Index` or `Timestamp` |               | `Observations-Notice`         |
+| `Epoch-Prescribed-Names`     | `Epoch-Index` or `Timestamp` |               | `Prescribed-Names-Notice`     |
+| `Epoch-Distributions`        | `Epoch-Index` or `Timestamp` |               | `Distributions-Notice`        |
 
-### Epoch
+#### State
 
-- `Epoch` - get epoch details
-- `Epochs` - get all epochs
+| Action  | Required Tags                             | Optional Tags | Result (the -Notice)                 |
+| ------- | ----------------------------------------- | ------------- | ------------------------------------ |
+| `Info`  |                                           |               | `Info-Notice`                        |
+| `State` |                                           |               | `State-Notice`                       |
+| `Tick`  | `Hash-Chain`, `Timestamp`, `Block-Height` |               | `Tick-Notice`, `Invalid-Tick_Notice` |
 
 ## Developers
 

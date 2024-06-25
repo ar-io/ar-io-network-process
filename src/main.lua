@@ -236,9 +236,9 @@ end)
 
 Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.ExtendVault), function(msg)
 	local checkAssertions = function()
-		assert(utils.isValidArweaveAddress(msg.Tags.VaultId), "Invalid vault id")
+		assert(utils.isValidArweaveAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
 		assert(
-			tonumber(msg.Tags.ExtendLength) > 0 and utils.isInteger(tonumber(msg.Tags.ExtendLength)),
+			tonumber(msg.Tags["Extend-Length"]) > 0 and utils.isInteger(tonumber(msg.Tags["Extend-Length"])),
 			"Invalid extension length. Must be integer greater than 0"
 		)
 	end
@@ -254,7 +254,7 @@ Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.Ext
 		return
 	end
 
-	local result, err = balances.extendVault(msg.From, msg.Tags.ExtendLength, msg.Timestamp, msg.Tags.VaultId)
+	local result, err = balances.extendVault(msg.From, msg.Tags["Extend-Length"], msg.Timestamp, msg.Tags["Vault-Id"])
 	if err then
 		ao.send({
 			Target = msg.From,
