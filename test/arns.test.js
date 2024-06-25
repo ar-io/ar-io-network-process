@@ -21,6 +21,76 @@ describe('ArNS', async () => {
     );
   }
 
+  it('should buy a record', async () => {
+    const buyRecordResult = await handle({
+      Tags: [
+        { name: 'Action', value: 'Buy-Record' },
+        { name: 'Name', value: 'test-name' },
+        { name: 'Purchase-Type', value: 'lease' },
+        { name: 'Years', value: '1' },
+        { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+      ],
+    });
+
+    const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
+
+    // fetch the record
+    const realRecord = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Record' },
+          { name: 'Name', value: 'test-name' },
+        ],
+      },
+      buyRecordResult.Memory,
+    );
+
+    const record = JSON.parse(realRecord.Messages[0].Data);
+    assert.deepEqual(record, {
+      processId: ''.padEnd(43, 'a'),
+      purchasePrice: 600000000,
+      startTimestamp: buyRecordData.startTimestamp,
+      endTimestamp: buyRecordData.endTimestamp,
+      type: 'lease',
+      undernameLimit: 10,
+    });
+  });
+
+  it('should buy a record and default the name to lower case', async () => {
+    const buyRecordResult = await handle({
+      Tags: [
+        { name: 'Action', value: 'Buy-Record' },
+        { name: 'Name', value: 'Test-NAme' },
+        { name: 'Purchase-Type', value: 'lease' },
+        { name: 'Years', value: '1' },
+        { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+      ],
+    });
+
+    const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
+
+    // fetch the record
+    const realRecord = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Record' },
+          { name: 'Name', value: 'test-name' },
+        ],
+      },
+      buyRecordResult.Memory,
+    );
+
+    const record = JSON.parse(realRecord.Messages[0].Data);
+    assert.deepEqual(record, {
+      processId: ''.padEnd(43, 'a'),
+      purchasePrice: 600000000,
+      startTimestamp: buyRecordData.startTimestamp,
+      endTimestamp: buyRecordData.endTimestamp,
+      type: 'lease',
+      undernameLimit: 10,
+    });
+  });
+
   it('should increase the undernames', async () => {
     const buyUndernameResult = await handle({
       Tags: [

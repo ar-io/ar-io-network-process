@@ -332,7 +332,7 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 
 	local status, result = pcall(
 		arns.buyRecord,
-		msg.Tags.Name,
+		string.lower(msg.Tags.Name),
 		msg.Tags["Purchase-Type"],
 		tonumber(msg.Tags.Years),
 		msg.From,
@@ -378,7 +378,8 @@ Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.Ext
 		return
 	end
 
-	local status, result = pcall(arns.extendLease, msg.From, msg.Tags.Name, tonumber(msg.Tags.Years), msg.Timestamp)
+	local status, result =
+		pcall(arns.extendLease, msg.From, string.lower(msg.Tags.Name), tonumber(msg.Tags.Years), msg.Timestamp)
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -388,7 +389,7 @@ Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.Ext
 	else
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Extend-Lease-Notice", Name = msg.Tags.Name },
+			Tags = { Action = "Extend-Lease-Notice", Name = string.lower(msg.Tags.Name) },
 			Data = json.encode(result),
 		})
 	end
@@ -419,8 +420,13 @@ Handlers.add(
 			return
 		end
 
-		local status, result =
-			pcall(arns.increaseundernameLimit, msg.From, msg.Tags.Name, tonumber(msg.Tags.Quantity), msg.Timestamp)
+		local status, result = pcall(
+			arns.increaseundernameLimit,
+			msg.From,
+			string.lower(msg.Tags.Name),
+			tonumber(msg.Tags.Quantity),
+			msg.Timestamp
+		)
 		if not status then
 			ao.send({
 				Target = msg.From,
@@ -430,7 +436,7 @@ Handlers.add(
 		else
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Increase-Undername-Limit-Notice", Name = msg.Tags.Name },
+				Tags = { Action = "Increase-Undername-Limit-Notice", Name = string.lower(msg.Tags.Name) },
 				Data = json.encode(result),
 			})
 		end
@@ -473,7 +479,7 @@ Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.Token
 
 	local status, result = pcall(arns.getTokenCost, {
 		intent = msg.Tags.Intent,
-		name = msg.Tags.Name,
+		name = string.lower(msg.Tags.Name),
 		years = tonumber(msg.Tags.Years) or 1,
 		quantity = tonumber(msg.Tags.Quantity),
 		purchaseType = msg.Tags["Purchase-Type"] or "lease",
@@ -1229,7 +1235,7 @@ Handlers.add("addRecord", utils.hasMatchingTag("Action", "AddRecord"), function(
 		ao.send({ Target = msg.From, Data = "Unauthorized" })
 		return
 	end
-	local status, result = pcall(arns.addRecord, msg.Tags.Name, json.decode(msg.Data))
+	local status, result = pcall(arns.addRecord, string.lower(msg.Tags.Name), json.decode(msg.Data))
 	if status then
 		ao.send({ Target = msg.From, Data = json.encode(result) })
 	else
@@ -1242,7 +1248,7 @@ Handlers.add("addReservedName", utils.hasMatchingTag("Action", "AddReservedName"
 		ao.send({ Target = msg.From, Data = "Unauthorized" })
 		return
 	end
-	local status, result = pcall(arns.addReservedName, msg.Tags.Name, json.decode(msg.Data))
+	local status, result = pcall(arns.addReservedName, string.lower(msg.Tags.Name), json.decode(msg.Data))
 	if status then
 		ao.send({ Target = msg.From, Data = json.encode(result) })
 	else
