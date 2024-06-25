@@ -1214,9 +1214,9 @@ Handlers.add("addGateway", utils.hasMatchingTag("Action", "AddGateway"), functio
 		return
 	end
 	local status, result = pcall(gar.addGateway, msg.Tags.Address, json.decode(msg.Data))
-	-- TODO: deduct balance from owner when adding a gateway
-	-- reduce the owner balance when a gateway is added
-	balances.reduceBalance(Owner, 50000000000)
+
+	local operatorStake = json.decode(msg.Data).operatorStake
+	balances.reduceBalance(Owner, operatorStake)
 	if status then
 		ao.send({ Target = msg.From, Data = json.encode(result) })
 	else
