@@ -1274,6 +1274,15 @@ Handlers.add("addReservedName", utils.hasMatchingTag("Action", "AddReservedName"
 	end
 end)
 
+Handlers.add("sortedRecords", utils.hasMatchingTag("Action", "Sorted-Records"), function(msg)
+	local page = tonumber(msg.Tags.Page) or 1
+	local pageLimit = tonumber(msg.Tags["Page-Size"]) or 10
+	local sortOrder = msg.Tags.SortOrder and string.lower(msg.Tags["Sort-Order"]) or "asc"
+	local sortBy = msg.Tags.SortBy and string.lower(msg.Tags["Sort-By"]) or "name"
+	local sortedRecords = arns.getSortedRecords(page, pageLimit, sortBy, sortOrder)
+	ao.send({ Target = msg.From, Data = json.encode(sortedRecords) })
+end)
+
 -- END UTILITY HANDLERS USED FOR MIGRATION
 
 return process

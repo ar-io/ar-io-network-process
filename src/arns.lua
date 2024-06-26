@@ -70,6 +70,35 @@ function arns.addRecord(name, record)
 	end
 end
 
+function arns.getSortedRecords(page, pageLimit, sortBy, sortDirection)
+	local records = arns.getRecords()
+	-- sort the reocrds map by the keys alphabeticcally
+	local sortedRecords = {}
+	for name, record in pairs(records) do
+		record.name = name
+		table.insert(sortedRecords, record)
+	end
+
+	-- sort the records by the named
+	table.sort(sortedRecords, function(recordA, recordB)
+		local nameAString = recordA[sortBy]
+		local nameBString = recordB[sortBy]
+		if sortDirection == "desc" then
+			nameAString, nameBString = nameBString, nameAString
+		end
+		return nameAString < nameBString
+	end)
+	return {
+		records = utils.slice(sortedRecords, (page - 1) * pageLimit + 1, page * pageLimit),
+		page = page,
+		totalItems = #sortedRecords,
+		totalPages = math.ceil(#sortedRecords / pageLimit),
+		sortBy = sortBy,
+		sortDirection = sortDirection,
+		hasNextPage = page * pageLimit < #sortedRecords,
+	}
+end
+
 function arns.extendLease(from, name, years, currentTimestamp)
 	local record = arns.getRecord(name)
 	-- throw error if invalid
