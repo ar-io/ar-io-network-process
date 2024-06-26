@@ -521,7 +521,7 @@ function gar.assertValidGatewayParameters(from, stake, settings, observerAddress
 			type(settings.minDelegatedStake) == "number"
 				and utils.isInteger(settings.minDelegatedStake)
 				and settings.minDelegatedStake >= gar.getSettings().delegates.minStake,
-			"minDelegatedStake must be an integer and "
+			"minDelegatedStake must be an integer greater than or equal to the minimum delegated stake"
 		)
 	end
 end

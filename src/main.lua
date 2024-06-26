@@ -888,11 +888,12 @@ Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	local currentEpochIndex = epochs.getEpochIndexForTimestamp(msgTimestamp)
 	-- if epoch index is -1 then we are before the genesis epoch and we should not tick
 	if currentEpochIndex < 0 then
+		-- do nothing and just send a notice back to the sender
 		ao.send({
 			Target = msg.From,
-			Action = "Invalid-Tick-Notice",
-			Error = "Invalid-Tick",
-			Data = json.encode("Cannot tick before genesis epoch"),
+			Action = "Tick-Notice",
+			LastTickedEpochIndex = LastTickedEpochIndex,
+			Data = json.encode("Genesis epocch has not started yet."),
 		})
 	end
 

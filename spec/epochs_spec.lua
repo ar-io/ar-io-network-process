@@ -41,7 +41,7 @@ describe("epochs", function()
 		}
 		epochs.updateEpochSettings({
 			prescribedNameCount = 5,
-			maxObservers = 3,
+			maxObservers = 5,
 			epochZeroStartTimestamp = 0,
 			durationMs = 100,
 			distributionDelayMs = 15,
@@ -450,7 +450,7 @@ describe("epochs", function()
 		it("should distribute rewards for the epoch", function()
 			local epochIndex = 0
 			local hashchain = "c29tZSBzYW1wbGUgaGFzaA==" -- base64 of "some sample hash"
-			for i = 1, 3 do
+			for i = 1, 5 do
 				local gateway = {
 					operatorStake = gar.getSettings().operators.minStake,
 					totalDelegatedStake = 0,
@@ -486,12 +486,13 @@ describe("epochs", function()
 			-- save observations using saveObsevations function for each gateway, gateway1 failed, gateway2 and gateway3 passed
 			local failedGateways = {
 				"test-this-is-valid-arweave-wallet-address-1",
+				"test-this-is-valid-arweave-wallet-address-3",
 			}
 			local epochStartTimetamp, epochEndTimestamp, epochDistributionTimestamp =
 				epochs.getEpochTimestampsForIndex(epochIndex)
 			local validObservationTimestamp = epochStartTimetamp + epochs.getSettings().distributionDelayMs + 1
 			-- save observations for the epoch for last two gateways
-			for i = 2, 3 do
+			for i = 3, 5 do
 				local status, result = pcall(
 					epochs.saveObservations,
 					"test-this-very-valid-observer-wallet-addr-" .. i,
@@ -503,20 +504,23 @@ describe("epochs", function()
 			end
 			-- set the protocol balance to 5 million IO
 			local totalEligibleRewards = math.floor(protocolBalance * 0.0025)
-			local expectedGatewaryReward = math.floor(totalEligibleRewards * 0.95 / 3)
-			local expectedObserverReward = math.floor(totalEligibleRewards * 0.05 / 3)
+			local expectedGatewaryReward = math.floor(totalEligibleRewards * 0.95 / 5)
+			local expectedObserverReward = math.floor(totalEligibleRewards * 0.05 / 5)
 			-- clear the balances for the gateways
 			Balances["test-this-is-valid-arweave-wallet-address-1"] = 0
 
 			-- distribute rewards for the epoch
 			local status = pcall(epochs.distributeRewardsForEpoch, epochDistributionTimestamp)
 			assert.is_true(status)
-			-- gateway 1 should only get observer rewards
-			-- gateway 2 should get obesrver and gateway rewards
+			-- gateway 1 should not get any rewards
+			-- gateway 2 should get both observer and gateway rewards
 			-- gateway 3 should get observer and gateway rewards
 			local gateway1 = gar.getGateway("test-this-is-valid-arweave-wallet-address-1")
 			local gateway2 = gar.getGateway("test-this-is-valid-arweave-wallet-address-2")
 			local gateway3 = gar.getGateway("test-this-is-valid-arweave-wallet-address-3")
+			local gateway4 = gar.getGateway("test-this-is-valid-arweave-wallet-address-4")
+			local gateway5 = gar.getGateway("test-this-is-valid-arweave-wallet-address-5")
+			-- failed observation and did not observe
 			assert.are.same({
 				prescribedEpochCount = 1,
 				observedEpochCount = 0,
@@ -526,16 +530,27 @@ describe("epochs", function()
 				passedConsecutiveEpochs = 0,
 				totalEpochCount = 1,
 			}, gateway1.stats)
+			-- passed observation, did not observe
 			assert.are.same({
 				prescribedEpochCount = 1,
-				observedEpochCount = 1,
+				observedEpochCount = 0,
 				passedEpochCount = 1,
 				failedEpochCount = 0,
 				failedConsecutiveEpochs = 0,
 				passedConsecutiveEpochs = 1,
 				totalEpochCount = 1,
 			}, gateway2.stats)
-
+			-- failed observation, did observe
+			assert.are.same({
+				prescribedEpochCount = 1,
+				observedEpochCount = 1,
+				passedEpochCount = 0,
+				failedEpochCount = 1,
+				failedConsecutiveEpochs = 1,
+				passedConsecutiveEpochs = 0,
+				totalEpochCount = 1,
+			}, gateway3.stats)
+			-- passed observation, did observe
 			assert.are.same({
 				prescribedEpochCount = 1,
 				observedEpochCount = 1,
@@ -544,26 +559,49 @@ describe("epochs", function()
 				failedConsecutiveEpochs = 0,
 				passedConsecutiveEpochs = 1,
 				totalEpochCount = 1,
-			}, gateway3.stats)
+			}, gateway4.stats)
+			-- passed observation, did observe
+			assert.are.same({
+				prescribedEpochCount = 1,
+				observedEpochCount = 1,
+				passedEpochCount = 1,
+				failedEpochCount = 0,
+				failedConsecutiveEpochs = 0,
+				passedConsecutiveEpochs = 1,
+				totalEpochCount = 1,
+			}, gateway5.stats)
 			-- check balances
 			assert.are.equal(0, balances.getBalance("test-this-is-valid-arweave-wallet-address-1"))
 			assert.are.equal(
-				expectedGatewaryReward + expectedObserverReward,
+				math.floor(expectedGatewaryReward * 0.75),
 				balances.getBalance("test-this-is-valid-arweave-wallet-address-2")
+			)
+			assert.are.equal(expectedObserverReward, balances.getBalance("test-this-is-valid-arweave-wallet-address-3"))
+			assert.are.equal(expectedObserverReward, balances.getBalance("test-this-is-valid-arweave-wallet-address-3"))
+			assert.are.equal(
+				expectedGatewaryReward + expectedObserverReward,
+				balances.getBalance("test-this-is-valid-arweave-wallet-address-4")
 			)
 			assert.are.equal(
 				expectedGatewaryReward + expectedObserverReward,
-				balances.getBalance("test-this-is-valid-arweave-wallet-address-3")
+				balances.getBalance("test-this-is-valid-arweave-wallet-address-5")
 			)
 			-- check the epoch was updated
 			local distributions = epochs.getEpoch(epochIndex).distributions
+			local expectedTotalDistribution = 0 -- gateway 1 did not get any rewards
+				+ math.floor(expectedGatewaryReward * 0.75) -- gateway 2 got 75% of the gateway reward
+				+ expectedObserverReward * 3 -- gateway 3, 4, 5 got observer rewards
+				+ expectedGatewaryReward * 2 -- gateway 4, 5 got gateway rewards
 			assert.are.same({
 				totalEligibleRewards = totalEligibleRewards,
-				totalDistributedRewards = (expectedGatewaryReward + expectedObserverReward) * 2,
+				totalDistributedRewards = expectedTotalDistribution,
 				distributedTimestamp = epochDistributionTimestamp,
 				rewards = {
-					["test-this-is-valid-arweave-wallet-address-2"] = expectedGatewaryReward + expectedObserverReward,
-					["test-this-is-valid-arweave-wallet-address-3"] = expectedGatewaryReward + expectedObserverReward,
+					["test-this-is-valid-arweave-wallet-address-1"] = 0,
+					["test-this-is-valid-arweave-wallet-address-2"] = math.floor(expectedGatewaryReward * 0.75),
+					["test-this-is-valid-arweave-wallet-address-3"] = expectedObserverReward,
+					["test-this-is-valid-arweave-wallet-address-4"] = expectedGatewaryReward + expectedObserverReward,
+					["test-this-is-valid-arweave-wallet-address-5"] = expectedGatewaryReward + expectedObserverReward,
 				},
 			}, distributions)
 		end)
