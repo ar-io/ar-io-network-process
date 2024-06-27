@@ -88,6 +88,7 @@ function arns.getSortedRecords(page, pageLimit, sortBy, sortDirection)
 		end
 		return nameAString < nameBString
 	end)
+
 	return {
 		records = utils.slice(sortedRecords, (page - 1) * pageLimit + 1, page * pageLimit),
 		page = page,

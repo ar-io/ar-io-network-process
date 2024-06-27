@@ -1274,7 +1274,7 @@ Handlers.add("addReservedName", utils.hasMatchingTag("Action", "AddReservedName"
 	end
 end)
 
-Handlers.add("sortedRecords", utils.hasMatchingTag("Action", "Sorted-Records"), function(msg)
+Handlers.add("paginatedRecords", utils.hasMatchingTag("Action", "Paginated-Records"), function(msg)
 	local page = tonumber(msg.Tags.Page) or 1
 	local pageLimit = tonumber(msg.Tags["Page-Size"]) or 10
 	local sortOrder = msg.Tags.SortOrder and string.lower(msg.Tags["Sort-Order"]) or "asc"
