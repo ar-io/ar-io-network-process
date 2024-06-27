@@ -8,7 +8,7 @@ local testSettings = {
 	autoStake = true,
 	label = "test",
 	delegateRewardShareRatio = 0,
-	properties = "properties",
+	properties = "test-this-is-valid-arweave-wallet-address-1",
 }
 
 local startTimestamp = 0
@@ -28,7 +28,7 @@ local testGateway = {
 	},
 	settings = testSettings,
 	status = "joined",
-	observerAddress = "observerAddress",
+	observerAddress = "test-this-is-valid-arweave-wallet-address-1",
 }
 
 describe("gar", function()
@@ -66,14 +66,14 @@ describe("gar", function()
 				},
 				settings = testSettings,
 				status = "joined",
-				observerAddress = "observerAddress",
+				observerAddress = "test-this-is-valid-arweave-wallet-address-1",
 			}
 			local status, error = pcall(
 				gar.joinNetwork,
 				"test-this-is-valid-arweave-wallet-address-1",
 				gar.getSettings().operators.minStake,
 				testSettings,
-				"observerAddress",
+				"test-this-is-valid-arweave-wallet-address-1",
 				startTimestamp
 			)
 			assert.is_false(status)
@@ -108,14 +108,14 @@ describe("gar", function()
 					properties = testSettings.properties,
 				},
 				status = "joined",
-				observerAddress = "observerAddress",
+				observerAddress = "test-this-is-valid-arweave-wallet-address-1",
 			}
 			local status, result = pcall(
 				gar.joinNetwork,
 				"test-this-is-valid-arweave-wallet-address-1",
 				gar.getSettings().operators.minStake,
 				testSettings,
-				"observerAddress",
+				"test-this-is-valid-arweave-wallet-address-1",
 				startTimestamp
 			)
 			assert.is_true(status)
@@ -322,13 +322,13 @@ describe("gar", function()
 				},
 				settings = testSettings,
 				status = "joined",
-				observerAddress = "observerAddress",
+				observerAddress = "test-this-is-valid-arweave-wallet-address-0",
 			}
-			local newObserverWallet = "QGWqtJdLLgm2ehFWiiPzMaoFLD50CnGuzZIPEdoDRGQ"
+			local newObserverWallet = "test-this-is-valid-arweave-wallet-address-1"
 			local updatedSettings = {
 				fqdn = "example.com",
 				port = 80,
-				protocol = "http",
+				protocol = "https",
 				properties = "NdZ3YRwMB2AMwwFYjKn1g88Y9nRybTo0qhS1ORq_E7g",
 				note = "This is a test update.",
 				label = "Test Label Update",
