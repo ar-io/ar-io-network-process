@@ -116,8 +116,6 @@ describe('GatewayRegistry', async () => {
           Tags: [...overwriteTags, ...tags],
         });
 
-        console.log(joinNetworkResult);
-
         // confirm there is an error tag
         const errorTag = joinNetworkResult.Messages[0].Tags.find(
           (tag) => tag.name === 'Error',
