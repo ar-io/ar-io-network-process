@@ -560,9 +560,8 @@ Handlers.add(
 	utils.hasMatchingTag("Action", ActionMap.IncreaseOperatorStake),
 	function(msg)
 		local checkAssertions = function()
-			assert(tonumber(msg.Tags.Quantity) > 0, "Invalid quantity")
 			assert(
-				utils.isInteger(tonumber(msg.Tags.Quantity) and tonumber(msg.Tags.Quantity) > 0),
+				utils.isInteger(tonumber(msg.Tags.Quantity)) and tonumber(msg.Tags.Quantity) > 0,
 				"Invalid quantity. Must be integer greater than 0"
 			)
 		end
@@ -601,7 +600,7 @@ Handlers.add(
 	function(msg)
 		local checkAssertions = function()
 			assert(
-				utils.isInteger(tonumber(msg.Tags.Quantity) and tonumber(msg.Tags.Quantity) > 0),
+				utils.isInteger(tonumber(msg.Tags.Quantity)) and tonumber(msg.Tags.Quantity) > 0,
 				"Invalid quantity. Must be integer greater than 0"
 			)
 		end
@@ -889,11 +888,12 @@ Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	local currentEpochIndex = epochs.getEpochIndexForTimestamp(msgTimestamp)
 	-- if epoch index is -1 then we are before the genesis epoch and we should not tick
 	if currentEpochIndex < 0 then
+		-- do nothing and just send a notice back to the sender
 		ao.send({
 			Target = msg.From,
-			Action = "Invalid-Tick-Notice",
-			Error = "Invalid-Tick",
-			Data = json.encode("Cannot tick before genesis epoch"),
+			Action = "Tick-Notice",
+			LastTickedEpochIndex = LastTickedEpochIndex,
+			Data = json.encode("Genesis epocch has not started yet."),
 		})
 	end
 
@@ -1219,9 +1219,9 @@ Handlers.add("addGateway", utils.hasMatchingTag("Action", "AddGateway"), functio
 		ao.send({ Target = msg.From, Data = "Unauthorized" })
 		return
 	end
+	local operatorStake = tonumber(json.decode(msg.Data).operatorStake)
+	assert(operatorStake > 0, "Operator stake must be greater than 0")
 	local status, result = pcall(gar.addGateway, msg.Tags.Address, json.decode(msg.Data))
-
-	local operatorStake = json.decode(msg.Data).operatorStake
 	balances.reduceBalance(Owner, operatorStake)
 	if status then
 		ao.send({ Target = msg.From, Data = json.encode(result) })
