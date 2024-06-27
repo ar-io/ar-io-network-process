@@ -4,7 +4,7 @@ local constants = require("constants")
 
 Name = Name or "Testnet IO"
 Ticker = Ticker or "tIO"
-Logo = "Sie_26dvgyok0PZD_-iQAFOhOd5YxDTkczOLoqTTL_A"
+Logo = Logo or "qUjrTmHdVjXX4D6rU6Fik02bUOzWkOR6oOqUg39g4-s"
 Denomination = 6
 DemandFactor = DemandFactor or {}
 Owner = Owner or ao.env.Process.Owner
