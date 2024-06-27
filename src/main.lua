@@ -744,7 +744,7 @@ Handlers.add(
 			delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"])
 				or gateway.settings.delegateRewardShareRatio,
 			properties = msg.Tags.Properties or gateway.settings.properties,
-			autoStake = msg.Tags["Auto-Stkae"] == "true" or gateway.settings.autoStake,
+			autoStake = msg.Tags["Auto-Stake"] == "true" or gateway.settings.autoStake,
 		}
 		local observerAddress = msg.Tags["Observer-Address"] or gateway.observerAddress
 		local status, result =
