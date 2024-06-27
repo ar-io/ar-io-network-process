@@ -4,7 +4,7 @@ local constants = require("constants")
 
 Name = Name or "Testnet IO"
 Ticker = Ticker or "tIO"
-Logo = "Sie_26dvgyok0PZD_-iQAFOhOd5YxDTkczOLoqTTL_A"
+Logo = Logo or "qUjrTmHdVjXX4D6rU6Fik02bUOzWkOR6oOqUg39g4-s"
 Denomination = 6
 DemandFactor = DemandFactor or {}
 Owner = Owner or ao.env.Process.Owner
@@ -744,7 +744,7 @@ Handlers.add(
 			delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"])
 				or gateway.settings.delegateRewardShareRatio,
 			properties = msg.Tags.Properties or gateway.settings.properties,
-			autoStake = msg.Tags["Auto-Stake"] == "true" or gateway.settings.autoStake,
+			autoStake = not msg.Tags["Auto-Stake"] and gateway.settings.autoStake or msg.Tags["Auto-Stake"] == "true",
 		}
 		local observerAddress = msg.Tags["Observer-Address"] or gateway.observerAddress
 		local status, result =
