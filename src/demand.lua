@@ -86,6 +86,10 @@ function demand.shouldUpdateDemandFactor(currentTimestamp)
 	return calculatedPeriod > demand.getCurrentPeriod()
 end
 
+function demand.getDemandFactorInfo()
+	return utils.deepCopy(DemandFactor)
+end
+
 function demand.updateDemandFactor(timestamp)
 	if not demand.shouldUpdateDemandFactor(timestamp) then
 		print("Not updating demand factor")

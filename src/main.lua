@@ -39,6 +39,7 @@ local ActionMap = {
 	Balance = "Balance",
 	Balances = "Balances",
 	DemandFactor = "Demand-Factor",
+	DemandFactorInfo = "Demand-Factor-Info",
 	DemandFactorSettings = "Demand-Factor-Settings",
 	-- EPOCH READ APIS
 	Epochs = "Epochs",
@@ -1017,12 +1018,26 @@ Handlers.add(ActionMap.DemandFactor, utils.hasMatchingTag("Action", ActionMap.De
 	-- wrap in a protected call, and return the result or error accoringly to sender
 	local status, result = pcall(demand.getDemandFactor)
 	if status then
-		ao.send({ Target = msg.From, Action = "Demand-Factor-Notice", Data = tostring(result) })
+		ao.send({ Target = msg.From, Action = "Demand-Factor-Notice", Data = json.encode(result) })
 	else
 		ao.send({
 			Target = msg.From,
 			Action = "Invalid-Demand-Factor-Notice",
 			Error = "Invalid-Demand-Factor",
+			Data = json.encode(result),
+		})
+	end
+end)
+
+Handlers.add(ActionMap.DemandFactorInfo, utils.hasMatchingTag("Action", ActionMap.DemandFactorInfo), function(msg)
+	local status, result = pcall(demand.getDemandFactorInfo)
+	if status then
+		ao.send({ Target = msg.From, Action = "Demand-Factor-Info-Notice", Data = json.encode(result) })
+	else
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-Demand-Factor-Info-Notice",
+			Error = "Invalid-Demand-Info-Factor",
 			Data = json.encode(result),
 		})
 	end
