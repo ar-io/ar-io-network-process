@@ -78,7 +78,7 @@ local ActionMap = {
 }
 
 -- Write handlers
-Handlers.add("info", utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
+Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
 	-- assert recipient is a valid arweave address
 	local function checkAssertions()
 		assert(utils.isValidArweaveAddress(msg.Tags.Recipient), "Invalid recipient")
