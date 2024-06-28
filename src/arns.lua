@@ -30,7 +30,10 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		error("Insufficient balance")
 	end
 
-	if arns.getRecord(name) and arns.getRecord(name).endTimestamp + constants.gracePeriodMs > timestamp then
+	if
+		arns.getRecord(name) ~= nil and arns.getRecord(name).endTimestamp == nil
+		or arns.getRecord(name) ~= nil and arns.getRecord(name).endTimestamp + constants.gracePeriodMs > timestamp
+	then
 		error("Name is already registered")
 	end
 
@@ -257,14 +260,17 @@ function arns.assertValidBuyRecord(name, years, purchaseType, processId)
 	assert(#name >= 1 and #name <= 51, "Name pattern is invalid.")
 	assert(name:match("^%w") and name:match("%w$") and name:match("^[%w-]+$"), "Name pattern is invalid.")
 
-	-- If 'years' is present, validate it as an integer between 1 and 5
-	assert(
-		years == nil or (type(years) == "number" and years % 1 == 0 and years >= 1 and years <= 5),
-		"Years is invalid. Must be an integer between 1 and 5"
-	)
-
 	-- assert purchase type if present is lease or permabuy
 	assert(purchaseType == nil or purchaseType == "lease" or purchaseType == "permabuy", "PurchaseType is invalid.")
+
+	if purchaseType == "lease" or purchaseType == nil then
+		-- only check on leases (nil is set to lease)
+		-- If 'years' is present, validate it as an integer between 1 and 5
+		assert(
+			years == nil or (type(years) == "number" and years % 1 == 0 and years >= 1 and years <= 5),
+			"Years is invalid. Must be an integer between 1 and 5"
+		)
+	end
 
 	-- assert processId is valid pattern
 	assert(type(processId) == "string", "ProcessId is required and must be a string.")

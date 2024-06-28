@@ -78,7 +78,7 @@ local ActionMap = {
 }
 
 -- Write handlers
-Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
+Handlers.add("info", utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
 	-- assert recipient is a valid arweave address
 	local function checkAssertions()
 		assert(utils.isValidArweaveAddress(msg.Tags.Recipient), "Invalid recipient")
@@ -312,12 +312,14 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 		assert(type(msg.Tags.Name) == "string", "Invalid name")
 		assert(type(msg.Tags["Purchase-Type"]) == "string", "Invalid purchase type")
 		assert(utils.isValidArweaveAddress(msg.Tags["Process-Id"]), "Invalid process id")
-		assert(
-			tonumber(msg.Tags.Years) >= 1
-				and tonumber(msg.Tags.Years) <= 5
-				and utils.isInteger(tonumber(msg.Tags.Years)),
-			"Invalid years. Must be integer between 1 and 5"
-		)
+		if msg.Tags.Years then
+			assert(
+				tonumber(msg.Tags.Years) >= 1
+					and tonumber(msg.Tags.Years) <= 5
+					and utils.isInteger(tonumber(msg.Tags.Years)),
+				"Invalid years. Must be integer between 1 and 5"
+			)
+		end
 	end
 
 	local inputStatus, inputResult = pcall(checkAssertions)
