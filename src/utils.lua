@@ -28,6 +28,15 @@ function utils.isInteger(value)
 	return value % 1 == 0
 end
 
+function utils.slice(tbl, first, last, step)
+	local sliced = {}
+
+	for i = first or 1, last or #tbl, step or 1 do
+		sliced[#sliced + 1] = tbl[i]
+	end
+
+	return sliced
+end
 function utils.isValidArweaveAddress(address)
 	return #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
 end
