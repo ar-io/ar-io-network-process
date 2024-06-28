@@ -21,6 +21,14 @@ describe('ArNS', async () => {
     );
   }
 
+  it('should get token info', async () => {
+    const result = await handle({
+      Tags: [{ name: 'Action', value: 'Info' }],
+    });
+    const tokenInfo = JSON.parse(result.Messages[0].Data);
+    assert(tokenInfo);
+  });
+
   it('should buy a record', async () => {
     const buyRecordResult = await handle({
       Tags: [

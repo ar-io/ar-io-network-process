@@ -952,6 +952,7 @@ Handlers.add(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", ActionMap.I
 		Target = msg.From,
 		Action = "Info-Notice",
 		Tags = { Name = Name, Ticker = Ticker, Logo = Logo, Denomination = tostring(Denomination) },
+		Data = json.encode({ Name = Name, Ticker = Ticker, Logo = Logo, Denomination = Denomination }),
 	})
 end)
 
