@@ -64,6 +64,61 @@ describe('ArNS', async () => {
     });
   });
 
+  it('should fail to buy a permanently registered record', async () => {
+    const buyRecordResult = await handle({
+      Tags: [
+        { name: 'Action', value: 'Buy-Record' },
+        { name: 'Name', value: 'test-name' },
+        { name: 'Purchase-Type', value: 'permabuy' },
+        { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+      ],
+    });
+    const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
+
+    // fetch the record
+    const realRecord = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Record' },
+          { name: 'Name', value: 'test-name' },
+        ],
+      },
+      buyRecordResult.Memory,
+    );
+
+    const record = JSON.parse(realRecord.Messages[0].Data);
+    assert.deepEqual(record, {
+      processId: ''.padEnd(43, 'a'),
+      purchasePrice: 2500000000,
+      startTimestamp: buyRecordData.startTimestamp,
+      type: 'permabuy',
+      undernameLimit: 10,
+    });
+
+    const failedBuyRecordResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Buy-Record' },
+          { name: 'Name', value: 'test-name' },
+          { name: 'Purchase-Type', value: 'lease' },
+          { name: 'Years', value: '1' },
+          { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+        ],
+      },
+      buyRecordResult.Memory,
+    );
+
+    const failedBuyRecordError = failedBuyRecordResult.Messages[0].Tags.find(
+      (t) => t.name === 'Error',
+    );
+
+    assert.equal(failedBuyRecordError?.value, 'Invalid-Buy-Record');
+    const alreadyRegistered = failedBuyRecordResult.Messages[0].Data.includes(
+      'Name is already registered',
+    );
+    assert(alreadyRegistered);
+  });
+
   it('should buy a record and default the name to lower case', async () => {
     const buyRecordResult = await handle({
       Tags: [
