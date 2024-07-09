@@ -11,7 +11,7 @@ EpochSettings = EpochSettings
 		prescribedNameCount = 5,
 		rewardPercentage = 0.0005, -- 0.05%
 		maxObservers = 50,
-		epochZeroStartTimestamp = 1719900000000, -- July 2nd, 00:00:00 UTC
+		epochZeroStartTimestamp = 1719900000000, -- July 9th, 00:00:00 UTC
 		durationMs = 60 * 1000 * 60 * 24, -- 24 hours
 		distributionDelayMs = 60 * 1000 * 30, -- 15 blocks / 30 minutes
 	}
