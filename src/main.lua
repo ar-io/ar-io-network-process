@@ -1292,6 +1292,24 @@ Handlers.add("paginatedRecords", utils.hasMatchingTag("Action", "Paginated-Recor
 	end
 end)
 
+Handlers.add("paginatedGateways", utils.hasMatchingTag("Action", "Paginated-Gateways"), function(msg)
+	local page = tonumber(msg.Tags.Page) or 1
+	local pageSize = tonumber(msg.Tags["Page-Size"]) or 10
+	local sortOrder = msg.Tags["Sort-Order"] and string.lower(msg.Tags["Sort-Order"]) or "asc"
+	local sortBy = msg.Tags["Sort-By"] and msg.Tags["Sort-By"] or "gatewayAddress"
+	local status, result = pcall(gar.getPaginatedGateways, page, pageSize, sortBy, sortOrder)
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-Gateways-Notice",
+			Error = "Pagination-Error",
+			Data = json.encode(result),
+		})
+	else
+		ao.send({ Target = msg.From, Action = "Gateways-Notice", Data = json.encode(result) })
+	end
+end)
+
 -- END UTILITY HANDLERS USED FOR MIGRATION
 
 return process

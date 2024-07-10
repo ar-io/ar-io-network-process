@@ -605,4 +605,48 @@ function gar.pruneGateways(currentTimestamp)
 	end
 end
 
+-- TODO: make this a generic utility function that slices any object
+function gar.getPaginatedGateways(page, pageSize, sortBy, sortOrder)
+	local gateways = gar.getGateways()
+	-- sort the reocrds map by the keys alphabeticcally
+	local sortedGateways = {}
+	for address, record in pairs(gateways) do
+		record.gatewayAddress = address
+		table.insert(sortedGateways, record)
+	end
+
+	-- sort the records by the named
+	table.sort(sortedGateways, function(recordA, recordB)
+		local nameAString = recordA[sortBy]
+		local nameBString = recordB[sortBy]
+
+		if not nameAString or not nameBString then
+			error(
+				"Invalid sort by field, not every gateway has field "
+					.. sortBy
+					.. " Comparing:"
+					.. recordA.name
+					.. " to "
+					.. recordB.name
+			)
+		end
+
+		if sortOrder == "desc" then
+			nameAString, nameBString = nameBString, nameAString
+		end
+		return nameAString < nameBString
+	end)
+
+	return {
+		items = utils.slice(sortedGateways, (page - 1) * pageSize + 1, page * pageSize),
+		page = page,
+		pageSize = pageSize,
+		totalItems = #sortedGateways,
+		totalPages = math.ceil(#sortedGateways / pageSize),
+		sortBy = sortBy,
+		sortOrder = sortOrder,
+		hasNextPage = page * pageSize < #sortedGateways,
+	}
+end
+
 return gar
