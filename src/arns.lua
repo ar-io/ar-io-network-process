@@ -70,47 +70,15 @@ function arns.addRecord(name, record)
 	end
 end
 
-function arns.getSortedRecords(page, pageSize, sortBy, sortOrder)
+function arns.getPaginatedRecords(cursor, limit, sortBy, sortOrder)
 	local records = arns.getRecords()
-	-- sort the reocrds map by the keys alphabeticcally
-	local sortedRecords = {}
+	local recordsArray = {}
 	for name, record in pairs(records) do
 		record.name = name
-		table.insert(sortedRecords, record)
+		table.insert(recordsArray, record)
 	end
 
-	-- sort the records by the named
-	table.sort(sortedRecords, function(recordA, recordB)
-		local nameAString = recordA[sortBy]
-		local nameBString = recordB[sortBy]
-
-		if not nameAString or not nameBString then
-			error(
-				"Invalid sort by field, not every item has field "
-					.. sortBy
-					.. " Comparing:"
-					.. recordA.name
-					.. " to "
-					.. recordB.name
-			)
-		end
-
-		if sortOrder == "desc" then
-			nameAString, nameBString = nameBString, nameAString
-		end
-		return nameAString < nameBString
-	end)
-
-	return {
-		items = utils.slice(sortedRecords, (page - 1) * pageSize + 1, page * pageSize),
-		page = page,
-		pageSize = pageSize,
-		totalItems = #sortedRecords,
-		totalPages = math.ceil(#sortedRecords / pageSize),
-		sortBy = sortBy,
-		sortOrder = sortOrder,
-		hasNextPage = page * pageSize < #sortedRecords,
-	}
+	return utils.paginateTableWithCursor(recordsArray, cursor, limit, sortBy, sortOrder)
 end
 
 function arns.extendLease(from, name, years, currentTimestamp)
