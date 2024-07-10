@@ -1276,11 +1276,20 @@ end)
 
 Handlers.add("paginatedRecords", utils.hasMatchingTag("Action", "Paginated-Records"), function(msg)
 	local page = tonumber(msg.Tags.Page) or 1
-	local pageLimit = tonumber(msg.Tags["Page-Size"]) or 10
-	local sortOrder = msg.Tags.SortOrder and string.lower(msg.Tags["Sort-Order"]) or "asc"
-	local sortBy = msg.Tags.SortBy and string.lower(msg.Tags["Sort-By"]) or "name"
-	local sortedRecords = arns.getSortedRecords(page, pageLimit, sortBy, sortOrder)
-	ao.send({ Target = msg.From, Data = json.encode(sortedRecords) })
+	local pageSize = tonumber(msg.Tags["Page-Size"]) or 10
+	local sortOrder = msg.Tags["Sort-Order"] and string.lower(msg.Tags["Sort-Order"]) or "asc"
+	local sortBy = msg.Tags["Sort-By"] and msg.Tags["Sort-By"] or "name"
+	local status, result = pcall(arns.getSortedRecords, page, pageSize, sortBy, sortOrder)
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-Records-Notice",
+			Error = "Pagination-Error",
+			Data = json.encode(result),
+		})
+	else
+		ao.send({ Target = msg.From, Action = "Records-Notice", Data = json.encode(result) })
+	end
 end)
 
 -- END UTILITY HANDLERS USED FOR MIGRATION

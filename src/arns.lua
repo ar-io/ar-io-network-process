@@ -70,7 +70,7 @@ function arns.addRecord(name, record)
 	end
 end
 
-function arns.getSortedRecords(page, pageLimit, sortBy, sortDirection)
+function arns.getSortedRecords(page, pageSize, sortBy, sortOrder)
 	local records = arns.getRecords()
 	-- sort the reocrds map by the keys alphabeticcally
 	local sortedRecords = {}
@@ -83,20 +83,33 @@ function arns.getSortedRecords(page, pageLimit, sortBy, sortDirection)
 	table.sort(sortedRecords, function(recordA, recordB)
 		local nameAString = recordA[sortBy]
 		local nameBString = recordB[sortBy]
-		if sortDirection == "desc" then
+
+		if not nameAString or not nameBString then
+			error(
+				"Invalid sort by field, not every item has field "
+					.. sortBy
+					.. " Comparing:"
+					.. recordA.name
+					.. " to "
+					.. recordB.name
+			)
+		end
+
+		if sortOrder == "desc" then
 			nameAString, nameBString = nameBString, nameAString
 		end
 		return nameAString < nameBString
 	end)
 
 	return {
-		records = utils.slice(sortedRecords, (page - 1) * pageLimit + 1, page * pageLimit),
+		items = utils.slice(sortedRecords, (page - 1) * pageSize + 1, page * pageSize),
 		page = page,
+		pageSize = pageSize,
 		totalItems = #sortedRecords,
-		totalPages = math.ceil(#sortedRecords / pageLimit),
+		totalPages = math.ceil(#sortedRecords / pageSize),
 		sortBy = sortBy,
-		sortDirection = sortDirection,
-		hasNextPage = page * pageLimit < #sortedRecords,
+		sortOrder = sortOrder,
+		hasNextPage = page * pageSize < #sortedRecords,
 	}
 end
 
