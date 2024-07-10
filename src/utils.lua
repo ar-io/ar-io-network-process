@@ -72,7 +72,7 @@ function utils.sortTableByField(prevTable, field, order)
 	return tableCopy
 end
 
-function utils.paginateTableWithCursor(tableArray, cursor, limit, sortBy, sortOrder)
+function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, sortBy, sortOrder)
 	local sortedTable = utils.sortTableByField(tableArray, sortBy, sortOrder)
 	if not sortedTable or #sortedTable == 0 then
 		return {
@@ -90,7 +90,7 @@ function utils.paginateTableWithCursor(tableArray, cursor, limit, sortBy, sortOr
 
 	if cursor then
 		for i, obj in ipairs(sortedTable) do
-			if obj[sortBy] == cursor then
+			if obj[cursorField] == cursor then
 				startIndex = i + 1
 				break
 			end
@@ -117,6 +117,7 @@ function utils.paginateTableWithCursor(tableArray, cursor, limit, sortBy, sortOr
 		sortBy = sortBy,
 		sortOrder = sortOrder,
 		nextCursor = nextCursor,
+		cursorField = cursorField,
 	}
 end
 

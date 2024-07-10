@@ -73,12 +73,13 @@ end
 function arns.getPaginatedRecords(cursor, limit, sortBy, sortOrder)
 	local records = arns.getRecords()
 	local recordsArray = {}
+	local cursorField = "name" -- the cursor will be the name
 	for name, record in pairs(records) do
 		record.name = name
 		table.insert(recordsArray, record)
 	end
 
-	return utils.paginateTableWithCursor(recordsArray, cursor, limit, sortBy, sortOrder)
+	return utils.paginateTableWithCursor(recordsArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
 function arns.extendLease(from, name, years, currentTimestamp)

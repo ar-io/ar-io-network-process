@@ -608,12 +608,13 @@ end
 function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
 	local gateways = gar.getGateways()
 	local gatewaysArray = {}
+	local cursorField = "gatewayAddress" -- the cursor will be the gateway address
 	for address, record in pairs(gateways) do
 		record.gatewayAddress = address
 		table.insert(gatewaysArray, record)
 	end
 
-	return utils.paginateTableWithCursor(gatewaysArray, cursor, limit, sortBy, sortOrder)
+	return utils.paginateTableWithCursor(gatewaysArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
 return gar

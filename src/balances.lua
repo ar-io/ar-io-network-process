@@ -49,6 +49,7 @@ end
 function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder)
 	local balances = balances.getBalances()
 	local balancesArray = {}
+	local cursorField = "address" -- the cursor will be the wallet address
 	for address, balance in pairs(balances) do
 		table.insert(balancesArray, {
 			address = address,
@@ -56,7 +57,7 @@ function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder)
 		})
 	end
 
-	return utils.paginateTableWithCursor(balancesArray, cursor, limit, sortBy, sortOrder)
+	return utils.paginateTableWithCursor(balancesArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
 return balances
