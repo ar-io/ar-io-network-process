@@ -117,7 +117,6 @@ function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, s
 		sortBy = sortBy,
 		sortOrder = sortOrder,
 		nextCursor = nextCursor,
-		cursorField = cursorField,
 	}
 end
 
