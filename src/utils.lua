@@ -37,6 +37,89 @@ function utils.slice(tbl, first, last, step)
 
 	return sliced
 end
+
+function utils.parsePaginationTags(msg)
+	local cursor = tonumber(msg.Tags.Cursor) or msg.Tags.Cursor
+	local limit = tonumber(msg.Tags["Limit"]) or 100
+	local sortOrder = msg.Tags["Sort-Order"] and string.lower(msg.Tags["Sort-Order"]) or "desc"
+	local sortBy = msg.Tags["Sort-By"] and msg.Tags["Sort-By"]
+	return {
+		cursor = cursor,
+		limit = limit,
+		sortBy = sortBy,
+		sortOrder = sortOrder,
+	}
+end
+
+function utils.sortTableByField(prevTable, field, order)
+	local tableCopy = utils.deepCopy(prevTable)
+
+	if order ~= "asc" and order ~= "desc" then
+		error("Invalid sort order")
+	end
+
+	if not tableCopy or #tableCopy == 0 then
+		return tableCopy
+	end
+
+	table.sort(tableCopy, function(a, b)
+		if order == "asc" then
+			return a[field] < b[field]
+		else
+			return a[field] > b[field]
+		end
+	end)
+	return tableCopy
+end
+
+function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, sortBy, sortOrder)
+	local sortedTable = utils.sortTableByField(tableArray, sortBy, sortOrder)
+	if not sortedTable or #sortedTable == 0 then
+		return {
+			items = {},
+			limit = limit,
+			totalItems = 0,
+			totalPages = 0,
+			sortBy = sortBy,
+			sortOrder = sortOrder,
+			nextCursor = nil,
+		}
+	end
+
+	local startIndex = 1
+
+	if cursor then
+		for i, obj in ipairs(sortedTable) do
+			if obj[cursorField] == cursor then
+				startIndex = i + 1
+				break
+			end
+		end
+	end
+
+	local items = {}
+	local endIndex = math.min(startIndex + limit - 1, #sortedTable)
+
+	for i = startIndex, endIndex do
+		table.insert(items, sortedTable[i])
+	end
+
+	local nextCursor = nil
+	if endIndex < #sortedTable then
+		nextCursor = sortedTable[endIndex][cursorField]
+	end
+
+	return {
+		items = items,
+		limit = limit,
+		totalItems = #sortedTable,
+		totalPages = math.ceil(#sortedTable / limit),
+		sortBy = sortBy,
+		sortOrder = sortOrder,
+		nextCursor = nextCursor,
+	}
+end
+
 function utils.isValidArweaveAddress(address)
 	return #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
 end
@@ -137,6 +220,32 @@ function utils.splitString(str, delimiter)
 		result[#result + 1] = match
 	end
 	return result
+end
+
+function utils.checkAndConvertTimestamptoMs(timestamp)
+	-- Check if the timestamp is an integer
+	if type(timestamp) ~= "number" or timestamp % 1 ~= 0 then
+		return error("Timestamp must be an integer")
+	end
+
+	-- Define the plausible range for Unix timestamps in seconds
+	local min_timestamp = 0
+	local max_timestamp = 4102444800 -- Corresponds to 2100-01-01
+
+	if timestamp >= min_timestamp and timestamp <= max_timestamp then
+		-- The timestamp is already in seconds, convert it to milliseconds
+		return timestamp * 1000
+	end
+
+	-- If the timestamp is outside the range for seconds, check for milliseconds
+	local min_timestamp_ms = min_timestamp * 1000
+	local max_timestamp_ms = max_timestamp * 1000
+
+	if timestamp >= min_timestamp_ms and timestamp <= max_timestamp_ms then
+		return timestamp
+	end
+
+	return error("Timestamp is out of range")
 end
 
 return utils

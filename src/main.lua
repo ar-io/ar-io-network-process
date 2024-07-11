@@ -107,7 +107,8 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 			Data = tostring(result),
 		})
 	else
-		if msg.Cast then
+		-- Casting implies that the sender does not want a response - Reference: https://elixirforum.com/t/what-is-the-etymology-of-genserver-cast/33610/3
+		if not msg.Cast then
 			-- Debit-Notice message template, that is sent to the Sender of the transfer
 			local debitNotice = {
 				Target = msg.From,
@@ -1274,12 +1275,12 @@ Handlers.add("addReservedName", utils.hasMatchingTag("Action", "AddReservedName"
 	end
 end)
 
+-- Pagination handlers
+
 Handlers.add("paginatedRecords", utils.hasMatchingTag("Action", "Paginated-Records"), function(msg)
-	local page = tonumber(msg.Tags.Page) or 1
-	local pageSize = tonumber(msg.Tags["Page-Size"]) or 10
-	local sortOrder = msg.Tags["Sort-Order"] and string.lower(msg.Tags["Sort-Order"]) or "asc"
-	local sortBy = msg.Tags["Sort-By"] and msg.Tags["Sort-By"] or "name"
-	local status, result = pcall(arns.getSortedRecords, page, pageSize, sortBy, sortOrder)
+	local page = utils.parsePaginationTags(msg)
+	local status, result =
+		pcall(arns.getPaginatedRecords, page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -1293,11 +1294,9 @@ Handlers.add("paginatedRecords", utils.hasMatchingTag("Action", "Paginated-Recor
 end)
 
 Handlers.add("paginatedGateways", utils.hasMatchingTag("Action", "Paginated-Gateways"), function(msg)
-	local page = tonumber(msg.Tags.Page) or 1
-	local pageSize = tonumber(msg.Tags["Page-Size"]) or 10
-	local sortOrder = msg.Tags["Sort-Order"] and string.lower(msg.Tags["Sort-Order"]) or "asc"
-	local sortBy = msg.Tags["Sort-By"] and msg.Tags["Sort-By"] or "gatewayAddress"
-	local status, result = pcall(gar.getPaginatedGateways, page, pageSize, sortBy, sortOrder)
+	local page = utils.parsePaginationTags(msg)
+	local status, result =
+		pcall(gar.getPaginatedGateways, page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -1311,11 +1310,9 @@ Handlers.add("paginatedGateways", utils.hasMatchingTag("Action", "Paginated-Gate
 end)
 
 Handlers.add("paginatedBalances", utils.hasMatchingTag("Action", "Paginated-Balances"), function(msg)
-	local page = tonumber(msg.Tags.Page) or 1
-	local pageSize = tonumber(msg.Tags["Page-Size"]) or 10
-	local sortOrder = msg.Tags["Sort-Order"] and string.lower(msg.Tags["Sort-Order"]) or "asc"
-	local sortBy = msg.Tags["Sort-By"] and msg.Tags["Sort-By"] or "address"
-	local status, result = pcall(balances.getPaginatedBalances, page, pageSize, sortBy, sortOrder)
+	local page = utils.parsePaginationTags(msg)
+	local status, result =
+		pcall(balances.getPaginatedBalances, page.cursor, page.limit, page.sortBy or "balance", page.sortOrder)
 	if not status then
 		ao.send({
 			Target = msg.From,

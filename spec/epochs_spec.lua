@@ -11,7 +11,7 @@ local testSettings = {
 	label = "test",
 	delegateRewardShareRatio = 0,
 }
-local startTimestamp = 0
+local startTimestamp = 1704092400000
 local protocolBalance = 500000000 * 1000000
 local hashchain = "NGU1fq_ssL9m6kRbRU1bqiIDBht79ckvAwRMGElkSOg" -- base64 of "some sample hash"
 
@@ -23,9 +23,9 @@ describe("epochs", function()
 		}
 		_G.Epochs = {
 			[0] = {
-				startTimestamp = 0,
-				endTimestamp = 100,
-				distributionTimestamp = 115,
+				startTimestamp = 1704092400000,
+				endTimestamp = 1704092400100,
+				distributionTimestamp = 1704092400115,
 				prescribedObservers = {},
 				distributions = {},
 				observations = {
@@ -42,7 +42,7 @@ describe("epochs", function()
 		epochs.updateEpochSettings({
 			prescribedNameCount = 5,
 			maxObservers = 5,
-			epochZeroStartTimestamp = 0,
+			epochZeroStartTimestamp = 1704092400000, -- 2024-01-01T00:00:00.000Z
 			durationMs = 100,
 			distributionDelayMs = 15,
 			rewardPercentage = 0.0025, -- 0.25%
@@ -233,7 +233,8 @@ describe("epochs", function()
 		it("should throw an error when saving observation too early in the epoch", function()
 			local observer = "test-this-is-valid-arweave-wallet-address-2"
 			local reportTxId = "test-this-very-valid-observations-report-tx"
-			local timestamp = 1
+			local settings = epochs.getSettings()
+			local timestamp = settings.epochZeroStartTimestamp + settings.distributionDelayMs - 1
 			local failedGateways = {
 				"test-this-is-valid-arweave-wallet-address-1",
 			}
@@ -244,7 +245,8 @@ describe("epochs", function()
 		it("should throw an error if the caller is not prescribed", function()
 			local observer = "test-this-is-valid-arweave-wallet-address-2"
 			local reportTxId = "test-this-very-valid-observations-report-tx"
-			local timestamp = epochs.getSettings().distributionDelayMs + 1
+			local settings = epochs.getSettings()
+			local timestamp = settings.epochZeroStartTimestamp + settings.distributionDelayMs + 1
 			local failedGateways = {
 				"test-this-is-valid-arweave-wallet-address-1",
 			}
@@ -271,7 +273,8 @@ describe("epochs", function()
 			function()
 				local observer = "test-this-is-valid-arweave-wallet-address-2"
 				local reportTxId = "test-this-very-valid-observations-report-tx"
-				local timestamp = epochs.getSettings().distributionDelayMs + 1
+				local settings = epochs.getSettings()
+				local timestamp = settings.epochZeroStartTimestamp + settings.distributionDelayMs + 1
 				_G.GatewayRegistry = {
 					["test-this-is-valid-arweave-wallet-address-1"] = {
 						operatorStake = gar.getSettings().operators.minStake,
@@ -403,7 +406,7 @@ describe("epochs", function()
 	describe("getEpochTimestampsForIndex", function()
 		it("should return the epoch timestamps for the given epoch index", function()
 			local epochIndex = 0
-			local expectation = { 0, 100, 115 }
+			local expectation = { 1704092400000, 1704092400100, 1704092400115 }
 			local result = { epochs.getEpochTimestampsForIndex(epochIndex) }
 			assert.are.same(result, expectation)
 		end)
@@ -413,11 +416,12 @@ describe("epochs", function()
 		it(
 			"should create a new epoch for the given timestamp once distributions for the last epoch have occurred",
 			function()
-				local timestamp = 100
+				local settings = epochs.getSettings()
 				local epochIndex = 1
-				local epochStartTimestamp = 100
-				local epochEndTimestamp = 200
-				local epochDistributionTimestamp = 215
+				local epochStartTimestamp = settings.epochZeroStartTimestamp + settings.durationMs
+				local timestamp = epochStartTimestamp
+				local epochEndTimestamp = epochStartTimestamp + settings.durationMs
+				local epochDistributionTimestamp = epochEndTimestamp + settings.distributionDelayMs
 				local epochStartBlockHeight = 0
 				local expectation = {
 					startTimestamp = epochStartTimestamp,
