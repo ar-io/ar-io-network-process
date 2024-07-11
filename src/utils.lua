@@ -222,4 +222,30 @@ function utils.splitString(str, delimiter)
 	return result
 end
 
+function utils.checkAndConvertTimestamptoMs(timestamp)
+	-- Check if the timestamp is an integer
+	if type(timestamp) ~= "number" or timestamp % 1 ~= 0 then
+		return error("Timestamp must be an integer")
+	end
+
+	-- Define the plausible range for Unix timestamps in seconds
+	local min_timestamp = 0
+	local max_timestamp = 4102444800 -- Corresponds to 2100-01-01
+
+	if timestamp >= min_timestamp and timestamp <= max_timestamp then
+		-- The timestamp is already in seconds, convert it to milliseconds
+		return timestamp * 1000
+	end
+
+	-- If the timestamp is outside the range for seconds, check for milliseconds
+	local min_timestamp_ms = min_timestamp * 1000
+	local max_timestamp_ms = max_timestamp * 1000
+
+	if timestamp >= min_timestamp_ms and timestamp <= max_timestamp_ms then
+		return timestamp
+	end
+
+	return error("Timestamp is out of range")
+end
+
 return utils
