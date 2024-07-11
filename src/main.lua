@@ -107,7 +107,8 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 			Data = tostring(result),
 		})
 	else
-		if msg.Cast then
+		-- Casting implies that the sender does not want a response - Reference: https://elixirforum.com/t/what-is-the-etymology-of-genserver-cast/33610/3
+		if not msg.Cast then
 			-- Debit-Notice message template, that is sent to the Sender of the transfer
 			local debitNotice = {
 				Target = msg.From,
