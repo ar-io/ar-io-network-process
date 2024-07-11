@@ -113,10 +113,10 @@ function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, s
 		items = items,
 		limit = limit,
 		totalItems = #sortedTable,
-		totalPages = math.ceil(#sortedTable / limit),
 		sortBy = sortBy,
 		sortOrder = sortOrder,
 		nextCursor = nextCursor,
+		hasMore = nextCursor ~= nil,
 	}
 end
 
