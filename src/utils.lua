@@ -1,5 +1,6 @@
 local base64 = require("base64")
 local crypto = require("crypto.init")
+local json = require("json")
 local utils = {}
 
 function utils.hasMatchingTag(tag, value)
@@ -63,6 +64,12 @@ function utils.sortTableByField(prevTable, field, order)
 	end
 
 	table.sort(tableCopy, function(a, b)
+		-- If the field is not present in the table, return false
+		if not a[field] or not b[field] then
+			print("Field not found in table, skipping:" .. field .. " " .. json.encode(a) .. " " .. json.encode(b))
+			return false
+		end
+
 		if order == "asc" then
 			return a[field] < b[field]
 		else
