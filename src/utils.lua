@@ -106,7 +106,7 @@ function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, s
 
 	local nextCursor = nil
 	if endIndex < #sortedTable then
-		nextCursor = sortedTable[endIndex][sortBy]
+		nextCursor = sortedTable[endIndex][cursorField]
 	end
 
 	return {
