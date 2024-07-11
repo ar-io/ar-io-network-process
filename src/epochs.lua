@@ -227,9 +227,10 @@ function epochs.getEpochTimestampsForIndex(epochIndex)
 end
 
 function epochs.getEpochIndexForTimestamp(timestamp)
+	local timestampInMS = utils.checkAndConvertTimestamptoMs(timestamp)
 	local epochZeroStartTimestamp = epochs.getSettings().epochZeroStartTimestamp
 	local epochLengthMs = epochs.getSettings().durationMs
-	local epochIndex = math.floor((timestamp - epochZeroStartTimestamp) / epochLengthMs)
+	local epochIndex = math.floor((timestampInMS - epochZeroStartTimestamp) / epochLengthMs)
 	return epochIndex
 end
 
