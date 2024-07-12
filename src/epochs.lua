@@ -402,6 +402,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	local totalEligibleRewards = math.floor(balances.getBalance(ao.id) * epochs.getSettings().rewardPercentage)
 	local gatewayReward = math.floor(totalEligibleRewards * 0.95 / #activeGatewayAddresses)
 	local observerReward = math.floor(totalEligibleRewards * 0.05 / #prescribedObservers)
+	local totalObservationsSubmitted = #epoch.observations.reports or 0
 
 	-- check if already distributed rewards for epoch
 	if epoch.distributions.distributedTimestamp then
@@ -421,7 +422,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 			local observersMarkedFailed = epoch.observations.failureSummaries
 					and epoch.observations.failureSummaries[gatewayAddress]
 				or {}
-			local failed = #observersMarkedFailed > (#prescribedObservers / 2) -- more than 50% of observers marked as failed
+			local failed = #observersMarkedFailed > (totalObservationsSubmitted / 2) -- more than 50% of observerations submitted marked gateway as failed
 
 			-- if prescribed, we'll update the prescribed stats as well - find if the observer address is in prescribed observers
 			local observerIndex = utils.findInArray(prescribedObservers, function(prescribedObserver)
