@@ -4,7 +4,6 @@ local utils = require("utils")
 local gar = {}
 
 GatewayRegistry = GatewayRegistry or {}
--- TODO: any necessary state modifcations as we iterate go here
 GatewayRegistrySettings = GatewayRegistrySettings
 	or {
 		observers = {
@@ -18,6 +17,7 @@ GatewayRegistrySettings = GatewayRegistrySettings
 			withdrawLengthMs = 30 * 24 * 60 * 60 * 1000, -- 30 days to lower operator stake
 			maxDelegates = 10000,
 			leaveLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days that balance will be vaulted
+			failedEpochCountMax = 30, -- number of epochs failed before marked as leaving
 		},
 		delegates = {
 			minStake = 500 * 1000000, -- 500 IO
@@ -564,6 +564,8 @@ end
 
 function gar.pruneGateways(currentTimestamp)
 	local gateways = gar.getGateways()
+	local garSettings = gar.getSettings()
+
 	-- we take a deep copy so we can operate directly on the gateway object
 	for address, gateway in pairs(gateways) do
 		if gateway then
@@ -592,8 +594,13 @@ function gar.pruneGateways(currentTimestamp)
 			-- update the gateway before we do anything else
 			GatewayRegistry[address] = gateway
 
-			-- if gateway is joined but failed more than 3 consecutive epochs, mark it as leaving and put operator stake and delegate stakes in vaults
-			if gateway.status == "joined" and gateway.stats.failedConsecutiveEpochs >= 3 then
+			-- if gateway is joined but failed more than 30 consecutive epochs, mark it as leaving and put operator stake and delegate stakes in vaults
+			if
+				gateway.status == "joined"
+				and garSettings ~= nil
+				and gateway.stats.failedConsecutiveEpochs >= garSettings.operators.failedEpochCountMax
+			then
+				-- mark as leaving
 				gar.leaveNetwork(address, currentTimestamp, address)
 			else
 				if gateway.status == "leaving" and gateway.endTimestamp <= currentTimestamp then
