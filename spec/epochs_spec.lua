@@ -457,9 +457,15 @@ describe("epochs", function()
 			for i = 1, 5 do
 				local gateway = {
 					operatorStake = gar.getSettings().operators.minStake,
-					totalDelegatedStake = 0,
+					totalDelegatedStake = 100000000,
 					vaults = {},
-					delegates = {},
+					delegates = {
+						["this-is-a-delegate"] = {
+							delegatedStake = 100000000,
+							startTimestamp = 0,
+							vaults = {},
+						},
+					},
 					startTimestamp = 0,
 					stats = {
 						prescribedEpochCount = 0,
@@ -479,7 +485,7 @@ describe("epochs", function()
 						autoStake = false, -- TODO: validate autostake behavior
 						label = "test",
 						properties = "",
-						delegateRewardShareRatio = 20,
+						delegateRewardShareRatio = 10,
 					},
 					status = "joined",
 					observerAddress = "test-this-very-valid-observer-wallet-addr-" .. i,
@@ -508,7 +514,7 @@ describe("epochs", function()
 			end
 			-- set the protocol balance to 5 million IO
 			local totalEligibleRewards = math.floor(protocolBalance * 0.0025)
-			local expectedGatewaryReward = math.floor(totalEligibleRewards * 0.95 / 5)
+			local expectedGatewayReward = math.floor(totalEligibleRewards * 0.95 / 5)
 			local expectedObserverReward = math.floor(totalEligibleRewards * 0.05 / 5)
 			-- clear the balances for the gateways
 			Balances["test-this-is-valid-arweave-wallet-address-1"] = 0
@@ -577,37 +583,53 @@ describe("epochs", function()
 			-- check balances
 			assert.are.equal(0, balances.getBalance("test-this-is-valid-arweave-wallet-address-1"))
 			assert.are.equal(
-				math.floor(expectedGatewaryReward * 0.75),
+				math.floor(expectedGatewayReward * 0.75) * 0.90, -- 10% is given to delegates
 				balances.getBalance("test-this-is-valid-arweave-wallet-address-2")
 			)
-			assert.are.equal(expectedObserverReward, balances.getBalance("test-this-is-valid-arweave-wallet-address-3"))
-			assert.are.equal(expectedObserverReward, balances.getBalance("test-this-is-valid-arweave-wallet-address-3"))
 			assert.are.equal(
-				expectedGatewaryReward + expectedObserverReward,
+				math.floor(expectedObserverReward * 0.90), -- 10% is given to delegates
+				balances.getBalance("test-this-is-valid-arweave-wallet-address-3")
+			)
+			assert.are.equal(
+				math.floor(expectedObserverReward * 0.90), -- 10% is given to delegates
+				balances.getBalance("test-this-is-valid-arweave-wallet-address-3")
+			)
+			assert.are.equal(
+				math.floor((expectedGatewayReward + expectedObserverReward) * 0.90), -- 10% is given to delegates
 				balances.getBalance("test-this-is-valid-arweave-wallet-address-4")
 			)
 			assert.are.equal(
-				expectedGatewaryReward + expectedObserverReward,
+				(expectedGatewayReward + expectedObserverReward) * 0.90, -- 10% is given to delegates
 				balances.getBalance("test-this-is-valid-arweave-wallet-address-5")
 			)
 			-- check the epoch was updated
 			local distributions = epochs.getEpoch(epochIndex).distributions
 			local expectedTotalDistribution = 0 -- gateway 1 did not get any rewards
-				+ math.floor(expectedGatewaryReward * 0.75) -- gateway 2 got 75% of the gateway reward
+				+ math.floor(expectedGatewayReward * 0.75) -- gateway 2 got 75% of the gateway reward
 				+ expectedObserverReward * 3 -- gateway 3, 4, 5 got observer rewards
-				+ expectedGatewaryReward * 2 -- gateway 4, 5 got gateway rewards
+				+ expectedGatewayReward * 2 -- gateway 4, 5 got gateway rewards
 			assert.are.same({
 				totalEligibleRewards = totalEligibleRewards,
 				totalDistributedRewards = expectedTotalDistribution,
 				distributedTimestamp = epochDistributionTimestamp,
 				rewards = {
 					["test-this-is-valid-arweave-wallet-address-1"] = 0,
-					["test-this-is-valid-arweave-wallet-address-2"] = math.floor(expectedGatewaryReward * 0.75),
-					["test-this-is-valid-arweave-wallet-address-3"] = expectedObserverReward,
-					["test-this-is-valid-arweave-wallet-address-4"] = expectedGatewaryReward + expectedObserverReward,
-					["test-this-is-valid-arweave-wallet-address-5"] = expectedGatewaryReward + expectedObserverReward,
+					["test-this-is-valid-arweave-wallet-address-2"] = math.floor(expectedGatewayReward * 0.75 * 0.90),
+					["test-this-is-valid-arweave-wallet-address-3"] = expectedObserverReward * 0.90,
+					["test-this-is-valid-arweave-wallet-address-4"] = (expectedGatewayReward + expectedObserverReward)
+						* 0.90,
+					["test-this-is-valid-arweave-wallet-address-5"] = (expectedGatewayReward + expectedObserverReward)
+						* 0.90,
+					-- the delegate that got rewards
+					["this-is-a-delegate"] = math.floor(
+						(expectedGatewayReward * 0.10 * 2) -- recevied by two passing gateways
+							+ (expectedGatewayReward * 0.10 * 0.75) -- recevied by one passing gateway that did not observe
+							+ (expectedObserverReward * 0.10 * 3) -- recevied by three observer gateways
+					),
 				},
 			}, distributions)
+			-- assert that the balance withdrawn from the protocol balance matches the total distributed rewards
+			assert.are.equal(protocolBalance - expectedTotalDistribution, balances.getBalance(ao.id))
 		end)
 	end)
 end)

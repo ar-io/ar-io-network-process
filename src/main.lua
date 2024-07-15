@@ -843,11 +843,13 @@ Handlers.add(
 Handlers.add("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Token-Supply"), function(msg)
 	-- add all the balances
 	local totalSupply = 0
-	for _, balance in pairs(Balances) do
+	local balances = balances.getBalances()
+	for _, balance in pairs(balances) do
 		totalSupply = totalSupply + balance
 	end
 	-- gateways and delegates
-	for _, gateway in pairs(GatewayRegistry) do
+	local gateways = gar.getGateways()
+	for _, gateway in pairs(gateways) do
 		totalSupply = totalSupply + gateway.operatorStake + gateway.totalDelegatedStake
 		for _, delegate in pairs(gateway.delegates) do
 			-- check vaults
@@ -856,14 +858,18 @@ Handlers.add("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Token-Sup
 			end
 		end
 		-- iterate through vaults
-		for _, vault in pairs(Vaults) do
+		for _, vault in pairs(gateway.vaults) do
 			totalSupply = totalSupply + vault.balance
 		end
 	end
 
 	-- vaults
-	for _, vault in pairs(Vaults) do
-		totalSupply = totalSupply + vault.balance
+	local vaults = vaults.getVaults()
+	for _, vaultsForAddress in pairs(vaults) do
+		-- they may have several vaults iterate through them
+		for _, vault in pairs(vaultsForAddress) do
+			totalSupply = totalSupply + vault.balance
+		end
 	end
 
 	ao.send({
