@@ -483,10 +483,10 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 				if remaingOperatorReward > 0 and gateway.settings.autoStake then
 					gar.increaseOperatorStake(gatewayAddress, remaingOperatorReward)
 				end
-				epochDistributions[gatewayAddress] = remaingOperatorReward
+				epochDistributions[gatewayAddress] = (epochDistributions[gatewayAddress] or 0) + remaingOperatorReward
 			else
 				-- mark it as zero rewards
-				epochDistributions[gatewayAddress] = 0
+				epochDistributions[gatewayAddress] = epochDistributions[gatewayAddress] or 0
 			end
 
 			-- increment the total distributed

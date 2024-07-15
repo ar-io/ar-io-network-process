@@ -840,6 +840,40 @@ Handlers.add(
 	end
 )
 
+Handlers.add("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Token-Supply"), function(msg)
+	-- add all the balances
+	local totalSupply = 0
+	for _, balance in pairs(Balances) do
+		totalSupply = totalSupply + balance
+	end
+	-- gateways and delegates
+	for _, gateway in pairs(GatewayRegistry) do
+		totalSupply = totalSupply + gateway.operatorStake + gateway.totalDelegatedStake
+		for _, delegate in pairs(gateway.delegates) do
+			-- check vaults
+			for _, vault in pairs(delegate.vaults) do
+				totalSupply = totalSupply + vault.balance
+			end
+		end
+		-- iterate through vaults
+		for _, vault in pairs(Vaults) do
+			totalSupply = totalSupply + vault.balance
+		end
+	end
+
+	-- vaults
+	for _, vault in pairs(Vaults) do
+		totalSupply = totalSupply + vault.balance
+	end
+
+	ao.send({
+		Target = msg.From,
+		Action = "Total-Token-Supply-Notice",
+		["Total-Token-Supply"] = totalSupply,
+		Data = json.encode(totalSupply),
+	})
+end)
+
 -- TICK HANDLER
 Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	-- assert this is a write interaction and we have a timetsamp
@@ -1118,7 +1152,7 @@ end)
 
 Handlers.add(ActionMap.Epochs, utils.hasMatchingTag("Action", ActionMap.Epochs), function(msg)
 	local epochs = epochs.getEpochs()
-	ao.send({ Target = msg.From, Action = "Epochs-Notice", Data = json.encode(epochs) })
+	ao.send({ Target = msg.From, Action = "Epochs-Notice", Data = epochs })
 end)
 
 Handlers.add(ActionMap.PrescribedObservers, utils.hasMatchingTag("Action", ActionMap.PrescribedObservers), function(msg)
