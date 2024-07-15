@@ -119,6 +119,7 @@ describe("gar", function()
 				startTimestamp
 			)
 			assert.is_true(status)
+			assert.are.equal(Balances["test-this-is-valid-arweave-wallet-address-1"], 0)
 			assert.are.same(expectation, result)
 			assert.are.same(expectation, gar.getGateway("test-this-is-valid-arweave-wallet-address-1"))
 		end)
@@ -224,6 +225,7 @@ describe("gar", function()
 				observerAddress = "observerAddress",
 			}
 			local result, err = gar.increaseOperatorStake("test-this-is-valid-arweave-wallet-address-1", 1000)
+			assert.are.equal(Balances["test-this-is-valid-arweave-wallet-address-1"], 0)
 			assert.are.same(result, {
 				operatorStake = gar.getSettings().operators.minStake + 1000,
 				totalDelegatedStake = 0,
@@ -398,6 +400,7 @@ describe("gar", function()
 				gar.getSettings().delegates.minStake,
 				startTimestamp
 			)
+			assert.are.equal(Balances["test-this-is-valid-arweave-wallet-address-2"], 0)
 			assert.are.same(result, {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = gar.getSettings().delegates.minStake,

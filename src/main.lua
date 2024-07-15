@@ -60,6 +60,8 @@ local ActionMap = {
 	Gateways = "Gateways",
 	GatewayRegistrySettings = "Gateway-Registry-Settings",
 	-- writes
+	Vault = "Vault",
+	Vaults = "Vaults",
 	CreateVault = "Create-Vault",
 	VaultedTransfer = "Vaulted-Transfer",
 	ExtendVault = "Extend-Vault",
@@ -838,6 +840,46 @@ Handlers.add(
 	end
 )
 
+Handlers.add("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Token-Supply"), function(msg)
+	-- add all the balances
+	local totalSupply = 0
+	local balances = balances.getBalances()
+	for _, balance in pairs(balances) do
+		totalSupply = totalSupply + balance
+	end
+	-- gateways and delegates
+	local gateways = gar.getGateways()
+	for _, gateway in pairs(gateways) do
+		totalSupply = totalSupply + gateway.operatorStake + gateway.totalDelegatedStake
+		for _, delegate in pairs(gateway.delegates) do
+			-- check vaults
+			for _, vault in pairs(delegate.vaults) do
+				totalSupply = totalSupply + vault.balance
+			end
+		end
+		-- iterate through vaults
+		for _, vault in pairs(gateway.vaults) do
+			totalSupply = totalSupply + vault.balance
+		end
+	end
+
+	-- vaults
+	local vaults = vaults.getVaults()
+	for _, vaultsForAddress in pairs(vaults) do
+		-- they may have several vaults iterate through them
+		for _, vault in pairs(vaultsForAddress) do
+			totalSupply = totalSupply + vault.balance
+		end
+	end
+
+	ao.send({
+		Target = msg.From,
+		Action = "Total-Token-Supply-Notice",
+		["Total-Token-Supply"] = totalSupply,
+		Data = json.encode(totalSupply),
+	})
+end)
+
 -- TICK HANDLER
 Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	-- assert this is a write interaction and we have a timetsamp
@@ -1116,7 +1158,7 @@ end)
 
 Handlers.add(ActionMap.Epochs, utils.hasMatchingTag("Action", ActionMap.Epochs), function(msg)
 	local epochs = epochs.getEpochs()
-	ao.send({ Target = msg.From, Action = "Epochs-Notice", Data = json.encode(epochs) })
+	ao.send({ Target = msg.From, Action = "Epochs-Notice", Data = epochs })
 end)
 
 Handlers.add(ActionMap.PrescribedObservers, utils.hasMatchingTag("Action", ActionMap.PrescribedObservers), function(msg)
@@ -1230,6 +1272,21 @@ Handlers.add(ActionMap.ReservedName, utils.hasMatchingTag("Action", ActionMap.Re
 	})
 end)
 
+Handlers.add(ActionMap.Vaults, utils.hasMatchingTag("Action", ActionMap.Vaults), function(msg)
+	local vaults = vaults.getVaults()
+	ao.send({ Target = msg.From, Action = "Vaults-Notice", Data = json.encode(vaults) })
+end)
+
+Handlers.add(ActionMap.Vault, utils.hasMatchingTag("Action", ActionMap.Vault), function(msg)
+	local vault = vaults.getVault(msg.Tags.Address or msg.From)
+	ao.send({
+		Target = msg.From,
+		Action = "Vault-Notice",
+		Address = msg.Tags.Address or msg.From,
+		Data = json.encode(vault),
+	})
+end)
+
 -- END READ HANDLERS
 
 -- UTILITY HANDLERS USED FOR MIGRATION
@@ -1323,51 +1380,6 @@ Handlers.add("paginatedBalances", utils.hasMatchingTag("Action", "Paginated-Bala
 	else
 		ao.send({ Target = msg.From, Action = "Balances-Notice", Data = json.encode(result) })
 	end
-end)
-
-Handlers.add("fixGateways", utils.hasMatchingTag("Action", "Fix-Gateways"), function(msg)
-	-- if msg.From ~= Owner then
-	-- 	ao.send({ Target = msg.From, Data = "Unauthorized" })
-	-- 	return
-	-- end
-
-	local fixGateways = function()
-		-- reset any gateways marked as leaving
-		local gateways = gar.getGateways()
-		for address, gateway in pairs(gateways) do
-			if gateway ~= nil and gateway.status == "leaving" then
-				gateway.status = "joined"
-				gateway.endTimestamp = nil
-				local totalOperatorStake = 0
-				for _, vault in pairs(gateway.vaults) do
-					totalOperatorStake = totalOperatorStake + vault.balance
-				end
-				gateway.operatorStake = totalOperatorStake
-				gateway.vaults = {}
-				-- move the delegated vaults back
-				for delegateAddress, delegate in pairs(gateway.delegates) do
-					for _, vault in pairs(delegate.vaults) do
-						-- if the vault is delegated to the gateway, move it back
-						gateway.totalDelegatedStake = gateway.totalDelegatedStake + vault.balance
-						gateway.delegates[delegateAddress].delegatedStake = (
-							gateway.delegates[delegateAddress].delegatedStake or 0
-						) + vault.balance
-					end
-					gateway.delegates[delegateAddress].vaults = {}
-				end
-				-- now update the actual registry
-				gar.addGateway(address, gateway)
-			end
-		end
-	end
-
-	local status, result = pcall(fixGateways)
-	if not status then
-		ao.send({ Target = msg.From, Action = "Fix-Gateways-Error-Notice", Data = json.encode(result) })
-	else
-		ao.send({ Target = msg.From, Action = "Fix-Gateways-Notice", Data = json.encode(result) })
-	end
-	-- end
 end)
 
 -- END UTILITY HANDLERS USED FOR MIGRATION
