@@ -954,8 +954,8 @@ Handlers.add(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", ActionMap.I
 	ao.send({
 		Target = msg.From,
 		Action = "Info-Notice",
-		Tags = { Name = Name, Ticker = Ticker, Logo = Logo, Denomination = tostring(Denomination) },
-		Data = json.encode({ Name = Name, Ticker = Ticker, Logo = Logo, Denomination = Denomination }),
+		Tags = { Name = Name, Ticker = Ticker, Logo = Logo, Owner = Owner, Denomination = tostring(Denomination) },
+		Data = json.encode({ Name = Name, Ticker = Ticker, Logo = Logo, Owner = Owner, Denomination = Denomination }),
 	})
 end)
 
@@ -1323,6 +1323,51 @@ Handlers.add("paginatedBalances", utils.hasMatchingTag("Action", "Paginated-Bala
 	else
 		ao.send({ Target = msg.From, Action = "Balances-Notice", Data = json.encode(result) })
 	end
+end)
+
+Handlers.add("fixGateways", utils.hasMatchingTag("Action", "Fix-Gateways"), function(msg)
+	-- if msg.From ~= Owner then
+	-- 	ao.send({ Target = msg.From, Data = "Unauthorized" })
+	-- 	return
+	-- end
+
+	local fixGateways = function()
+		-- reset any gateways marked as leaving
+		local gateways = gar.getGateways()
+		for address, gateway in pairs(gateways) do
+			if gateway ~= nil and gateway.status == "leaving" then
+				gateway.status = "joined"
+				gateway.endTimestamp = nil
+				local totalOperatorStake = 0
+				for _, vault in pairs(gateway.vaults) do
+					totalOperatorStake = totalOperatorStake + vault.balance
+				end
+				gateway.operatorStake = totalOperatorStake
+				gateway.vaults = {}
+				-- move the delegated vaults back
+				for delegateAddress, delegate in pairs(gateway.delegates) do
+					for _, vault in pairs(delegate.vaults) do
+						-- if the vault is delegated to the gateway, move it back
+						gateway.totalDelegatedStake = gateway.totalDelegatedStake + vault.balance
+						gateway.delegates[delegateAddress].delegatedStake = (
+							gateway.delegates[delegateAddress].delegatedStake or 0
+						) + vault.balance
+					end
+					gateway.delegates[delegateAddress].vaults = {}
+				end
+				-- now update the actual registry
+				gar.addGateway(address, gateway)
+			end
+		end
+	end
+
+	local status, result = pcall(fixGateways)
+	if not status then
+		ao.send({ Target = msg.From, Action = "Fix-Gateways-Error-Notice", Data = json.encode(result) })
+	else
+		ao.send({ Target = msg.From, Action = "Fix-Gateways-Notice", Data = json.encode(result) })
+	end
+	-- end
 end)
 
 -- END UTILITY HANDLERS USED FOR MIGRATION
