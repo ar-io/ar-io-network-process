@@ -1,0 +1,44 @@
+name: Observe Contract
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *' # every hour
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        name: Check out repository code
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4.0.2
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install
+        run: yarn
+
+      - name: Observe
+        run: yarn observe
+        continue-on-error: true
+
+      # Failure notification
+      - name: Send Slack failure notification
+        if: failure()
+        env:
+          SLACK_TITLE: IO/AO Contract Observation failed!
+          SLACK_COLOR: danger
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        uses: rtCamp/action-slack-notify@v2
+
+      # Success notification
+      - name: Send Slack success notification
+        if: success()
+        env:
+          SLACK_TITLE: IO/AO Contract Observation succeeded!
+          SLACK_COLOR: good
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        uses: rtCamp/action-slack-notify@v2
