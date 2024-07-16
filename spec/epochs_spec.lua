@@ -514,8 +514,8 @@ describe("epochs", function()
 			end
 			-- set the protocol balance to 5 million IO
 			local totalEligibleRewards = math.floor(protocolBalance * 0.0025)
-			local expectedGatewayReward = math.floor(totalEligibleRewards * 0.95 / 5)
-			local expectedObserverReward = math.floor(totalEligibleRewards * 0.05 / 5)
+			local expectedGatewayReward = math.floor(totalEligibleRewards * 0.90 / 5)
+			local expectedObserverReward = math.floor(totalEligibleRewards * 0.10 / 5)
 			-- clear the balances for the gateways
 			Balances["test-this-is-valid-arweave-wallet-address-1"] = 0
 

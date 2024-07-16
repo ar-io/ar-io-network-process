@@ -16,7 +16,7 @@ DemandFactor = DemandFactor
 
 DemandFactorSettings = DemandFactorSettings
 	or {
-		periodZeroStartTimestamp = 1721109600000, -- 07/16/2025 @ 12:00am (UTC)
+		periodZeroStartTimestamp = 1722837600000, -- 08/05/2024 @ 12:00am (UTC)
 		movingAvgPeriodCount = 7,
 		periodLengthMs = 60 * 60 * 1000 * 24, -- one day in milseconds
 		demandFactorBaseValue = 1,
