@@ -400,8 +400,8 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	local activeGatewayAddresses = gar.getActiveGatewaysBetweenTimestamps(epoch.startTimestamp, epoch.endTimestamp)
 	local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
 	local totalEligibleRewards = math.floor(balances.getBalance(ao.id) * epochs.getSettings().rewardPercentage)
-	local gatewayReward = math.floor(totalEligibleRewards * 0.95 / #activeGatewayAddresses)
-	local observerReward = math.floor(totalEligibleRewards * 0.05 / #prescribedObservers)
+	local gatewayReward = math.floor(totalEligibleRewards * 0.90 / #activeGatewayAddresses) -- TODO: make these setting variables
+	local observerReward = math.floor(totalEligibleRewards * 0.10 / #prescribedObservers) -- TODO: make these setting variables
 	local totalObservationsSubmitted = utils.lengthOfTable(epoch.observations.reports) or 0
 
 	-- check if already distributed rewards for epoch
