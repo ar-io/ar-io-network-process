@@ -42,6 +42,24 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4.0.2
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'yarn'
+
+        # chekcout the ar-io-sdk repo alpha branch
+      - run: git clone -b alpha https://github.com/ar-io/ar-io-sdk.git
+      # install the sdk
+      - run: yarn install --ignore-engines
+        working-directory: ./ar-io-sdk
+      # run the e2e tests for the sdk
+      - run: yarn test:e2e
+        working-directory: ./ar-io-sdk
+
   deploy:
     runs-on: ubuntu-latest
     needs: [integration, test]
