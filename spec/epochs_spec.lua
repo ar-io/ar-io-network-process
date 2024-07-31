@@ -416,6 +416,41 @@ describe("epochs", function()
 		it(
 			"should create a new epoch for the given timestamp once distributions for the last epoch have occurred",
 			function()
+				_G.Epochs[0].distributions = {
+					totalEligibleRewards = 0,
+					totalDistributedRewards = 0,
+					distributedTimestamp = 0,
+					rewards = {},
+				}
+				_G.GatewayRegistry = {
+					["test-this-is-valid-arweave-wallet-address-1"] = {
+						operatorStake = gar.getSettings().operators.minStake,
+						totalDelegatedStake = 0,
+						vaults = {},
+						delegates = {},
+						startTimestamp = 0,
+						stats = {
+							prescribedEpochCount = 0,
+							observedEpochCount = 0,
+							totalEpochCount = 0,
+							passedEpochCount = 0,
+							failedEpochCount = 0,
+							failedConsecutiveEpochs = 0,
+							passedConsecutiveEpochs = 0,
+						},
+						settings = testSettings,
+						status = "joined",
+						observerAddress = "test-this-is-valid-arweave-wallet-address-1",
+						weights = {
+							stakeWeight = 0,
+							tenureWeight = 0,
+							gatewayRewardRatioWeight = 0,
+							observerRewardRatioWeight = 0,
+							compositeWeight = 0,
+							normalizedCompositeWeight = 0,
+						},
+					},
+				}
 				local settings = epochs.getSettings()
 				local epochIndex = 1
 				local epochStartTimestamp = settings.epochZeroStartTimestamp + settings.durationMs
@@ -433,19 +468,26 @@ describe("epochs", function()
 						failureSummaries = {},
 						reports = {},
 					},
-					prescribedObservers = {},
+					prescribedObservers = {
+						{
+							compositeWeight = 4.0,
+							gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
+							gatewayRewardRatioWeight = 1.0,
+							normalizedCompositeWeight = 1.0,
+							observerAddress = "test-this-is-valid-arweave-wallet-address-1",
+							observerRewardRatioWeight = 1.0,
+							stake = gar.getSettings().operators.minStake,
+							stakeWeight = 1.0,
+							startTimestamp = 0,
+							tenureWeight = 4,
+						},
+					},
 					prescribedNames = {},
 					distributions = {},
 				}
-				_G.Epochs[0].distributions = {
-					totalEligibleRewards = 0,
-					totalDistributedRewards = 0,
-					distributedTimestamp = 0,
-					rewards = {},
-				}
 				local status = pcall(epochs.createEpoch, timestamp, epochStartBlockHeight, hashchain)
 				assert.is_true(status)
-				assert.are.same(epochs.getEpoch(epochIndex), expectation)
+				assert.are.same(expectation, epochs.getEpoch(epochIndex))
 			end
 		)
 	end)
