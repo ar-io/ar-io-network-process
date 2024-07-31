@@ -143,18 +143,18 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 
 	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 	local activeGatewayAddresses = gar.getActiveGatewaysBetweenTimestamps(epochStartTimestamp, epochEndTimestamp)
-	local weightedObservers = gar.getGatewayWeightsAtTimestamp(activeGatewayAddresses, epochStartTimestamp)
+	local weightedGateways = gar.getGatewayWeightsAtTimestamp(activeGatewayAddresses, epochStartTimestamp)
 
 	-- Filter out any observers that could have a normalized composite weight of 0
 	local filteredObservers = {}
 	-- use ipairs as weightedObservers in array
-	for _, observer in ipairs(weightedObservers) do
+	for _, observer in ipairs(weightedGateways) do
 		if observer.normalizedCompositeWeight > 0 then
 			table.insert(filteredObservers, observer)
 		end
 	end
 	if #filteredObservers <= epochs.getSettings().maxObservers then
-		return filteredObservers
+		return filteredObservers, weightedGateways
 	end
 
 	-- the hash we will use to create entropy for prescribed observers
@@ -215,7 +215,8 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 		return a.normalizedCompositeWeight > b.normalizedCompositeWeight -- sort by descending weight
 	end)
 
-	return prescribedObservers
+	-- return the prescribed observers and the weighted observers
+	return prescribedObservers, weightedGateways
 end
 
 function epochs.getEpochTimestampsForIndex(epochIndex)
@@ -260,8 +261,9 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 
 	local epochStartTimestamp, epochEndTimestamp, epochDistributionTimestamp =
 		epochs.getEpochTimestampsForIndex(epochIndex)
-	local prescribedObservers = epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
+	local prescribedObservers, weightedGateways = epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	local prescribedNames = epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
+	-- create the epoch
 	local epoch = {
 		epochIndex = epochIndex,
 		startTimestamp = epochStartTimestamp,
@@ -277,6 +279,12 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 		distributions = {},
 	}
 	Epochs[epochIndex] = epoch
+	-- update the gateway weights
+	if weightedGateways then
+		for _, weightedGateway in ipairs(weightedGateways) do
+			gar.updateGatewayWeights(weightedGateway)
+		end
+	end
 end
 
 function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddresses, timestamp)
