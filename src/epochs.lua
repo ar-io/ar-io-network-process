@@ -215,7 +215,8 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 		return a.normalizedCompositeWeight > b.normalizedCompositeWeight -- sort by descending weight
 	end)
 
-	return prescribedObservers
+	-- return the prescribed observers and the weighted observers
+	return prescribedObservers, weightedObservers
 end
 
 function epochs.getEpochTimestampsForIndex(epochIndex)
@@ -260,8 +261,9 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 
 	local epochStartTimestamp, epochEndTimestamp, epochDistributionTimestamp =
 		epochs.getEpochTimestampsForIndex(epochIndex)
-	local prescribedObservers = epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
+	local prescribedObservers, weights = epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	local prescribedNames = epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
+	-- create the epoch
 	local epoch = {
 		epochIndex = epochIndex,
 		startTimestamp = epochStartTimestamp,
@@ -277,6 +279,12 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 		distributions = {},
 	}
 	Epochs[epochIndex] = epoch
+	-- update the gateway weights
+	if weights then
+		for _, weightedGateway in ipairs(weights) do
+			gar.updateGatewayWeights(weightedGateway)
+		end
+	end
 end
 
 function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddresses, timestamp)

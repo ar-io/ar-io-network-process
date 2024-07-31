@@ -553,6 +553,31 @@ function gar.updateGatewayStats(address, stats)
 	GatewayRegistry[address] = gateway
 end
 
+function gar.updateGatewayWeights(weightedGateway)
+	local address = weightedGateway.gatewayAddress
+	local gateway = gar.getGateway(address)
+	if gateway == nil then
+		error("Gateway does not exist")
+	end
+
+	assert(weightedGateway.stakeWeight, "stakeWeight is required")
+	assert(weightedGateway.tenureWeight, "tenureWeight is required")
+	assert(weightedGateway.gatewayRewardRatioWeight, "gatewayRewardRatioWeight is required")
+	assert(weightedGateway.observerRewardRatioWeight, "observerRewardRatioWeight is required")
+	assert(weightedGateway.compositeWeight, "compositeWeight is required")
+	assert(weightedGateway.normalizedCompositeWeight, "normalizedCompositeWeight is required")
+
+	gateway.weights = {
+		stakeWeight = weightedGateway.stakeWeight,
+		tenureWeight = weightedGateway.tenureWeight,
+		gatewayRewardRatioWeight = weightedGateway.gatewayRewardRatioWeight,
+		observerRewardRatioWeight = weightedGateway.observerRewardRatioWeight,
+		compositeWeight = weightedGateway.compositeWeight,
+		normalizedCompositeWeight = weightedGateway.normalizedCompositeWeight,
+	}
+	GatewayRegistry[address] = gateway
+end
+
 function gar.addGateway(address, gateway)
 	GatewayRegistry[address] = gateway
 end
