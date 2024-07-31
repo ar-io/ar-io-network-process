@@ -488,6 +488,15 @@ describe("epochs", function()
 				local status = pcall(epochs.createEpoch, timestamp, epochStartBlockHeight, hashchain)
 				assert.is_true(status)
 				assert.are.same(expectation, epochs.getEpoch(epochIndex))
+				-- confirm the gateway weights were updated
+				assert.are.same({
+					stakeWeight = 1,
+					tenureWeight = 4,
+					gatewayRewardRatioWeight = 1,
+					observerRewardRatioWeight = 1,
+					compositeWeight = 4,
+					normalizedCompositeWeight = 1,
+				}, gar.getGateway("test-this-is-valid-arweave-wallet-address-1").weights)
 			end
 		)
 	end)
