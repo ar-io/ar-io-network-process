@@ -131,6 +131,21 @@ function utils.isValidArweaveAddress(address)
 	return #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
 end
 
+function utils.isValidEthAddress(address)
+	return #address == 42 and string.match(address, "^0x[%x]+$") ~= nil
+end
+
+function utils.isValidAOAddress(url)
+	return utils.isValidArweaveAddress(url) or utils.isValidEthAddress(url)
+end
+
+function utils.formatAddress(address)
+	if utils.isValidEthAddress(address) then
+		return string.lower(address)
+	end
+	return address
+end
+
 function utils.validateFQDN(fqdn)
 	-- Check if the fqdn is not nil and not empty
 	if not fqdn or fqdn == "" then
