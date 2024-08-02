@@ -2,7 +2,7 @@
   "scripts": {
     "build": "node tools/bundle-aos.js",
     "test": "yarn build && node --test --test-concurrency 1 --experimental-wasm-memory64 **/*.test.js",
-    "observe": "node tools/observe.js"
+    "evolve": "yarn build && node tools/evolve.js"
   },
   "devDependencies": {
     "@ar.io/sdk": "^2.1.0-alpha.2",
