@@ -1,7 +1,5 @@
 print("Loading .busted configuration...")
 
-require("luacov")
-
 return {
     default = {
         root = "src",

@@ -10,9 +10,6 @@ node_modules
 wallet.json
 .DS_Store
 luacov-html
-.luacov
 *.gz
 dist
 luacov.stats.out
-coverage/**
-!coverage/.gitkeep
