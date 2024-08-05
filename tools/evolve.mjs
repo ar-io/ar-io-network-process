@@ -8,7 +8,7 @@ const networkProcess = new AOProcess({ processId });
 
 const { id } = await networkProcess.send({
   tags: [{ name: 'Action', value: 'Eval' }],
-  data: constants.BUNDLED_AOS_LUA,
+  data: constants.BUNDLED_SOURCE_CODE,
   signer,
 });
 console.log(`Evolve result tx: ${id}`);

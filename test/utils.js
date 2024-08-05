@@ -3,15 +3,15 @@ const {
   AOS_WASM,
   AO_LOADER_HANDLER_ENV,
   AO_LOADER_OPTIONS,
-  BUNDLED_AOS_ANT_LUA,
   DEFAULT_HANDLE_OPTIONS,
+  BUNDLED_SOURCE_CODE,
 } = require('../tools/constants');
 
 /**
  * Loads the aos wasm binary and returns the handle function with program memory
  * @returns {Promise<{handle: Function, memory: WebAssembly.Memory}>}
  */
-async function createAntAosLoader() {
+async function createAosLoader() {
   const handle = await AoLoader(AOS_WASM, AO_LOADER_OPTIONS);
   const evalRes = await handle(
     null,
@@ -21,7 +21,7 @@ async function createAntAosLoader() {
         { name: 'Action', value: 'Eval' },
         { name: 'Module', value: ''.padEnd(43, '1') },
       ],
-      Data: BUNDLED_AOS_ANT_LUA,
+      Data: BUNDLED_SOURCE_CODE,
     },
     AO_LOADER_HANDLER_ENV,
   );
@@ -32,5 +32,5 @@ async function createAntAosLoader() {
 }
 
 module.exports = {
-  createAntAosLoader,
+  createAosLoader,
 };
