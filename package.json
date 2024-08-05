@@ -1,7 +1,7 @@
 {
   "scripts": {
     "build": "node tools/bundle-aos.js",
-    "test": "yarn build && node --test --test-concurrency 1 --experimental-wasm-memory64 **/*.test.js",
+    "test": "yarn build && node --test --experimental-wasm-memory64 **/*.test.js",
     "evolve": "yarn build && node tools/evolve.mjs"
   },
   "devDependencies": {
