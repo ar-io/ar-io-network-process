@@ -73,18 +73,15 @@ describe('Transfers', async () => {
         transferResult.Memory,
       );
       const balances = JSON.parse(result.Messages[0].Data);
-      assert.equal(balances[recipient.toLowerCase()], quantity);
-      assert.equal(
-        balances[sender.toLowerCase()],
-        senderBalanceData - quantity,
-      );
+      assert.equal(balances[recipient], quantity);
+      assert.equal(balances[sender], senderBalanceData - quantity);
     };
 
     const arweave1 = ''.padEnd(43, 'a');
     const arweave2 = ''.padEnd(43, '1');
-    // test with mixed case
-    const eth1 = '0x'.padEnd(42, 'Aa');
-    const eth2 = '0x'.padEnd(42, 'Bb');
+    // EIP55 checksummed addresses
+    const eth1 = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa';
+    const eth2 = '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB';
 
     await checkTransfer(arweave1, arweave2, 100000000);
     await checkTransfer(eth1, arweave2, 100000000);
