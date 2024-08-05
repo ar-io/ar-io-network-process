@@ -2,10 +2,10 @@
   "scripts": {
     "build": "node tools/bundle-aos.js",
     "test": "yarn build && node --test --test-concurrency 1 --experimental-wasm-memory64 **/*.test.js",
-    "observe": "node tools/observe.js"
+    "evolve": "yarn build && node tools/evolve.mjs"
   },
   "devDependencies": {
-    "@ar.io/sdk": "^2.1.0-alpha.2",
+    "@ar.io/sdk": "^2.1.0-alpha.6",
     "@permaweb/ao-loader": "^0.0.35",
     "@permaweb/aoconnect": "^0.0.55",
     "arweave": "^1.15.1",
