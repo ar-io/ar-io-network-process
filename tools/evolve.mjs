@@ -1,4 +1,4 @@
-import { AOProcess, createAoSigner } from '@ar.io/sdk/node';
+import { AOProcess, createAoSigner, ArweaveSigner } from '@ar.io/sdk/node';
 import constants from './constants.js';
 
 const registryId = process.env.REGISTRY_ID;
