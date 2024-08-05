@@ -71,4 +71,4 @@ jobs:
       - run: yarn evolve
         env:
           WALLET: ${{ secrets.WALLET }}
-          REGISTRY_ID: ${{ secrets.REGISTRY_ID }}
+          IO_NETWORK_PROCESS_ID: ${{ env.IO_NETWORK_PROCESS_ID }}
