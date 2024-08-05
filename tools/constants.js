@@ -30,7 +30,7 @@ const AOS_WASM = fs.readFileSync(
   ),
 );
 
-const BUNDLED_AOS_ANT_LUA = fs.readFileSync(
+const BUNDLED_SOURCE_CODE = fs.readFileSync(
   path.join(__dirname, '../dist/aos-bundled.lua'),
   'utf-8',
 );
@@ -47,7 +47,7 @@ const DEFAULT_HANDLE_OPTIONS = {
 };
 
 module.exports = {
-  BUNDLED_AOS_ANT_LUA,
+  BUNDLED_SOURCE_CODE,
   AOS_WASM,
   AO_LOADER_OPTIONS,
   AO_LOADER_HANDLER_ENV,
