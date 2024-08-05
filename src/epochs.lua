@@ -445,7 +445,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 				failedConsecutiveEpochs = failed and gateway.stats.failedConsecutiveEpochs + 1 or 0,
 				passedConsecutiveEpochs = failed and 0 or gateway.stats.passedConsecutiveEpochs + 1,
 				passedEpochCount = failed and gateway.stats.passedEpochCount or gateway.stats.passedEpochCount + 1,
-				prescribedEpochCount = observerIndex and gateway.stats.prescribedEpochCount + 1 or 0,
+				prescribedEpochCount = observerIndex ~= nil and gateway.stats.prescribedEpochCount + 1 or 0,
 				observedEpochCount = observationSubmitted and gateway.stats.observedEpochCount + 1
 					or gateway.stats.observedEpochCount,
 			}
