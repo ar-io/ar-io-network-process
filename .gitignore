@@ -14,3 +14,5 @@ luacov-html
 *.gz
 dist
 luacov.stats.out
+coverage/**
+!coverage/.gitkeep
