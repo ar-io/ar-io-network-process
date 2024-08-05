@@ -83,9 +83,9 @@ local ActionMap = {
 Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
 	-- assert recipient is a valid arweave address
 	local function checkAssertions()
-		assert(utils.isValidAOAddress(msg.Recipient), "Invalid recipient")
+		assert(utils.isValidAOAddress(msg.Tags.Recipient), "Invalid recipient")
 		assert(
-			tonumber(msg.Quantity) > 0 and utils.isInteger(tonumber(msg.Quantity)),
+			tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
 			"Invalid quantity. Must be integer greater than 0"
 		)
 	end
@@ -102,9 +102,9 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 	end
 
 	local from = utils.formatAddress(msg.From)
-	local recipient = utils.formatAddress(msg.Recipient)
+	local recipient = utils.formatAddress(msg.Tags.Recipient)
 
-	local status, result = pcall(balances.transfer, recipient, from, tonumber(msg.Quantity))
+	local status, result = pcall(balances.transfer, recipient, from, tonumber(msg.Tags.Quantity))
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -119,16 +119,16 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 				Target = msg.From,
 				Action = "Debit-Notice",
 				Recipient = recipient,
-				Quantity = msg.Quantity,
-				Data = "You transferred " .. msg.Quantity .. " to " .. msg.Recipient,
+				Quantity = msg.Tags.Quantity,
+				Data = "You transferred " .. msg.Tags.Quantity .. " to " .. recipient,
 			}
 			-- Credit-Notice message template, that is sent to the Recipient of the transfer
 			local creditNotice = {
 				Target = recipient,
 				Action = "Credit-Notice",
 				Sender = msg.From,
-				Quantity = msg.Quantity,
-				Data = "You received " .. msg.Quantity .. " from " .. msg.From,
+				Quantity = msg.Tags.Quantity,
+				Data = "You received " .. msg.Tags.Quantity .. " from " .. msg.From,
 			}
 
 			-- Add forwarded tags to the credit and debit notice messages
