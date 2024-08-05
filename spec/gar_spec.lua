@@ -500,6 +500,57 @@ describe("gar", function()
 		end)
 	end)
 
+	describe("getGatewayWeightsAtTimestamp", function()
+		it("shoulud properly compute weights based on gateways for a given timestamp", function()
+			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+				startTimestamp = 0,
+				stats = {
+					prescribedEpochCount = 3,
+					observedEpochCount = 1,
+					totalEpochCount = 10,
+					passedEpochCount = 3,
+					failedEpochCount = 7,
+					failedConsecutiveEpochs = 5,
+					passedConsecutiveEpochs = 0,
+				},
+				settings = testSettings,
+				status = "joined",
+				observerAddress = "observerAddress",
+			}
+			local timestamp = 100
+			local expectedTenureWeight = timestamp / gar.getSettings().observers.tenureWeightPeriod
+			local expectedStakeWeight = 1
+			local expectedObserverRatioWeight = 1 / 3
+			local expectedGatewayRatioWeight = 3 / 10
+			local expectedCompositeWeight = expectedStakeWeight
+				* expectedTenureWeight
+				* expectedGatewayRatioWeight
+				* expectedObserverRatioWeight
+			local expectation = {
+				{
+					gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
+					observerAddress = "observerAddress",
+					stake = gar.getSettings().operators.minStake,
+					startTimestamp = 0,
+					stakeWeight = expectedStakeWeight,
+					tenureWeight = expectedTenureWeight,
+					gatewayRewardRatioWeight = expectedGatewayRatioWeight,
+					observerRewardRatioWeight = expectedObserverRatioWeight,
+					compositeWeight = expectedCompositeWeight,
+					normalizedCompositeWeight = 1, -- there is only one gateway
+				},
+			}
+			local status, result =
+				pcall(gar.getGatewayWeightsAtTimestamp, { "test-this-is-valid-arweave-wallet-address-1" }, timestamp)
+			assert.is_true(status)
+			assert.are.same(expectation, result)
+		end)
+	end)
+
 	describe("getters", function()
 		-- TODO: other tests for error conditions when joining/leaving network
 		it("should get single gateway", function()
