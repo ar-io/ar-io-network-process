@@ -6,9 +6,9 @@ const wallet = JSON.parse(process.env.WALLET);
 const signer = createAoSigner(new ArweaveSigner(wallet));
 const networkProcess = new AOProcess({ processId });
 
-const evolveResult = await networkProcess.send({
+const { id } = await networkProcess.send({
   tags: [{ name: 'Action', value: 'Eval' }],
   data: constants.BUNDLED_AOS_LUA,
   signer,
 });
-console.log(`Evolve result: ${evolveResult}`);
+console.log(`Evolve result tx: ${id}`);

@@ -524,8 +524,9 @@ describe("gar", function()
 			local timestamp = 100
 			local expectedTenureWeight = timestamp / gar.getSettings().observers.tenureWeightPeriod
 			local expectedStakeWeight = 1
-			local expectedObserverRatioWeight = 1 / 3
-			local expectedGatewayRatioWeight = 3 / 10
+			-- NOTE: we increment by one to avoid division by zero
+			local expectedObserverRatioWeight = 2 / 4 -- (the stats are 1/3)
+			local expectedGatewayRatioWeight = 4 / 11 -- (the tats are 3/10)
 			local expectedCompositeWeight = expectedStakeWeight
 				* expectedTenureWeight
 				* expectedGatewayRatioWeight

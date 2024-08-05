@@ -437,14 +437,10 @@ function gar.getGatewayWeightsAtTimestamp(gatewayAddresses, timestamp)
 
 			local totalEpochsGatewayPassed = gateway.stats.passedEpochCount or 0
 			local totalEpochsParticipatedIn = gateway.stats.totalEpochCount or 0
-			local gatewayRewardRatioWeight = totalEpochsParticipatedIn > 0
-					and totalEpochsGatewayPassed / totalEpochsParticipatedIn
-				or 1
-
+			local gatewayRewardRatioWeight = (1 + totalEpochsGatewayPassed) / (1 + totalEpochsParticipatedIn)
 			local totalEpochsPrescribed = gateway.stats.prescribedEpochCount or 0
 			local totalEpochsSubmitted = gateway.stats.observedEpochCount or 0
-			local observerRewardRatioWeight = totalEpochsPrescribed > 0 and totalEpochsSubmitted / totalEpochsPrescribed
-				or 1
+			local observerRewardRatioWeight = (1 + totalEpochsSubmitted) / (1 + totalEpochsPrescribed)
 
 			local compositeWeight = stakeWeightRatio
 				* gatewayTenureWeight
