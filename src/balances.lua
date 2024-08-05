@@ -11,8 +11,7 @@ function balances.transfer(recipient, from, qty)
 	assert(type(recipient) == "string", "Recipient is required!")
 	assert(type(from) == "string", "From is required!")
 	assert(type(qty) == "number", "Quantity is required and must be a number!")
-	assert(qty > 0, "Quantity must be greater than 0")
-	-- assert(qty % 1 == 0, "Quantity must be an integer")
+	assert(utils.isInteger(qty), "Quantity must be an integer")
 
 	balances.reduceBalance(from, qty)
 	balances.increaseBalance(recipient, qty)
@@ -45,6 +44,20 @@ end
 function balances.increaseBalance(target, qty)
 	local prevBalance = balances.getBalance(target) or 0
 	Balances[target] = prevBalance + qty
+end
+
+function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder)
+	local balances = balances.getBalances()
+	local balancesArray = {}
+	local cursorField = "address" -- the cursor will be the wallet address
+	for address, balance in pairs(balances) do
+		table.insert(balancesArray, {
+			address = address,
+			balance = balance,
+		})
+	end
+
+	return utils.paginateTableWithCursor(balancesArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
 return balances

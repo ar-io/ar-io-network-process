@@ -4,11 +4,11 @@ local testSettings = {
 	protocol = "https",
 	port = 443,
 	allowDelegatedStaking = true,
-	minDelegatedStake = 100,
+	minDelegatedStake = gar.getSettings().delegates.minStake,
 	autoStake = true,
 	label = "test",
 	delegateRewardShareRatio = 0,
-	properties = "properties",
+	properties = "test-this-is-valid-arweave-wallet-address-1",
 }
 
 local startTimestamp = 0
@@ -28,7 +28,7 @@ local testGateway = {
 	},
 	settings = testSettings,
 	status = "joined",
-	observerAddress = "observerAddress",
+	observerAddress = "test-this-is-valid-arweave-wallet-address-1",
 }
 
 describe("gar", function()
@@ -66,14 +66,14 @@ describe("gar", function()
 				},
 				settings = testSettings,
 				status = "joined",
-				observerAddress = "observerAddress",
+				observerAddress = "test-this-is-valid-arweave-wallet-address-1",
 			}
 			local status, error = pcall(
 				gar.joinNetwork,
 				"test-this-is-valid-arweave-wallet-address-1",
 				gar.getSettings().operators.minStake,
 				testSettings,
-				"observerAddress",
+				"test-this-is-valid-arweave-wallet-address-1",
 				startTimestamp
 			)
 			assert.is_false(status)
@@ -108,17 +108,18 @@ describe("gar", function()
 					properties = testSettings.properties,
 				},
 				status = "joined",
-				observerAddress = "observerAddress",
+				observerAddress = "test-this-is-valid-arweave-wallet-address-1",
 			}
 			local status, result = pcall(
 				gar.joinNetwork,
 				"test-this-is-valid-arweave-wallet-address-1",
 				gar.getSettings().operators.minStake,
 				testSettings,
-				"observerAddress",
+				"test-this-is-valid-arweave-wallet-address-1",
 				startTimestamp
 			)
 			assert.is_true(status)
+			assert.are.equal(Balances["test-this-is-valid-arweave-wallet-address-1"], 0)
 			assert.are.same(expectation, result)
 			assert.are.same(expectation, gar.getGateway("test-this-is-valid-arweave-wallet-address-1"))
 		end)
@@ -152,7 +153,8 @@ describe("gar", function()
 				},
 			}
 
-			local status, result = pcall(gar.leaveNetwork, "test-this-is-valid-arweave-wallet-address-1", startTimestamp, "msgId")
+			local status, result =
+				pcall(gar.leaveNetwork, "test-this-is-valid-arweave-wallet-address-1", startTimestamp, "msgId")
 			assert.is_true(status)
 			assert.are.same(result, {
 				operatorStake = 0,
@@ -223,6 +225,7 @@ describe("gar", function()
 				observerAddress = "observerAddress",
 			}
 			local result, err = gar.increaseOperatorStake("test-this-is-valid-arweave-wallet-address-1", 1000)
+			assert.are.equal(Balances["test-this-is-valid-arweave-wallet-address-1"], 0)
 			assert.are.same(result, {
 				operatorStake = gar.getSettings().operators.minStake + 1000,
 				totalDelegatedStake = 0,
@@ -266,8 +269,13 @@ describe("gar", function()
 				status = "joined",
 				observerAddress = "observerAddress",
 			}
-			local status, result =
-				pcall(gar.decreaseOperatorStake, "test-this-is-valid-arweave-wallet-address-1", 1000, startTimestamp, "msgId")
+			local status, result = pcall(
+				gar.decreaseOperatorStake,
+				"test-this-is-valid-arweave-wallet-address-1",
+				1000,
+				startTimestamp,
+				"msgId"
+			)
 			assert.is_true(status)
 			assert.are.same(result, {
 				operatorStake = gar.getSettings().operators.minStake,
@@ -316,13 +324,13 @@ describe("gar", function()
 				},
 				settings = testSettings,
 				status = "joined",
-				observerAddress = "observerAddress",
+				observerAddress = "test-this-is-valid-arweave-wallet-address-0",
 			}
-			local newObserverWallet = "QGWqtJdLLgm2ehFWiiPzMaoFLD50CnGuzZIPEdoDRGQ"
+			local newObserverWallet = "test-this-is-valid-arweave-wallet-address-1"
 			local updatedSettings = {
 				fqdn = "example.com",
 				port = 80,
-				protocol = "http",
+				protocol = "https",
 				properties = "NdZ3YRwMB2AMwwFYjKn1g88Y9nRybTo0qhS1ORq_E7g",
 				note = "This is a test update.",
 				label = "Test Label Update",
@@ -392,6 +400,7 @@ describe("gar", function()
 				gar.getSettings().delegates.minStake,
 				startTimestamp
 			)
+			assert.are.equal(Balances["test-this-is-valid-arweave-wallet-address-2"], 0)
 			assert.are.same(result, {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = gar.getSettings().delegates.minStake,
@@ -488,6 +497,58 @@ describe("gar", function()
 			assert.is_true(status)
 			assert.are.same(expectation, result)
 			assert.are.same(expectation, gar.getGateway("test-this-is-valid-arweave-wallet-address-1"))
+		end)
+	end)
+
+	describe("getGatewayWeightsAtTimestamp", function()
+		it("shoulud properly compute weights based on gateways for a given timestamp", function()
+			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+				startTimestamp = 0,
+				stats = {
+					prescribedEpochCount = 3,
+					observedEpochCount = 1,
+					totalEpochCount = 10,
+					passedEpochCount = 3,
+					failedEpochCount = 7,
+					failedConsecutiveEpochs = 5,
+					passedConsecutiveEpochs = 0,
+				},
+				settings = testSettings,
+				status = "joined",
+				observerAddress = "observerAddress",
+			}
+			local timestamp = 100
+			local expectedTenureWeight = timestamp / gar.getSettings().observers.tenureWeightPeriod
+			local expectedStakeWeight = 1
+			-- NOTE: we increment by one to avoid division by zero
+			local expectedObserverRatioWeight = 2 / 4 -- (the stats are 1/3)
+			local expectedGatewayRatioWeight = 4 / 11 -- (the tats are 3/10)
+			local expectedCompositeWeight = expectedStakeWeight
+				* expectedTenureWeight
+				* expectedGatewayRatioWeight
+				* expectedObserverRatioWeight
+			local expectation = {
+				{
+					gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
+					observerAddress = "observerAddress",
+					stake = gar.getSettings().operators.minStake,
+					startTimestamp = 0,
+					stakeWeight = expectedStakeWeight,
+					tenureWeight = expectedTenureWeight,
+					gatewayRewardRatioWeight = expectedGatewayRatioWeight,
+					observerRewardRatioWeight = expectedObserverRatioWeight,
+					compositeWeight = expectedCompositeWeight,
+					normalizedCompositeWeight = 1, -- there is only one gateway
+				},
+			}
+			local status, result =
+				pcall(gar.getGatewayWeightsAtTimestamp, { "test-this-is-valid-arweave-wallet-address-1" }, timestamp)
+			assert.is_true(status)
+			assert.are.same(expectation, result)
 		end)
 	end)
 

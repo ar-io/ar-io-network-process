@@ -4,27 +4,26 @@ local utils = require("utils")
 local gar = {}
 
 GatewayRegistry = GatewayRegistry or {}
--- TODO: any necessary state modifcations as we iterate go here
-local garSettings = {
-	observers = {
-		maxPerEpoch = 50,
-		tenureWeightDays = 180,
-		tenureWeightPeriod = 180 * 24 * 60 * 60 * 1000,
-		maxTenureWeight = 4,
-	},
-	operators = {
-		minStake = 10000 * 1000000, -- 10,000 IO
-		withdrawLengthMs = 30 * 24 * 60 * 60 * 1000, -- 30 days to lower operator stake
-		maxDelegates = 10000,
-		leaveLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days that balance will be vaulted
-	},
-	delegates = {
-		minStake = 50 * 1000000, -- 50 IO
-		withdrawLengthMs = 30 * 24 * 60 * 60 * 1000, -- 30 days
-		minLockLengthMs = 24 * 60 * 60 * 1000, -- 1 day
-		maxLockLengthMs = 3 * 365 * 24 * 60 * 60 * 1000, -- 3 years
-	},
-}
+GatewayRegistrySettings = GatewayRegistrySettings
+	or {
+		observers = {
+			maxPerEpoch = 50,
+			tenureWeightDays = 180,
+			tenureWeightPeriod = 180 * 24 * 60 * 60 * 1000, -- aproximately 2 years
+			maxTenureWeight = 4,
+		},
+		operators = {
+			minStake = 50000 * 1000000, -- 50,000 IO
+			withdrawLengthMs = 30 * 24 * 60 * 60 * 1000, -- 30 days to lower operator stake
+			maxDelegates = 10000,
+			leaveLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days that balance will be vaulted
+			failedEpochCountMax = 30, -- number of epochs failed before marked as leaving
+		},
+		delegates = {
+			minStake = 500 * 1000000, -- 500 IO
+			withdrawLengthMs = 30 * 24 * 60 * 60 * 1000, -- 30 days
+		},
+	}
 
 function gar.joinNetwork(from, stake, settings, observerAddress, timeStamp)
 	gar.assertValidGatewayParameters(from, stake, settings, observerAddress)
@@ -130,7 +129,9 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 end
 
 function gar.increaseOperatorStake(from, qty)
-	assert(type(qty) == "number", "Quantity is required and must be a number!")
+	assert(type(qty) == "number", "Quantity is required and must be a number")
+	-- asssert it is an integer
+	assert(utils.isInteger(qty), "Quantity must be an integer")
 	assert(qty > 0, "Quantity must be greater than 0")
 
 	local gateway = gar.getGateway(from)
@@ -155,7 +156,7 @@ function gar.increaseOperatorStake(from, qty)
 end
 
 function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId)
-	assert(type(qty) == "number", "Quantity is required and must be a number!")
+	assert(type(qty) == "number", "Quantity is required and must be a number")
 	assert(qty > 0, "Quantity must be greater than 0")
 
 	local gateway = gar.getGateway(from)
@@ -264,10 +265,10 @@ function gar.getGateways()
 end
 
 function gar.delegateStake(from, target, qty, currentTimestamp)
-	assert(type(qty) == "number", "Quantity is required and must be a number!")
+	assert(type(qty) == "number", "Quantity is required and must be a number")
 	assert(qty > 0, "Quantity must be greater than 0")
-	assert(type(target) == "string", "Target is required and must be a string!")
-	assert(type(from) == "string", "From is required and must be a string!")
+	assert(type(target) == "string", "Target is required and must be a string")
+	assert(type(from) == "string", "From is required and must be a string")
 
 	local gateway = gar.getGateway(target)
 	if gateway == nil then
@@ -338,11 +339,11 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 end
 
 function gar.getSettings()
-	return garSettings
+	return utils.deepCopy(GatewayRegistrySettings)
 end
 
 function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimestamp, messageId)
-	assert(type(qty) == "number", "Quantity is required and must be a number!")
+	assert(type(qty) == "number", "Quantity is required and must be a number")
 	assert(qty > 0, "Quantity must be greater than 0")
 
 	local gateway = gar.getGateway(gatewayAddress)
@@ -437,9 +438,8 @@ function gar.getGatewayWeightsAtTimestamp(gatewayAddresses, timestamp)
 			local totalEpochsGatewayPassed = gateway.stats.passedEpochCount or 0
 			local totalEpochsParticipatedIn = gateway.stats.totalEpochCount or 0
 			local gatewayRewardRatioWeight = (1 + totalEpochsGatewayPassed) / (1 + totalEpochsParticipatedIn)
-
-			local totalEpochsPrescribed = gateway.stats.totalEpochsPrescribedCount or 0
-			local totalEpochsSubmitted = gateway.stats.submittedEpochCount or 0
+			local totalEpochsPrescribed = gateway.stats.prescribedEpochCount or 0
+			local totalEpochsSubmitted = gateway.stats.observedEpochCount or 0
 			local observerRewardRatioWeight = (1 + totalEpochsSubmitted) / (1 + totalEpochsPrescribed)
 
 			local compositeWeight = stakeWeightRatio
@@ -480,19 +480,43 @@ function gar.isGatewayJoined(gateway, currentTimestamp)
 end
 
 function gar.assertValidGatewayParameters(from, stake, settings, observerAddress)
-	assert(type(from) == "string", "from is required and must be a string!")
-	assert(type(stake) == "number", "stake is required and must be a number!")
-	assert(type(settings) == "table", "settings is required and must be a table!")
-	assert(type(observerAddress) == "string", "observerAddress is required and must be a string!")
+	assert(type(from) == "string", "from is required and must be a string")
+	assert(type(stake) == "number", "stake is required and must be a number")
+	assert(type(settings) == "table", "settings is required and must be a table")
+	assert(
+		type(observerAddress) == "string" and utils.isValidArweaveAddress(observerAddress),
+		"Observer-Address is required and must be a a valid arweave address"
+	)
 	assert(type(settings.allowDelegatedStaking) == "boolean", "allowDelegatedStaking must be a boolean")
-	assert(type(settings.minDelegatedStake) == "number", "minDelegatedStake must be a number")
 	assert(type(settings.label) == "string", "label is required and must be a string")
 	assert(type(settings.fqdn) == "string", "fqdn is required and must be a string")
-	assert(type(settings.protocol) == "string", "protocol is required and must be a string")
-	assert(type(settings.port) == "number", "port is required and must be a number")
-	assert(type(settings.properties) == "string", "properties is required and must be a string")
+	assert(
+		type(settings.protocol) == "string" and settings.protocol == "https",
+		"protocol is required and must be https"
+	)
+	assert(
+		type(settings.port) == "number"
+			and utils.isInteger(settings.port)
+			and settings.port >= 0
+			and settings.port <= 65535,
+		"port is required and must be an integer between 0 and 65535"
+	)
+	assert(
+		type(settings.properties) == "string" and utils.isValidArweaveAddress(settings.properties),
+		"properties is required and must be a string"
+	)
+	assert(
+		stake >= gar.getSettings().operators.minStake,
+		"Operator stake must be greater than the minimum stake to join the network"
+	)
 	if settings.delegateRewardShareRatio ~= nil then
-		assert(type(settings.delegateRewardShareRatio) == "number", "delegateRewardShareRatio must be a number")
+		assert(
+			type(settings.delegateRewardShareRatio) == "number"
+				and utils.isInteger(settings.delegateRewardShareRatio)
+				and settings.delegateRewardShareRatio >= 0
+				and settings.delegateRewardShareRatio <= 100,
+			"delegateRewardShareRatio must be an integer between 0 and 100"
+		)
 	end
 	if settings.autoStake ~= nil then
 		assert(type(settings.autoStake) == "boolean", "autoStake must be a boolean")
@@ -501,7 +525,12 @@ function gar.assertValidGatewayParameters(from, stake, settings, observerAddress
 		assert(type(settings.properties) == "string", "properties must be a table")
 	end
 	if settings.minDelegatedStake ~= nil then
-		assert(type(settings.minDelegatedStake) == "number", "minDelegatedStake must be a number")
+		assert(
+			type(settings.minDelegatedStake) == "number"
+				and utils.isInteger(settings.minDelegatedStake)
+				and settings.minDelegatedStake >= gar.getSettings().delegates.minStake,
+			"minDelegatedStake must be an integer greater than or equal to the minimum delegated stake"
+		)
 	end
 end
 
@@ -523,17 +552,44 @@ function gar.updateGatewayStats(address, stats)
 	GatewayRegistry[address] = gateway
 end
 
+function gar.updateGatewayWeights(weightedGateway)
+	local address = weightedGateway.gatewayAddress
+	local gateway = gar.getGateway(address)
+	if gateway == nil then
+		error("Gateway does not exist")
+	end
+
+	assert(weightedGateway.stakeWeight, "stakeWeight is required")
+	assert(weightedGateway.tenureWeight, "tenureWeight is required")
+	assert(weightedGateway.gatewayRewardRatioWeight, "gatewayRewardRatioWeight is required")
+	assert(weightedGateway.observerRewardRatioWeight, "observerRewardRatioWeight is required")
+	assert(weightedGateway.compositeWeight, "compositeWeight is required")
+	assert(weightedGateway.normalizedCompositeWeight, "normalizedCompositeWeight is required")
+
+	gateway.weights = {
+		stakeWeight = weightedGateway.stakeWeight,
+		tenureWeight = weightedGateway.tenureWeight,
+		gatewayRewardRatioWeight = weightedGateway.gatewayRewardRatioWeight,
+		observerRewardRatioWeight = weightedGateway.observerRewardRatioWeight,
+		compositeWeight = weightedGateway.compositeWeight,
+		normalizedCompositeWeight = weightedGateway.normalizedCompositeWeight,
+	}
+	GatewayRegistry[address] = gateway
+end
+
 function gar.addGateway(address, gateway)
 	GatewayRegistry[address] = gateway
 end
 
 -- for test purposes
 function gar.updateSettings(newSettings)
-	garSettings = newSettings
+	GatewayRegistrySettings = newSettings
 end
 
 function gar.pruneGateways(currentTimestamp)
 	local gateways = gar.getGateways()
+	local garSettings = gar.getSettings()
+
 	-- we take a deep copy so we can operate directly on the gateway object
 	for address, gateway in pairs(gateways) do
 		if gateway then
@@ -562,8 +618,13 @@ function gar.pruneGateways(currentTimestamp)
 			-- update the gateway before we do anything else
 			GatewayRegistry[address] = gateway
 
-			-- if gateway is joined but failed more than 3 consecutive epochs, mark it as leaving and put operator stake and delegate stakes in vaults
-			if gateway.status == "joined" and gateway.stats.failedConsecutiveEpochs >= 3 then
+			-- if gateway is joined but failed more than 30 consecutive epochs, mark it as leaving and put operator stake and delegate stakes in vaults
+			if
+				gateway.status == "joined"
+				and garSettings ~= nil
+				and gateway.stats.failedConsecutiveEpochs >= garSettings.operators.failedEpochCountMax
+			then
+				-- mark as leaving
 				gar.leaveNetwork(address, currentTimestamp, address)
 			else
 				if gateway.status == "leaving" and gateway.endTimestamp <= currentTimestamp then
@@ -573,6 +634,18 @@ function gar.pruneGateways(currentTimestamp)
 			end
 		end
 	end
+end
+
+function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
+	local gateways = gar.getGateways()
+	local gatewaysArray = {}
+	local cursorField = "gatewayAddress" -- the cursor will be the gateway address
+	for address, record in pairs(gateways) do
+		record.gatewayAddress = address
+		table.insert(gatewaysArray, record)
+	end
+
+	return utils.paginateTableWithCursor(gatewaysArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
 return gar

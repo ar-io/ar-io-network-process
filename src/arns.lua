@@ -30,7 +30,10 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		error("Insufficient balance")
 	end
 
-	if arns.getRecord(name) and arns.getRecord(name).endTimestamp + constants.gracePeriodMs > timestamp then
+	if
+		arns.getRecord(name) ~= nil and arns.getRecord(name).endTimestamp == nil
+		or arns.getRecord(name) ~= nil and arns.getRecord(name).endTimestamp + constants.gracePeriodMs > timestamp
+	then
 		error("Name is already registered")
 	end
 
@@ -67,6 +70,18 @@ function arns.addRecord(name, record)
 	end
 end
 
+function arns.getPaginatedRecords(cursor, limit, sortBy, sortOrder)
+	local records = arns.getRecords()
+	local recordsArray = {}
+	local cursorField = "name" -- the cursor will be the name
+	for name, record in pairs(records) do
+		record.name = name
+		table.insert(recordsArray, record)
+	end
+
+	return utils.paginateTableWithCursor(recordsArray, cursor, cursorField, limit, sortBy, sortOrder)
+end
+
 function arns.extendLease(from, name, years, currentTimestamp)
 	local record = arns.getRecord(name)
 	-- throw error if invalid
@@ -89,7 +104,7 @@ end
 
 function arns.calculateExtensionFee(baseFee, years, demandFactor)
 	local extensionFee = arns.calculateAnnualRenewalFee(baseFee, years)
-	return demandFactor * extensionFee
+	return math.floor(demandFactor * extensionFee)
 end
 
 function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
@@ -237,14 +252,17 @@ function arns.calculateUndernameCost(baseFee, increaseQty, registrationType, yea
 		undernamePercentageFee = constants.UNDERNAME_LEASE_FEE_PERCENTAGE
 	elseif registrationType == "permabuy" then
 		undernamePercentageFee = constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE
+	else
+		error("Invalid registration type")
 	end
 
 	local totalFeeForQtyAndYears = baseFee * undernamePercentageFee * increaseQty * years
 	return math.floor(demandFactor * totalFeeForQtyAndYears)
 end
 
+-- this is intended to be a float point number - TODO: protect against large decimals
 function arns.calculateYearsBetweenTimestamps(startTimestamp, endTimestamp)
-	local yearsRemainingFloat = math.floor((endTimestamp - startTimestamp) / constants.oneYearMs)
+	local yearsRemainingFloat = (endTimestamp - startTimestamp) / constants.oneYearMs
 	return yearsRemainingFloat
 end
 
@@ -254,14 +272,17 @@ function arns.assertValidBuyRecord(name, years, purchaseType, processId)
 	assert(#name >= 1 and #name <= 51, "Name pattern is invalid.")
 	assert(name:match("^%w") and name:match("%w$") and name:match("^[%w-]+$"), "Name pattern is invalid.")
 
-	-- If 'years' is present, validate it as an integer between 1 and 5
-	assert(
-		years == nil or (type(years) == "number" and years % 1 == 0 and years >= 1 and years <= 5),
-		"Years is invalid. Must be an integer between 1 and 5"
-	)
-
 	-- assert purchase type if present is lease or permabuy
 	assert(purchaseType == nil or purchaseType == "lease" or purchaseType == "permabuy", "PurchaseType is invalid.")
+
+	if purchaseType == "lease" or purchaseType == nil then
+		-- only check on leases (nil is set to lease)
+		-- If 'years' is present, validate it as an integer between 1 and 5
+		assert(
+			years == nil or (type(years) == "number" and years % 1 == 0 and years >= 1 and years <= 5),
+			"Years is invalid. Must be an integer between 1 and 5"
+		)
+	end
 
 	-- assert processId is valid pattern
 	assert(type(processId) == "string", "ProcessId is required and must be a string.")
@@ -305,7 +326,7 @@ end
 
 function arns.getTokenCost(intendedAction)
 	local tokenCost = 0
-	if intendedAction.intent == "BuyRecord" then
+	if intendedAction.intent == "Buy-Record" then
 		local purchaseType = intendedAction.purchaseType
 		local years = intendedAction.years
 		local name = intendedAction.name
@@ -314,7 +335,7 @@ function arns.getTokenCost(intendedAction)
 		assert(type(name) == "string", "Name is required and must be a string.")
 		local baseFee = demand.getFees()[#name]
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
-	elseif intendedAction.intent == "ExtendLease" then
+	elseif intendedAction.intent == "Extend-Lease" then
 		local name = intendedAction.name
 		local years = intendedAction.years
 		assert(type(name) == "string", "Name is required and must be a string.")
@@ -329,19 +350,23 @@ function arns.getTokenCost(intendedAction)
 		local years = intendedAction.years
 		local baseFee = demand.getFees()[#intendedAction.name]
 		tokenCost = arns.calculateExtensionFee(baseFee, years, demand.getDemandFactor())
-	elseif intendedAction.intent == "IncreaseUndernameLimit" then
+	elseif intendedAction.intent == "Increase-Undername-Limit" then
 		local name = intendedAction.name
-		local qty = intendedAction.quantity
+		local qty = tonumber(intendedAction.quantity)
+		local currentTimestamp = intendedAction.currentTimestamp
 		assert(type(name) == "string", "Name is required and must be a string.")
-		assert(qty >= 1 and qty <= 9990, "Quantity is invalid, must be between 1 and 9990")
+		assert(
+			qty >= 1 and qty <= 9990 and utils.isInteger(qty),
+			"Quantity is invalid, must be an integer between 1 and 9990"
+		)
+		assert(type(currentTimestamp) == "number" and currentTimestamp > 0, "Timestamp is required")
 		local record = arns.getRecord(intendedAction.name)
 		if not record then
 			error("Name is not registered")
 		end
-		local qty = intendedAction.quantity
 		local yearsRemaining = constants.PERMABUY_LEASE_FEE_LENGTH
 		if record.type == "lease" then
-			yearsRemaining = arns.calculateYearsBetweenTimestamps(intendedAction.currentTimestamp, record.endTimestamp)
+			yearsRemaining = arns.calculateYearsBetweenTimestamps(currentTimestamp, record.endTimestamp)
 		end
 		local baseFee = demand.getFees()[#intendedAction.name]
 		tokenCost = arns.calculateUndernameCost(baseFee, qty, record.type, yearsRemaining, demand.getDemandFactor())
@@ -366,7 +391,7 @@ function arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
 		error("Name is expired")
 	end
 
-	if qty < 1 or qty > 9990 then
+	if qty < 1 or qty > 9990 or not utils.isInteger(qty) then
 		error("Qty is invalid")
 	end
 

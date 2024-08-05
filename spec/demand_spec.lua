@@ -15,6 +15,7 @@ describe("demand", function()
 			fees = constants.genesisFees,
 		}
 		demand.updateSettings({
+			periodZeroStartTimestamp = 0,
 			movingAvgPeriodCount = 7,
 			periodLengthMs = 60 * 1000 * 24, -- one day
 			demandFactorBaseValue = 1,
@@ -91,7 +92,7 @@ describe("demand", function()
 		it(
 			"updateDemandFactor() adjust fees and reset demend factor parameters when consecutive periods at minimum threshold is hit",
 			function()
-				DemandFactor.currentDemandFactor = demand.getSettings().demandFactorMin
+				DemandFactor.currentDemandFactor = demand.getSettings().demandFactorMin - 0.1
 				DemandFactor.consecutivePeriodsWithMinDemandFactor = demand.getSettings().stepDownThreshold
 				DemandFactor.revenueThisPeriod = 0
 				DemandFactor.trailingPeriodRevenues = { 0, 10, 10, 10, 10, 10 }
@@ -112,6 +113,7 @@ describe("demand", function()
 	describe("purchase count criteria", function()
 		before_each(function()
 			demand.updateSettings({
+				periodZeroStartTimestamp = 0,
 				movingAvgPeriodCount = 7,
 				periodLengthMs = 60 * 1000 * 24, -- one day
 				demandFactorBaseValue = 1,
