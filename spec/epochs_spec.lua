@@ -519,7 +519,7 @@ describe("epochs", function()
 					},
 					startTimestamp = 0,
 					stats = {
-						prescribedEpochCount = 0,
+						prescribedEpochCount = i,
 						observedEpochCount = 0,
 						totalEpochCount = 0,
 						passedEpochCount = 0,
@@ -583,7 +583,7 @@ describe("epochs", function()
 			local gateway5 = gar.getGateway("test-this-is-valid-arweave-wallet-address-5")
 			-- failed observation and did not observe
 			assert.are.same({
-				prescribedEpochCount = 1,
+				prescribedEpochCount = 2, -- increment by one
 				observedEpochCount = 0,
 				passedEpochCount = 0,
 				failedEpochCount = 1,
@@ -593,7 +593,7 @@ describe("epochs", function()
 			}, gateway1.stats)
 			-- passed observation, did not observe
 			assert.are.same({
-				prescribedEpochCount = 1,
+				prescribedEpochCount = 3, -- increment by one
 				observedEpochCount = 0,
 				passedEpochCount = 1,
 				failedEpochCount = 0,
@@ -603,7 +603,7 @@ describe("epochs", function()
 			}, gateway2.stats)
 			-- failed observation, did observe
 			assert.are.same({
-				prescribedEpochCount = 1,
+				prescribedEpochCount = 4, -- increment by one
 				observedEpochCount = 1,
 				passedEpochCount = 0,
 				failedEpochCount = 1,
@@ -613,7 +613,7 @@ describe("epochs", function()
 			}, gateway3.stats)
 			-- passed observation, did observe
 			assert.are.same({
-				prescribedEpochCount = 1,
+				prescribedEpochCount = 5, -- increment by one
 				observedEpochCount = 1,
 				passedEpochCount = 1,
 				failedEpochCount = 0,
@@ -623,7 +623,7 @@ describe("epochs", function()
 			}, gateway4.stats)
 			-- passed observation, did observe
 			assert.are.same({
-				prescribedEpochCount = 1,
+				prescribedEpochCount = 6, -- increment by one
 				observedEpochCount = 1,
 				passedEpochCount = 1,
 				failedEpochCount = 0,
