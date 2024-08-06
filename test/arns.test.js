@@ -1,4 +1,4 @@
-const { createAntAosLoader } = require('./utils');
+const { createAosLoader } = require('./utils');
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const {
@@ -13,7 +13,7 @@ const testEthAddress2 = '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB';
 
 describe('ArNS', async () => {
   const { handle: originalHandle, memory: startMemory } =
-    await createAntAosLoader();
+    await createAosLoader();
 
   async function handle(options = {}, mem = startMemory) {
     return originalHandle(

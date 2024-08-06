@@ -1,4 +1,5 @@
 print("Loading .busted configuration...")
+
 return {
     default = {
         root = "src",

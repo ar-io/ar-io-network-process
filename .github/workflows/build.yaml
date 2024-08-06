@@ -14,7 +14,7 @@ jobs:
 
       - run: yarn --frozen-lockfile
       - run: yarn build
-      - run: yarn test
+      - run: yarn test:integration
 
   unit:
     runs-on: ubuntu-latest
@@ -34,12 +34,13 @@ jobs:
         run: luarocks install ar-io-ao-0.1-1.rockspec
 
       - name: Run Busted Tests
-        run: busted .
+        run: busted . && luacov
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/luacov.report.out
 
   sdk:
     runs-on: ubuntu-latest

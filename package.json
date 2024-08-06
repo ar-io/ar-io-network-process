@@ -1,7 +1,9 @@
 {
   "scripts": {
     "build": "node tools/bundle-aos.js",
-    "test": "yarn build && node --test --test-concurrency 1 --experimental-wasm-memory64 **/*.test.js",
+    "test:integration": "yarn build && node --test --experimental-wasm-memory64 **/*.test.js",
+    "test:unit": "busted . && luacov",
+    "test": "yarn test:unit && yarn test:integration",
     "evolve": "yarn build && node tools/evolve.mjs"
   },
   "devDependencies": {

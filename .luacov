@@ -1,0 +1,5 @@
+statsfile = 'coverage/luacov.stats.out';
+reportfile = 'coverage/luacov.report.out';
+deleteStatsFile = false;
+include = { "src/" }
+exclude = { "crypto", "json", "base64", "ao" }
