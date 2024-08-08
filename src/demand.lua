@@ -21,8 +21,8 @@ DemandFactorSettings = DemandFactorSettings
 		periodLengthMs = 60 * 60 * 1000 * 24, -- one day in milseconds
 		demandFactorBaseValue = 1,
 		demandFactorMin = 0.5,
-		demandFactorUpAdjustment = 0.05,
-		demandFactorDownAdjustment = 0.025,
+		demandFactorUpAdjustment = 0.05, -- 5%
+		demandFactorDownAdjustment = 0.015, -- 1.5%
 		stepDownThreshold = 3,
 		criteria = "revenue",
 	}
