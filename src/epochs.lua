@@ -263,6 +263,8 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 		epochs.getEpochTimestampsForIndex(epochIndex)
 	local prescribedObservers, weightedGateways = epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	local prescribedNames = epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
+	-- get the max rewards for each participant eligible for the epoch
+	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
 	-- create the epoch
 	local epoch = {
 		epochIndex = epochIndex,
@@ -276,7 +278,14 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 			failureSummaries = {},
 			reports = {},
 		},
-		distributions = {},
+		distributions = {
+			totalEligibleRewards = eligibleEpochRewards.totalEligibleRewards,
+			totalEligibleGatewayReward = eligibleEpochRewards.perGatewayReward,
+			totalEligibleObserverReward = eligibleEpochRewards.perObserverReward,
+			rewards = {
+				eligible = eligibleEpochRewards.potentialRewards,
+			},
+		},
 	}
 	Epochs[epochIndex] = epoch
 	-- update the gateway weights
@@ -285,6 +294,7 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 			gar.updateGatewayWeights(weightedGateway)
 		end
 	end
+	return epoch
 end
 
 function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddresses, timestamp)
@@ -383,6 +393,51 @@ function epochs.updateEpochSettings(newSettings)
 	EpochSettings = newSettings
 end
 
+function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
+	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
+	local activeGatewayAddresses = gar.getActiveGatewaysBetweenTimestamps(epochStartTimestamp, epochEndTimestamp)
+	local totalEligibleRewards = math.floor(balances.getBalance(ao.id) * epochs.getSettings().rewardPercentage)
+	local eligibleGatewayReward = math.floor(totalEligibleRewards * 0.90 / #activeGatewayAddresses) -- TODO: make these setting variables
+	local eligibleObserverReward = math.floor(totalEligibleRewards * 0.10 / #prescribedObservers) -- TODO: make these setting variables
+	-- compute for each gateway and delegate what their potential reward is and put into a table
+	local potentialRewards = {}
+	-- use ipairs as activeGatewayAddresses is an array
+	for _, gatewayAddress in ipairs(activeGatewayAddresses) do
+		local gateway = gar.getGateway(gatewayAddress)
+		if gateway ~= nil then
+			local potentialReward = eligibleGatewayReward -- start with the gateway reward
+			-- it it is a prescribed observer for the epoch, it is eligible for the observer reward
+			local observerIndex = utils.findInArray(prescribedObservers, function(prescribedObserver)
+				return prescribedObserver.observerAddress == gateway.observerAddress
+			end)
+			if observerIndex then
+				potentialReward = potentialReward + eligibleObserverReward -- add observer reward if it is a prescribed observer
+			end
+			-- if any delegates are present, distribute the rewards to the delegates
+			local eligbibleDelegateRewards =
+				math.floor(potentialReward * (gateway.settings.delegateRewardShareRatio / 100))
+			-- set the potential reward for the gateway
+			local eligibleOperatorReards = potentialReward - eligbibleDelegateRewards
+			potentialRewards[gatewayAddress] = (potentialRewards[gatewayAddress] or 0) + eligibleOperatorReards
+			-- use pairs as gateway.delegates is map
+			for delegateAddress, delegate in pairs(gateway.delegates) do
+				if gateway.totalDelegatedStake > 0 then
+					local delegateReward =
+						math.floor((delegate.delegatedStake / gateway.totalDelegatedStake) * eligbibleDelegateRewards)
+					if delegateReward > 0 then
+						potentialRewards[delegateAddress] = (potentialRewards[delegateAddress] or 0) + delegateReward
+					end
+				end
+			end
+		end
+	end
+	return {
+		totalEligibleRewards = totalEligibleRewards,
+		perGatewayReward = eligibleGatewayReward,
+		perObserverReward = eligibleObserverReward,
+		potentialRewards = potentialRewards,
+	}
+end
 -- Steps
 -- 1. Get gateways participated in full epoch based on start and end timestamp
 -- 2. Get the prescribed observers for the relevant epoch
@@ -405,6 +460,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 		return
 	end
 
+	-- TODO: look at the potential rewards recorded in the epoch and compare against the behavior of the gateway
 	local activeGatewayAddresses = gar.getActiveGatewaysBetweenTimestamps(epoch.startTimestamp, epoch.endTimestamp)
 	local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
 	local totalEligibleRewards = math.floor(balances.getBalance(ao.id) * epochs.getSettings().rewardPercentage)

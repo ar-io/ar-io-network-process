@@ -419,8 +419,11 @@ describe("epochs", function()
 				_G.Epochs[0].distributions = {
 					totalEligibleRewards = 0,
 					totalDistributedRewards = 0,
-					distributedTimestamp = 0,
-					rewards = {},
+					distributedTimestamp = 0, -- it has a distribution timestamp
+					rewards = {
+						eligible = {},
+						distributed = {},
+					},
 				}
 				_G.GatewayRegistry = {
 					["test-this-is-valid-arweave-wallet-address-1"] = {
@@ -458,6 +461,11 @@ describe("epochs", function()
 				local epochEndTimestamp = epochStartTimestamp + settings.durationMs
 				local epochDistributionTimestamp = epochEndTimestamp + settings.distributionDelayMs
 				local epochStartBlockHeight = 0
+				local expectedElibibleRewards = math.floor(protocolBalance * settings.rewardPercentage)
+				local expectedTotalGatewayReward = math.floor(expectedElibibleRewards * 0.90)
+				local expectedTotalObserverReward = math.floor(expectedElibibleRewards * 0.10)
+				local expectedPerGatewayReward = math.floor(expectedTotalGatewayReward / 1) -- only one gateway in the registry
+				local expectedPerObserverReward = math.floor(expectedTotalObserverReward / 1) -- only one prescribed obserever
 				local expectation = {
 					startTimestamp = epochStartTimestamp,
 					endTimestamp = epochEndTimestamp,
@@ -483,10 +491,21 @@ describe("epochs", function()
 						},
 					},
 					prescribedNames = {},
-					distributions = {},
+					distributions = {
+						totalEligibleRewards = expectedElibibleRewards,
+						totalEligibleGatewayReward = expectedTotalGatewayReward,
+						totalEligibleObserverReward = expectedTotalObserverReward,
+						rewards = {
+							eligible = {
+								["test-this-is-valid-arweave-wallet-address-1"] = expectedPerGatewayReward
+									+ expectedPerObserverReward,
+							},
+						},
+					},
 				}
-				local status = pcall(epochs.createEpoch, timestamp, epochStartBlockHeight, hashchain)
+				local status, result = pcall(epochs.createEpoch, timestamp, epochStartBlockHeight, hashchain)
 				assert.is_true(status)
+				assert.are.same(expectation, result)
 				assert.are.same(expectation, epochs.getEpoch(epochIndex))
 				-- confirm the gateway weights were updated
 				assert.are.same({
@@ -518,6 +537,7 @@ describe("epochs", function()
 						},
 					},
 					startTimestamp = 0,
+					endTimestamp = 0,
 					stats = {
 						prescribedEpochCount = i,
 						observedEpochCount = 0,
