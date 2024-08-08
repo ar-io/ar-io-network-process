@@ -7,10 +7,19 @@ describe("utils", function()
 	describe("isValidEthAddress", function()
 		it("should validate eth address", function()
 			assert.is_true(utils.isValidEthAddress(testEthAddress))
+		end)
+
+		it("should fail on non-hexadecimal character ", function()
 			-- invalid non-hexadecimal G character
 			assert.is_false(utils.isValidEthAddress("0xFCAd0B19bB29D4674531d6f115237E16AfCE377G"))
-			-- invalid length
+		end)
+
+		it("should return false on an an invalid-length address", function()
 			assert.is_false(utils.isValidEthAddress("0xFCAd0B19bB29D4674531d6f115237E16AfCE37"))
+		end)
+
+		it("should return false on passing in non-string value", function()
+			assert.is_false(utils.isValidEthAddress(3))
 		end)
 	end)
 

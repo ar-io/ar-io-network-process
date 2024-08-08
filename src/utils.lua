@@ -128,11 +128,11 @@ function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, s
 end
 
 function utils.isValidArweaveAddress(address)
-	return #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
+	return type(address) == "string" and #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
 end
 
 function utils.isValidEthAddress(address)
-	return #address == 42 and string.match(address, "^0x[%x]+$") ~= nil
+	return type(address) == "string" and #address == 42 and string.match(address, "^0x[%x]+$") ~= nil
 end
 
 function utils.isValidAOAddress(url)
