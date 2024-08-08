@@ -83,7 +83,7 @@ local ActionMap = {
 Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
 	-- assert recipient is a valid arweave address
 	local function checkAssertions()
-		assert(utils.isValidArweaveAddress(msg.Tags.Recipient), "Invalid recipient")
+		assert(utils.isValidAOAddress(msg.Tags.Recipient), "Invalid recipient")
 		assert(
 			tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
 			"Invalid quantity. Must be integer greater than 0"
@@ -101,7 +101,10 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 		return
 	end
 
-	local status, result = pcall(balances.transfer, msg.Tags.Recipient, msg.From, tonumber(msg.Tags.Quantity))
+	local from = utils.formatAddress(msg.From)
+	local recipient = utils.formatAddress(msg.Tags.Recipient)
+
+	local status, result = pcall(balances.transfer, recipient, from, tonumber(msg.Tags.Quantity))
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -115,17 +118,17 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 			local debitNotice = {
 				Target = msg.From,
 				Action = "Debit-Notice",
-				Recipient = msg.Recipient,
-				Quantity = msg.Quantity,
-				Data = "You transferred " .. msg.Quantity .. " to " .. msg.Recipient,
+				Recipient = recipient,
+				Quantity = msg.Tags.Quantity,
+				Data = "You transferred " .. msg.Tags.Quantity .. " to " .. recipient,
 			}
 			-- Credit-Notice message template, that is sent to the Recipient of the transfer
 			local creditNotice = {
-				Target = msg.Recipient,
+				Target = recipient,
 				Action = "Credit-Notice",
 				Sender = msg.From,
-				Quantity = msg.Quantity,
-				Data = "You received " .. msg.Quantity .. " from " .. msg.From,
+				Quantity = msg.Tags.Quantity,
+				Data = "You received " .. msg.Tags.Quantity .. " from " .. msg.From,
 			}
 
 			-- Add forwarded tags to the credit and debit notice messages
@@ -1047,8 +1050,10 @@ Handlers.add(ActionMap.Balances, Handlers.utils.hasMatchingTag("Action", ActionM
 end)
 
 Handlers.add(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMap.Balance), function(msg)
+	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From)
+
 	-- TODO: arconnect et. all expect to accept Target
-	local balance = balances.getBalance(msg.Tags.Target or msg.Tags.Address or msg.From)
+	local balance = balances.getBalance(target)
 	-- must adhere to token.lua spec for arconnect compatibility
 	ao.send({
 		Target = msg.From,
@@ -1056,7 +1061,7 @@ Handlers.add(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMa
 		Data = balance,
 		Balance = balance,
 		Ticker = Ticker,
-		Address = msg.Tags.Target or msg.Tags.Address or msg.From,
+		Address = target,
 	})
 end)
 

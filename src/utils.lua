@@ -128,7 +128,46 @@ function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, s
 end
 
 function utils.isValidArweaveAddress(address)
-	return #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
+	return type(address) == "string" and #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
+end
+
+function utils.isValidEthAddress(address)
+	return type(address) == "string" and #address == 42 and string.match(address, "^0x[%x]+$") ~= nil
+end
+
+function utils.isValidAOAddress(url)
+	return utils.isValidArweaveAddress(url) or utils.isValidEthAddress(url)
+end
+
+-- Convert address to EIP-55 checksum format
+-- assumes address has been validated as a valid Ethereum address (see utils.isValidEthAddress)
+-- Reference: https://eips.ethereum.org/EIPS/eip-55
+function utils.formatEIP55Address(address)
+	local hex = string.lower(string.sub(address, 3))
+
+	local hash = crypto.digest.keccak256(hex)
+	local hashHex = hash.asHex()
+
+	local checksumAddress = "0x"
+
+	for i = 1, #hashHex do
+		local hexChar = string.sub(hashHex, i, i)
+		local hexCharValue = tonumber(hexChar, 16)
+		local char = string.sub(hex, i, i)
+		if hexCharValue > 7 then
+			char = string.upper(char)
+		end
+		checksumAddress = checksumAddress .. char
+	end
+
+	return checksumAddress
+end
+
+function utils.formatAddress(address)
+	if utils.isValidEthAddress(address) then
+		return utils.formatEIP55Address(address)
+	end
+	return address
 end
 
 function utils.validateFQDN(fqdn)

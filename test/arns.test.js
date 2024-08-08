@@ -4,7 +4,11 @@ const assert = require('node:assert');
 const {
   AO_LOADER_HANDLER_ENV,
   DEFAULT_HANDLE_OPTIONS,
+  STUB_ADDRESS,
 } = require('../tools/constants');
+
+// EIP55-formatted test address
+const testEthAddress = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa';
 
 describe('ArNS', async () => {
   const { handle: originalHandle, memory: startMemory } =
@@ -29,22 +33,42 @@ describe('ArNS', async () => {
     assert(tokenInfo);
   });
 
-  it('should buy a record', async () => {
-    const buyRecordResult = await handle({
-      Tags: [
-        { name: 'Action', value: 'Buy-Record' },
-        { name: 'Name', value: 'test-name' },
-        { name: 'Purchase-Type', value: 'lease' },
-        { name: 'Years', value: '1' },
-        { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-      ],
-    });
+  const runBuyRecord = async (sender) => {
+    let mem = startMemory;
+    if (sender != STUB_ADDRESS) {
+      const transferResult = await handle({
+        Tags: [
+          { name: 'Action', value: 'Transfer' },
+          { name: 'Recipient', value: sender },
+          { name: 'Quantity', value: 600000000 },
+          { name: 'Cast', value: true },
+        ],
+      });
+      mem = transferResult.Memory;
+    }
+
+    const buyRecordResult = await handle(
+      {
+        From: sender,
+        Owner: sender,
+        Tags: [
+          { name: 'Action', value: 'Buy-Record' },
+          { name: 'Name', value: 'test-name' },
+          { name: 'Purchase-Type', value: 'lease' },
+          { name: 'Years', value: '1' },
+          { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+        ],
+      },
+      mem,
+    );
 
     const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
 
     // fetch the record
     const realRecord = await handle(
       {
+        From: sender,
+        Owner: sender,
         Tags: [
           { name: 'Action', value: 'Record' },
           { name: 'Name', value: 'test-name' },
@@ -62,6 +86,14 @@ describe('ArNS', async () => {
       type: 'lease',
       undernameLimit: 10,
     });
+  };
+
+  it('should buy a record with Ethereum address', async () => {
+    await runBuyRecord(STUB_ADDRESS);
+  });
+
+  it('should buy a record with an Ethereum address', async () => {
+    await runBuyRecord(testEthAddress);
   });
 
   it('should fail to buy a permanently registered record', async () => {
@@ -155,36 +187,64 @@ describe('ArNS', async () => {
   });
 
   it('should increase the undernames', async () => {
-    const buyUndernameResult = await handle({
-      Tags: [
-        { name: 'Action', value: 'Buy-Record' },
-        { name: 'Name', value: 'test-name' },
-        { name: 'Purchase-Type', value: 'lease' },
-        { name: 'Years', value: '1' },
-        { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-      ],
-    });
-    const increaseUndernameResult = await handle(
-      {
-        Tags: [
-          { name: 'Action', value: 'Increase-Undername-Limit' },
-          { name: 'Name', value: 'test-name' },
-          { name: 'Quantity', value: '1' },
-        ],
-      },
-      buyUndernameResult.Memory,
-    );
-    const result = await handle(
-      {
-        Tags: [
-          { name: 'Action', value: 'Record' },
-          { name: 'Name', value: 'test-name' },
-        ],
-      },
-      increaseUndernameResult.Memory,
-    );
-    const record = JSON.parse(result.Messages[0].Data);
-    assert.equal(record.undernameLimit, 11);
+    const assertIncreaseUndername = async (sender) => {
+      let mem = startMemory;
+
+      if (sender != STUB_ADDRESS) {
+        const transferResult = await handle({
+          Tags: [
+            { name: 'Action', value: 'Transfer' },
+            { name: 'Recipient', value: sender },
+            { name: 'Quantity', value: 6000000000 },
+            { name: 'Cast', value: true },
+          ],
+        });
+        mem = transferResult.Memory;
+      }
+
+      const buyUndernameResult = await handle(
+        {
+          From: sender,
+          Owner: sender,
+          Tags: [
+            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Purchase-Type', value: 'lease' },
+            { name: 'Years', value: '1' },
+            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+          ],
+        },
+        mem,
+      );
+
+      const increaseUndernameResult = await handle(
+        {
+          From: sender,
+          Owner: sender,
+          Tags: [
+            { name: 'Action', value: 'Increase-Undername-Limit' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Quantity', value: '1' },
+          ],
+        },
+        buyUndernameResult.Memory,
+      );
+      const result = await handle(
+        {
+          From: sender,
+          Owner: sender,
+          Tags: [
+            { name: 'Action', value: 'Record' },
+            { name: 'Name', value: 'test-name' },
+          ],
+        },
+        increaseUndernameResult.Memory,
+      );
+      const record = JSON.parse(result.Messages[0].Data);
+      assert.equal(record.undernameLimit, 11);
+    };
+    await assertIncreaseUndername(STUB_ADDRESS);
+    await assertIncreaseUndername(testEthAddress);
   });
 
   //Reference: https://ardriveio.sharepoint.com/:x:/s/AR.IOLaunch/Ec3L8aX0wuZOlG7yRtlQoJgB39wCOoKu02PE_Y4iBMyu7Q?e=ZG750l
