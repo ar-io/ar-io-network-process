@@ -51,11 +51,23 @@ function epochs.getPrescribedObserversForEpoch(epochIndex)
 end
 
 function epochs.getEligibleRewardsForEpoch(epochIndex)
-	return epochs.getEpoch(epochIndex).distributions.rewards.eligible or {}
+	local epoch = epochs.getEpoch(epochIndex)
+	local eligible = epoch
+			and epoch.distributions
+			and epoch.distributions.rewards
+			and epoch.distributions.rewards.eligible
+		or {}
+	return eligible
 end
 
 function epochs.getDistributedRewardsForEpoch(epochIndex)
-	return epochs.getEpoch(epochIndex).distributions.rewards.distributed or {}
+	local epoch = epochs.getEpoch(epochIndex)
+	local distributed = epoch
+			and epoch.distributions
+			and epoch.distributions.rewards
+			and epoch.distributions.rewards.distributed
+		or {}
+	return distributed
 end
 
 function epochs.getObservationsForEpoch(epochIndex)
@@ -587,6 +599,9 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	-- set the distributions for the epoch
 	epoch.distributions.totalDistributedRewards = totalDistributed
 	epoch.distributions.distributedTimestamp = currentTimestamp
+	epoch.distributions.rewards = epoch.distributions.rewards or {
+		eligible = {},
+	}
 	epoch.distributions.rewards.distributed = distributed
 
 	-- update the epoch

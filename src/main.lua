@@ -896,13 +896,13 @@ Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	end
 
 	local previousState = {
-		Balances = utils.deepCopy(Balances),
-		Vaults = utils.deepCopy(Vaults),
-		GatewayRegistry = utils.deepCopy(GatewayRegistry),
-		NameRegistry = utils.deepCopy(NameRegistry),
-		Epochs = utils.deepCopy(Epochs),
-		DemandFactor = utils.deepCopy(DemandFactor),
-		LastTickedEpochIndex = utils.deepCopy(LastTickedEpochIndex),
+		Balances = Balances,
+		Vaults = Vaults,
+		GatewayRegistry = GatewayRegistry,
+		NameRegistry = NameRegistry,
+		Epochs = Epochs,
+		DemandFactor = DemandFactor,
+		LastTickedEpochIndex = LastTickedEpochIndex,
 	}
 	local msgTimestamp = tonumber(msg.Timestamp)
 
@@ -950,13 +950,13 @@ Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	for i = lastTickedEpochIndex + 1, currentEpochIndex do
 		print("Ticking epoch: " .. i)
 		local previousState = {
-			Balances = utils.deepCopy(Balances),
-			Vaults = utils.deepCopy(Vaults),
-			GatewayRegistry = utils.deepCopy(GatewayRegistry),
-			NameRegistry = utils.deepCopy(NameRegistry),
-			Epochs = utils.deepCopy(Epochs),
-			DemandFactor = utils.deepCopy(DemandFactor),
-			LastTickedEpochIndex = utils.deepCopy(LastTickedEpochIndex),
+			Balances = Balances,
+			Vaults = Vaults,
+			GatewayRegistry = GatewayRegistry,
+			NameRegistry = NameRegistry,
+			Epochs = Epochs,
+			DemandFactor = DemandFactor,
+			LastTickedEpochIndex = LastTickedEpochIndex,
 		}
 		local _, _, epochDistributionTimestamp = epochs.getEpochTimestampsForIndex(i)
 		-- use the minimum of the msg timestamp or the epoch distribution timestamp, this ensures an epoch gets created for the genesis block and that we don't try and distribute before an epoch is created
