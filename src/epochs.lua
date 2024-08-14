@@ -546,34 +546,40 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 				if observerIndex then
 					if observationSubmitted then
 						-- 1. gateway passed and was prescribed and submittied an observation - it gets full reward
-						earnedRewardForGatewayAndDelegates = totalEligibleGatewayReward + totalElgibleObserverReward
+						earnedRewardForGatewayAndDelegates =
+							math.floor(totalEligibleGatewayReward + totalElgibleObserverReward)
 					else
 						-- 2. gateway passed and was prescribed and did not submit an observation - it gets only the gateway reward, docked by 25%
 						earnedRewardForGatewayAndDelegates = math.floor(totalEligibleGatewayReward * 0.75)
 					end
 				else
 					-- 3. gateway passed and was not prescribed -- it gets full gateway reward
-					earnedRewardForGatewayAndDelegates = totalEligibleGatewayReward
+					earnedRewardForGatewayAndDelegates = math.floor(totalEligibleGatewayReward)
 				end
 			else
 				if observerIndex then
 					if observationSubmitted then
 						-- 3. gateway failed and was prescribed and did submit an observation -- it gets the observer reward
-						earnedRewardForGatewayAndDelegates = totalElgibleObserverReward
+						earnedRewardForGatewayAndDelegates = math.floor(totalElgibleObserverReward)
 					end
 				end
 			end
 
-			if earnedRewardForGatewayAndDelegates > 0 then
+			local totalEligibleRewardsForGatewayAndDelegates = totalEligibleRewardsForGateway.operatorReward
+				+ utils.sumTableValues(totalEligibleRewardsForGateway.delegateRewards)
+
+			if earnedRewardForGatewayAndDelegates > 0 and totalEligibleRewardsForGatewayAndDelegates > 0 then
 				local percentOfEligibleEarned = earnedRewardForGatewayAndDelegates
-					/ totalEligibleRewardsForGateway.operatorReward
+					/ totalEligibleRewardsForGatewayAndDelegates -- percent of what was earned vs what was eligible
 				-- optimally this is 1, but if the gateway did not do what it was supposed to do, it will be less than 1 and thus all payouts will be less
 				local totalDistributedToDelegates = 0
 				-- distribute all the predetermined rewards to the delegates
 				for delegateAddress, eligibleDelegateReward in pairs(totalEligibleRewardsForGateway.delegateRewards) do
 					local actualDelegateReward = math.floor(eligibleDelegateReward * percentOfEligibleEarned)
-					-- distribute the rewards to the delegate
-					balances.transfer(delegateAddress, ao.id, actualDelegateReward)
+					-- distribute the rewards to the delegate if greater than 0
+					if actualDelegateReward > 0 then
+						balances.transfer(delegateAddress, ao.id, actualDelegateReward)
+					end
 					-- increment the total distributed
 					totalDistributed = math.floor(totalDistributed + actualDelegateReward)
 					-- update the distributed rewards for the delegate
@@ -582,9 +588,12 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 					totalDistributedToDelegates = totalDistributedToDelegates + actualDelegateReward
 				end
 				-- transfer the remaining rewards to the gateway
-				local actualOperatorReward = earnedRewardForGatewayAndDelegates - totalDistributedToDelegates
-				-- distribute the rewards to the gateway
-				balances.transfer(gatewayAddress, ao.id, actualOperatorReward)
+				local actualOperatorReward =
+					math.floor(earnedRewardForGatewayAndDelegates - totalDistributedToDelegates)
+				if actualOperatorReward > 0 then
+					-- distribute the rewards to the gateway
+					balances.transfer(gatewayAddress, ao.id, actualOperatorReward)
+				end
 				-- update the distributed rewards for the gateway
 				distributed[gatewayAddress] = (distributed[gatewayAddress] or 0) + actualOperatorReward
 				-- increment the total distributed for the epoch
