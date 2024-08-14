@@ -29,6 +29,14 @@ function utils.isInteger(value)
 	return value % 1 == 0
 end
 
+function utils.sumTableValues(tbl)
+	local sum = 0
+	for _, value in pairs(tbl) do
+		sum = sum + value
+	end
+	return sum
+end
+
 function utils.slice(tbl, first, last, step)
 	local sliced = {}
 

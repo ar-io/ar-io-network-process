@@ -999,8 +999,22 @@ Handlers.add(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", ActionMap.I
 	ao.send({
 		Target = msg.From,
 		Action = "Info-Notice",
-		Tags = { Name = Name, Ticker = Ticker, Logo = Logo, Owner = Owner, Denomination = tostring(Denomination) },
-		Data = json.encode({ Name = Name, Ticker = Ticker, Logo = Logo, Owner = Owner, Denomination = Denomination }),
+		Tags = {
+			Name = Name,
+			Ticker = Ticker,
+			Logo = Logo,
+			Owner = Owner,
+			Denomination = tostring(Denomination),
+			LastTickedEpochIndex = tostring(LastTickedEpochIndex),
+		},
+		Data = json.encode({
+			Name = Name,
+			Ticker = Ticker,
+			Logo = Logo,
+			Owner = Owner,
+			Denomination = Denomination,
+			LastTickedEpochIndex = LastTickedEpochIndex,
+		}),
 	})
 end)
 
