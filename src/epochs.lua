@@ -599,8 +599,8 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 				-- increment the total distributed for the epoch
 				totalDistributed = math.floor(totalDistributed + actualOperatorReward)
 			else
-				-- if the gateway did not earn any rewards, we still need to update the distributed rewards
-				distributed[gatewayAddress] = 0
+				-- if the gateway did not earn any of it's own rewards, we still need to update the distributed rewards with it's current value or add it
+				distributed[gatewayAddress] = distributed[gatewayAddress] or 0
 			end
 		end
 	end
