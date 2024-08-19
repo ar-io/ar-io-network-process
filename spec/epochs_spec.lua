@@ -555,36 +555,42 @@ describe("epochs", function()
 					rewards = {
 						eligible = {
 							["test-this-is-valid-arweave-wallet-address-2"] = {
-								operatorReward = 250000000000,
-								delegateRewards = {
-									["this-is-a-delegate"] = 25000000000,
-								},
+								operatorReward = 225000000000,
+								delegateRewards = { ["this-is-a-delegate"] = 25000000000 },
 							},
 							["test-this-is-valid-arweave-wallet-address-1"] = {
-								operatorReward = 250000000000,
-								delegateRewards = {
-									["this-is-a-delegate"] = 25000000000,
-								},
+								operatorReward = 225000000000,
+								delegateRewards = { ["this-is-a-delegate"] = 25000000000 },
 							},
 							["test-this-is-valid-arweave-wallet-address-4"] = {
-								operatorReward = 250000000000,
+								operatorReward = 225000000000,
 								delegateRewards = { ["this-is-a-delegate"] = 25000000000 },
 							},
 							["test-this-is-valid-arweave-wallet-address-5"] = {
-								operatorReward = 250000000000,
+								operatorReward = 225000000000,
 								delegateRewards = { ["this-is-a-delegate"] = 25000000000 },
 							},
 							["test-this-is-valid-arweave-wallet-address-3"] = {
-								operatorReward = 250000000000,
-								delegateRewards = {
-									["this-is-a-delegate"] = 25000000000,
-								},
+								operatorReward = 225000000000,
+								delegateRewards = { ["this-is-a-delegate"] = 25000000000 },
 							},
 						},
 					},
 				},
 				prescribedNames = {},
 				prescribedObservers = {
+					{
+						tenureWeight = 4,
+						observerRewardRatioWeight = 0.5,
+						observerAddress = "test-this-very-valid-observer-wallet-addr-1",
+						stakeWeight = 1.002,
+						startTimestamp = 0,
+						normalizedCompositeWeight = 0.3448275862069,
+						compositeWeight = 2.004,
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
+						gatewayRewardRatioWeight = 1,
+						stake = 50100000000,
+					},
 					{
 						tenureWeight = 4,
 						observerRewardRatioWeight = 0.33333333333333,
@@ -599,13 +605,13 @@ describe("epochs", function()
 					},
 					{
 						tenureWeight = 4,
-						observerRewardRatioWeight = 0.5,
-						observerAddress = "test-this-very-valid-observer-wallet-addr-1",
+						observerRewardRatioWeight = 0.25,
+						observerAddress = "test-this-very-valid-observer-wallet-addr-3",
 						stakeWeight = 1.002,
 						startTimestamp = 0,
-						normalizedCompositeWeight = 0.3448275862069,
-						compositeWeight = 2.004,
-						gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
+						normalizedCompositeWeight = 0.17241379310345,
+						compositeWeight = 1.002,
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-3",
 						gatewayRewardRatioWeight = 1,
 						stake = 50100000000,
 					},
@@ -630,18 +636,6 @@ describe("epochs", function()
 						normalizedCompositeWeight = 0.11494252873563,
 						compositeWeight = 0.668,
 						gatewayAddress = "test-this-is-valid-arweave-wallet-address-5",
-						gatewayRewardRatioWeight = 1,
-						stake = 50100000000,
-					},
-					{
-						tenureWeight = 4,
-						observerRewardRatioWeight = 0.25,
-						observerAddress = "test-this-very-valid-observer-wallet-addr-3",
-						stakeWeight = 1.002,
-						startTimestamp = 0,
-						normalizedCompositeWeight = 0.17241379310345,
-						compositeWeight = 1.002,
-						gatewayAddress = "test-this-is-valid-arweave-wallet-address-3",
 						gatewayRewardRatioWeight = 1,
 						stake = 50100000000,
 					},
@@ -718,7 +712,8 @@ describe("epochs", function()
 				totalEpochCount = 1,
 			}, gar.getGateway("test-this-is-valid-arweave-wallet-address-2").stats)
 			assert.are.equal(
-				math.floor(expectedGatewayReward * 0.75 * 0.90),
+				-- it passed, but did not observe, so it gets 75% of the gateway reward and then 90% of that bc of the delegate reward share
+				math.floor((expectedGatewayReward * 0.75) * 0.90),
 				balances.getBalance("test-this-is-valid-arweave-wallet-address-2")
 			)
 			-- failed observation, did observe
