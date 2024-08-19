@@ -267,10 +267,16 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 		return
 	end
 
-	-- TODO: we may not want to create the epoch until after rewards are distributed and weights are updated
 	local prevEpochIndex = epochIndex - 1
 	local prevEpoch = epochs.getEpoch(prevEpochIndex)
-	if prevEpochIndex >= 0 and timestamp < prevEpoch.distributions.distributedTimestamp then
+	-- if the previous epoch has not distributed rewards, we cannot create a new epoch
+	if
+		prevEpochIndex >= 0
+		and (
+			prevEpoch.distributions.distributedTimestamp == nil
+			or timestamp < prevEpoch.distributions.distributedTimestamp
+		)
+	then
 		-- silently return
 		print(
 			"Distributions have not occured for the previous epoch. A new epoch will not be created until those are complete: "
