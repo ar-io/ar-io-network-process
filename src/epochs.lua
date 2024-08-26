@@ -440,8 +440,9 @@ function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObserv
 				potentialReward = potentialReward + eligibleObserverReward -- add observer reward if it is a prescribed observer
 			end
 			-- if any delegates are present, distribute the rewards to the delegates
-			local eligbibleDelegateRewards =
-				math.floor(potentialReward * (gateway.settings.delegateRewardShareRatio / 100))
+			local eligbibleDelegateRewards = gateway.totalDelegatedStake > 0
+					and math.floor(potentialReward * (gateway.settings.delegateRewardShareRatio / 100))
+				or 0
 			-- set the potential reward for the gateway
 			local eligibleOperatorRewards = potentialReward - eligbibleDelegateRewards
 			local eligibleRewardsForGateway = {
