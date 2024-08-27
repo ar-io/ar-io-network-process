@@ -2,19 +2,20 @@
 # yarn lockfile v1
 
 
-"@ar.io/sdk@^2.1.0-alpha.6":
-  version "2.1.0-alpha.7"
-  resolved "https://registry.yarnpkg.com/@ar.io/sdk/-/sdk-2.1.0-alpha.7.tgz#33b6ca4a7e8213b07b4e304c113b7e9e90f328d2"
-  integrity sha512-v35OICwdtlIgKJPzjNaVH/3ygVWjnm1/aXIwF5HagA14xooFjc0YUAh9MOsz6WEacBrXO+M5za2zy4qUR4D9xQ==
+"@ar.io/sdk@alpha":
+  version "2.2.0-alpha.1"
+  resolved "https://registry.yarnpkg.com/@ar.io/sdk/-/sdk-2.2.0-alpha.1.tgz#3b4764bf39b1aecfb459ebf9815c2c34b4a8c32b"
+  integrity sha512-32zHXcruaEPcAxJlKRgBuDp0odhLake44t44qlzjg36CgeunHr/Amtehu0U6FuulGjLrh7OMkUvbyLrcurOU/w==
   dependencies:
     "@permaweb/aoconnect" "^0.0.57"
     arbundles "0.11.0"
     arweave "1.14.4"
-    axios "1.7.2"
+    axios "1.7.3"
     axios-retry "^4.3.0"
     eventemitter3 "^5.0.1"
     plimit-lit "^3.0.1"
     winston "^3.13.0"
+    zod "^3.23.8"
 
 "@colors/colors@1.6.0", "@colors/colors@^1.6.0":
   version "1.6.0"
@@ -341,42 +342,19 @@
   resolved "https://registry.yarnpkg.com/@noble/ed25519/-/ed25519-1.7.3.tgz#57e1677bf6885354b466c38e2b620c62f45a7123"
   integrity sha512-iR8GBkDt0Q3GyaVcIu7mSsVIqnFbkbRzGLWlvhwunacoLwt4J3swfKhfaM6rN6WY+TBGoYT1GtT1mIh2/jGbRQ==
 
-"@permaweb/ao-loader@^0.0.35":
-  version "0.0.35"
-  resolved "https://registry.yarnpkg.com/@permaweb/ao-loader/-/ao-loader-0.0.35.tgz#b525f70f3fda620148b245b8b6872c3d500348aa"
-  integrity sha512-vgDs2PYJqiKYnEVHYccP5VOjc+YkcinYW8YQa53fxYzy4D/KEWwiMnocz3zNb7L+6dKNT6EghHft7xMcs01WMQ==
+"@permaweb/ao-loader@^0.0.36":
+  version "0.0.36"
+  resolved "https://registry.yarnpkg.com/@permaweb/ao-loader/-/ao-loader-0.0.36.tgz#901632148d7c8ee6b5013068b0249d047e9d9d43"
+  integrity sha512-So4WzXjh+Ovx5aAivw3JIL2bBgqDsetu6+Dyn4S23HeOyZTS9Sm2MJvTrnt3LvjdpsYSxfp2p445L1uEOspMTA==
 
-"@permaweb/ao-scheduler-utils@~0.0.16":
-  version "0.0.19"
-  resolved "https://registry.yarnpkg.com/@permaweb/ao-scheduler-utils/-/ao-scheduler-utils-0.0.19.tgz#69d35c19583624ace3f500f53b4b4d73fca883e1"
-  integrity sha512-xwIe9FqQ1UZxEYWvSGJDONz0xr4vDq2Ny1NeRUiO0dKYoonShN+oI1ULgrHocKOjOPNEgRX70vMCKGLe+3x70A==
+"@permaweb/ao-scheduler-utils@~0.0.20", "@permaweb/ao-scheduler-utils@~0.0.23":
+  version "0.0.24"
+  resolved "https://registry.yarnpkg.com/@permaweb/ao-scheduler-utils/-/ao-scheduler-utils-0.0.24.tgz#a7d2c1e09f9b6ea5d45127fa395bbbcef6688452"
+  integrity sha512-G6109Nz8+dQFPuG7mV8mz66kLVA+gl2uTSqU7qpaRwfujrWi6obM94CpmvyvAnrLo3dB29EYiuv7+KOKcns8ig==
   dependencies:
     lru-cache "^10.2.2"
     ramda "^0.30.0"
     zod "^3.23.5"
-
-"@permaweb/ao-scheduler-utils@~0.0.20":
-  version "0.0.21"
-  resolved "https://registry.yarnpkg.com/@permaweb/ao-scheduler-utils/-/ao-scheduler-utils-0.0.21.tgz#ac3efd0c77b883988ef6dd5d52222accf7a30a08"
-  integrity sha512-VWl/xAJGzOKlfwJ983eYewd7Lo1t0XVgv6iRPVpKQEKAqL9MZaERPzPMbNFZwBy8NjEIzse3/KtgUAnMNgzVtg==
-  dependencies:
-    lru-cache "^10.2.2"
-    ramda "^0.30.0"
-    zod "^3.23.5"
-
-"@permaweb/aoconnect@^0.0.55":
-  version "0.0.55"
-  resolved "https://registry.yarnpkg.com/@permaweb/aoconnect/-/aoconnect-0.0.55.tgz#d856a078d3702154ac58541d09478d25ed3acf2c"
-  integrity sha512-W2GtLZedVseuDkCKk4CmM9SFmi0DdrMKqvhMBm9xo65z+Mzr/t1TEjMJKRNzEA2qh5IdwM43sWJ5fmbBYLg6TQ==
-  dependencies:
-    "@permaweb/ao-scheduler-utils" "~0.0.16"
-    buffer "^6.0.3"
-    debug "^4.3.4"
-    hyper-async "^1.1.2"
-    mnemonist "^0.39.8"
-    ramda "^0.29.1"
-    warp-arbundles "^1.0.4"
-    zod "^3.22.4"
 
 "@permaweb/aoconnect@^0.0.57":
   version "0.0.57"
@@ -386,6 +364,20 @@
     "@permaweb/ao-scheduler-utils" "~0.0.20"
     buffer "^6.0.3"
     debug "^4.3.5"
+    hyper-async "^1.1.2"
+    mnemonist "^0.39.8"
+    ramda "^0.30.1"
+    warp-arbundles "^1.0.4"
+    zod "^3.23.8"
+
+"@permaweb/aoconnect@^0.0.59":
+  version "0.0.59"
+  resolved "https://registry.yarnpkg.com/@permaweb/aoconnect/-/aoconnect-0.0.59.tgz#0ceb6257e2f376f4af6783163e3037240560dff1"
+  integrity sha512-AgnUv50hp3BVvqWk2IOw3p9ksF2GblFwQHCIWqwTYjvdViCPlsL4gx/BefxFqbMABXQ5q2QJItMJLlPelqC2CQ==
+  dependencies:
+    "@permaweb/ao-scheduler-utils" "~0.0.23"
+    buffer "^6.0.3"
+    debug "^4.3.6"
     hyper-async "^1.1.2"
     mnemonist "^0.39.8"
     ramda "^0.30.1"
@@ -511,9 +503,9 @@ async-retry@^1.3.3:
     retry "0.13.1"
 
 async@^3.2.3:
-  version "3.2.5"
-  resolved "https://registry.yarnpkg.com/async/-/async-3.2.5.tgz#ebd52a8fdaf7a2289a24df399f8d8485c8a46b66"
-  integrity sha512-baNZyqaaLhyLVKm/DlvdW051MSgO6b8eVfIezl9E5PqWxFgzLm/wQntEW4zOytVburDEr0JlALEpdOFwvErLsg==
+  version "3.2.6"
+  resolved "https://registry.yarnpkg.com/async/-/async-3.2.6.tgz#1b0728e14929d51b85b449b7f06e27c1145e38ce"
+  integrity sha512-htCUDlxyyCLMgaM3xXg0C0LW2xqfuQ6p05pCEIsXuyQ+a1koYKTuBMzRNwmybfLgvJDMd0r1LTn4+E0Ti6C2AA==
 
 asynckit@^0.4.0:
   version "0.4.0"
@@ -521,16 +513,25 @@ asynckit@^0.4.0:
   integrity sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==
 
 axios-retry@^4.3.0:
-  version "4.4.1"
-  resolved "https://registry.yarnpkg.com/axios-retry/-/axios-retry-4.4.1.tgz#e5d0c851e635fd4de866aec2b9b422f05d661257"
-  integrity sha512-JGzNoglDHtHWIEvvAampB0P7jxQ/sT4COmW0FgSQkVg6o4KqNjNMBI6uFVOq517hkw/OAYYAG08ADtBlV8lvmQ==
+  version "4.5.0"
+  resolved "https://registry.yarnpkg.com/axios-retry/-/axios-retry-4.5.0.tgz#441fdc32cedf63d6abd5de5d53db3667afd4c39b"
+  integrity sha512-aR99oXhpEDGo0UuAlYcn2iGRds30k366Zfa05XWScR9QaQD4JYiP3/1Qt1u7YlefUOK+cn0CcwoL1oefavQUlQ==
   dependencies:
     is-retry-allowed "^2.2.0"
 
-axios@1.7.2, axios@^1.4.0:
-  version "1.7.2"
-  resolved "https://registry.yarnpkg.com/axios/-/axios-1.7.2.tgz#b625db8a7051fbea61c35a3cbb3a1daa7b9c7621"
-  integrity sha512-2A8QhOMrbomlDuiLeK9XibIBzuHeRcqqNOHp0Cyp5EoJ1IFDh+XZH3A6BkXtv0K4gFGCI0Y4BM7B1wOEi0Rmgw==
+axios@1.7.3:
+  version "1.7.3"
+  resolved "https://registry.yarnpkg.com/axios/-/axios-1.7.3.tgz#a1125f2faf702bc8e8f2104ec3a76fab40257d85"
+  integrity sha512-Ar7ND9pU99eJ9GpoGQKhKf58GpUOgnzuaB7ueNQ5BMi0p+LZ5oaEnfF999fAArcTIBwXTCHAmGcHOZJaWPq9Nw==
+  dependencies:
+    follow-redirects "^1.15.6"
+    form-data "^4.0.0"
+    proxy-from-env "^1.1.0"
+
+axios@^1.4.0:
+  version "1.7.5"
+  resolved "https://registry.yarnpkg.com/axios/-/axios-1.7.5.tgz#21eed340eb5daf47d29b6e002424b3e88c8c54b1"
+  integrity sha512-fZu86yCo+svH3uqJ/yTdQ0QHpQu5oL+/QE+QPSv6BZSkDAoky9vytxp7u5qk83OJFS3kEBcesWni9WTZAv3tSw==
   dependencies:
     follow-redirects "^1.15.6"
     form-data "^4.0.0"
@@ -648,14 +649,7 @@ cross-fetch@^3.1.5:
   dependencies:
     node-fetch "^2.6.12"
 
-debug@^4.3.4:
-  version "4.3.5"
-  resolved "https://registry.yarnpkg.com/debug/-/debug-4.3.5.tgz#e83444eceb9fedd4a1da56d671ae2446a01a6e1e"
-  integrity sha512-pt0bNEmneDIvdL1Xsd9oDQ/wrQRkXDT4AUWlNZNPKvW5x/jyO9VFXkJUP07vQ2upmw5PlaITaPKc31jK13V+jg==
-  dependencies:
-    ms "2.1.2"
-
-debug@^4.3.5:
+debug@^4.3.5, debug@^4.3.6:
   version "4.3.6"
   resolved "https://registry.yarnpkg.com/debug/-/debug-4.3.6.tgz#2ab2c38fbaffebf8aa95fdfe6d88438c7a13c52b"
   integrity sha512-O/09Bd4Z1fBrU4VzkhFqVgpPzaGbw6Sm9FEkBT1A/YBXQFGuuSxa1dN2nxgxS34JmKXqYx8CZAwEVoJFImUXIg==
@@ -681,9 +675,9 @@ elliptic@6.5.4:
     minimalistic-crypto-utils "^1.0.1"
 
 elliptic@^6.5.4:
-  version "6.5.5"
-  resolved "https://registry.yarnpkg.com/elliptic/-/elliptic-6.5.5.tgz#c715e09f78b6923977610d4c2346d6ce22e6dded"
-  integrity sha512-7EjbcmUm17NQFu4Pmgmq2olYMj8nwMnpcddByChSUjArp8F5DQWcIcpriwO4ZToLNAJig0yiyjswfyGNje/ixw==
+  version "6.5.7"
+  resolved "https://registry.yarnpkg.com/elliptic/-/elliptic-6.5.7.tgz#8ec4da2cb2939926a1b9a73619d768207e647c8b"
+  integrity sha512-ESVCtTwiA+XhY3wyh24QqRGBoP3rEdDUl3EDUUo9tft074fi19IrdpH7hLCMMP3CIj7jb3W96rn8lt/BqIlt5Q==
   dependencies:
     bn.js "^4.11.9"
     brorand "^1.1.0"
@@ -833,9 +827,9 @@ logform@^2.6.0, logform@^2.6.1:
     triple-beam "^1.3.0"
 
 lru-cache@^10.2.2:
-  version "10.2.2"
-  resolved "https://registry.yarnpkg.com/lru-cache/-/lru-cache-10.2.2.tgz#48206bc114c1252940c41b25b41af5b545aca878"
-  integrity sha512-9hp3Vp2/hFQUiIwKo8XCeFVnrg8Pk3TYNPIR7tJADKi5YfcF7vEaK7avFHTlSy3kOKYaJQaalfEo6YuXdceBOQ==
+  version "10.4.3"
+  resolved "https://registry.yarnpkg.com/lru-cache/-/lru-cache-10.4.3.tgz#410fc8a17b70e598013df257c2446b7f3383f119"
+  integrity sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==
 
 mime-db@1.52.0:
   version "1.52.0"
@@ -933,9 +927,9 @@ plimit-lit@^3.0.1:
     queue-lit "^3.0.0"
 
 prettier@^3.3.2:
-  version "3.3.2"
-  resolved "https://registry.yarnpkg.com/prettier/-/prettier-3.3.2.tgz#03ff86dc7c835f2d2559ee76876a3914cec4a90a"
-  integrity sha512-rAVeHYMcv8ATV5d508CFdn+8/pHPpXeIid1DdrPwXnaAdH7cqjVbpJaT5eq4yRAFU/lsbwYwSF/n5iNrdJHPQA==
+  version "3.3.3"
+  resolved "https://registry.yarnpkg.com/prettier/-/prettier-3.3.3.tgz#30c54fe0be0d8d12e6ae61dbb10109ea00d53105"
+  integrity sha512-i2tDNA0O5IrMO757lfrdQZCc2jPNDVntV0m/+4whiDfWaTKfMNgR7Qz0NAeGz/nRqF4m5/6CLzbP4/liHt12Ew==
 
 proxy-from-env@^1.1.0:
   version "1.1.0"
@@ -946,11 +940,6 @@ queue-lit@^3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/queue-lit/-/queue-lit-3.0.0.tgz#5062f815e49c28759a2dc12124ab1723d563b932"
   integrity sha512-iyVL2X5G58kICVGLW/nseYmdHxBoAp2Gav16H23NPtIllyEJ+UheHlYZqBjO+lJHRYoZRSrX7chH8tMrH9MB/A==
-
-ramda@^0.29.1:
-  version "0.29.1"
-  resolved "https://registry.yarnpkg.com/ramda/-/ramda-0.29.1.tgz#408a6165b9555b7ba2fc62555804b6c5a2eca196"
-  integrity sha512-OfxIeWzd4xdUNxlWhgFazxsA/nl3mS4/jGZI5n00uWOoSSFRhC1b6gl6xvmzUamgmqELraWp0J/qqVlXYPDPyA==
 
 ramda@^0.30.0, ramda@^0.30.1:
   version "0.30.1"
@@ -977,9 +966,9 @@ safe-buffer@^5.0.1, safe-buffer@~5.2.0:
   integrity sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==
 
 safe-stable-stringify@^2.3.1:
-  version "2.4.3"
-  resolved "https://registry.yarnpkg.com/safe-stable-stringify/-/safe-stable-stringify-2.4.3.tgz#138c84b6f6edb3db5f8ef3ef7115b8f55ccbf886"
-  integrity sha512-e2bDA2WJT0wxseVd4lsDP4+3ONX6HpMXQa1ZhFQ7SU+GjvORCmShbCMltrtIDfkYhVHrOcPtj+KhmDBdPdZD1g==
+  version "2.5.0"
+  resolved "https://registry.yarnpkg.com/safe-stable-stringify/-/safe-stable-stringify-2.5.0.tgz#4ca2f8e385f2831c432a719b108a3bf7af42a1dd"
+  integrity sha512-b3rppTKm9T+PsVCBEOUR46GWI7fdOs00VKZ1+9c1EWDaDMvjQc6tUwuFyIprgGgTcWoVHSKrU8H31ZHA2e0RHA==
 
 safer-buffer@^2.1.0:
   version "2.1.2"
@@ -1109,9 +1098,9 @@ winston-transport@^4.7.0:
     triple-beam "^1.3.0"
 
 winston@^3.13.0:
-  version "3.13.1"
-  resolved "https://registry.yarnpkg.com/winston/-/winston-3.13.1.tgz#53ddadb9c2332eb12cff8306413b3480dc82b6c3"
-  integrity sha512-SvZit7VFNvXRzbqGHsv5KSmgbEYR5EiQfDAL9gxYkRqa934Hnk++zze0wANKtMHcy/gI4W/3xmSDwlhf865WGw==
+  version "3.14.2"
+  resolved "https://registry.yarnpkg.com/winston/-/winston-3.14.2.tgz#94ce5fd26d374f563c969d12f0cd9c641065adab"
+  integrity sha512-CO8cdpBB2yqzEf8v895L+GNKYJiEq8eKlHU38af3snQBQ+sdAIUepjMSguOIJC7ICbzm0ZI+Af2If4vIJrtmOg==
   dependencies:
     "@colors/colors" "^1.6.0"
     "@dabh/diagnostics" "^2.0.2"
@@ -1135,7 +1124,7 @@ ws@7.4.6:
   resolved "https://registry.yarnpkg.com/ws/-/ws-7.4.6.tgz#5654ca8ecdeee47c33a9a4bf6d28e2be2980377c"
   integrity sha512-YmhHDO4MzaDLB+M9ym/mDA5z0naX8j7SIlT8f8z+I0VtzsRbekxEutHSme7NPS2qE8StCYQNUnfWdXta/Yu85A==
 
-zod@^3.22.4, zod@^3.23.5, zod@^3.23.8:
+zod@^3.23.5, zod@^3.23.8:
   version "3.23.8"
   resolved "https://registry.yarnpkg.com/zod/-/zod-3.23.8.tgz#e37b957b5d52079769fb8097099b592f0ef4067d"
   integrity sha512-XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==

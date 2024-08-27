@@ -19,7 +19,7 @@ constants.MAX_ALLOWED_UNDERNAMES = 10000
 constants.UNDERNAME_LEASE_FEE_PERCENTAGE = 0.001
 constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE = 0.005
 constants.oneYearMs = 31536000 * 1000
-constants.gracePeriodMs = 3 * 14 * 24 * 60 * 60 * 1000
+constants.gracePeriodMs = 14 * 24 * 60 * 60 * 1000 -- 2 weeks
 constants.maxLeaseLengthYears = 5
 
 -- DEMAND

@@ -1,8 +1,13 @@
-const fs = require('fs');
-const path = require('path');
-const STUB_ADDRESS = ''.padEnd(43, '1');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+export const STUB_ADDRESS = ''.padEnd(43, '1');
 /* ao READ-ONLY Env Variables */
-const AO_LOADER_HANDLER_ENV = {
+export const AO_LOADER_HANDLER_ENV = {
   Process: {
     Id: STUB_ADDRESS,
     Owner: STUB_ADDRESS,
@@ -14,7 +19,7 @@ const AO_LOADER_HANDLER_ENV = {
   },
 };
 
-const AO_LOADER_OPTIONS = {
+export const AO_LOADER_OPTIONS = {
   format: 'wasm64-unknown-emscripten-draft_2024_02_15',
   inputEncoding: 'JSON-1',
   outputEncoding: 'JSON-1',
@@ -23,19 +28,19 @@ const AO_LOADER_OPTIONS = {
   extensions: [],
 };
 
-const AOS_WASM = fs.readFileSync(
+export const AOS_WASM = fs.readFileSync(
   path.join(
     __dirname,
     'fixtures/aos-cbn0KKrBZH7hdNkNokuXLtGryrWM--PjSTBqIzw9Kkk.wasm',
   ),
 );
 
-const BUNDLED_SOURCE_CODE = fs.readFileSync(
+export const BUNDLED_SOURCE_CODE = fs.readFileSync(
   path.join(__dirname, '../dist/aos-bundled.lua'),
   'utf-8',
 );
 
-const DEFAULT_HANDLE_OPTIONS = {
+export const DEFAULT_HANDLE_OPTIONS = {
   Id: ''.padEnd(43, '1'),
   ['Block-Height']: '1',
   // important to set the address so that that `Authority` check passes. Else the `isTrusted` with throw an error.
@@ -44,13 +49,4 @@ const DEFAULT_HANDLE_OPTIONS = {
   Target: ''.padEnd(43, '1'),
   From: STUB_ADDRESS,
   Timestamp: Date.now(),
-};
-
-module.exports = {
-  BUNDLED_SOURCE_CODE,
-  AOS_WASM,
-  AO_LOADER_OPTIONS,
-  AO_LOADER_HANDLER_ENV,
-  STUB_ADDRESS,
-  DEFAULT_HANDLE_OPTIONS,
 };
