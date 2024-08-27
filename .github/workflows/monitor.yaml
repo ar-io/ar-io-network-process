@@ -44,7 +44,7 @@ jobs:
 
       - name: Notify Failure
         if: failure()
-        uses: 8398a7/action-slack@v3
+        uses: rtCamp/action-slack-notify@v2
         with:
           status: ${{ job.status }}
           text: 'IO Process Observation Failed!'
