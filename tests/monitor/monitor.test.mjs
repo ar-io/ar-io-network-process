@@ -11,6 +11,12 @@ describe('distribution totals', () => {
     const { distributions: currentEpochDistributions } =
       await io.getCurrentEpoch();
 
+    // assert it has eligible rewards
+    assert(
+      currentEpochDistributions.rewards?.eligible !== undefined,
+      'No eligible rewards found for current epoch',
+    );
+
     // TODO: for now pass if distributions are empty
     if (Object.keys(currentEpochDistributions.rewards.eligible).length === 0) {
       return;

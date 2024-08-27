@@ -29,7 +29,6 @@ jobs:
 
       - name: Monitor
         run: yarn monitor | tee results.txt
-        continue-on-error: true
         id: monitor
         env:
           IO_PROCESS_ID: ${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}
