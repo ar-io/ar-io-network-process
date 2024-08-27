@@ -1,11 +1,11 @@
-const { createAosLoader } = require('./utils');
-const { describe, it } = require('node:test');
-const assert = require('node:assert');
-const {
+import { createAosLoader } from './utils.mjs';
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
+import {
   AO_LOADER_HANDLER_ENV,
   DEFAULT_HANDLE_OPTIONS,
   STUB_ADDRESS,
-} = require('../tools/constants');
+} from '../tools/constants.mjs';
 
 // EIP55-formatted test address
 const testEthAddress = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa';

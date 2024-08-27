@@ -1,9 +1,11 @@
 {
+  "type": "module",
   "scripts": {
-    "build": "node tools/bundle-aos.js",
-    "test:integration": "yarn build && node --test --experimental-wasm-memory64 **/*.test.js",
+    "build": "node tools/bundle-aos.mjs",
+    "test:integration": "yarn build && node --test --experimental-wasm-memory64 **/*.test.mjs",
     "test:unit": "busted . && luacov",
     "test": "yarn test:unit && yarn test:integration",
+    "monitor": "node tests/monitor/monitor.test.mjs",
     "evolve": "yarn build && node tools/evolve.mjs"
   },
   "devDependencies": {

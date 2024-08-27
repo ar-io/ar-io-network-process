@@ -1,5 +1,5 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
 /**
  * @typedef Module
@@ -105,11 +105,9 @@ function exploreNodes(node, cwd) {
   return requiredModules;
 }
 
-function bundle(entryLuaPath) {
+export function bundle(entryLuaPath) {
   const project = createProjectStructure(entryLuaPath);
   const [bundledLua] = createExecutableFromProject(project);
 
   return bundledLua;
 }
-
-module.exports = { bundle };

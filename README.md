@@ -2,6 +2,8 @@
 
 [![codecov](https://codecov.io/gh/ar-io/ar-io-network-process/graph/badge.svg?token=DMM8LQO8KL)](https://codecov.io/gh/ar-io/ar-io-network-process)
 
+[![IO Process Status](https://github.com/ar-io/ar-io-network-process/actions/workflows/monitor.yaml/badge.svg)](https://github.com/ar-io/ar-io-network-process/actions/workflows/monitor.yaml)
+
 The implementation of the ar.io network contract is written in lua and deployed as an AO process on Arweave. The contract is responsible for managing the network state, handling transactions, and enforcing the network rules. Refer to the [contract whitepaper] for more details on the network rules and the contract design.
 
 ## Contract Spec

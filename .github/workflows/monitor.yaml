@@ -1,0 +1,112 @@
+name: IO Process Status
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */4 * * *' # Run every 4 hours
+
+jobs:
+  monitor:
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      matrix:
+        network: [testnet, devnet]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'yarn'
+
+      - name: Setup
+        run: yarn
+
+      - name: Monitor
+        run: yarn monitor | tee results.txt
+        continue-on-error: true
+        id: monitor
+        env:
+          IO_PROCESS_ID: ${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}
+
+      - name: Create test output
+        id: test-outputs
+        run: |
+          TEST_RESULTS=$(cat results.txt)
+          echo "TEST_RESULTS<<EOF" >> $GITHUB_ENV
+          echo "$TEST_RESULTS" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Notify Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: 'IO Process Observation Failed!'
+          custom_payload: |
+            {
+                text: "IO Process Observation Failed",
+                attachments: [{
+                    fallback: 'IO Process Observation Failed',
+                    color: 'danger',
+                    title: 'Test Results',
+                    text: 'The IO Process has failed at least one observation tests!',
+                    "fields": [{
+                        "title": "Network",
+                        "value": "${{ matrix.network }}",
+                        "short": true
+                    },
+                    {
+                        "title": "Process ID",
+                        "value": "${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}",
+                        "short": true
+                    },
+                    {
+                        "title": "Test Output",
+                        "value": "```\n${{ env.TEST_RESULTS }}\n```",
+                        "short": false
+                    }
+                }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+      # on sucess send a slack message
+      - name: Notify Success
+        if: ${{ success() && vars.NOTIFY_SUCCESS == 'true' }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: IO Process Observation Success!
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CUSTOM_PAYLOAD: |
+            {
+              "text": "IO Process Observation Success!",
+              "attachments": [{
+                "fallback": "IO Process Observation Success!",
+                "color": "good",
+                "title": "Test Results",
+                text: 'The IO Process has passed all observation tests!',
+                "fields": [{
+                  "title": "Network",
+                  "value": "${{ matrix.network }}",
+                  "short": true
+                },
+                {
+                  "title": "Process ID",
+                  "value": "${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}",
+                  "short": true
+                },
+                {
+                  "title": "Test Output",
+                  "value": "```\n${{ env.TEST_RESULTS }}\n```",
+                  "short": false
+                }
+                ]
+              }]
+            }
