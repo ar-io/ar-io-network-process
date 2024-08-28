@@ -56,12 +56,11 @@ jobs:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_CUSTOM_PAYLOAD: |
             {
-                text: "IO Process Observation Failed",
-                attachments: [{
-                    fallback: 'IO Process Observation Failed',
-                    color: 'danger',
-                    title: 'Test Results',
-                    text: 'The IO Process has failed at least one observation tests!',
+                "attachments": [{
+                    "fallback": 'IO Process Observation Failed',
+                    "color": 'danger',
+                    "title": 'Details',
+                    "text": 'The IO Process has failed at least one observation tests!',
                     "fields": [{
                         "title": "Network",
                         "value": "${{ matrix.network }}",
@@ -90,12 +89,11 @@ jobs:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_CUSTOM_PAYLOAD: |
             {
-              "text": "IO Process Observation Success!",
               "attachments": [{
                 "fallback": "IO Process Observation Success!",
                 "color": "good",
                 "title": "Test Results",
-                text: 'The IO Process has passed all observation tests!',
+                "text": 'The IO Process has passed all observation tests!',
                 "fields": [{
                   "title": "Network",
                   "value": "${{ matrix.network }}",
