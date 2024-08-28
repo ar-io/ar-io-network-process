@@ -41,6 +41,15 @@ jobs:
           echo "$TEST_RESULTS" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
+      - name: Parse test results
+        run: |
+          if grep -q "ERR_ASSERTION" results.txt; then
+            echo "Test failure detected"
+            exit 1
+          else
+            echo "All tests passed"
+          fi
+
       - name: Notify Failure
         if: failure()
         uses: rtCamp/action-slack-notify@v2
