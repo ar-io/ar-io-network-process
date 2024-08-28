@@ -33,14 +33,6 @@ jobs:
         env:
           IO_PROCESS_ID: ${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}
 
-      - name: Create test output
-        id: test-outputs
-        run: |
-          TEST_RESULTS=$(cat results.txt)
-          echo "TEST_RESULTS<<EOF" >> $GITHUB_ENV
-          echo "$TEST_RESULTS" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
       - name: Check for test failures
         run: |
           if grep -q "ERR_ASSERTION" results.txt; then
@@ -57,6 +49,7 @@ jobs:
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: IO Process Observation Failed!
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_FILE_UPLOAD: results.txt
           SLACK_CUSTOM_PAYLOAD: |
             {
               "attachments": [
@@ -75,7 +68,12 @@ jobs:
                       "title": "Process ID",
                       "value": "${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}",
                       "short": true
-                    }
+                    },
+                    {
+                      "title": "GitHub Action",
+                      "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                      "short": false
+                    },
                   ]
                 }
               ]
@@ -89,6 +87,7 @@ jobs:
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: IO Process Observation Success!
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_FILE_UPLOAD: results.txt
           SLACK_CUSTOM_PAYLOAD: |
             {
               "attachments": [{
@@ -107,8 +106,8 @@ jobs:
                   "short": true
                 },
                 {
-                  "title": "Test Output",
-                  "value": "```\n${{ env.TEST_RESULTS }}\n```",
+                  "title": "GitHub Action",
+                  "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
                   "short": false
                 }
                 ]
