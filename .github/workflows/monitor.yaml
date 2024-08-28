@@ -59,27 +59,26 @@ jobs:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_CUSTOM_PAYLOAD: |
             {
-                "attachments": [{
-                    "fallback": 'IO Process Observation Failed',
-                    "color": 'danger',
-                    "title": 'Details',
-                    "text": 'The IO Process has failed at least one observation tests!',
-                    "fields": [{
-                        "title": "Network",
-                        "value": "${{ matrix.network }}",
-                        "short": true
+              "attachments": [
+                {
+                  "fallback": "IO Process Observation Failed",
+                  "color": "danger",
+                  "title": "Details",
+                  "text": "The IO Process has failed at least one observation test!",
+                  "fields": [
+                    {
+                      "title": "Network",
+                      "value": "${{ matrix.network }}",
+                      "short": true
                     },
                     {
-                        "title": "Process ID",
-                        "value": "${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}",
-                        "short": true
-                    },
-                    {
-                        "title": "Test Output",
-                        "value": "```\n${{ env.TEST_RESULTS }}\n```",
-                        "short": false
+                      "title": "Process ID",
+                      "value": "${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}",
+                      "short": true
                     }
-                }]
+                  ]
+                }
+              ]
             }
 
       # on sucess send a slack message
