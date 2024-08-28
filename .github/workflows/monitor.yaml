@@ -79,8 +79,6 @@ jobs:
                     }
                 }]
             }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
 
       # on sucess send a slack message
       - name: Notify Success
