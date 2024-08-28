@@ -87,7 +87,7 @@ jobs:
                 "fallback": "Updated IO Process!",
                 "color": "good",
                 "title": "Details",
-                "text": 'The IO "${{ github.ref_name == 'main' && 'testnet' || 'devnet' }} Process ( ${{ vars.IO_NETWORK_PROCESS_ID }}) has been updated!',
+                "text": 'The IO ${{ github.ref_name == 'main' && 'Testnet' || 'Devnet' }} Process has been updated!',
                 "fields": [{
                   "title": "Network",
                   "value": "${{ github.ref_name == 'main' && 'testnet' || 'devnet' }}",
