@@ -13,6 +13,7 @@ jobs:
     strategy:
       matrix:
         network: [testnet, devnet]
+      fail-fast: false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
