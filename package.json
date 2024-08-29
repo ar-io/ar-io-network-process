@@ -1,15 +1,17 @@
 {
+  "type": "module",
   "scripts": {
-    "build": "node tools/bundle-aos.js",
-    "test:integration": "yarn build && node --test --experimental-wasm-memory64 **/*.test.js",
+    "build": "node tools/bundle-aos.mjs",
+    "test:integration": "yarn build && node --test --experimental-wasm-memory64 **/*.test.mjs",
     "test:unit": "busted . && luacov",
     "test": "yarn test:unit && yarn test:integration",
+    "monitor": "node --test tests/monitor/monitor.test.mjs",
     "evolve": "yarn build && node tools/evolve.mjs"
   },
   "devDependencies": {
-    "@ar.io/sdk": "^2.1.0-alpha.6",
-    "@permaweb/ao-loader": "^0.0.35",
-    "@permaweb/aoconnect": "^0.0.55",
+    "@ar.io/sdk": "alpha",
+    "@permaweb/ao-loader": "^0.0.36",
+    "@permaweb/aoconnect": "^0.0.59",
     "arweave": "^1.15.1",
     "prettier": "^3.3.2"
   },

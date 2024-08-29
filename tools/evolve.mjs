@@ -1,5 +1,5 @@
 import { AOProcess, createAoSigner, ArweaveSigner } from '@ar.io/sdk/node';
-import constants from './constants.js';
+import * as constants from './constants.mjs';
 
 const processId = process.env.IO_NETWORK_PROCESS_ID;
 const wallet = JSON.parse(process.env.WALLET);

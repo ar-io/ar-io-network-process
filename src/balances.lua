@@ -11,7 +11,7 @@ function balances.transfer(recipient, from, qty)
 	assert(type(recipient) == "string", "Recipient is required!")
 	assert(type(from) == "string", "From is required!")
 	assert(type(qty) == "number", "Quantity is required and must be a number!")
-	assert(utils.isInteger(qty), "Quantity must be an integer")
+	assert(utils.isInteger(qty), debug.traceback("Quantity must be an integer: " .. qty))
 
 	balances.reduceBalance(from, qty)
 	balances.increaseBalance(recipient, qty)

@@ -1,6 +1,10 @@
 name: Build / Test / Evolve
 
-on: [push, workflow_dispatch]
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - src/**/*
 
 jobs:
   integration:
@@ -73,3 +77,79 @@ jobs:
         env:
           WALLET: ${{ secrets.WALLET }}
           IO_NETWORK_PROCESS_ID: ${{ vars.IO_NETWORK_PROCESS_ID }}
+
+      - name: Notify Success
+        if: success()
+        uses: rtCamp/action-slack-notify@v2.3.0
+        env:
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: Evolved IO Process!
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CUSTOM_PAYLOAD: |
+            {
+              "attachments": [{
+                "fallback": "Updated IO Process!",
+                "color": "good",
+                "title": "Details",
+                "text": 'The IO ${{ github.ref_name == 'main' && 'Testnet' || 'Devnet' }} Process has been updated!',
+                "fields": [{
+                  "title": "Network",
+                  "value": "${{ github.ref_name == 'main' && 'testnet' || 'devnet' }}",
+                  "short": true
+                },
+                {
+                  "title": "Process ID",
+                  "value": "${{ vars.IO_NETWORK_PROCESS_ID }}",
+                  "short": true
+                },
+                {
+                  "title": "View on ao.link",
+                  "value": "https://www.ao.link/#/entity/${{ vars.IO_NETWORK_PROCESS_ID }}?tab=source-code",
+                  "short": false
+                }
+                ,
+                {
+                  "title": "Commit",
+                  "value": "<https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>"
+                }
+                ]
+              }]
+            }
+
+      - name: Notify Failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: danger
+          SLACK_TITLE: IO Process Evolution Failed!
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CUSTOM_PAYLOAD: |
+            {
+              "text": "IO Process Evolution Failed!",
+              "attachments": [{
+                "fallback": "Failed to update IO Process!",
+                "color": "danger",
+                "title": "Details",
+                "text": 'The IO "${{ github.ref_name == 'main' && 'testnet' || 'devnet' }} Process ( ${{ vars.IO_NETWORK_PROCESS_ID }}) FAILED to update!',
+                "fields": [{
+                  "title": "Network",
+                  "value": "${{ github.ref_name == 'main' && 'testnet' || 'devnet' }}",
+                  "short": true
+                },
+                {
+                  "title": "Process ID",
+                  "value": "${{ vars.IO_NETWORK_PROCESS_ID }}",
+                  "short": true
+                },
+                {
+                  "title": "GitHub Action",
+                  "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                  "short": false
+                },
+                {
+                  "title": "Commit",
+                  "value": "<https://github.com/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>"
+                }
+                ]
+              }]
+            }
