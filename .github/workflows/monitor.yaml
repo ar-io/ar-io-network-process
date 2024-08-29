@@ -49,7 +49,6 @@ jobs:
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: IO Process Observation Failed!
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_FILE_UPLOAD: results.txt
           SLACK_CUSTOM_PAYLOAD: |
             {
               "attachments": [
@@ -87,7 +86,6 @@ jobs:
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: IO Process Observation Success!
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_FILE_UPLOAD: results.txt
           SLACK_CUSTOM_PAYLOAD: |
             {
               "attachments": [{
