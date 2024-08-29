@@ -1,6 +1,10 @@
 name: Build / Test / Evolve
 
-on: [push, workflow_dispatch]
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - src/**/*
 
 jobs:
   integration:
