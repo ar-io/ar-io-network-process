@@ -76,7 +76,7 @@ jobs:
 
       - name: Notify Success
         if: success()
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@v2.3.0
         env:
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: Evolved IO Process!
