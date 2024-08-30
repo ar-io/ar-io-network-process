@@ -13,7 +13,7 @@ EpochSettings = EpochSettings
 		maxObservers = 50,
 		epochZeroStartTimestamp = 1719900000000, -- July 9th, 00:00:00 UTC
 		durationMs = 60 * 1000 * 60 * 24, -- 24 hours
-		distributionDelayMs = 60 * 1000 * 30, -- 15 blocks / 30 minutes
+		distributionDelayMs = 60 * 1000 * 40, -- 40 minutes (~ 20 arweave blocks)
 	}
 
 function epochs.getEpochs()
