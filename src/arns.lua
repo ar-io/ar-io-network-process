@@ -415,7 +415,7 @@ end
 function arns.pruneRecords(currentTimestamp)
 	-- identify any records that are leases and that have expired, account for a one week grace period in seconds
 	for name, record in pairs(arns.getRecords()) do
-		if record.type == "lease" and record.endTimestamp + constants.gracePeriodMs < currentTimestamp then
+		if record.type == "lease" and record.endTimestamp + constants.gracePeriodMs <= currentTimestamp then
 			arns.removeRecord(name)
 		end
 	end

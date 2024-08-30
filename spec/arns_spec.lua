@@ -436,4 +436,96 @@ describe("arns", function()
 			end)
 		end)
 	end
+
+	describe("pruneRecords", function()
+		it("should prune records", function()
+			local currentTimestamp = 1000000000
+
+			_G.NameRegistry = {
+				records = {
+					["active-record"] = {
+						endTimestamp = currentTimestamp + 1000000, -- far in the future
+						processId = "active-process-id",
+						purchasePrice = 600000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 10,
+					},
+					["expired-record"] = {
+						endTimestamp = currentTimestamp - constants.gracePeriodMs - 1, -- expired and past the grace period
+						processId = "expired-process-id",
+						purchasePrice = 400000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 5,
+					},
+					["grace-period-record"] = {
+						endTimestamp = currentTimestamp - constants.gracePeriodMs + 10, -- expired, but within grace period
+						processId = "grace-process-id",
+						purchasePrice = 500000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 8,
+					},
+					["permabuy-record"] = {
+						endTimestamp = nil,
+						processId = "permabuy-process-id",
+						purchasePrice = 600000000,
+						startTimestamp = 0,
+						type = "permabuy",
+						undernameLimit = 10,
+					},
+				},
+			}
+			arns.pruneRecords(currentTimestamp)
+			assert.are.same({
+				["active-record"] = {
+					endTimestamp = currentTimestamp + 1000000, -- far in the future
+					processId = "active-process-id",
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				},
+				["grace-period-record"] = {
+					endTimestamp = currentTimestamp - constants.gracePeriodMs + 10, -- expired, but within grace period
+					processId = "grace-process-id",
+					purchasePrice = 500000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 8,
+				},
+				["permabuy-record"] = {
+					endTimestamp = nil,
+					processId = "permabuy-process-id",
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "permabuy",
+					undernameLimit = 10,
+				},
+			}, _G.NameRegistry.records)
+		end)
+	end)
+	describe("pruneReservedNames", function()
+		it("should remove expired reserved names", function()
+			local currentTimestamp = 1000000
+			_G.NameRegistry.reserved = {
+				["active-reserved"] = {
+					endTimestamp = currentTimestamp + 1000000, -- far in the future
+				},
+				["expired-reserved"] = {
+					endTimestamp = currentTimestamp - 1000, -- expired
+				},
+				["expired-exact-reserved"] = {
+					endTimestamp = currentTimestamp, -- expired at the exact timestamp
+				},
+			}
+			arns.pruneReservedNames(currentTimestamp)
+			assert.are.same({
+				["active-reserved"] = {
+					endTimestamp = currentTimestamp + 1000000, -- far in the future
+				},
+			}, _G.NameRegistry.reserved)
+		end)
+	end)
 end)
