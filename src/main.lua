@@ -30,6 +30,7 @@ local gar = require("gar")
 local demand = require("demand")
 local epochs = require("epochs")
 local vaults = require("vaults")
+local tick = require("tick")
 
 local ActionMap = {
 	-- reads
@@ -78,6 +79,27 @@ local ActionMap = {
 	DelegateStake = "Delegate-Stake",
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
 }
+
+-- prune state before every interaction
+Handlers.prepend("tick", function()
+	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
+end, function(msg)
+	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
+	local msgTimestamp = tonumber(msg.Timestamp)
+	print("Pruning state at timestamp: " .. msgTimestamp)
+	-- TODO: we should copy state here and restore if tick fails, but that requires larger memory - DO NOT DO THIS UNTIL WE START PRUNING STATE of epochs and distributions
+	local status, result = pcall(tick.pruneState, msgTimestamp)
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-Tick-Notice",
+			Error = "Invalid-Tick",
+			Data = json.encode(result),
+		})
+		return true -- stop processing here and return
+	end
+	return status
+end)
 
 -- Write handlers
 Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
@@ -883,48 +905,10 @@ Handlers.add("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Token-Sup
 	})
 end)
 
--- TICK HANDLER
-Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
-	-- assert this is a write interaction and we have a timetsamp
+-- TICK HANDLER - TODO: this may be better as a "Distribute" rewards handler
+Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
-	-- tick the things that only require timestamp and don't need to happen for every epoch
-	local function tickState(timestamp)
-		arns.pruneRecords(timestamp)
-		arns.pruneReservedNames(timestamp)
-		vaults.pruneVaults(timestamp)
-		gar.pruneGateways(timestamp)
-	end
-
-	local previousState = {
-		Balances = Balances,
-		Vaults = Vaults,
-		GatewayRegistry = GatewayRegistry,
-		NameRegistry = NameRegistry,
-		Epochs = Epochs,
-		DemandFactor = DemandFactor,
-		LastTickedEpochIndex = LastTickedEpochIndex,
-	}
 	local msgTimestamp = tonumber(msg.Timestamp)
-
-	-- tick the state and demand factor using just the timestamp
-	local stateStatus, stateResult = pcall(tickState, msgTimestamp)
-	if not stateStatus then
-		-- reset the state to previous state
-		Balances = previousState.Balances
-		Vaults = previousState.Vaults
-		GatewayRegistry = previousState.GatewayRegistry
-		NameRegistry = previousState.NameRegistry
-		Epochs = previousState.Epochs
-		DemandFactor = previousState.DemandFactor
-		LastTickedEpochIndex = previousState.LastTickedEpochIndex
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-Tick-Notice",
-			Error = "Invalid-Tick",
-			Data = json.encode(stateResult),
-		})
-	end
-
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
 	local function tickEpochs(timestamp, blockHeight, hashchain)
 		-- update demand factor if necessary
