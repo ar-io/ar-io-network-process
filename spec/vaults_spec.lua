@@ -42,4 +42,51 @@ describe("vaults", function()
 		assert.is_false(status)
 		assert.match("Insufficient balance", result)
 	end)
+
+	describe("pruneVaults", function()
+		it("should prune expired vaults and return balance to owners", function()
+			local currentTimestamp = 1000000
+
+			-- Set up test vaults
+			_G.Vaults = {
+				["owner1"] = {
+					["msgId1"] = {
+						balance = 100,
+						startTimestamp = 0,
+						endTimestamp = currentTimestamp - 1, -- Expired
+					},
+					["msgId2"] = {
+						balance = 200,
+						startTimestamp = 0,
+						endTimestamp = currentTimestamp + 1000, -- Not expired
+					},
+				},
+				["owner2"] = {
+					["msgId3"] = {
+						balance = 300,
+						startTimestamp = 0,
+						endTimestamp = currentTimestamp - 100, -- Expired
+					},
+				},
+			}
+
+			-- Set initial balances
+			_G.Balances = {
+				["owner1"] = 500,
+				["owner2"] = 1000,
+			}
+
+			-- Call pruneVaults
+			vaults.pruneVaults(currentTimestamp)
+
+			-- Check results
+			assert.is_nil(_G.Vaults["owner1"]["msgId1"])
+			assert.is_not_nil(_G.Vaults["owner1"]["msgId2"])
+			assert.is_nil(_G.Vaults["owner2"]["msgId3"])
+
+			-- Check that balances were returned to owners
+			assert.are.equal(600, _G.Balances["owner1"]) -- 500 + 100 from expired vault
+			assert.are.equal(1300, _G.Balances["owner2"]) -- 1000 + 300 from expired vault
+		end)
+	end)
 end)

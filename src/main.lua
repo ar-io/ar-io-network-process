@@ -86,9 +86,10 @@ Handlers.prepend("tick", function()
 end, function(msg)
 	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
 	local msgTimestamp = tonumber(msg.Timestamp)
+	local msgId = msg.Id
 	print("Pruning state at timestamp: " .. msgTimestamp)
 	-- TODO: we should copy state here and restore if tick fails, but that requires larger memory - DO NOT DO THIS UNTIL WE START PRUNING STATE of epochs and distributions
-	local status, result = pcall(tick.pruneState, msgTimestamp)
+	local status, result = pcall(tick.pruneState, msgTimestamp, msgId)
 	if not status then
 		ao.send({
 			Target = msg.From,

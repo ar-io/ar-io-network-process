@@ -586,9 +586,13 @@ function gar.updateSettings(newSettings)
 	GatewayRegistrySettings = newSettings
 end
 
-function gar.pruneGateways(currentTimestamp)
+function gar.pruneGateways(currentTimestamp, msgId)
 	local gateways = gar.getGateways()
 	local garSettings = gar.getSettings()
+
+	if next(gateways) == nil then
+		return
+	end
 
 	-- we take a deep copy so we can operate directly on the gateway object
 	for address, gateway in pairs(gateways) do
@@ -625,7 +629,7 @@ function gar.pruneGateways(currentTimestamp)
 				and gateway.stats.failedConsecutiveEpochs >= garSettings.operators.failedEpochCountMax
 			then
 				-- mark as leaving
-				gar.leaveNetwork(address, currentTimestamp, address)
+				gar.leaveNetwork(address, currentTimestamp, msgId)
 			else
 				if gateway.status == "leaving" and gateway.endTimestamp <= currentTimestamp then
 					-- if the timestamp is after gateway end timestamp, mark the gateway as nil
