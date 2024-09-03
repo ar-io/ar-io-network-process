@@ -30,6 +30,7 @@ local gar = require("gar")
 local demand = require("demand")
 local epochs = require("epochs")
 local vaults = require("vaults")
+local tick = require("tick")
 
 local ActionMap = {
 	-- reads
@@ -78,6 +79,28 @@ local ActionMap = {
 	DelegateStake = "Delegate-Stake",
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
 }
+
+-- prune state before every interaction
+Handlers.prepend("tick", function()
+	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
+end, function(msg)
+	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
+	local msgTimestamp = tonumber(msg.Timestamp)
+	local msgId = msg.Id
+	print("Pruning state at timestamp: " .. msgTimestamp)
+	-- TODO: we should copy state here and restore if tick fails, but that requires larger memory - DO NOT DO THIS UNTIL WE START PRUNING STATE of epochs and distributions
+	local status, result = pcall(tick.pruneState, msgTimestamp, msgId)
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-Tick-Notice",
+			Error = "Invalid-Tick",
+			Data = json.encode(result),
+		})
+		return true -- stop processing here and return
+	end
+	return status
+end)
 
 -- Write handlers
 Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
@@ -150,11 +173,13 @@ end)
 Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.CreateVault), function(msg)
 	local function checkAssertions()
 		assert(
-			tonumber(msg.Tags["Lock-Length"]) > 0 and utils.isInteger(tonumber(msg.Tags["Lock-Length"])),
+			msg.Tags["Lock-Length"]
+				and tonumber(msg.Tags["Lock-Length"]) > 0
+				and utils.isInteger(tonumber(msg.Tags["Lock-Length"])),
 			"Invalid lock length. Must be integer greater than 0"
 		)
 		assert(
-			tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+			msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
 			"Invalid quantity. Must be integer greater than 0"
 		)
 	end
@@ -170,8 +195,13 @@ Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.Cre
 		return
 	end
 
-	local result, err =
-		balances.createVault(msg.From, msg.Tags.Quantity, tonumber(msg.Tags["Lock-Length"]), msg.Timestamp, msg.Id)
+	local result, err = vaults.createVault(
+		msg.From,
+		tonumber(msg.Tags.Quantity),
+		tonumber(msg.Tags["Lock-Length"]),
+		tonumber(msg.Timestamp),
+		msg.Id
+	)
 	if err then
 		ao.send({
 			Target = msg.From,
@@ -181,7 +211,10 @@ Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.Cre
 	else
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Vault-Created-Notice" },
+			Tags = {
+				Action = "Vault-Created-Notice",
+				["Vault-Id"] = msg.Id,
+			},
 			Data = json.encode(result),
 		})
 	end
@@ -261,7 +294,7 @@ Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.Ext
 		return
 	end
 
-	local result, err = balances.extendVault(msg.From, msg.Tags["Extend-Length"], msg.Timestamp, msg.Tags["Vault-Id"])
+	local result, err = vaults.extendVault(msg.From, msg.Tags["Extend-Length"], msg.Timestamp, msg.Tags["Vault-Id"])
 	if err then
 		ao.send({
 			Target = msg.From,
@@ -297,7 +330,7 @@ Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.I
 		return
 	end
 
-	local result, err = balances.increaseVault(msg.From, msg.Tags.Quantity, msg.Tags["Vault-Id"], msg.Timestamp)
+	local result, err = vaults.increaseVault(msg.From, msg.Tags.Quantity, msg.Tags["Vault-Id"], msg.Timestamp)
 	if err then
 		ao.send({
 			Target = msg.From,
@@ -883,48 +916,10 @@ Handlers.add("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Token-Sup
 	})
 end)
 
--- TICK HANDLER
-Handlers.add("tick", utils.hasMatchingTag("Action", "Tick"), function(msg)
-	-- assert this is a write interaction and we have a timetsamp
+-- TICK HANDLER - TODO: this may be better as a "Distribute" rewards handler
+Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
-	-- tick the things that only require timestamp and don't need to happen for every epoch
-	local function tickState(timestamp)
-		arns.pruneRecords(timestamp)
-		arns.pruneReservedNames(timestamp)
-		vaults.pruneVaults(timestamp)
-		gar.pruneGateways(timestamp)
-	end
-
-	local previousState = {
-		Balances = Balances,
-		Vaults = Vaults,
-		GatewayRegistry = GatewayRegistry,
-		NameRegistry = NameRegistry,
-		Epochs = Epochs,
-		DemandFactor = DemandFactor,
-		LastTickedEpochIndex = LastTickedEpochIndex,
-	}
 	local msgTimestamp = tonumber(msg.Timestamp)
-
-	-- tick the state and demand factor using just the timestamp
-	local stateStatus, stateResult = pcall(tickState, msgTimestamp)
-	if not stateStatus then
-		-- reset the state to previous state
-		Balances = previousState.Balances
-		Vaults = previousState.Vaults
-		GatewayRegistry = previousState.GatewayRegistry
-		NameRegistry = previousState.NameRegistry
-		Epochs = previousState.Epochs
-		DemandFactor = previousState.DemandFactor
-		LastTickedEpochIndex = previousState.LastTickedEpochIndex
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-Tick-Notice",
-			Error = "Invalid-Tick",
-			Data = json.encode(stateResult),
-		})
-	end
-
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
 	local function tickEpochs(timestamp, blockHeight, hashchain)
 		-- update demand factor if necessary
@@ -1292,18 +1287,33 @@ Handlers.add(ActionMap.ReservedName, utils.hasMatchingTag("Action", ActionMap.Re
 end)
 
 Handlers.add(ActionMap.Vaults, utils.hasMatchingTag("Action", ActionMap.Vaults), function(msg)
-	local vaults = vaults.getVaults()
-	ao.send({ Target = msg.From, Action = "Vaults-Notice", Data = json.encode(vaults) })
+	ao.send({ Target = msg.From, Action = "Vaults-Notice", Data = json.encode(Vaults) })
 end)
 
 Handlers.add(ActionMap.Vault, utils.hasMatchingTag("Action", ActionMap.Vault), function(msg)
-	local vault = vaults.getVault(msg.Tags.Address or msg.From)
-	ao.send({
-		Target = msg.From,
-		Action = "Vault-Notice",
-		Address = msg.Tags.Address or msg.From,
-		Data = json.encode(vault),
-	})
+	local address = msg.Tags.Address or msg.From
+	local vaultId = msg.Tags["Vault-Id"]
+	local vault = vaults.getVault(address, vaultId)
+	if not vault then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-Vault-Notice",
+			Error = "Vault-Not-Found",
+			Tags = {
+				Address = address,
+				["Vault-Id"] = vaultId,
+			},
+		})
+		return
+	else
+		ao.send({
+			Target = msg.From,
+			Action = "Vault-Notice",
+			Address = address,
+			["Vault-Id"] = vaultId,
+			Data = json.encode(vault),
+		})
+	end
 end)
 
 -- END READ HANDLERS
