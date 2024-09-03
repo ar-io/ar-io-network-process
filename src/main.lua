@@ -1293,9 +1293,7 @@ end)
 Handlers.add(ActionMap.Vault, utils.hasMatchingTag("Action", ActionMap.Vault), function(msg)
 	local address = msg.Tags.Address or msg.From
 	local vaultId = msg.Tags["Vault-Id"]
-	-- print all the vaults fo rhte address in json encode
 	local vault = vaults.getVault(address, vaultId)
-	print("vault " .. json.encode(vault))
 	if not vault then
 		ao.send({
 			Target = msg.From,
@@ -1307,14 +1305,15 @@ Handlers.add(ActionMap.Vault, utils.hasMatchingTag("Action", ActionMap.Vault), f
 			},
 		})
 		return
+	else
+		ao.send({
+			Target = msg.From,
+			Action = "Vault-Notice",
+			Address = address,
+			["Vault-Id"] = vaultId,
+			Data = json.encode(vault),
+		})
 	end
-	ao.send({
-		Target = msg.From,
-		Action = "Vault-Notice",
-		Address = address,
-		["Vault-Id"] = vaultId,
-		Data = json.encode(vault),
-	})
 end)
 
 -- END READ HANDLERS
