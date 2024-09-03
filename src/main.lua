@@ -173,11 +173,13 @@ end)
 Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.CreateVault), function(msg)
 	local function checkAssertions()
 		assert(
-			tonumber(msg.Tags["Lock-Length"]) > 0 and utils.isInteger(tonumber(msg.Tags["Lock-Length"])),
+			msg.Tags["Lock-Length"]
+				and tonumber(msg.Tags["Lock-Length"]) > 0
+				and utils.isInteger(tonumber(msg.Tags["Lock-Length"])),
 			"Invalid lock length. Must be integer greater than 0"
 		)
 		assert(
-			tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+			msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
 			"Invalid quantity. Must be integer greater than 0"
 		)
 	end
@@ -193,8 +195,13 @@ Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.Cre
 		return
 	end
 
-	local result, err =
-		balances.createVault(msg.From, msg.Tags.Quantity, tonumber(msg.Tags["Lock-Length"]), msg.Timestamp, msg.Id)
+	local result, err = vaults.createVault(
+		msg.From,
+		tonumber(msg.Tags.Quantity),
+		tonumber(msg.Tags["Lock-Length"]),
+		tonumber(msg.Timestamp),
+		msg.Id
+	)
 	if err then
 		ao.send({
 			Target = msg.From,
@@ -204,7 +211,10 @@ Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.Cre
 	else
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Vault-Created-Notice" },
+			Tags = {
+				Action = "Vault-Created-Notice",
+				["Vault-Id"] = msg.Id,
+			},
 			Data = json.encode(result),
 		})
 	end
@@ -284,7 +294,7 @@ Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.Ext
 		return
 	end
 
-	local result, err = balances.extendVault(msg.From, msg.Tags["Extend-Length"], msg.Timestamp, msg.Tags["Vault-Id"])
+	local result, err = vaults.extendVault(msg.From, msg.Tags["Extend-Length"], msg.Timestamp, msg.Tags["Vault-Id"])
 	if err then
 		ao.send({
 			Target = msg.From,
@@ -320,7 +330,7 @@ Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.I
 		return
 	end
 
-	local result, err = balances.increaseVault(msg.From, msg.Tags.Quantity, msg.Tags["Vault-Id"], msg.Timestamp)
+	local result, err = vaults.increaseVault(msg.From, msg.Tags.Quantity, msg.Tags["Vault-Id"], msg.Timestamp)
 	if err then
 		ao.send({
 			Target = msg.From,
@@ -1277,16 +1287,32 @@ Handlers.add(ActionMap.ReservedName, utils.hasMatchingTag("Action", ActionMap.Re
 end)
 
 Handlers.add(ActionMap.Vaults, utils.hasMatchingTag("Action", ActionMap.Vaults), function(msg)
-	local vaults = vaults.getVaults()
-	ao.send({ Target = msg.From, Action = "Vaults-Notice", Data = json.encode(vaults) })
+	ao.send({ Target = msg.From, Action = "Vaults-Notice", Data = json.encode(Vaults) })
 end)
 
 Handlers.add(ActionMap.Vault, utils.hasMatchingTag("Action", ActionMap.Vault), function(msg)
-	local vault = vaults.getVault(msg.Tags.Address or msg.From)
+	local address = msg.Tags.Address or msg.From
+	local vaultId = msg.Tags["Vault-Id"]
+	-- print all the vaults fo rhte address in json encode
+	local vault = vaults.getVault(address, vaultId)
+	print("vault " .. json.encode(vault))
+	if not vault then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-Vault-Notice",
+			Error = "Vault-Not-Found",
+			Tags = {
+				Address = address,
+				["Vault-Id"] = vaultId,
+			},
+		})
+		return
+	end
 	ao.send({
 		Target = msg.From,
 		Action = "Vault-Notice",
-		Address = msg.Tags.Address or msg.From,
+		Address = address,
+		["Vault-Id"] = vaultId,
 		Data = json.encode(vault),
 	})
 end)
