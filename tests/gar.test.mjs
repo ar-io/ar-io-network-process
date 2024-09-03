@@ -5,6 +5,7 @@ import {
   AO_LOADER_HANDLER_ENV,
   DEFAULT_HANDLE_OPTIONS,
   STUB_ADDRESS,
+  validGatewayTags,
 } from '../tools/constants.mjs';
 
 describe('GatewayRegistry', async () => {
@@ -21,25 +22,6 @@ describe('GatewayRegistry', async () => {
       AO_LOADER_HANDLER_ENV,
     );
   }
-
-  const validGatewayTags = [
-    { name: 'Action', value: 'Join-Network' },
-    { name: 'Label', value: 'test-gateway' },
-    { name: 'Note', value: 'test-note' },
-    { name: 'FQDN', value: 'test-fqdn' },
-    { name: 'Operator-Stake', value: '50000000000' }, // 50K IO
-    { name: 'Port', value: '443' },
-    { name: 'Protocol', value: 'https' },
-    { name: 'Allow-Delegated-Staking', value: 'true' },
-    { name: 'Min-Delegated-Stake', value: '500000000' }, // 500 IO
-    { name: 'Delegate-Reward-Share-Ratio', value: '0' },
-    { name: 'Observer-Address', value: STUB_ADDRESS },
-    {
-      name: 'Properties',
-      value: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
-    },
-    { name: 'Auto-Stake', value: 'true' },
-  ];
 
   describe('Join-Network', () => {
     it('should allow joining of the network record', async () => {

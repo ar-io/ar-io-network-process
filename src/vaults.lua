@@ -5,6 +5,7 @@ local vaults = {}
 local balances = require("balances")
 local utils = require("utils")
 local constants = require("constants")
+local json = require("json")
 
 function vaults.createVault(from, qty, lockLength, currentTimestamp, msgId)
 	if vaults.getVault(from, msgId) then
@@ -15,8 +16,9 @@ function vaults.createVault(from, qty, lockLength, currentTimestamp, msgId)
 		error(
 			"Invalid lock length. Must be between "
 				.. constants.MIN_TOKEN_LOCK_TIME
-				.. " - "
+				.. " and "
 				.. constants.MAX_TOKEN_LOCK_TIME
+				.. " ms"
 		)
 	end
 
@@ -114,7 +116,10 @@ end
 
 function vaults.getVault(target, id)
 	local vaults = vaults.getVaults()
-	return vaults[target] and vaults[target][id]
+	if not vaults[target] then
+		return nil
+	end
+	return vaults[target][id]
 end
 
 function vaults.setVault(target, id, vault)
