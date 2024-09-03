@@ -4,7 +4,7 @@ local demand = {}
 
 DemandFactor = DemandFactor
 	or {
-		currentPeriod = 0,
+		currentPeriod = 1, -- one based index of the current period
 		trailingPeriodPurchases = { 0, 0, 0, 0, 0, 0, 0 }, -- Acts as a ring buffer of trailing period purchase counts
 		trailingPeriodRevenues = { 0, 0, 0, 0, 0, 0 }, -- Acts as a ring buffer of trailing period revenues
 		purchasesThisPeriod = 0,
@@ -51,7 +51,6 @@ function demand.mvgAvgTrailingRevenues()
 end
 
 function demand.isDemandIncreasing()
-	local currentPeriod = demand.getCurrentPeriod()
 	local settings = demand.getSettings()
 
 	-- check that we have settings
@@ -60,15 +59,15 @@ function demand.isDemandIncreasing()
 		return false
 	end
 
-	local purchasesLastPeriod = demand.getTrailingPeriodPurchases()[currentPeriod] or 0
-	local revenueInLastPeriod = demand.getTrailingPeriodRevenues()[currentPeriod] or 0
+	local purchasesInCurrentPeriod = demand.getCurrentPeriodPurchases()
+	local revunueInCurrentPeriod = demand.getCurrentPeriodRevenue()
 	local mvgAvgOfTrailingNamePurchases = demand.mvgAvgTrailingPurchaseCounts()
 	local mvgAvgOfTrailingRevenue = demand.mvgAvgTrailingRevenues()
 
 	if settings.criteria == "revenue" then
-		return revenueInLastPeriod > 0 and revenueInLastPeriod > mvgAvgOfTrailingRevenue
+		return revunueInCurrentPeriod > 0 and (revunueInCurrentPeriod > mvgAvgOfTrailingRevenue)
 	else
-		return purchasesLastPeriod > 0 and purchasesLastPeriod > mvgAvgOfTrailingNamePurchases
+		return purchasesInCurrentPeriod > 0 and (purchasesInCurrentPeriod > mvgAvgOfTrailingNamePurchases)
 	end
 end
 
@@ -122,12 +121,18 @@ function demand.updateDemandFactor(timestamp)
 			demand.resetConsecutivePeriodsWithMinimumDemandFactor()
 			demand.updateFees(settings.demandFactorMin)
 			demand.setDemandFactor(settings.demandFactorBaseValue)
+			demand.resetConsecutivePeriodsWithMinimumDemandFactor()
 		else
 			demand.incrementConsecutivePeriodsWithMinDemandFactor(1)
 		end
 	end
 
-	demand.incrementPeriodAndResetValues()
+	-- update the current period values in the ring buffer for previous periods
+	demand.updateTrailingPeriodPurchases()
+	demand.updateTrailingPeriodRevenues()
+	demand.resetPurchasesThisPeriod()
+	demand.resetRevenueThisPeriod()
+	demand.incrementCurrentPeriod(1)
 end
 
 function demand.updateFees(multiplier)
@@ -180,7 +185,7 @@ end
 
 function demand.getCurrentPeriod()
 	local demandFactor = utils.deepCopy(DemandFactor)
-	return demandFactor and demandFactor.currentPeriod or 0
+	return demandFactor and demandFactor.currentPeriod or 1
 end
 
 function demand.updateSettings(settings)
@@ -201,14 +206,25 @@ end
 function demand.setDemandFactor(demandFactor)
 	DemandFactor.currentDemandFactor = demandFactor
 end
-function demand.updateTrailingPeriodPurchases()
+
+function demand.getPeriodIndex()
 	local currentPeriod = demand.getCurrentPeriod()
-	DemandFactor.trailingPeriodPurchases[currentPeriod] = demand.getCurrentPeriodPurchases()
+	local settings = demand.getSettings()
+	if not settings then
+		return 0
+	end
+	-- current period is one based index of the current period
+	return (currentPeriod % settings.movingAvgPeriodCount) + 1 -- has to be + 1 to avoid zero index
+end
+
+function demand.updateTrailingPeriodPurchases()
+	local periodIndex = demand.getPeriodIndex()
+	DemandFactor.trailingPeriodPurchases[periodIndex] = demand.getCurrentPeriodPurchases()
 end
 
 function demand.updateTrailingPeriodRevenues()
-	local currentPeriod = demand.getCurrentPeriod()
-	DemandFactor.trailingPeriodRevenues[currentPeriod] = demand.getCurrentPeriodRevenue()
+	local periodIndex = demand.getPeriodIndex()
+	DemandFactor.trailingPeriodRevenues[periodIndex] = demand.getCurrentPeriodRevenue()
 end
 
 function demand.resetPurchasesThisPeriod()
@@ -241,13 +257,6 @@ end
 
 function demand.incrementConsecutivePeriodsWithMinDemandFactor(count)
 	DemandFactor.consecutivePeriodsWithMinDemandFactor = DemandFactor.consecutivePeriodsWithMinDemandFactor + count
-end
-
-function demand.incrementPeriodAndResetValues()
-	demand.resetConsecutivePeriodsWithMinimumDemandFactor()
-	demand.resetPurchasesThisPeriod()
-	demand.resetRevenueThisPeriod()
-	demand.incrementCurrentPeriod(1)
 end
 
 return demand
