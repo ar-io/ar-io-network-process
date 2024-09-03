@@ -155,9 +155,13 @@ describe('Tick', async () => {
   });
 
   // vaulting is not working as expected, need to fix before enabling this test
-  it.skip('should prune and return vaults that are expired', async () => {
-    const startTimestamp = Date.now();
+  it('should prune vaults that are expired', async () => {
     const lockLengthMs = 1209600000;
+    const quantity = 1000000000;
+    const balanceBefore = await handle({
+      Tags: [{ name: 'Action', value: 'Balance' }],
+    });
+    const balanceBeforeData = JSON.parse(balanceBefore.Messages[0].Data);
     const createVaultResult = await handle({
       Tags: [
         {
@@ -166,32 +170,35 @@ describe('Tick', async () => {
         },
         {
           name: 'Quantity',
-          value: '1000000000',
+          value: quantity.toString(),
         },
         {
           name: 'Lock-Length',
           value: lockLengthMs.toString(), // the minimum lock length is 14 days
         },
-        {
-          name: 'Timestamp',
-          value: startTimestamp.toString(),
-        },
       ],
     });
     // parse the data and ensure the vault was created
-    const createdVaultData = JSON.parse(createVaultResult.Messages[0].Data);
-    assert.deepEqual(createdVaultData.balance, '1000000000');
-    assert.deepEqual(createdVaultData.startTimestamp, startTimestamp);
-    assert.deepEqual(
-      createdVaultData.endTimestamp,
-      startTimestamp + lockLengthMs,
+    const createVaultResultData = JSON.parse(
+      createVaultResult.Messages[0].Data,
     );
-
     const vaultId = createVaultResult.Messages[0].Tags.find(
       (tag) => tag.name === 'Vault-Id',
     ).value;
     // assert the vault id is in the tags
     assert.deepEqual(vaultId, DEFAULT_HANDLE_OPTIONS.Id);
+
+    // assert the balance is deducted
+    const balanceAfterVault = await handle(
+      {
+        Tags: [{ name: 'Action', value: 'Balance' }],
+      },
+      createVaultResult.Memory,
+    );
+    const balanceAfterVaultData = JSON.parse(
+      balanceAfterVault.Messages[0].Data,
+    );
+    assert.deepEqual(balanceAfterVaultData, balanceBeforeData - quantity);
 
     // check that vault exists
     const vault = await handle(
@@ -199,7 +206,7 @@ describe('Tick', async () => {
         Tags: [
           {
             name: 'Action',
-            value: 'Vaults',
+            value: 'Vault',
           },
           {
             name: 'Vault-Id',
@@ -210,11 +217,19 @@ describe('Tick', async () => {
       createVaultResult.Memory,
     );
     const vaultData = JSON.parse(vault.Messages[0].Data);
-    assert.deepEqual(vaultData.balance, '1000000000');
-    assert.deepEqual(createdVaultData.startTimestamp, startTimestamp);
     assert.deepEqual(
-      createdVaultData.endTimestamp,
-      startTimestamp + lockLengthMs,
+      createVaultResultData.balance,
+      vaultData.balance,
+      quantity,
+    );
+    assert.deepEqual(
+      vaultData.startTimestamp,
+      createVaultResultData.startTimestamp,
+    );
+    assert.deepEqual(
+      vaultData.endTimestamp,
+      createVaultResultData.endTimestamp,
+      createVaultResult.startTimestamp + lockLengthMs,
     );
     // mock the passage of time and tick with a future timestamp
     const futureTimestamp = vaultData.endTimestamp + 1;
@@ -235,8 +250,23 @@ describe('Tick', async () => {
       },
       futureTick.Memory,
     );
+    assert.deepEqual(undefined, prunedVault.Messages[0].Data);
+    assert.equal(
+      prunedVault.Messages[0].Tags.find((tag) => tag.name === 'Error').value,
+      'Vault-Not-Found',
+    );
 
-    const prunedVaultData = JSON.parse(prunedVault.Messages[0].Data);
-    assert.deepEqual(undefined, prunedVaultData);
+    // Check that the balance is returned to the owner
+    const ownerBalance = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Balance' },
+          { name: 'Target', value: DEFAULT_HANDLE_OPTIONS.Owner },
+        ],
+      },
+      futureTick.Memory,
+    );
+    const balanceData = JSON.parse(ownerBalance.Messages[0].Data);
+    assert.equal(balanceData, balanceBeforeData);
   });
 });
