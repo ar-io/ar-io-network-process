@@ -118,7 +118,6 @@ function demand.updateDemandFactor(timestamp)
 
 	if demand.getDemandFactor() <= settings.demandFactorMin then
 		if demand.getConsecutivePeriodsWithMinDemandFactor() >= settings.stepDownThreshold then
-			demand.resetConsecutivePeriodsWithMinimumDemandFactor()
 			demand.updateFees(settings.demandFactorMin)
 			demand.setDemandFactor(settings.demandFactorBaseValue)
 			demand.resetConsecutivePeriodsWithMinimumDemandFactor()
