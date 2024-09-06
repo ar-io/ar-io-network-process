@@ -600,6 +600,10 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 				if actualOperatorReward > 0 then
 					-- distribute the rewards to the gateway
 					balances.transfer(gatewayAddress, ao.id, actualOperatorReward)
+					-- move that balance to the gateway if autostaking is on
+					if gateway.settings.autoStake then
+						gar.increaseOperatorStake(gatewayAddress, actualOperatorReward)
+					end
 				end
 				-- update the distributed rewards for the gateway
 				distributed[gatewayAddress] = (distributed[gatewayAddress] or 0) + actualOperatorReward
