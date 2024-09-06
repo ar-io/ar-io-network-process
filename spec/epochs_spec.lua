@@ -672,7 +672,7 @@ describe("epochs", function()
 						port = 443,
 						allowDelegatedStaking = true,
 						minDelegatedStake = 100,
-						autoStake = false, -- TODO=  validate autostake behavior
+						autoStake = i == 2, -- set autostake on for the second gateway
 						label = "test",
 						properties = "",
 						delegateRewardShareRatio = 10,
@@ -701,6 +701,11 @@ describe("epochs", function()
 				passedConsecutiveEpochs = 0,
 				totalEpochCount = 1,
 			}, gar.getGateway("test-this-is-valid-arweave-wallet-address-1").stats)
+			assert.are.equal(
+				gar.getSettings().operators.minStake,
+				gar.getGateway("test-this-is-valid-arweave-wallet-address-1").operatorStake
+			)
+
 			-- passed observation, did not observe
 			assert.are.same({
 				prescribedEpochCount = 3, -- increment by one
@@ -711,11 +716,14 @@ describe("epochs", function()
 				passedConsecutiveEpochs = 1,
 				totalEpochCount = 1,
 			}, gar.getGateway("test-this-is-valid-arweave-wallet-address-2").stats)
+			local gateway1 = gar.getGateway("test-this-is-valid-arweave-wallet-address-2")
+			local balance1 = balances.getBalance("test-this-is-valid-arweave-wallet-address-2")
 			assert.are.equal(
 				-- it passed, but did not observe, so it gets 75% of the gateway reward and then 90% of that bc of the delegate reward share
-				math.floor((expectedGatewayReward * 0.75) * 0.90),
-				balances.getBalance("test-this-is-valid-arweave-wallet-address-2")
+				gar.getSettings().operators.minStake + math.floor((expectedGatewayReward * 0.75) * 0.90),
+				gateway1.operatorStake
 			)
+			assert.are.equal(0, balance1)
 			-- failed observation, did observe
 			assert.are.same({
 				prescribedEpochCount = 4, -- increment by one
@@ -729,6 +737,10 @@ describe("epochs", function()
 			assert.are.equal(
 				math.floor(expectedObserverReward * 0.90), -- 10% is given to delegates
 				balances.getBalance("test-this-is-valid-arweave-wallet-address-3")
+			)
+			assert.are.equal(
+				gar.getSettings().operators.minStake,
+				gar.getGateway("test-this-is-valid-arweave-wallet-address-3").operatorStake
 			)
 			-- passed observation, did observe
 			assert.are.same({
@@ -744,6 +756,10 @@ describe("epochs", function()
 				math.floor((expectedGatewayReward + expectedObserverReward) * 0.90), -- 10% is given to delegates
 				balances.getBalance("test-this-is-valid-arweave-wallet-address-4")
 			)
+			assert.are.equal(
+				gar.getSettings().operators.minStake,
+				gar.getGateway("test-this-is-valid-arweave-wallet-address-4").operatorStake
+			)
 			-- passed observation, did observe
 			assert.are.same({
 				prescribedEpochCount = 6, -- increment by one
@@ -757,6 +773,10 @@ describe("epochs", function()
 			assert.are.equal(
 				(expectedGatewayReward + expectedObserverReward) * 0.90, -- 10% is given to delegates
 				balances.getBalance("test-this-is-valid-arweave-wallet-address-5")
+			)
+			assert.are.equal(
+				gar.getSettings().operators.minStake,
+				gar.getGateway("test-this-is-valid-arweave-wallet-address-5").operatorStake
 			)
 
 			-- check the epoch was updated
