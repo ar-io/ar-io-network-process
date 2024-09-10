@@ -720,6 +720,42 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 	end
 end)
 
+Handlers.add(ActionMap.CancelDelegateStake, utils.hasMatchingTag("Action", ActionMap.CancelDelegateStake), function(msg)
+	local checkAssertions = function()
+		assert(utils.isValidAOAddress(msg.Tags.Gateway), "Invalid gateway address")
+		assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
+	end
+
+	local inputStatus, inputResult = pcall(checkAssertions)
+
+	if not inputStatus then
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-Cancel-Delegate-Stake-Notice", Error = "Bad-Input" },
+			Data = tostring(inputResult),
+		})
+		return
+	end
+
+	local gatewayAddress = utils.formatAddress(msg.Tags.Gateway)
+	local fromAddress = utils.formatAddress(msg.From)
+
+	local status, result = pcall(gar.cancelDelegateWithdrawal, fromAddress, gatewayAddress, msg.Tags["Vault-Id"])
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-Cancel-Delegate-Stake-Notice", Error = "Invalid-Cancel-Delegate-Stake" },
+			Data = tostring(result),
+		})
+	else
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Cancel-Delegate-Stake-Notice", Gateway = msg.Tags.Target },
+			Data = json.encode(result),
+		})
+	end
+end)
+
 Handlers.add(
 	ActionMap.DecreaseDelegateStake,
 	utils.hasMatchingTag("Action", ActionMap.DecreaseDelegateStake),

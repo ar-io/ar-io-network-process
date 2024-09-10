@@ -2,7 +2,7 @@
 local balances = require("balances")
 local utils = require("utils")
 local gar = {}
-
+local json = require("json")
 GatewayRegistry = GatewayRegistry or {}
 GatewayRegistrySettings = GatewayRegistrySettings
 	or {
@@ -673,6 +673,29 @@ function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
 	end
 
 	return utils.paginateTableWithCursor(gatewaysArray, cursor, cursorField, limit, sortBy, sortOrder)
+end
+
+function gar.cancelDelegateWithdrawal(from, gatewayAddress, vaultId)
+	local gateway = gar.getGateway(gatewayAddress)
+	if gateway == nil then
+		error("Gateway does not exist")
+	end
+
+	local delegate = gateway.delegates[from]
+	if delegate == nil then
+		error("Delegate does not exist")
+	end
+
+	local vault = delegate.vaults[vaultId]
+	if vault == nil then
+		error("Vault does not exist")
+	end
+
+	local vaultBalance = vault.balance
+	delegate.vaults[vaultId] = nil
+	delegate.delegatedStake = delegate.delegatedStake + vaultBalance
+	gateway.totalDelegatedStake = gateway.totalDelegatedStake + vaultBalance
+	GatewayRegistry[gatewayAddress] = gateway
 end
 
 return gar

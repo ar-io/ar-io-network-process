@@ -262,7 +262,7 @@ describe('GatewayRegistry', async () => {
 
   describe('Decrease-Operator-Stake', () => {
     // join the network and then increase stake
-    it('should allow decrease the operator stake', async () => {
+    it('should allow decreasing the operator stake', async () => {
       // filter the operator-stake tag
       const overrideTags = validGatewayTags.filter(
         (tag) => tag.name !== 'Operator-Stake',
@@ -412,141 +412,141 @@ describe('GatewayRegistry', async () => {
     });
   });
 
-  // describe.skip('Delegate-Stake', () => {
-  //   let sharedMemory;
-  //   // transfer some tokens to different address
-  //   const newStubAddress = 'stub-address-2'.padEnd(43, '0');
+  describe('Delegate-Stake', () => {
+    let sharedMemory;
+    // transfer some tokens to different address
+    const newStubAddress = 'stub-address-2'.padEnd(43, '0');
 
-  //   before(async () => {
-  //     const joinNetworkResult = await handle({
-  //       Tags: validGatewayTags,
-  //     });
+    before(async () => {
+      const joinNetworkResult = await handle({
+        Tags: validGatewayTags,
+      });
 
-  //     const joinNetworkData = JSON.parse(joinNetworkResult.Messages[0].Data);
+      const joinNetworkData = JSON.parse(joinNetworkResult.Messages[0].Data);
 
-  //     // transfer some tokens to different address
-  //     const transferResult = await handle(
-  //       {
-  //         Tags: [
-  //           { name: 'Action', value: 'Transfer' },
-  //           { name: 'Recipient', value: newStubAddress },
-  //           { name: 'Quantity', value: '1000000000' }, // 1K IO
-  //         ],
-  //       },
-  //       joinNetworkResult.Memory,
-  //     );
-  //     sharedMemory = transferResult.Memory;
-  //   });
-  //   it('should allow delegating stake', async () => {
-  //     const delegateStakeResult = await handle(
-  //       {
-  //         Tags: [
-  //           { name: 'Action', value: 'Delegate-Stake' },
-  //           { name: 'Quantity', value: '1000000000' }, // 1K IO
-  //         ],
-  //         From: newStubAddress,
-  //       },
-  //       sharedMemory.Memory,
-  //     );
+      // transfer some tokens to different address
+      const transferResult = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Transfer' },
+            { name: 'Recipient', value: newStubAddress },
+            { name: 'Quantity', value: '1000000000' }, // 1K IO
+          ],
+        },
+        joinNetworkResult.Memory,
+      );
+      sharedMemory = transferResult.Memory;
+    });
+    it('should allow delegating stake', async () => {
+      const delegateStakeResult = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Delegate-Stake' },
+            { name: 'Quantity', value: '1000000000' }, // 1K IO
+          ],
+          From: newStubAddress,
+        },
+        sharedMemory.Memory,
+      );
 
-  //     // check the gateway record from contract
-  //     const gateway = await handle(
-  //       {
-  //         Tags: [
-  //           { name: 'Action', value: 'Gateway' },
-  //           { name: 'Address', value: STUB_ADDRESS },
-  //         ],
-  //       },
-  //       delegateStakeResult.Memory,
-  //     );
-  //     const gatewayData = JSON.parse(gateway.Messages[0].Data);
-  //     assert.deepEqual(
-  //       {
-  //         observerAddress: STUB_ADDRESS,
-  //         operatorStake: 0,
-  //         totalDelegatedStake: 1_000_000_000,
-  //         status: 'joined',
-  //         delegates: [
-  //           {
-  //             address: newStubAddress,
-  //             staked: 1_000_000_000,
-  //             reward: 0,
-  //           },
-  //         ],
-  //         vaults: [],
-  //         startTimestamp: joinNetworkData.startTimestamp,
-  //         settings: {
-  //           label: 'test-gateway',
-  //           note: 'test-note',
-  //           fqdn: 'test-fqdn',
-  //           port: 443,
-  //           protocol: 'https',
-  //           allowDelegatedStaking: true,
-  //         },
-  //       },
-  //       gatewayData,
-  //     );
-  //     sharedMemory = delegateStakeResult.Memory;
-  //   });
+      // check the gateway record from contract
+      const gateway = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Gateway' },
+            { name: 'Address', value: STUB_ADDRESS },
+          ],
+        },
+        delegateStakeResult.Memory,
+      );
+      const gatewayData = JSON.parse(gateway.Messages[0].Data);
+      assert.deepEqual(
+        {
+          observerAddress: STUB_ADDRESS,
+          operatorStake: 0,
+          totalDelegatedStake: 1_000_000_000,
+          status: 'joined',
+          delegates: [
+            {
+              address: newStubAddress,
+              staked: 1_000_000_000,
+              reward: 0,
+            },
+          ],
+          vaults: [],
+          startTimestamp: joinNetworkData.startTimestamp,
+          settings: {
+            label: 'test-gateway',
+            note: 'test-note',
+            fqdn: 'test-fqdn',
+            port: 443,
+            protocol: 'https',
+            allowDelegatedStaking: true,
+          },
+        },
+        gatewayData,
+      );
+      sharedMemory = delegateStakeResult.Memory;
+    });
 
-  //   it('should allow with drawing stake from a gateway', async () => {
-  //     const withdrawDelegateStakeResult = await handle(
-  //       {
-  //         Tags: [
-  //           { name: 'Action', value: 'Withdraw-Delegate-Stake' },
-  //           { name: 'Gateway', value: STUB_ADDRESS },
-  //         ],
-  //         From: newStubAddress,
-  //       },
-  //       sharedMemory,
-  //     );
-  //     // get the gateway record
-  //     const gateway = await handle({
-  //       Tags: [
-  //         { name: 'Action', value: 'Gateway' },
-  //         { name: 'Address', value: STUB_ADDRESS },
-  //       ],
-  //     });
-  //     const gatewayData = JSON.parse(gateway.Messages[0].Data);
-  //     assert.deepEqual(gatewayData, {
-  //       observerAddress: STUB_ADDRESS,
-  //       operatorStake: 0,
-  //       totalDelegatedStake: 0,
-  //       status: 'joined',
-  //       delegates: [],
-  //       vaults: [],
-  //     });
-  //     sharedMemory = withdrawDelegateStakeResult.Memory;
-  //   });
+    it('should allow with drawing stake from a gateway', async () => {
+      const withdrawDelegateStakeResult = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Withdraw-Delegate-Stake' },
+            { name: 'Gateway', value: STUB_ADDRESS },
+          ],
+          From: newStubAddress,
+        },
+        sharedMemory,
+      );
+      // get the gateway record
+      const gateway = await handle({
+        Tags: [
+          { name: 'Action', value: 'Gateway' },
+          { name: 'Address', value: STUB_ADDRESS },
+        ],
+      });
+      const gatewayData = JSON.parse(gateway.Messages[0].Data);
+      assert.deepEqual(gatewayData, {
+        observerAddress: STUB_ADDRESS,
+        operatorStake: 0,
+        totalDelegatedStake: 0,
+        status: 'joined',
+        delegates: [],
+        vaults: [],
+      });
+      sharedMemory = withdrawDelegateStakeResult.Memory;
+    });
 
-  //   it('should allow canceling a withdrawal', async () => {
-  //     const cancelWithdrawalResult = await handle(
-  //       {
-  //         Tags: [
-  //           { name: 'Action', value: 'Cancel-Delegate-Stake' },
-  //           { name: 'Gateway', value: STUB_ADDRESS },
-  //         ],
-  //       },
-  //       sharedMemory,
-  //     );
+    it('should allow canceling a withdrawal', async () => {
+      const cancelWithdrawalResult = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Cancel-Delegate-Stake' },
+            { name: 'Gateway', value: STUB_ADDRESS },
+          ],
+        },
+        sharedMemory,
+      );
 
-  //     // now get the gateway record
-  //     const gateway = await handle({
-  //       Tags: [
-  //         { name: 'Action', value: 'Gateway' },
-  //         { name: 'Address', value: STUB_ADDRESS },
-  //       ],
-  //     });
+      // now get the gateway record
+      const gateway = await handle({
+        Tags: [
+          { name: 'Action', value: 'Gateway' },
+          { name: 'Address', value: STUB_ADDRESS },
+        ],
+      });
 
-  //     const gatewayData = JSON.parse(gateway.Messages[0].Data);
-  //     assert.deepEqual(gatewayData, {
-  //       observerAddress: STUB_ADDRESS,
-  //       operatorStake: 0,
-  //       totalDelegatedStake: 0,
-  //       status: 'joined',
-  //       delegates: [],
-  //       vaults: [],
-  //     });
-  //   });
-  // });
+      const gatewayData = JSON.parse(gateway.Messages[0].Data);
+      assert.deepEqual(gatewayData, {
+        observerAddress: STUB_ADDRESS,
+        operatorStake: 0,
+        totalDelegatedStake: 0,
+        status: 'joined',
+        delegates: [],
+        vaults: [],
+      });
+    });
+  });
 });
