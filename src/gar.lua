@@ -629,8 +629,10 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				and garSettings ~= nil
 				and gateway.stats.failedConsecutiveEpochs >= garSettings.operators.failedEpochCountMax
 			then
-				-- slash operator stake and return 20% of operator stake to the protocol balance and mark as leaving
-				gar.slashOperatorStake(address)
+				-- slash 20% of the minimum operator stake and return the rest to the protocol balance, then mark the gateway as leaving
+				local slashedOperatorStake = math.min(gateway.operatorStake, garSettings.operators.minStake)
+				local slashAmount = math.floor(slashedOperatorStake * garSettings.operators.failedEpochSlashPercentage)
+				gar.slashOperatorStake(address, slashAmount)
 				gar.leaveNetwork(address, currentTimestamp, msgId)
 			else
 				if gateway.status == "leaving" and gateway.endTimestamp <= currentTimestamp then
@@ -642,7 +644,10 @@ function gar.pruneGateways(currentTimestamp, msgId)
 	end
 end
 
-function gar.slashOperatorStake(address)
+function gar.slashOperatorStake(address, slashAmount)
+	assert(utils.isInteger(slashAmount), "Slash amount must be an integer")
+	assert(slashAmount > 0, "Slash amount must be greater than 0")
+
 	local gateway = gar.getGateway(address)
 	if gateway == nil then
 		error("Gateway does not exist")
@@ -652,7 +657,6 @@ function gar.slashOperatorStake(address)
 		error("Gateway Registry settings do not exist")
 	end
 
-	local slashAmount = math.floor(gateway.operatorStake * garSettings.operators.failedEpochSlashPercentage)
 	gateway.operatorStake = gateway.operatorStake - slashAmount
 	balances.increaseBalance(ao.id, slashAmount)
 	GatewayRegistry[address] = gateway

@@ -501,6 +501,28 @@ describe("gar", function()
 		end)
 	end)
 
+	describe("slashOperatorStake", function()
+		it("should slash operator stake by the provided slash amount and return it to the protocol balance", function()
+			local slashAmount = 10000
+			Balances[ao.id] = 0
+			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+			}
+			local status, err =
+				pcall(gar.slashOperatorStake, "test-this-is-valid-arweave-wallet-address-1", slashAmount)
+			assert.is_true(status)
+			assert.is_nil(err)
+			assert.are.equal(
+				gar.getSettings().operators.minStake - slashAmount,
+				GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].operatorStake
+			)
+			assert.are.equal(slashAmount, Balances[ao.id])
+		end)
+	end)
+
 	describe("getGatewayWeightsAtTimestamp", function()
 		it("shoulud properly compute weights based on gateways for a given timestamp", function()
 			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
@@ -590,7 +612,7 @@ describe("gar", function()
 						startTimestamp = currentTimestamp - 100,
 						endTimestamp = 0, -- Not expired, but failedConsecutiveEpochs is 30
 						status = "joined",
-						operatorStake = gar.getSettings().operators.minStake + 10000,
+						operatorStake = gar.getSettings().operators.minStake + 10000, -- will slash 20% of the min operator stake
 						vaults = {},
 						delegates = {},
 						stats = {
@@ -606,8 +628,8 @@ describe("gar", function()
 				assert.is_true(status)
 				assert.is_nil(err)
 
-				local expectedSlashedStake = math.floor((gar.getSettings().operators.minStake + 10000) * 0.2)
-				local expectedRemainingStake = math.floor((gar.getSettings().operators.minStake + 10000) * 0.8)
+				local expectedSlashedStake = math.floor(gar.getSettings().operators.minStake * 0.2)
+				local expectedRemainingStake = math.floor(gar.getSettings().operators.minStake * 0.8) + 10000
 				assert.is_nil(GatewayRegistry["address1"]) -- removed
 				assert.is_not_nil(GatewayRegistry["address2"]) -- not removed
 				assert.is_not_nil(GatewayRegistry["address3"]) -- not removed
