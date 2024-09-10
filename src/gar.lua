@@ -18,6 +18,7 @@ GatewayRegistrySettings = GatewayRegistrySettings
 			maxDelegates = 10000,
 			leaveLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days that balance will be vaulted
 			failedEpochCountMax = 30, -- number of epochs failed before marked as leaving
+			failedEpochSlashPercentage = 0.2, -- 20% of stake is returned to protocol balance
 		},
 		delegates = {
 			minStake = 500 * 1000000, -- 500 IO
@@ -89,17 +90,17 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 
 	-- Add minimum staked tokens to a vault that unlocks after the gateway completely leaves the network
 	gateway.vaults[from] = {
-		balance = gar.getSettings().operators.minStake,
+		balance = math.min(gar.getSettings().operators.minStake, gateway.operatorStake),
 		startTimestamp = currentTimestamp,
 		endTimestamp = gatewayEndTimestamp,
 	}
 
-	gateway.operatorStake = gateway.operatorStake - gar.getSettings().operators.minStake
+	local remainingStake = gateway.operatorStake - gar.getSettings().operators.minStake
 
 	-- Add remainder to another vault
-	if gateway.operatorStake > 0 then
+	if remainingStake > 0 then
 		gateway.vaults[msgId] = {
-			balance = gateway.operatorStake,
+			balance = remainingStake,
 			startTimestamp = currentTimestamp,
 			endTimestamp = gatewayStakeWithdrawTimestamp,
 		}
@@ -628,7 +629,8 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				and garSettings ~= nil
 				and gateway.stats.failedConsecutiveEpochs >= garSettings.operators.failedEpochCountMax
 			then
-				-- mark as leaving
+				-- slash operator stake and return 20% of operator stake to the protocol balance and mark as leaving
+				gar.slashOperatorStake(address)
 				gar.leaveNetwork(address, currentTimestamp, msgId)
 			else
 				if gateway.status == "leaving" and gateway.endTimestamp <= currentTimestamp then
@@ -638,6 +640,23 @@ function gar.pruneGateways(currentTimestamp, msgId)
 			end
 		end
 	end
+end
+
+function gar.slashOperatorStake(address)
+	local gateway = gar.getGateway(address)
+	if gateway == nil then
+		error("Gateway does not exist")
+	end
+	local garSettings = gar.getSettings()
+	if garSettings == nil then
+		error("Gateway Registry settings do not exist")
+	end
+
+	local slashAmount = math.floor(gateway.operatorStake * garSettings.operators.failedEpochSlashPercentage)
+	gateway.operatorStake = gateway.operatorStake - slashAmount
+	balances.increaseBalance(ao.id, slashAmount)
+	GatewayRegistry[address] = gateway
+	-- TODO: send slash notice to gateway address
 end
 
 function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)

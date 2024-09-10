@@ -554,72 +554,74 @@ describe("gar", function()
 	end)
 
 	describe("pruneGateways", function()
-		it("should remove gateways with endTimestamp < currentTimestamp", function()
-			local currentTimestamp = 1000000
-			local msgId = "msgId"
+		it(
+			"should remove gateways with endTimestamp < currentTimestamp, slash gateways with failedConsecutiveEpochs > 30 and mark them for leaving",
+			function()
+				local currentTimestamp = 1000000
+				local msgId = "msgId"
 
-			-- Set up test gateways
-			_G.GatewayRegistry = {
-				["address1"] = {
-					startTimestamp = currentTimestamp - 1000,
-					endTimestamp = currentTimestamp - 100, -- Expired
-					status = "leaving",
-					operatorStake = gar.getSettings().operators.minStake,
-					vaults = {},
-					delegates = {},
-					stats = {
-						failedConsecutiveEpochs = 30,
+				-- Set up test gateways
+				_G.GatewayRegistry = {
+					["address1"] = {
+						startTimestamp = currentTimestamp - 1000,
+						endTimestamp = currentTimestamp - 100, -- Expired
+						status = "leaving",
+						operatorStake = gar.getSettings().operators.minStake,
+						vaults = {},
+						delegates = {},
+						stats = {
+							failedConsecutiveEpochs = 30,
+						},
+						-- Other gateway properties...
 					},
-					-- Other gateway properties...
-				},
-				["address2"] = {
-					startTimestamp = currentTimestamp - 100,
-					endTimestamp = currentTimestamp + 100, -- Not expired
-					status = "joined",
-					operatorStake = gar.getSettings().operators.minStake,
-					vaults = {},
-					delegates = {},
-					stats = {
-						failedConsecutiveEpochs = 30,
+					["address2"] = {
+						startTimestamp = currentTimestamp - 100,
+						endTimestamp = currentTimestamp + 100, -- Not expired, failedConsecutiveEpochs is 20
+						status = "joined",
+						operatorStake = gar.getSettings().operators.minStake,
+						vaults = {},
+						delegates = {},
+						stats = {
+							failedConsecutiveEpochs = 20,
+						},
+						-- Other gateway properties...
 					},
-					-- Other gateway properties...
-				},
-				["address3"] = {
-					startTimestamp = currentTimestamp - 100,
-					endTimestamp = 0, -- Not expired, but failedConsecutiveEpochs is 30
-					status = "joined",
-					operatorStake = gar.getSettings().operators.minStake + 10000,
-					vaults = {},
-					delegates = {},
-					stats = {
-						failedConsecutiveEpochs = 30,
+					["address3"] = {
+						startTimestamp = currentTimestamp - 100,
+						endTimestamp = 0, -- Not expired, but failedConsecutiveEpochs is 30
+						status = "joined",
+						operatorStake = gar.getSettings().operators.minStake + 10000,
+						vaults = {},
+						delegates = {},
+						stats = {
+							failedConsecutiveEpochs = 30,
+						},
+						-- Other gateway properties...
 					},
-					-- Other gateway properties...
-				},
-			}
+				}
 
-			-- Call pruneGateways
-			gar.pruneGateways(currentTimestamp, msgId)
+				-- Call pruneGateways
+				local protocolBalanceBefore = _G.Balances[ao.id] or 0
+				local status, err = pcall(gar.pruneGateways, currentTimestamp, msgId)
+				assert.is_true(status)
+				assert.is_nil(err)
 
-			-- Check results
-			assert.is_nil(GatewayRegistry["address1"])
-			assert.is_not_nil(GatewayRegistry["address2"])
-			assert.is_not_nil(GatewayRegistry["address3"])
-			-- check that gateway 3 was marked as leaving and stake is vaulted
-			assert.are.equal("leaving", GatewayRegistry["address3"].status)
-			assert.are.equal(0, GatewayRegistry["address3"].operatorStake)
-			-- Check that gateway 3's operator stake is vaulted
-			assert.are.same({
-				balance = gar.getSettings().operators.minStake,
-				startTimestamp = currentTimestamp,
-				endTimestamp = currentTimestamp + gar.getSettings().operators.leaveLengthMs,
-			}, GatewayRegistry["address3"].vaults["address3"])
-			assert.are.same({
-				balance = 10000,
-				startTimestamp = currentTimestamp,
-				endTimestamp = currentTimestamp + gar.getSettings().operators.withdrawLengthMs,
-			}, GatewayRegistry["address3"].vaults[msgId])
-		end)
+				local expectedSlashedStake = math.floor((gar.getSettings().operators.minStake + 10000) * 0.2)
+				local expectedRemainingStake = math.floor((gar.getSettings().operators.minStake + 10000) * 0.8)
+				assert.is_nil(GatewayRegistry["address1"]) -- removed
+				assert.is_not_nil(GatewayRegistry["address2"]) -- not removed
+				assert.is_not_nil(GatewayRegistry["address3"]) -- not removed
+				-- Check that gateway 3's operator stake is slashed by 20% and the remaining stake is vaulted
+				assert.are.equal("leaving", GatewayRegistry["address3"].status)
+				assert.are.equal(0, GatewayRegistry["address3"].operatorStake)
+				assert.are.same({
+					balance = expectedRemainingStake,
+					startTimestamp = currentTimestamp,
+					endTimestamp = currentTimestamp + gar.getSettings().operators.leaveLengthMs,
+				}, GatewayRegistry["address3"].vaults["address3"])
+				assert.are.equal(protocolBalanceBefore + expectedSlashedStake, Balances[ao.id])
+			end
+		)
 
 		it("should handle empty GatewayRegistry", function()
 			local currentTimestamp = 1000000

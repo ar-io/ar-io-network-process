@@ -42,8 +42,9 @@ function balances.reduceBalance(target, qty)
 end
 
 function balances.increaseBalance(target, qty)
+	assert(utils.isInteger(qty), debug.traceback("Quantity must be an integer: " .. qty))
 	local prevBalance = balances.getBalance(target) or 0
-	Balances[target] = prevBalance + qty
+	Balances[target] = math.floor(prevBalance + qty)
 end
 
 function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder)
