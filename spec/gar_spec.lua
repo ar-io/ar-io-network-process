@@ -15,6 +15,7 @@ local testSettings = {
 local startTimestamp = 0
 local testGateway = {
 	operatorStake = gar.getSettings().operators.minStake,
+	totalDelegatedStake = 0,
 	vaults = {},
 	delegates = {},
 	startTimestamp = 0,
@@ -657,6 +658,41 @@ describe("gar", function()
 			-- Check results
 			local gateways = gar.getGateways()
 			assert.equals(0, utils.lengthOfTable(gateways))
+		end)
+	end)
+
+	describe("cancelDelegateWithdrawal", function()
+		it("should cancel a withdrawal", function()
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"] =
+				{
+					delegatedStake = 0,
+					vaults = {
+						["some-previous-withdrawal-id"] = {
+							balance = 1000,
+							startTimestamp = 0,
+							endTimestamp = 1000,
+						},
+					},
+				}
+			local status, err = pcall(
+				gar.cancelDelegateWithdrawal,
+				"test-this-is-valid-arweave-wallet-address-2",
+				"test-this-is-valid-arweave-wallet-address-1",
+				"some-previous-withdrawal-id"
+			)
+			assert.is_true(status)
+			assert.is_nil(err)
+			-- assert the vault is removed and the delegated stake is added back to the delegate
+			assert.are.equal(
+				1000, -- added back to the delegate
+				GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"].delegatedStake
+			)
+			assert.are.equal(
+				nil,
+				GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"].vaults["some-previous-withdrawal-id"]
+			)
+			assert.are.equal(1000, GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].totalDelegatedStake)
 		end)
 	end)
 
