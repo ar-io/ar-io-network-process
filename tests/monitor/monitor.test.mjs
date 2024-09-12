@@ -1,9 +1,15 @@
-import { IO, IO_TESTNET_PROCESS_ID } from '@ar.io/sdk';
+import { AOProcess, IO, IO_TESTNET_PROCESS_ID } from '@ar.io/sdk';
+import { connect } from '@permaweb/aoconnect';
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
 const io = IO.init({
-  processId: process.env.IO_PROCESS_ID || IO_TESTNET_PROCESS_ID,
+  process: new AOProcess({
+    processId: process.env.IO_PROCESS_ID || IO_TESTNET_PROCESS_ID,
+    ao: connect({
+      CU_URL: process.env.AO_CU_URL || 'https://cu.ar-io.dev',
+    }),
+  }),
 });
 
 describe('distribution totals', () => {
@@ -64,7 +70,17 @@ describe('gateway registry', () => {
         cursor,
       });
       for (const gateway of gateways) {
-        assert(gateway.operatorStake >= 50_000_000_000);
+        if (gateway.status === 'joined') {
+          assert(gateway.operatorStake >= 50_000_000_000);
+          assert(gateway.stats.failedConsecutiveEpochs < 30);
+        }
+        if (gateway.status === 'leaving') {
+          assert(gateway.operatorStake === 0);
+          assert(
+            gateway.vaults[gateway.gatewayAddress].balance >= 50_000_000_000,
+            `Gateway ${gateway.gatewayAddress} is leaving with less than 50_000_000 IO`,
+          );
+        }
       }
       cursor = nextCursor;
     } while (cursor !== undefined);
