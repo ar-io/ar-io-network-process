@@ -80,7 +80,7 @@ jobs:
         env:
           WALLET: ${{ secrets.WALLET }}
           IO_NETWORK_PROCESS_ID: ${{ vars.IO_NETWORK_PROCESS_ID }}
-
+          AO_CU_URL: ${{ vars.AO_CU_URL }}
       - name: Notify Success
         if: success()
         uses: rtCamp/action-slack-notify@v2.3.0
