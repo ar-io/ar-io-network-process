@@ -62,7 +62,7 @@ jobs:
         working-directory: ./ar-io-sdk
         env:
           IO_PROCESS_ID: ${{ vars.IO_NETWORK_PROCESS_ID }}
-          AO_CURL_URL: ${{ vars.AO_CURL_URL }}
+          AO_CU_URL: ${{ vars.AO_CU_URL }}
 
   evolve:
     runs-on: ubuntu-latest
