@@ -60,6 +60,9 @@ jobs:
         working-directory: ./ar-io-sdk
       - run: yarn test:e2e
         working-directory: ./ar-io-sdk
+        env:
+          IO_PROCESS_ID: ${{ vars.IO_NETWORK_PROCESS_ID }}
+          AO_CURL_URL: ${{ vars.AO_CURL_URL }}
 
   evolve:
     runs-on: ubuntu-latest
