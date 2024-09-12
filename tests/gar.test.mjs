@@ -411,8 +411,6 @@ describe('GatewayRegistry', async () => {
       });
     });
   });
-<<<<<<< Updated upstream
-=======
 
   // describe.skip('Delegate-Stake', () => {
   //   let sharedMemory;
@@ -551,5 +549,4 @@ describe('GatewayRegistry', async () => {
   //     });
   //   });
   // });
->>>>>>> Stashed changes
 });
