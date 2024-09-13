@@ -78,6 +78,7 @@ local ActionMap = {
 	SaveObservations = "Save-Observations",
 	DelegateStake = "Delegate-Stake",
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
+	CancelDelegateWithdrawl = "Cancel-Delegate-Withdrawl",
 }
 
 -- prune state before every interaction
@@ -685,7 +686,7 @@ Handlers.add(
 
 Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.DelegateStake), function(msg)
 	local checkAssertions = function()
-		assert(utils.isValidArweaveAddress(msg.Tags.Target), "Invalid target address")
+		assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid target address")
 		assert(
 			tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
 			"Invalid quantity. Must be integer greater than 0"
@@ -703,11 +704,13 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 		return
 	end
 
-	local status, result =
-		pcall(gar.delegateStake, msg.From, msg.Tags.Target, tonumber(msg.Tags.Quantity), tonumber(msg.Timestamp))
+	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
+	local from = utils.formatAddress(msg.From)
+
+	local status, result = pcall(gar.delegateStake, from, target, tonumber(msg.Tags.Quantity), tonumber(msg.Timestamp))
 	if not status then
 		ao.send({
-			Target = msg.From,
+			Target = from,
 			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Invalid-Delegate-Stake", Message = result },
 			Data = json.encode(result),
 		})
@@ -720,48 +723,59 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 	end
 end)
 
-Handlers.add(ActionMap.CancelDelegateStake, utils.hasMatchingTag("Action", ActionMap.CancelDelegateStake), function(msg)
-	local checkAssertions = function()
-		assert(utils.isValidAOAddress(msg.Tags.Gateway), "Invalid gateway address")
-		assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
+Handlers.add(
+	ActionMap.CancelDelegateWithdrawl,
+	utils.hasMatchingTag("Action", ActionMap.CancelDelegateWithdrawl),
+	function(msg)
+		local checkAssertions = function()
+			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
+			assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
+		end
+
+		local inputStatus, inputResult = pcall(checkAssertions)
+
+		if not inputStatus then
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-Cancel-Delegate-Stake-Notice", Error = "Bad-Input" },
+				Data = tostring(inputResult),
+			})
+			return
+		end
+
+		local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
+		local fromAddress = utils.formatAddress(msg.From)
+
+		local status, result = pcall(gar.cancelDelegateWithdrawal, fromAddress, gatewayAddress, msg.Tags["Vault-Id"])
+		if not status then
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Invalid-Cancel-Delegate-Withdrawl-Notice",
+					Error = "Invalid-Cancel-Delegate-Withdrawl",
+				},
+				Data = tostring(result),
+			})
+		else
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Cancel-Delegate-Withdrawl-Notice",
+					Address = gatewayAddress,
+					["Vault-Id"] = msg.Tags["Vault-Id"],
+				},
+				Data = json.encode(result),
+			})
+		end
 	end
-
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-Cancel-Delegate-Stake-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
-		})
-		return
-	end
-
-	local gatewayAddress = utils.formatAddress(msg.Tags.Gateway)
-	local fromAddress = utils.formatAddress(msg.From)
-
-	local status, result = pcall(gar.cancelDelegateWithdrawal, fromAddress, gatewayAddress, msg.Tags["Vault-Id"])
-	if not status then
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-Cancel-Delegate-Stake-Notice", Error = "Invalid-Cancel-Delegate-Stake" },
-			Data = tostring(result),
-		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Cancel-Delegate-Stake-Notice", Gateway = msg.Tags.Target },
-			Data = json.encode(result),
-		})
-	end
-end)
+)
 
 Handlers.add(
 	ActionMap.DecreaseDelegateStake,
 	utils.hasMatchingTag("Action", ActionMap.DecreaseDelegateStake),
 	function(msg)
 		local checkAssertions = function()
-			assert(utils.isValidArweaveAddress(msg.Tags.Target), "Invalid target address")
+			assert(utils.isValidArweaveAddress(msg.Tags.Target or msg.Tags.Address), "Invalid target address")
 			assert(
 				tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
 				"Invalid quantity. Must be integer greater than 0"
@@ -779,24 +793,21 @@ Handlers.add(
 			return
 		end
 
-		local status, result = pcall(
-			gar.decreaseDelegateStake,
-			msg.Tags.Target,
-			msg.From,
-			tonumber(msg.Tags.Quantity),
-			msg.Timestamp,
-			msg.Id
-		)
+		local from = utils.formatAddress(msg.From)
+		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
+
+		local status, result =
+			pcall(gar.decreaseDelegateStake, target, from, tonumber(msg.Tags.Quantity), msg.Timestamp, msg.Id)
 		if not status then
 			ao.send({
-				Target = msg.From,
+				Target = from,
 				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Invalid-Decrease-Delegate-Stake" },
 				Data = tostring(result),
 			})
 		else
 			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Decrease-Delegate-Stake-Notice", Gateway = msg.Tags.Target },
+				Target = from,
+				Tags = { Action = "Decrease-Delegate-Stake-Notice", Adddress = target, Quantity = msg.Tags.Quantity },
 				Data = json.encode(result),
 			})
 		end

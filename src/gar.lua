@@ -2,7 +2,7 @@
 local balances = require("balances")
 local utils = require("utils")
 local gar = {}
-local json = require("json")
+
 GatewayRegistry = GatewayRegistry or {}
 GatewayRegistrySettings = GatewayRegistrySettings
 	or {
