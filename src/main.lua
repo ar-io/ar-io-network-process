@@ -737,7 +737,7 @@ Handlers.add(
 		if not inputStatus then
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Invalid-Cancel-Delegate-Stake-Notice", Error = "Bad-Input" },
+				Tags = { Action = "Invalid-Cancel-Delegate-Withdrawl-Notice", Error = "Bad-Input" },
 				Data = tostring(inputResult),
 			})
 			return

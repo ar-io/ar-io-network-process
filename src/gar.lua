@@ -691,6 +691,11 @@ function gar.cancelDelegateWithdrawal(from, gatewayAddress, vaultId)
 		error("Vault does not exist")
 	end
 
+	-- confirm the gateway still allow staking
+	if not gateway.settings.allowDelegatedStaking then
+		error("Gateway does not allow staking")
+	end
+
 	local vaultBalance = vault.balance
 	delegate.vaults[vaultId] = nil
 	delegate.delegatedStake = delegate.delegatedStake + vaultBalance
