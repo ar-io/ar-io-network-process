@@ -29,19 +29,10 @@ jobs:
         run: yarn
 
       - name: Monitor
-        run: yarn monitor | tee results.txt
+        run: yarn monitor
         id: monitor
         env:
           IO_PROCESS_ID: ${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}
-
-      - name: Check for test failures
-        run: |
-          if grep -q "ERR_ASSERTION" results.txt; then
-            echo "Test failure detected"
-            exit 1
-          else
-            echo "All tests passed"
-          fi
 
       - name: Notify Failure
         if: failure()
