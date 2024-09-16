@@ -675,4 +675,36 @@ function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
 	return utils.paginateTableWithCursor(gatewaysArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
+function gar.cancelDelegateWithdrawal(from, gatewayAddress, vaultId)
+	local gateway = gar.getGateway(gatewayAddress)
+	if gateway == nil then
+		error("Gateway does not exist")
+	end
+
+	if gateway.status == "leaving" then
+		error("Gateway is leaving the network and cannot cancel withdrawals.")
+	end
+
+	local delegate = gateway.delegates[from]
+	if delegate == nil then
+		error("Delegate does not exist")
+	end
+
+	local vault = delegate.vaults[vaultId]
+	if vault == nil then
+		error("Vault does not exist")
+	end
+
+	-- confirm the gateway still allow staking
+	if not gateway.settings.allowDelegatedStaking then
+		error("Gateway does not allow staking")
+	end
+
+	local vaultBalance = vault.balance
+	delegate.vaults[vaultId] = nil
+	delegate.delegatedStake = delegate.delegatedStake + vaultBalance
+	gateway.totalDelegatedStake = gateway.totalDelegatedStake + vaultBalance
+	GatewayRegistry[gatewayAddress] = gateway
+end
+
 return gar

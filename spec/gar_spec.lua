@@ -15,6 +15,7 @@ local testSettings = {
 local startTimestamp = 0
 local testGateway = {
 	operatorStake = gar.getSettings().operators.minStake,
+	totalDelegatedStake = 0,
 	vaults = {},
 	delegates = {},
 	startTimestamp = 0,
@@ -657,6 +658,138 @@ describe("gar", function()
 			-- Check results
 			local gateways = gar.getGateways()
 			assert.equals(0, utils.lengthOfTable(gateways))
+		end)
+	end)
+
+	describe("cancelDelegateWithdrawal", function()
+		it("should cancel a withdrawal", function()
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"] =
+				{
+					delegatedStake = 0,
+					vaults = {
+						["some-previous-withdrawal-id"] = {
+							balance = 1000,
+							startTimestamp = 0,
+							endTimestamp = 1000,
+						},
+					},
+				}
+			local status, err = pcall(
+				gar.cancelDelegateWithdrawal,
+				"test-this-is-valid-arweave-wallet-address-2",
+				"test-this-is-valid-arweave-wallet-address-1",
+				"some-previous-withdrawal-id"
+			)
+			assert.is_true(status)
+			assert.is_nil(err)
+			-- assert the vault is removed and the delegated stake is added back to the delegate
+			assert.are.equal(
+				1000, -- added back to the delegate
+				GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"].delegatedStake
+			)
+			assert.are.equal(
+				nil,
+				GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"].vaults["some-previous-withdrawal-id"]
+			)
+			assert.are.equal(1000, GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].totalDelegatedStake)
+		end)
+		it("should not cancel a withdrawal if the gateway does not allow staking", function()
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].settings.allowDelegatedStaking = false
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"] =
+				{
+					delegatedStake = 0,
+					vaults = {
+						["some-previous-withdrawal-id"] = {
+							balance = 1000,
+							startTimestamp = 0,
+							endTimestamp = 1000,
+						},
+					},
+				}
+			local status, err = pcall(
+				gar.cancelDelegateWithdrawal,
+				"test-this-is-valid-arweave-wallet-address-2",
+				"test-this-is-valid-arweave-wallet-address-1",
+				"some-previous-withdrawal-id"
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Gateway does not allow staking", err)
+			assert.are.same(
+				{
+					delegatedStake = 0,
+					vaults = {
+						["some-previous-withdrawal-id"] = {
+							balance = 1000,
+							startTimestamp = 0,
+							endTimestamp = 1000,
+						},
+					},
+				},
+				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"]
+			)
+		end)
+		it("should not cancel a withdrawal if the delegate does not exist", function()
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"] =
+				nil
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].settings.allowDelegatedStaking = true
+			local status, err = pcall(
+				gar.cancelDelegateWithdrawal,
+				"test-this-is-valid-arweave-wallet-address-2",
+				"test-this-is-valid-arweave-wallet-address-1",
+				"some-previous-withdrawal-id"
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Delegate does not exist", err)
+		end)
+		it("should not cancel a withdrawal if the withdrawal does not exist", function()
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"] =
+				{
+					delegatedStake = 0,
+					vaults = {},
+					startTimestamp = 0,
+				}
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].settings.allowDelegatedStaking = true
+			local status, err = pcall(
+				gar.cancelDelegateWithdrawal,
+				"test-this-is-valid-arweave-wallet-address-2",
+				"test-this-is-valid-arweave-wallet-address-1",
+				"some-previous-withdrawal-id"
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Vault does not exist", err)
+		end)
+		it("should not cancel a withdrawal if the gateway is leaving", function()
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].settings.allowDelegatedStaking = true
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"] =
+				{
+					delegatedStake = 0,
+					vaults = {
+						["some-previous-withdrawal-id"] = {
+							balance = 1000,
+							startTimestamp = 0,
+							endTimestamp = 1000,
+						},
+					},
+					startTimestamp = 0,
+				}
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].status = "leaving"
+			local status, err = pcall(
+				gar.cancelDelegateWithdrawal,
+				"test-this-is-valid-arweave-wallet-address-2",
+				"test-this-is-valid-arweave-wallet-address-1",
+				"some-previous-withdrawal-id"
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Gateway is leaving the network and cannot cancel withdrawals.", err)
 		end)
 	end)
 
