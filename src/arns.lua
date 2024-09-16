@@ -324,29 +324,27 @@ function arns.getMaxAllowedYearsExtensionForRecord(record, currentTimestamp)
 	return constants.maxLeaseLengthYears - yearsRemainingOnLease
 end
 
+function arns.getRegistrationPrices()
+	local function createPriceListForDomainLength(baseFee, demandFactor)
+		local fees = {}
+		for i = 1, 5 do
+			fees[tostring(i)] = arns.calculateRegistrationFee("lease", baseFee, i, demandFactor)
+		end
+		fees.permabuy = arns.calculateRegistrationFee("permabuy", baseFee, nil, demandFactor)
+		return fees
+	end
+
+	-- return full price list for each length of name
+	local priceList = {}
+	for nameLength, baseFee in pairs(demand.getFees()) do
+		priceList[tostring(nameLength)] = createPriceListForDomainLength(baseFee, demand.getDemandFactor())
+	end
+	return priceList
+end
+
 function arns.getTokenCost(intendedAction)
 	local tokenCost = 0
 	if intendedAction.intent == "Buy-Record" then
-		local function createPriceListForDomainLength(baseFee, demandFactor)
-			local fees = {}
-			for i = 1, 5 do
-				fees[tostring(i)] = arns.calculateRegistrationFee("lease", baseFee, i, demandFactor)
-			end
-
-			fees.permabuy = arns.calculateRegistrationFee("permabuy", baseFee, nil, demandFactor)
-
-			return fees
-		end
-		-- if no name provided, return the full price list
-		if intendedAction.name == nil then
-			-- return full price list for each length of name
-			local priceList = {}
-			for nameLength, baseFee in pairs(demand.getFees()) do
-				priceList[tostring(nameLength)] = createPriceListForDomainLength(baseFee, demand.getDemandFactor())
-			end
-			return priceList
-		end
-
 		local purchaseType = intendedAction.purchaseType
 		local years = intendedAction.years
 		local name = intendedAction.name
