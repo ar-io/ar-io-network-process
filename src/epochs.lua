@@ -601,7 +601,8 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 					-- distribute the rewards to the gateway
 					balances.transfer(gatewayAddress, ao.id, actualOperatorReward)
 					-- move that balance to the gateway if autostaking is on
-					if gateway.settings.autoStake then
+					if gateway.settings.autoStake and gateway.status == "joined" then
+						-- only increase stake if the gateway is joined, otherwise it is leaving and cannot accept additional stake so distributed rewards to the operator directly
 						gar.increaseOperatorStake(gatewayAddress, actualOperatorReward)
 					end
 				end
