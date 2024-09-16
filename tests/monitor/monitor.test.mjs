@@ -60,10 +60,32 @@ describe('token supply', () => {
   });
 });
 
-// TODO: arns - ensure no invalid arns names
+// epoch information
+describe('epoch', () => {
+  it('should always be up to date', async () => {
+    const { durationMs, epochZeroStartTimestamp } = await io.getEpochSettings();
+    const currentEpochIndex = Math.floor(
+      (Date.now() - epochZeroStartTimestamp) / durationMs,
+    );
+    const { epochIndex } = await io.getCurrentEpoch();
+    assert(
+      epochIndex === currentEpochIndex,
+      `Epoch index is not up to date: ${epochIndex}`,
+    );
+  });
+});
 
+// TODO: add demand factor tests
+
+// gateway registry - ensure no invalid gateways
 describe('gateway registry', () => {
   it('should only have valid gateways', async () => {
+    const { durationMs, epochZeroStartTimestamp } = await io.getEpochSettings();
+    // compute the epoch index based on the epoch settings
+    const currentEpochIndex = Math.floor(
+      (Date.now() - epochZeroStartTimestamp) / durationMs,
+    );
+
     let cursor = '';
     do {
       const { items: gateways, nextCursor } = await io.getGateways({
@@ -72,7 +94,38 @@ describe('gateway registry', () => {
       for (const gateway of gateways) {
         if (gateway.status === 'joined') {
           assert(gateway.operatorStake >= 50_000_000_000);
-          assert(gateway.stats.failedConsecutiveEpochs < 30);
+          assert(
+            gateway.stats.failedConsecutiveEpochs >= 0,
+            `Gateway ${gateway.gatewayAddress} has less than 0 failed consecutive epochs`,
+          );
+          assert(
+            gateway.stats.failedConsecutiveEpochs < 30,
+            `Gateway ${gateway.gatewayAddress} has more than 30 failed consecutive epochs`,
+          );
+          assert(
+            gateway.stats.passedConsecutiveEpochs <= currentEpochIndex,
+            `Gateway ${gateway.gatewayAddress} has more passed consecutive epochs than current epoch index`,
+          );
+          assert(
+            gateway.stats.passedConsecutiveEpochs >= 0,
+            `Gateway ${gateway.gatewayAddress} has less than 0 passed consecutive epochs`,
+          );
+          assert(
+            gateway.stats.totalEpochCount <= currentEpochIndex,
+            `Gateway ${gateway.gatewayAddress} has more total epochs than current epoch index`,
+          );
+          assert(
+            gateway.stats.totalEpochCount >= 0,
+            `Gateway ${gateway.gatewayAddress} has less than 0 total epochs`,
+          );
+          assert(
+            gateway.stats.prescribedEpochCount <= currentEpochIndex,
+            `Gateway ${gateway.gatewayAddress} has more prescribed epochs than current epoch index`,
+          );
+          assert(
+            gateway.stats.prescribedEpochCount >= 0,
+            `Gateway ${gateway.gatewayAddress} has less than 0 prescribed epochs`,
+          );
         }
         if (gateway.status === 'leaving') {
           assert(gateway.operatorStake === 0);
@@ -87,7 +140,7 @@ describe('gateway registry', () => {
   });
 });
 
-// Gateway registry - ensure no invalid gateways
+// arns registry - ensure no invalid arns
 describe('arns names', () => {
   const twoWeeks = 2 * 7 * 24 * 60 * 60 * 1000;
   it('should not have any arns records older than two weeks', async () => {
