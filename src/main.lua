@@ -530,7 +530,7 @@ Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.Token
 
 	local status, result = pcall(arns.getTokenCost, {
 		intent = msg.Tags.Intent,
-		name = string.lower(msg.Tags.Name),
+		name = msg.Tags.Name and string.lower(msg.Tags.Name),
 		years = tonumber(msg.Tags.Years) or 1,
 		quantity = tonumber(msg.Tags.Quantity),
 		purchaseType = msg.Tags["Purchase-Type"] or "lease",

@@ -261,6 +261,24 @@ describe('ArNS', async () => {
     });
     const tokenCost = JSON.parse(result.Messages[0].Data);
     assert.equal(tokenCost, 600000000);
+
+    const priceListResult = await handle({
+      Tags: [
+        { name: 'Action', value: 'Token-Cost' },
+        { name: 'Intent', value: 'Buy-Record' },
+        // { name: 'Name', value: 'test-name' },
+        { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+      ],
+    });
+
+    const priceList = JSON.parse(priceListResult.Messages[0].Data);
+    Object.keys(priceList).forEach((key, index) => {
+      ['1', '2', '3', '4', '5', 'permabuy'].forEach((years) => {
+        assert(typeof priceList[key][years] === 'number');
+      });
+    });
+    // should return price list for names from 1 to 51
+    assert(Object.keys(priceList).length == 51);
   });
 
   it('should get the costs increase undername correctly', async () => {
