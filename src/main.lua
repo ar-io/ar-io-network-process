@@ -90,6 +90,11 @@ end, function(msg)
 	print("Pruning state at timestamp: " .. msgTimestamp)
 	-- TODO: we should copy state here and restore if tick fails, but that requires larger memory - DO NOT DO THIS UNTIL WE START PRUNING STATE of epochs and distributions
 	local status, result = pcall(tick.pruneState, msgTimestamp, msgId)
+	local previousState = {
+		Vaults = utils.deepCopy(Vaults),
+		GatewayRegistry = utils.deepCopy(GatewayRegistry),
+		NameRegistry = utils.deepCopy(NameRegistry),
+	}
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -97,6 +102,9 @@ end, function(msg)
 			Error = "Invalid-Tick",
 			Data = json.encode(result),
 		})
+		Vaults = previousState.Vaults
+		GatewayRegistry = previousState.GatewayRegistry
+		NameRegistry = previousState.NameRegistry
 		return true -- stop processing here and return
 	end
 	return status
@@ -945,13 +953,11 @@ Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	for i = lastTickedEpochIndex + 1, currentEpochIndex do
 		print("Ticking epoch: " .. i)
 		local previousState = {
-			Balances = Balances,
-			Vaults = Vaults,
-			GatewayRegistry = GatewayRegistry,
-			NameRegistry = NameRegistry,
-			Epochs = Epochs,
-			DemandFactor = DemandFactor,
-			LastTickedEpochIndex = LastTickedEpochIndex,
+			Balances = utils.deepCopy(Balances),
+			GatewayRegistry = utils.deepCopy(GatewayRegistry),
+			Epochs = utils.deepCopy(Epochs), -- we probably only need to copy the last ticked epoch
+			DemandFactor = utils.deepCopy(DemandFactor),
+			LastTickedEpochIndex = utils.deepCopy(LastTickedEpochIndex),
 		}
 		local _, _, epochDistributionTimestamp = epochs.getEpochTimestampsForIndex(i)
 		-- use the minimum of the msg timestamp or the epoch distribution timestamp, this ensures an epoch gets created for the genesis block and that we don't try and distribute before an epoch is created
@@ -972,9 +978,7 @@ Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 		else
 			-- reset the state to previous state
 			Balances = previousState.Balances
-			Vaults = previousState.Vaults
 			GatewayRegistry = previousState.GatewayRegistry
-			NameRegistry = previousState.NameRegistry
 			Epochs = previousState.Epochs
 			DemandFactor = previousState.DemandFactor
 			LastTickedEpochIndex = previousState.LastTickedEpochIndex
