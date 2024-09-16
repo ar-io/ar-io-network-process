@@ -681,6 +681,10 @@ function gar.cancelDelegateWithdrawal(from, gatewayAddress, vaultId)
 		error("Gateway does not exist")
 	end
 
+	if gateway.status == "leaving" then
+		error("Gateway is leaving the network and cannot cancel withdrawals.")
+	end
+
 	local delegate = gateway.delegates[from]
 	if delegate == nil then
 		error("Delegate does not exist")
