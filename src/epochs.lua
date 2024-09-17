@@ -629,4 +629,13 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	Epochs[epochIndex] = epoch
 end
 
+-- prune epochs older than 14 days
+function epochs.pruneEpochs(timestamp)
+	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)
+	local cutoffEpochIndex = currentEpochIndex - 14
+	for epochIndex = cutoffEpochIndex, 0 do
+		Epochs[epochIndex] = nil
+	end
+end
+
 return epochs
