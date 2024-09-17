@@ -60,6 +60,9 @@ jobs:
         working-directory: ./ar-io-sdk
       - run: yarn test:e2e
         working-directory: ./ar-io-sdk
+        env:
+          IO_PROCESS_ID: ${{ vars.IO_NETWORK_PROCESS_ID }}
+          AO_CU_URL: ${{ vars.AO_CU_URL }}
 
   evolve:
     runs-on: ubuntu-latest
@@ -77,7 +80,7 @@ jobs:
         env:
           WALLET: ${{ secrets.WALLET }}
           IO_NETWORK_PROCESS_ID: ${{ vars.IO_NETWORK_PROCESS_ID }}
-
+          AO_CU_URL: ${{ vars.AO_CU_URL }}
       - name: Notify Success
         if: success()
         uses: rtCamp/action-slack-notify@v2.3.0

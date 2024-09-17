@@ -15,6 +15,7 @@ local testSettings = {
 local startTimestamp = 0
 local testGateway = {
 	operatorStake = gar.getSettings().operators.minStake,
+	totalDelegatedStake = 0,
 	vaults = {},
 	delegates = {},
 	startTimestamp = 0,
@@ -501,6 +502,28 @@ describe("gar", function()
 		end)
 	end)
 
+	describe("slashOperatorStake", function()
+		it("should slash operator stake by the provided slash amount and return it to the protocol balance", function()
+			local slashAmount = 10000
+			Balances[ao.id] = 0
+			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+			}
+			local status, err =
+				pcall(gar.slashOperatorStake, "test-this-is-valid-arweave-wallet-address-1", slashAmount)
+			assert.is_true(status)
+			assert.is_nil(err)
+			assert.are.equal(
+				gar.getSettings().operators.minStake - slashAmount,
+				GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].operatorStake
+			)
+			assert.are.equal(slashAmount, Balances[ao.id])
+		end)
+	end)
+
 	describe("getGatewayWeightsAtTimestamp", function()
 		it("shoulud properly compute weights based on gateways for a given timestamp", function()
 			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
@@ -554,72 +577,74 @@ describe("gar", function()
 	end)
 
 	describe("pruneGateways", function()
-		it("should remove gateways with endTimestamp < currentTimestamp", function()
-			local currentTimestamp = 1000000
-			local msgId = "msgId"
+		it(
+			"should remove gateways with endTimestamp < currentTimestamp, slash gateways with failedConsecutiveEpochs > 30 and mark them for leaving",
+			function()
+				local currentTimestamp = 1000000
+				local msgId = "msgId"
 
-			-- Set up test gateways
-			_G.GatewayRegistry = {
-				["address1"] = {
-					startTimestamp = currentTimestamp - 1000,
-					endTimestamp = currentTimestamp - 100, -- Expired
-					status = "leaving",
-					operatorStake = gar.getSettings().operators.minStake,
-					vaults = {},
-					delegates = {},
-					stats = {
-						failedConsecutiveEpochs = 30,
+				-- Set up test gateways
+				_G.GatewayRegistry = {
+					["address1"] = {
+						startTimestamp = currentTimestamp - 1000,
+						endTimestamp = currentTimestamp - 100, -- Expired
+						status = "leaving",
+						operatorStake = gar.getSettings().operators.minStake,
+						vaults = {},
+						delegates = {},
+						stats = {
+							failedConsecutiveEpochs = 30,
+						},
+						-- Other gateway properties...
 					},
-					-- Other gateway properties...
-				},
-				["address2"] = {
-					startTimestamp = currentTimestamp - 100,
-					endTimestamp = currentTimestamp + 100, -- Not expired
-					status = "joined",
-					operatorStake = gar.getSettings().operators.minStake,
-					vaults = {},
-					delegates = {},
-					stats = {
-						failedConsecutiveEpochs = 30,
+					["address2"] = {
+						startTimestamp = currentTimestamp - 100,
+						endTimestamp = currentTimestamp + 100, -- Not expired, failedConsecutiveEpochs is 20
+						status = "joined",
+						operatorStake = gar.getSettings().operators.minStake,
+						vaults = {},
+						delegates = {},
+						stats = {
+							failedConsecutiveEpochs = 20,
+						},
+						-- Other gateway properties...
 					},
-					-- Other gateway properties...
-				},
-				["address3"] = {
-					startTimestamp = currentTimestamp - 100,
-					endTimestamp = 0, -- Not expired, but failedConsecutiveEpochs is 30
-					status = "joined",
-					operatorStake = gar.getSettings().operators.minStake + 10000,
-					vaults = {},
-					delegates = {},
-					stats = {
-						failedConsecutiveEpochs = 30,
+					["address3"] = {
+						startTimestamp = currentTimestamp - 100,
+						endTimestamp = 0, -- Not expired, but failedConsecutiveEpochs is 30
+						status = "joined",
+						operatorStake = gar.getSettings().operators.minStake + 10000, -- will slash 20% of the min operator stake
+						vaults = {},
+						delegates = {},
+						stats = {
+							failedConsecutiveEpochs = 30,
+						},
+						-- Other gateway properties...
 					},
-					-- Other gateway properties...
-				},
-			}
+				}
 
-			-- Call pruneGateways
-			gar.pruneGateways(currentTimestamp, msgId)
+				-- Call pruneGateways
+				local protocolBalanceBefore = _G.Balances[ao.id] or 0
+				local status, err = pcall(gar.pruneGateways, currentTimestamp, msgId)
+				assert.is_true(status)
+				assert.is_nil(err)
 
-			-- Check results
-			assert.is_nil(GatewayRegistry["address1"])
-			assert.is_not_nil(GatewayRegistry["address2"])
-			assert.is_not_nil(GatewayRegistry["address3"])
-			-- check that gateway 3 was marked as leaving and stake is vaulted
-			assert.are.equal("leaving", GatewayRegistry["address3"].status)
-			assert.are.equal(0, GatewayRegistry["address3"].operatorStake)
-			-- Check that gateway 3's operator stake is vaulted
-			assert.are.same({
-				balance = gar.getSettings().operators.minStake,
-				startTimestamp = currentTimestamp,
-				endTimestamp = currentTimestamp + gar.getSettings().operators.leaveLengthMs,
-			}, GatewayRegistry["address3"].vaults["address3"])
-			assert.are.same({
-				balance = 10000,
-				startTimestamp = currentTimestamp,
-				endTimestamp = currentTimestamp + gar.getSettings().operators.withdrawLengthMs,
-			}, GatewayRegistry["address3"].vaults[msgId])
-		end)
+				local expectedSlashedStake = math.floor(gar.getSettings().operators.minStake * 0.2)
+				local expectedRemainingStake = math.floor(gar.getSettings().operators.minStake * 0.8) + 10000
+				assert.is_nil(GatewayRegistry["address1"]) -- removed
+				assert.is_not_nil(GatewayRegistry["address2"]) -- not removed
+				assert.is_not_nil(GatewayRegistry["address3"]) -- not removed
+				-- Check that gateway 3's operator stake is slashed by 20% and the remaining stake is vaulted
+				assert.are.equal("leaving", GatewayRegistry["address3"].status)
+				assert.are.equal(0, GatewayRegistry["address3"].operatorStake)
+				assert.are.same({
+					balance = expectedRemainingStake,
+					startTimestamp = currentTimestamp,
+					endTimestamp = currentTimestamp + gar.getSettings().operators.leaveLengthMs,
+				}, GatewayRegistry["address3"].vaults["address3"])
+				assert.are.equal(protocolBalanceBefore + expectedSlashedStake, Balances[ao.id])
+			end
+		)
 
 		it("should handle empty GatewayRegistry", function()
 			local currentTimestamp = 1000000
@@ -633,6 +658,138 @@ describe("gar", function()
 			-- Check results
 			local gateways = gar.getGateways()
 			assert.equals(0, utils.lengthOfTable(gateways))
+		end)
+	end)
+
+	describe("cancelDelegateWithdrawal", function()
+		it("should cancel a withdrawal", function()
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"] =
+				{
+					delegatedStake = 0,
+					vaults = {
+						["some-previous-withdrawal-id"] = {
+							balance = 1000,
+							startTimestamp = 0,
+							endTimestamp = 1000,
+						},
+					},
+				}
+			local status, err = pcall(
+				gar.cancelDelegateWithdrawal,
+				"test-this-is-valid-arweave-wallet-address-2",
+				"test-this-is-valid-arweave-wallet-address-1",
+				"some-previous-withdrawal-id"
+			)
+			assert.is_true(status)
+			assert.is_nil(err)
+			-- assert the vault is removed and the delegated stake is added back to the delegate
+			assert.are.equal(
+				1000, -- added back to the delegate
+				GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"].delegatedStake
+			)
+			assert.are.equal(
+				nil,
+				GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"].vaults["some-previous-withdrawal-id"]
+			)
+			assert.are.equal(1000, GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].totalDelegatedStake)
+		end)
+		it("should not cancel a withdrawal if the gateway does not allow staking", function()
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].settings.allowDelegatedStaking = false
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"] =
+				{
+					delegatedStake = 0,
+					vaults = {
+						["some-previous-withdrawal-id"] = {
+							balance = 1000,
+							startTimestamp = 0,
+							endTimestamp = 1000,
+						},
+					},
+				}
+			local status, err = pcall(
+				gar.cancelDelegateWithdrawal,
+				"test-this-is-valid-arweave-wallet-address-2",
+				"test-this-is-valid-arweave-wallet-address-1",
+				"some-previous-withdrawal-id"
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Gateway does not allow staking", err)
+			assert.are.same(
+				{
+					delegatedStake = 0,
+					vaults = {
+						["some-previous-withdrawal-id"] = {
+							balance = 1000,
+							startTimestamp = 0,
+							endTimestamp = 1000,
+						},
+					},
+				},
+				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"]
+			)
+		end)
+		it("should not cancel a withdrawal if the delegate does not exist", function()
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"] =
+				nil
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].settings.allowDelegatedStaking = true
+			local status, err = pcall(
+				gar.cancelDelegateWithdrawal,
+				"test-this-is-valid-arweave-wallet-address-2",
+				"test-this-is-valid-arweave-wallet-address-1",
+				"some-previous-withdrawal-id"
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Delegate does not exist", err)
+		end)
+		it("should not cancel a withdrawal if the withdrawal does not exist", function()
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"] =
+				{
+					delegatedStake = 0,
+					vaults = {},
+					startTimestamp = 0,
+				}
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].settings.allowDelegatedStaking = true
+			local status, err = pcall(
+				gar.cancelDelegateWithdrawal,
+				"test-this-is-valid-arweave-wallet-address-2",
+				"test-this-is-valid-arweave-wallet-address-1",
+				"some-previous-withdrawal-id"
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Vault does not exist", err)
+		end)
+		it("should not cancel a withdrawal if the gateway is leaving", function()
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].settings.allowDelegatedStaking = true
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"] =
+				{
+					delegatedStake = 0,
+					vaults = {
+						["some-previous-withdrawal-id"] = {
+							balance = 1000,
+							startTimestamp = 0,
+							endTimestamp = 1000,
+						},
+					},
+					startTimestamp = 0,
+				}
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].status = "leaving"
+			local status, err = pcall(
+				gar.cancelDelegateWithdrawal,
+				"test-this-is-valid-arweave-wallet-address-2",
+				"test-this-is-valid-arweave-wallet-address-1",
+				"some-previous-withdrawal-id"
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Gateway is leaving the network and cannot cancel withdrawals.", err)
 		end)
 	end)
 

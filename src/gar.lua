@@ -18,6 +18,7 @@ GatewayRegistrySettings = GatewayRegistrySettings
 			maxDelegates = 10000,
 			leaveLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days that balance will be vaulted
 			failedEpochCountMax = 30, -- number of epochs failed before marked as leaving
+			failedEpochSlashPercentage = 0.2, -- 20% of stake is returned to protocol balance
 		},
 		delegates = {
 			minStake = 500 * 1000000, -- 500 IO
@@ -89,17 +90,17 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 
 	-- Add minimum staked tokens to a vault that unlocks after the gateway completely leaves the network
 	gateway.vaults[from] = {
-		balance = gar.getSettings().operators.minStake,
+		balance = math.min(gar.getSettings().operators.minStake, gateway.operatorStake),
 		startTimestamp = currentTimestamp,
 		endTimestamp = gatewayEndTimestamp,
 	}
 
-	gateway.operatorStake = gateway.operatorStake - gar.getSettings().operators.minStake
+	local remainingStake = gateway.operatorStake - gar.getSettings().operators.minStake
 
 	-- Add remainder to another vault
-	if gateway.operatorStake > 0 then
+	if remainingStake > 0 then
 		gateway.vaults[msgId] = {
-			balance = gateway.operatorStake,
+			balance = remainingStake,
 			startTimestamp = currentTimestamp,
 			endTimestamp = gatewayStakeWithdrawTimestamp,
 		}
@@ -628,7 +629,10 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				and garSettings ~= nil
 				and gateway.stats.failedConsecutiveEpochs >= garSettings.operators.failedEpochCountMax
 			then
-				-- mark as leaving
+				-- slash 20% of the minimum operator stake and return the rest to the protocol balance, then mark the gateway as leaving
+				local slashedOperatorStake = math.min(gateway.operatorStake, garSettings.operators.minStake)
+				local slashAmount = math.floor(slashedOperatorStake * garSettings.operators.failedEpochSlashPercentage)
+				gar.slashOperatorStake(address, slashAmount)
 				gar.leaveNetwork(address, currentTimestamp, msgId)
 			else
 				if gateway.status == "leaving" and gateway.endTimestamp <= currentTimestamp then
@@ -638,6 +642,25 @@ function gar.pruneGateways(currentTimestamp, msgId)
 			end
 		end
 	end
+end
+
+function gar.slashOperatorStake(address, slashAmount)
+	assert(utils.isInteger(slashAmount), "Slash amount must be an integer")
+	assert(slashAmount > 0, "Slash amount must be greater than 0")
+
+	local gateway = gar.getGateway(address)
+	if gateway == nil then
+		error("Gateway does not exist")
+	end
+	local garSettings = gar.getSettings()
+	if garSettings == nil then
+		error("Gateway Registry settings do not exist")
+	end
+
+	gateway.operatorStake = gateway.operatorStake - slashAmount
+	balances.increaseBalance(ao.id, slashAmount)
+	GatewayRegistry[address] = gateway
+	-- TODO: send slash notice to gateway address
 end
 
 function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
@@ -650,6 +673,38 @@ function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
 	end
 
 	return utils.paginateTableWithCursor(gatewaysArray, cursor, cursorField, limit, sortBy, sortOrder)
+end
+
+function gar.cancelDelegateWithdrawal(from, gatewayAddress, vaultId)
+	local gateway = gar.getGateway(gatewayAddress)
+	if gateway == nil then
+		error("Gateway does not exist")
+	end
+
+	if gateway.status == "leaving" then
+		error("Gateway is leaving the network and cannot cancel withdrawals.")
+	end
+
+	local delegate = gateway.delegates[from]
+	if delegate == nil then
+		error("Delegate does not exist")
+	end
+
+	local vault = delegate.vaults[vaultId]
+	if vault == nil then
+		error("Vault does not exist")
+	end
+
+	-- confirm the gateway still allow staking
+	if not gateway.settings.allowDelegatedStaking then
+		error("Gateway does not allow staking")
+	end
+
+	local vaultBalance = vault.balance
+	delegate.vaults[vaultId] = nil
+	delegate.delegatedStake = delegate.delegatedStake + vaultBalance
+	gateway.totalDelegatedStake = gateway.totalDelegatedStake + vaultBalance
+	GatewayRegistry[gatewayAddress] = gateway
 end
 
 return gar

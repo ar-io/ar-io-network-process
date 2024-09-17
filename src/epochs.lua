@@ -8,6 +8,7 @@ local epochs = {}
 Epochs = Epochs or {}
 EpochSettings = EpochSettings
 	or {
+		pruneEpochsCount = 14, -- prune epochs older than 14 days
 		prescribedNameCount = 5,
 		rewardPercentage = 0.0005, -- 0.05%
 		maxObservers = 50,
@@ -601,7 +602,8 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 					-- distribute the rewards to the gateway
 					balances.transfer(gatewayAddress, ao.id, actualOperatorReward)
 					-- move that balance to the gateway if autostaking is on
-					if gateway.settings.autoStake then
+					if gateway.settings.autoStake and gateway.status == "joined" then
+						-- only increase stake if the gateway is joined, otherwise it is leaving and cannot accept additional stake so distributed rewards to the operator directly
 						gar.increaseOperatorStake(gatewayAddress, actualOperatorReward)
 					end
 				end
@@ -626,6 +628,15 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 
 	-- update the epoch
 	Epochs[epochIndex] = epoch
+end
+
+-- prune epochs older than 14 days
+function epochs.pruneEpochs(timestamp)
+	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)
+	local cutoffEpochIndex = currentEpochIndex - epochs.getSettings().pruneEpochsCount
+	for epochIndex = 0, cutoffEpochIndex do
+		Epochs[epochIndex] = nil
+	end
 end
 
 return epochs
