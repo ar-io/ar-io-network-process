@@ -1,6 +1,7 @@
 local epochs = require("epochs")
 local gar = require("gar")
 local balances = require("balances")
+local utils = require("utils")
 local testSettings = {
 	fqdn = "test.com",
 	protocol = "https",
@@ -46,6 +47,7 @@ describe("epochs", function()
 			durationMs = 100,
 			distributionDelayMs = 15,
 			rewardPercentage = 0.0025, -- 0.25%
+			pruneEpochsCount = 14,
 		})
 	end)
 
@@ -809,6 +811,44 @@ describe("epochs", function()
 			}, distributions.rewards.distributed)
 			-- assert that the balance withdrawn from the protocol balance matches the total distributed rewards
 			assert.are.equal(protocolBalance - expectedTotalDistribution, balances.getBalance(ao.id))
+		end)
+	end)
+
+	-- prune epochs
+	describe("pruneEpochs", function()
+		it("should prune epochs older than 14 days", function()
+			-- add 20 epochs
+			for i = 0, 20 do
+				_G.Epochs[i] = {
+					epochIndex = i,
+					startTimestamp = 1704092400000,
+					endTimestamp = 1704092400100,
+					distributionTimestamp = 1704092400115,
+				}
+			end
+			local currentTimestamp = epochs.getSettings().epochZeroStartTimestamp
+				+ epochs.getSettings().durationMs * 20
+				+ 1
+			-- prune epochs
+			epochs.pruneEpochs(currentTimestamp)
+			-- confirm the lenght of epochs is only 14 and the last 14 days are left
+			assert.are.equal(14, utils.lengthOfTable(_G.Epochs))
+			assert.are.same({
+				[7] = _G.Epochs[7],
+				[8] = _G.Epochs[8],
+				[9] = _G.Epochs[9],
+				[10] = _G.Epochs[10],
+				[11] = _G.Epochs[11],
+				[12] = _G.Epochs[12],
+				[13] = _G.Epochs[13],
+				[14] = _G.Epochs[14],
+				[15] = _G.Epochs[15],
+				[16] = _G.Epochs[16],
+				[17] = _G.Epochs[17],
+				[18] = _G.Epochs[18],
+				[19] = _G.Epochs[19],
+				[20] = _G.Epochs[20],
+			}, _G.Epochs)
 		end)
 	end)
 end)

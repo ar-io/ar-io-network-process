@@ -8,6 +8,7 @@ local epochs = {}
 Epochs = Epochs or {}
 EpochSettings = EpochSettings
 	or {
+		pruneEpochsCount = 14, -- prune epochs older than 14 days
 		prescribedNameCount = 5,
 		rewardPercentage = 0.0005, -- 0.05%
 		maxObservers = 50,
@@ -632,8 +633,8 @@ end
 -- prune epochs older than 14 days
 function epochs.pruneEpochs(timestamp)
 	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	local cutoffEpochIndex = currentEpochIndex - 14
-	for epochIndex = cutoffEpochIndex, 0 do
+	local cutoffEpochIndex = currentEpochIndex - epochs.getSettings().pruneEpochsCount
+	for epochIndex = 0, cutoffEpochIndex do
 		Epochs[epochIndex] = nil
 	end
 end
