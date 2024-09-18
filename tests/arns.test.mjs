@@ -263,12 +263,9 @@ describe('ArNS', async () => {
     assert.equal(tokenCost, 600000000);
   });
 
-  it('should get registration prices', async () => {
+  it('should get registration fees', async () => {
     const priceListResult = await handle({
-      Tags: [
-        { name: 'Action', value: 'Get-Registration-Prices' },
-        { name: 'Intent', value: 'Buy-Record' },
-      ],
+      Tags: [{ name: 'Action', value: 'Get-Registration-Fees' }],
     });
 
     const priceList = JSON.parse(priceListResult.Messages[0].Data);

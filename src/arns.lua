@@ -324,7 +324,7 @@ function arns.getMaxAllowedYearsExtensionForRecord(record, currentTimestamp)
 	return constants.maxLeaseLengthYears - yearsRemainingOnLease
 end
 
-function arns.getRegistrationPrices()
+function arns.getRegistrationFees()
 	local function createPriceListForDomainLength(baseFee, demandFactor)
 		local fees = {}
 		for i = 1, 5 do

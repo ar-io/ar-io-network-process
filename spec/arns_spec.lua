@@ -530,9 +530,9 @@ describe("arns", function()
 		end)
 	end)
 
-	describe("getRegistrationPrices", function()
+	describe("getRegistrationFees", function()
 		it("should return the correct registration prices", function()
-			local prices = arns.getRegistrationPrices()
+			local prices = arns.getRegistrationFees()
 
 			for nameLength, priceList in ipairs(prices) do
 				for type, price in pairs(priceList) do
