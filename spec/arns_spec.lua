@@ -3,6 +3,7 @@ local constants = require("constants")
 local arns = require("arns")
 local balances = require("balances")
 local demand = require("demand")
+local json = require("json")
 
 describe("arns", function()
 	local timestamp = 0
@@ -526,6 +527,29 @@ describe("arns", function()
 					endTimestamp = currentTimestamp + 1000000, -- far in the future
 				},
 			}, _G.NameRegistry.reserved)
+		end)
+	end)
+
+	describe("getRegistrationPrices", function()
+		it("should return the correct registration prices", function()
+			local prices = arns.getRegistrationPrices()
+
+			for nameLength, priceList in ipairs(prices) do
+				for type, price in pairs(priceList) do
+					-- convert type to number if not equal to permabuy
+					local purchaseType = type
+					if type ~= "permabuy" then
+						purchaseType = tonumber(type)
+					end
+					local tokenCost = arns.getTokenCost({
+						intent = "Buy-Record",
+						purchaseType = type(purchaseType) == "number" and purchaseType or purchaseType,
+						years = type(purchaseType) == "number" and purchaseType or nil,
+						name = string.rep("a", nameLength),
+					})
+					assert.are.equal(price, tokenCost)
+				end
+			end
 		end)
 	end)
 end)
