@@ -700,6 +700,8 @@ Handlers.add(
 )
 
 Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.DelegateStake), function(msg)
+	local ioEvent = IOEvent(msg)
+	ioEvent.addFieldsIfExist(msg.Tags, {"Target", "Address", "Quantity"})
 	local checkAssertions = function()
 		assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid target address")
 		assert(
@@ -716,26 +718,40 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
+		ioEvent:addField("Error", inputResult)
+		ioEvent:printEvent()
 		return
 	end
 
 	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 	local from = utils.formatAddress(msg.From)
+	local quantity = tonumber(msg.Tags.Quantity)
+	ioEvent:addField("TargetFormatted", target)
 
-	local status, result = pcall(gar.delegateStake, from, target, tonumber(msg.Tags.Quantity), tonumber(msg.Timestamp))
+	local status, gatewayOrError = pcall(gar.delegateStake, from, target, quantity, tonumber(msg.Timestamp))
 	if not status then
 		ao.send({
 			Target = from,
-			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Invalid-Delegate-Stake", Message = result },
-			Data = json.encode(result),
+			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Invalid-Delegate-Stake", Message = gatewayOrError },
+			Data = json.encode(gatewayOrError),
 		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Delegate-Stake-Notice", Gateway = msg.Tags.Target },
-			Data = json.encode(result),
-		})
+		ioEvent:addField("Error", gatewayOrError)
+		ioEvent:printEvent()
+		return
 	end
+
+	if(gatewayOrError ~= nil) then
+		local newStake = gatewayOrError.delegates[from].delegatedStake
+		ioEvent:addField("PreviousStake", newStake - quantity)
+		ioEvent:addField("NewStake", newStake)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Delegate-Stake-Notice", Gateway = msg.Tags.Target },
+		Data = json.encode(gatewayOrError),
+	})
+	ioEvent:printEvent()
 end)
 
 Handlers.add(
