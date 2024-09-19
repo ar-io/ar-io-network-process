@@ -1,6 +1,7 @@
 -- Adjust package.path to include the current directory
 local process = { _version = "0.0.1" }
 local constants = require("constants")
+local IOEvent   = require("io_event")
 
 Name = Name or "Testnet IO"
 Ticker = Ticker or "tIO"
@@ -113,6 +114,9 @@ end)
 
 -- Write handlers
 Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
+	local ioEvent = IOEvent(msg)
+	ioEvent.addFieldsIfExist(msg.Tags, {"Recipient", "Quantity"})
+
 	-- assert recipient is a valid arweave address
 	local function checkAssertions()
 		assert(utils.isValidAOAddress(msg.Tags.Recipient), "Invalid recipient")
@@ -130,11 +134,14 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 			Tags = { Action = "Invalid-Transfer-Notice", Error = "Transfer-Error" },
 			Data = tostring(inputResult),
 		})
+		ioEvent:addField("Error", inputResult)
+		ioEvent:printEvent()
 		return
 	end
 
 	local from = utils.formatAddress(msg.From)
 	local recipient = utils.formatAddress(msg.Tags.Recipient)
+	ioEvent:addField("RecipientFormatted", recipient)
 
 	local status, result = pcall(balances.transfer, recipient, from, tonumber(msg.Tags.Quantity))
 	if not status then
@@ -143,40 +150,48 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 			Tags = { Action = "Invalid-Transfer-Notice", Error = "Transfer-Error" },
 			Data = tostring(result),
 		})
-	else
-		-- Casting implies that the sender does not want a response - Reference: https://elixirforum.com/t/what-is-the-etymology-of-genserver-cast/33610/3
-		if not msg.Cast then
-			-- Debit-Notice message template, that is sent to the Sender of the transfer
-			local debitNotice = {
-				Target = msg.From,
-				Action = "Debit-Notice",
-				Recipient = recipient,
-				Quantity = msg.Tags.Quantity,
-				Data = "You transferred " .. msg.Tags.Quantity .. " to " .. recipient,
-			}
-			-- Credit-Notice message template, that is sent to the Recipient of the transfer
-			local creditNotice = {
-				Target = recipient,
-				Action = "Credit-Notice",
-				Sender = msg.From,
-				Quantity = msg.Tags.Quantity,
-				Data = "You received " .. msg.Tags.Quantity .. " from " .. msg.From,
-			}
-
-			-- Add forwarded tags to the credit and debit notice messages
-			for tagName, tagValue in pairs(msg) do
-				-- Tags beginning with "X-" are forwarded
-				if string.sub(tagName, 1, 2) == "X-" then
-					debitNotice[tagName] = tagValue
-					creditNotice[tagName] = tagValue
-				end
-			end
-
-			-- Send Debit-Notice and Credit-Notice
-			ao.send(debitNotice)
-			ao.send(creditNotice)
-		end
+		ioEvent:addField("Error", result)
+		ioEvent:printEvent()
+		return
 	end
+	
+	-- Casting implies that the sender does not want a response - Reference: https://elixirforum.com/t/what-is-the-etymology-of-genserver-cast/33610/3
+	if not msg.Cast then
+		-- Debit-Notice message template, that is sent to the Sender of the transfer
+		local debitNotice = {
+			Target = msg.From,
+			Action = "Debit-Notice",
+			Recipient = recipient,
+			Quantity = msg.Tags.Quantity,
+			Data = "You transferred " .. msg.Tags.Quantity .. " to " .. recipient,
+		}
+		-- Credit-Notice message template, that is sent to the Recipient of the transfer
+		local creditNotice = {
+			Target = recipient,
+			Action = "Credit-Notice",
+			Sender = msg.From,
+			Quantity = msg.Tags.Quantity,
+			Data = "You received " .. msg.Tags.Quantity .. " from " .. msg.From,
+		}
+
+		-- Add forwarded tags to the credit and debit notice messages
+		local didForwardTags = false
+		for tagName, tagValue in pairs(msg) do
+			-- Tags beginning with "X-" are forwarded
+			if string.sub(tagName, 1, 2) == "X-" then
+				debitNotice[tagName] = tagValue
+				creditNotice[tagName] = tagValue
+				didForwardTags = true
+				ioEvent:addField(tagName, tagValue)
+			end
+		end
+		if(didForwardTags) then ioEvent:addField("ForwardedTags", "true") end
+
+		-- Send Debit-Notice and Credit-Notice
+		ao.send(debitNotice)
+		ao.send(creditNotice)
+	end
+	ioEvent:printEvent()
 end)
 
 Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.CreateVault), function(msg)
