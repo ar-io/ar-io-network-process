@@ -805,6 +805,9 @@ Handlers.add(
 	ActionMap.DecreaseDelegateStake,
 	utils.hasMatchingTag("Action", ActionMap.DecreaseDelegateStake),
 	function(msg)
+		local ioEvent = IOEvent(msg)
+		ioEvent.addFieldsIfExist(msg.Tags, {"Target", "Address", "Quantity"})
+
 		local checkAssertions = function()
 			assert(utils.isValidArweaveAddress(msg.Tags.Target or msg.Tags.Address), "Invalid target address")
 			assert(
@@ -821,27 +824,52 @@ Handlers.add(
 				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Bad-Input" },
 				Data = tostring(inputResult),
 			})
+			ioEvent:addField("Error", inputResult)
+			ioEvent:printEvent()
 			return
 		end
 
 		local from = utils.formatAddress(msg.From)
 		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
+		local quantity = tonumber(msg.Tags.Quantity)
+		ioEvent:addField("TargetFormatted", target)
 
-		local status, result =
+		local status, gatewayOrError =
 			pcall(gar.decreaseDelegateStake, target, from, tonumber(msg.Tags.Quantity), msg.Timestamp, msg.Id)
 		if not status then
 			ao.send({
 				Target = from,
 				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Invalid-Decrease-Delegate-Stake" },
-				Data = tostring(result),
+				Data = tostring(gatewayOrError),
 			})
-		else
-			ao.send({
-				Target = from,
-				Tags = { Action = "Decrease-Delegate-Stake-Notice", Adddress = target, Quantity = msg.Tags.Quantity },
-				Data = json.encode(result),
-			})
+			ioEvent:addField("Error", gatewayOrError)
+			ioEvent:printEvent()
+			return
 		end
+
+		if(gatewayOrError ~= nil) then
+			local newStake = gatewayOrError.delegates[from].delegatedStake
+			ioEvent:addField("PreviousStake", newStake + quantity)
+			ioEvent:addField("NewStake", newStake)
+			local newDelegateVaults = gatewayOrError.delegates[from].vaults
+			if(newDelegateVaults ~= nil) then
+				ioEvent:addField("VaultsCount", utils.lengthOfTable(newDelegateVaults))
+				local newDelegateVault = newDelegateVaults[msg.Id]
+				if(newDelegateVault ~= nil) then
+					ioEvent:addField("VaultId", msg.Id)
+					ioEvent:addField("VaultBalance", newDelegateVault.balance)
+					ioEvent:addField("VaultStartTimestamp", newDelegateVault.startTimestamp)
+					ioEvent:addField("VaultEndTimestamp", newDelegateVault.endTimestamp)
+				end
+			end
+		end
+
+		ao.send({
+			Target = from,
+			Tags = { Action = "Decrease-Delegate-Stake-Notice", Adddress = target, Quantity = msg.Tags.Quantity },
+			Data = json.encode(gatewayOrError),
+		})
+		ioEvent:printEvent()
 	end
 )
 
