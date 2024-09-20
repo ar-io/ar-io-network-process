@@ -1,13 +1,15 @@
 -- Factory function for creating an "AOEvent"
 local function AOEvent(initialData)
-  if type(initialData) ~= "table" then
-    error("AOEvent data must be a table.")
-  end
-
   local event = {
-    data = initialData or {},
     sampleRate = nil, -- Optional sample rate
   }
+
+  if type(initialData) ~= "table" then
+    print("ERROR: AOEvent data must be a table.")
+    event.data = {}
+  else
+    event.data = initialData
+  end
 
   local function isValidType(value)
     local valueType = type(value)
@@ -16,10 +18,12 @@ local function AOEvent(initialData)
 
   function event:addField(key, value)
     if type(key) ~= "string" then
-      error("Field key must be a string.")
+      print("ERROR: Field key must be a string.")
+      return self
     end
     if not isValidType(value) then
-      error("Invalid field value type: " .. type(value) .. ". Supported types are string, number, boolean, or nil.")
+      print("ERROR: Invalid field value type: " .. type(value) .. ". Supported types are string, number, boolean, or nil.")
+      return self
     end
     self.data[key] = value
     return self
@@ -27,7 +31,8 @@ local function AOEvent(initialData)
 
   function event:addFields(fields)
     if type(fields) ~= "table" then
-      error("Fields must be provided as a table.")
+      print("ERROR: Fields must be provided as a table.")
+      return self
     end
     for key, value in pairs(fields) do
       self:addField(key, value)
@@ -37,7 +42,8 @@ local function AOEvent(initialData)
 
   function event:addFieldsIfExist(table, fields)
     if type(table) ~= "table" then
-      error("Fields must be provided as a table.")
+      print("ERROR: Fields must be provided as a table.")
+      return self
     end
     for _, key in pairs(fields) do
       if(table[key]) then
@@ -77,10 +83,12 @@ local function AOEvent(initialData)
       elseif value == nil then
         serializedValue = "null"
       else
-        error("Unsupported data type: " .. type(value))
+        print("ERROR: Unsupported data type: " .. type(value))
+        goto printNextValue
       end
 
       serializedData = serializedData .. '"' .. key .. '": ' .. serializedValue .. ', '
+      ::printNextValue::
     end
 
     -- Remove trailing comma and space, if any
