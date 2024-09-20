@@ -788,6 +788,7 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 		delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"]) or 0,
 		properties = msg.Tags.Properties or "FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44",
 		autoStake = msg.Tags["Auto-Stake"] == "true",
+		services = json.decode(msg.Tags.Services) or {},
 	}
 
 	local updatedServices = utils.safeDecodeJson(msg.Tags.Services)

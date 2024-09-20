@@ -33,6 +33,22 @@ local testServices = {
 		},
 	},
 }
+local testServices = {
+	bundlers = {
+		{
+			fqdn = "bundler1.example.com",
+			port = 443,
+			protocol = "https",
+			path = "/bundler1",
+		},
+		{
+			fqdn = "bundler2.example.com",
+			port = 443,
+			protocol = "https",
+			path = "/bundler2",
+		},
+	},
+}
 
 local testGateway = {
 	operatorStake = gar.getSettings().operators.minStake,
@@ -97,7 +113,11 @@ describe("gar", function()
 				gar.getSettings().operators.minStake,
 				testSettings,
 				nil, -- no additional services on this gateway
+<<<<<<< HEAD
 				stubGatewayAddress,
+=======
+				"test-this-is-valid-arweave-wallet-address-1",
+>>>>>>> be76626 (feat:adds new services list for each gateway.  includes unit tests.)
 				startTimestamp
 			)
 			assert.is_false(status)
@@ -140,7 +160,11 @@ describe("gar", function()
 				gar.getSettings().operators.minStake,
 				testSettings,
 				nil, -- no additional services on this gateway
+<<<<<<< HEAD
 				stubGatewayAddress,
+=======
+				"test-this-is-valid-arweave-wallet-address-1",
+>>>>>>> be76626 (feat:adds new services list for each gateway.  includes unit tests.)
 				startTimestamp
 			)
 			assert.is_true(status)
@@ -350,6 +374,213 @@ describe("gar", function()
 				testSettings,
 				servicesWithInvalidPath,
 				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("bundler.path is required and must be a string", error)
+		end)
+		it("should join the network with services and bundlers", function()
+			local expectation = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+				startTimestamp = startTimestamp,
+				stats = {
+					prescribedEpochCount = 0,
+					observedEpochCount = 0,
+					totalEpochCount = 0,
+					passedEpochCount = 0,
+					failedEpochCount = 0,
+					failedConsecutiveEpochs = 0,
+					passedConsecutiveEpochs = 0,
+				},
+				settings = {
+					allowDelegatedStaking = testSettings.allowDelegatedStaking,
+					delegateRewardShareRatio = testSettings.delegateRewardShareRatio,
+					autoStake = testSettings.autoStake,
+					minDelegatedStake = testSettings.minDelegatedStake,
+					label = testSettings.label,
+					fqdn = testSettings.fqdn,
+					protocol = testSettings.protocol,
+					port = testSettings.port,
+					properties = testSettings.properties,
+				},
+				services = testServices,
+				status = "joined",
+				observerAddress = "test-this-is-valid-arweave-wallet-address-1",
+			}
+
+			local status, result = pcall(
+				gar.joinNetwork,
+				"test-this-is-valid-arweave-wallet-address-1",
+				gar.getSettings().operators.minStake,
+				testSettings,
+				testServices,
+				"test-this-is-valid-arweave-wallet-address-1",
+				startTimestamp
+			)
+			assert.is_true(status)
+			assert.are.equal(Balances["test-this-is-valid-arweave-wallet-address-1"], 0)
+			assert.are.same(expectation, result)
+			assert.are.same(expectation, gar.getGateway("test-this-is-valid-arweave-wallet-address-1"))
+		end)
+		it("should fail to join the network with invalid services key", function()
+			local invalidServices = {
+				invalidKey = {}, -- Invalid key not allowed
+			}
+			local status, error = pcall(
+				gar.joinNetwork,
+				"test-this-is-valid-arweave-wallet-address-1",
+				gar.getSettings().operators.minStake,
+				testSettings,
+				invalidServices,
+				"test-this-is-valid-arweave-wallet-address-1",
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("services contains an invalid key", error)
+		end)
+		it("should fail to join the network with invalid bundler keys", function()
+			local servicesWithInvalidBundler = {
+				bundlers = {
+					{
+						fqdn = "bundler1.example.com",
+						port = 443,
+						protocol = "https",
+						path = "/bundler1",
+						invalidKey = "invalid", -- Invalid key in bundler
+					},
+				},
+			}
+			local status, error = pcall(
+				gar.joinNetwork,
+				"test-this-is-valid-arweave-wallet-address-1",
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithInvalidBundler,
+				"test-this-is-valid-arweave-wallet-address-1",
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("bundler contains an invalid key", error)
+		end)
+		it("should fail to join the network with too many bundlers", function()
+			local servicesWithTooManyBundlers = {
+				bundlers = {},
+			}
+			for i = 1, 21 do -- Exceeding the maximum of 20 bundlers
+				table.insert(servicesWithTooManyBundlers.bundlers, {
+					fqdn = "bundler" .. i .. ".example.com",
+					port = 443,
+					protocol = "https",
+					path = "/bundler" .. i,
+				})
+			end
+
+			local status, error = pcall(
+				gar.joinNetwork,
+				"test-this-is-valid-arweave-wallet-address-1",
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithTooManyBundlers,
+				"test-this-is-valid-arweave-wallet-address-1",
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("No more than 20 bundlers allowed", error)
+		end)
+		it("should fail to join the network with invalid bundler fqdn", function()
+			local servicesWithInvalidFqdn = {
+				bundlers = {
+					{
+						fqdn = 20, -- Invalid fqdn (a number)
+						port = 443,
+						protocol = "https",
+						path = "/bundler",
+					},
+				},
+			}
+
+			local status, error = pcall(
+				gar.joinNetwork,
+				"test-this-is-valid-arweave-wallet-address-1",
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithInvalidFqdn,
+				"test-this-is-valid-arweave-wallet-address-1",
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("bundler.fqdn is required and must be a string", error)
+		end)
+		it("should fail to join the network with invalid bundler port", function()
+			local servicesWithInvalidPort = {
+				bundlers = {
+					{
+						fqdn = "bundler.example.com",
+						port = -1, -- Invalid port (negative number)
+						protocol = "https",
+						path = "/bundler",
+					},
+				},
+			}
+
+			local status, error = pcall(
+				gar.joinNetwork,
+				"test-this-is-valid-arweave-wallet-address-1",
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithInvalidPort,
+				"test-this-is-valid-arweave-wallet-address-1",
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("bundler.port must be an integer between 0 and 65535", error)
+		end)
+		it("should fail to join the network with invalid bundler protocol", function()
+			local servicesWithInvalidProtocol = {
+				bundlers = {
+					{
+						fqdn = "bundler.example.com",
+						port = 443,
+						protocol = "ftp", -- Invalid protocol (should be 'https')
+						path = "/bundler",
+					},
+				},
+			}
+
+			local status, error = pcall(
+				gar.joinNetwork,
+				"test-this-is-valid-arweave-wallet-address-1",
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithInvalidProtocol,
+				"test-this-is-valid-arweave-wallet-address-1",
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("bundler.protocol is required and must be 'https'", error)
+		end)
+		it("should fail to join the network with invalid bundler path", function()
+			local servicesWithInvalidPath = {
+				bundlers = {
+					{
+						fqdn = "bundler.example.com",
+						port = 443,
+						protocol = "https",
+						path = nil, -- Invalid path (nil value)
+					},
+				},
+			}
+
+			local status, error = pcall(
+				gar.joinNetwork,
+				"test-this-is-valid-arweave-wallet-address-1",
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithInvalidPath,
+				"test-this-is-valid-arweave-wallet-address-1",
 				startTimestamp
 			)
 			assert.is_false(status)
