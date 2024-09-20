@@ -195,6 +195,8 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 end)
 
 Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.CreateVault), function(msg)
+	local ioEvent = IOEvent(msg)
+	ioEvent.addFieldsIfExist(msg.Tags, {"Lock-Length", "Quantity"})
 	local function checkAssertions()
 		assert(
 			msg.Tags["Lock-Length"]
@@ -216,32 +218,45 @@ Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.Cre
 			Tags = { Action = "Invalid-Create-Vault-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
+		ioEvent:addField("Error", inputResult)
 		return
 	end
 
-	local result, err = vaults.createVault(
+	local status, vaultOrError = pcall(
+		vaults.createVault,
 		msg.From,
 		tonumber(msg.Tags.Quantity),
 		tonumber(msg.Tags["Lock-Length"]),
 		tonumber(msg.Timestamp),
 		msg.Id
 	)
-	if err then
+
+	if not status then
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Create-Vault-Notice", Error = "Invalid-Create-Vault" },
-			Data = tostring(err),
+			Data = tostring(vaultOrError),
 		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Vault-Created-Notice",
-				["Vault-Id"] = msg.Id,
-			},
-			Data = json.encode(result),
-		})
+		ioEvent:addField("Error", vaultOrError)
+		return
 	end
+
+	if vaultOrError ~= nil then
+		ioEvent:addField("Vault-Id", msg.Id)
+		ioEvent:addField("VaultBalance", vaultOrError.balance)
+		ioEvent:addField("VaultStartTimestamp", vaultOrError.startTimestamp)
+		ioEvent:addField("VaultEndTimestamp", vaultOrError.endTimestamp)
+	end
+	
+	ao.send({
+		Target = msg.From,
+		Tags = {
+			Action = "Vault-Created-Notice",
+			["Vault-Id"] = msg.Id,
+		},
+		Data = json.encode(status),
+	})
+	ioEvent:printEvent()
 end)
 
 Handlers.add(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap.VaultedTransfer), function(msg)
@@ -872,13 +887,13 @@ Handlers.add(
 			ioEvent:addField("PreviousStake", newStake + quantity)
 			ioEvent:addField("NewStake", newStake)
 			ioEvent:addField("GatewayTotalDelegatedStake", gatewayOrError.totalDelegatedStake)
-			
+
 			local newDelegateVaults = gatewayOrError.delegates[from].vaults
 			if(newDelegateVaults ~= nil) then
 				ioEvent:addField("VaultsCount", utils.lengthOfTable(newDelegateVaults))
 				local newDelegateVault = newDelegateVaults[msg.Id]
 				if(newDelegateVault ~= nil) then
-					ioEvent:addField("VaultId", msg.Id)
+					ioEvent:addField("Vault-Id", msg.Id)
 					ioEvent:addField("VaultBalance", newDelegateVault.balance)
 					ioEvent:addField("VaultStartTimestamp", newDelegateVault.startTimestamp)
 					ioEvent:addField("VaultEndTimestamp", newDelegateVault.endTimestamp)
