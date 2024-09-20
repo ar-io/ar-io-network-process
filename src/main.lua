@@ -314,6 +314,8 @@ Handlers.add(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap
 end)
 
 Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.ExtendVault), function(msg)
+	local ioEvent = IOEvent(msg)
+	ioEvent.addFieldsIfExist(msg.Tags, {"Vault-Id", "Extend-Length"})
 	local checkAssertions = function()
 		assert(utils.isValidArweaveAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
 		assert(
@@ -322,6 +324,8 @@ Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.Ext
 		)
 	end
 
+	local vaultId = msg.Tags["Vault-Id"]
+	local extendLength = tonumber(msg.Tags["Extend-Length"])
 	local inputStatus, inputResult = pcall(checkAssertions)
 
 	if not inputStatus then
@@ -330,23 +334,36 @@ Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.Ext
 			Tags = { Action = "Invalid-Extend-Vault-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
+		ioEvent:addField("Error", inputResult)
+		ioEvent:printEvent()
 		return
 	end
 
-	local result, err = vaults.extendVault(msg.From, msg.Tags["Extend-Length"], msg.Timestamp, msg.Tags["Vault-Id"])
-	if err then
+	local result, vaultOrError = vaults.extendVault(msg.From, extendLength , msg.Timestamp, vaultId)
+	if vaultOrError then
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Extend-Vault-Notice", Error = "Invalid-Extend-Vault" },
-			Data = tostring(err),
+			Data = tostring(vaultOrError),
 		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Vault-Extended-Notice" },
-			Data = json.encode(result),
-		})
+		ioEvent:addField("Error", vaultOrError)
+		ioEvent:printEvent()
 	end
+
+	if vaultOrError ~= nil then
+		ioEvent:addField("Vault-Id", vaultId)
+		ioEvent:addField("VaultBalance", vaultOrError.balance)
+		ioEvent:addField("VaultStartTimestamp", vaultOrError.startTimestamp)
+		ioEvent:addField("VaultEndTimestamp", vaultOrError.endTimestamp)
+		ioEvent:addField("VaultPrevEndTimestamp", vaultOrError.endTimestamp - extendLength)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Vault-Extended-Notice" },
+		Data = json.encode(result),
+	})
+	ioEvent:printEvent()
 end)
 
 Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.IncreaseVault), function(msg)
