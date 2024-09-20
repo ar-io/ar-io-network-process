@@ -25,8 +25,8 @@ GatewayRegistrySettings = GatewayRegistrySettings
 		},
 	}
 
-function gar.joinNetwork(from, stake, settings, observerAddress, timeStamp)
-	gar.assertValidGatewayParameters(from, stake, settings, observerAddress)
+function gar.joinNetwork(from, stake, settings, services, observerAddress, timeStamp)
+	gar.assertValidGatewayParameters(from, stake, settings, services, observerAddress)
 
 	if gar.getGateway(from) then
 		error("Gateway already exists")
@@ -63,6 +63,7 @@ function gar.joinNetwork(from, stake, settings, observerAddress, timeStamp)
 			properties = settings.properties,
 			note = settings.note,
 		},
+		services = services or nil,
 		status = "joined",
 		observerAddress = observerAddress or from,
 	}
@@ -190,7 +191,7 @@ function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId)
 	return gar.getGateway(from)
 end
 
-function gar.updateGatewaySettings(from, updatedSettings, observerAddress, currentTimestamp, msgId)
+function gar.updateGatewaySettings(from, updatedSettings, updatedServices, observerAddress, currentTimestamp, msgId)
 	local gateway = gar.getGateway(from)
 
 	if not gateway then
@@ -201,7 +202,7 @@ function gar.updateGatewaySettings(from, updatedSettings, observerAddress, curre
 		error("Gateway is leaving the network and cannot be updated")
 	end
 
-	gar.assertValidGatewayParameters(from, gateway.operatorStake, updatedSettings, observerAddress)
+	gar.assertValidGatewayParameters(from, gateway.operatorStake, updatedSettings, updatedServices, observerAddress)
 
 	if
 		updatedSettings.minDelegatedStake
@@ -250,6 +251,9 @@ function gar.updateGatewaySettings(from, updatedSettings, observerAddress, curre
 	end
 
 	gateway.settings = updatedSettings
+	if updatedServices then
+		gateway.services = updatedServices
+	end
 	if observerAddress then
 		gateway.observerAddress = observerAddress
 	end
@@ -474,7 +478,7 @@ function gar.isGatewayJoined(gateway, currentTimestamp)
 	return gateway.status == "joined" and gateway.startTimestamp <= currentTimestamp
 end
 
-function gar.assertValidGatewayParameters(from, stake, settings, observerAddress)
+function gar.assertValidGatewayParameters(from, stake, settings, services, observerAddress)
 	assert(type(from) == "string", "from is required and must be a string")
 	assert(type(stake) == "number", "stake is required and must be a number")
 	assert(type(settings) == "table", "settings is required and must be a table")
@@ -526,6 +530,41 @@ function gar.assertValidGatewayParameters(from, stake, settings, observerAddress
 				and settings.minDelegatedStake >= gar.getSettings().delegates.minStake,
 			"minDelegatedStake must be an integer greater than or equal to the minimum delegated stake"
 		)
+	end
+
+	if services ~= nil then
+		assert(type(services) == "table", "services must be a table")
+
+		local allowedServiceKeys = { bundlers = true }
+		for key, _ in pairs(services) do
+			assert(allowedServiceKeys[key], "services contains an invalid key: " .. tostring(key))
+		end
+
+		if services.bundlers ~= nil then
+			assert(type(services.bundlers) == "table", "services.bundlers must be a table")
+
+			assert(utils.lengthOfTable(services.bundlers) <= 20, "No more than 20 bundlers allowed")
+
+			for index, bundler in ipairs(services.bundlers) do
+				local allowedBundlerKeys = { fqdn = true, port = true, protocol = true, path = true }
+				for key, _ in pairs(bundler) do
+					assert(allowedBundlerKeys[key], "bundler contains an invalid key: " .. tostring(key))
+				end
+				assert(type(bundler.fqdn) == "string", "bundler.fqdn is required and must be a string")
+				assert(
+					type(bundler.port) == "number"
+						and utils.isInteger(bundler.port)
+						and bundler.port >= 0
+						and bundler.port <= 65535,
+					"bundler.port must be an integer between 0 and 65535"
+				)
+				assert(
+					type(bundler.protocol) == "string" and bundler.protocol == "https",
+					"bundler.protocol is required and must be 'https'"
+				)
+				assert(type(bundler.path) == "string", "bundler.path is required and must be a string")
+			end
+		end
 	end
 end
 

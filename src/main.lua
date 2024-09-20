@@ -771,32 +771,31 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 		delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"]) or 0,
 		properties = msg.Tags.Properties or "FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44",
 		autoStake = msg.Tags["Auto-Stake"] == "true",
+		services = json.decode(msg.Tags.Services) or {},
 	}
-	local observerAddress = msg.Tags["Observer-Address"] or msg.Tags.From
-	msg.ioEvent:addField("Resolved-Observer-Address", observerAddress)
-	msg.ioEvent:addField("Sender-Previous-Balance", balances[msg.From])
 
-	local shouldContinue, gateway = eventingPcall(
-		msg.ioEvent,
-		function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Invalid-Join-Network-Notice", Error = "Invalid-Join-Network" },
-				Data = tostring(error),
-			})
-		end,
-		gar.joinNetwork,
-		msg.From,
-		tonumber(msg.Tags["Operator-Stake"]),
-		updatedSettings,
-		observerAddress,
-		msg.Timestamp
-	)
+	-- format join network and observer address
+	local fromAddress = utils.formatAddress(msg.From)
+	local observerAddress = msg.Tags["Observer-Address"] or fromAddress
+	local formattedObserverAddress = utils.formatAddress(observerAddress)
+	local stake = tonumber(msg.Tags["Operator-Stake"])
+	local timestamp = tonumber(msg.Timestamp)
+
+	msg.ioEvent:addField("Resolved-Observer-Address", formattedObserverAddress)
+	msg.ioEvent:addField("Sender-Previous-Balance", fromBalance)
+
+	local shouldContinue, gateway = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-Join-Network-Notice", Error = "Invalid-Join-Network" },
+			Data = tostring(error),
+		})
+	end, gar.joinNetwork, fromAddress, stake, updatedSettings, updatedServices, formattedObserverAddress, timestamp)
 	if not shouldContinue then
 		return
 	end
 
-	msg.ioEvent:addField("Sender-New-Balance", balances[msg.From])
+	msg.ioEvent:addField("Sender-New-Balance", fromBalance)
 	if gateway ~= nil then
 		msg.ioEvent:addField("GW-Start-Timestamp", gateway.startTimestamp)
 	end
@@ -805,7 +804,7 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
 
 	ao.send({
-		Target = msg.From,
+		Target = fromAddress,
 		Tags = { Action = "Join-Network-Notice" },
 		Data = json.encode(gateway),
 	})
@@ -1170,6 +1169,25 @@ addEventingHandler(
 			return
 		end
 
+		local services = nil
+		if msg.Tags.Services then
+			local status, result = pcall(json.decode, msg.Tags.Services)
+			if status then
+				services = result
+			else
+				-- Handle JSON decoding error
+				ao.send({
+					Target = msg.From,
+					Tags = {
+						Action = "Invalid-Update-Gateway-Settings-Notice",
+						Error = "Failed-Update-Gateway-Settings",
+					},
+					Data = "Failed to decode Services JSON: " .. tostring(result),
+				})
+				return
+			end
+		end
+
 		-- keep defaults, but update any new ones
 		local updatedSettings = {
 			label = msg.Tags.Label or gateway.settings.label,
@@ -1185,9 +1203,18 @@ addEventingHandler(
 			properties = msg.Tags.Properties or gateway.settings.properties,
 			autoStake = not msg.Tags["Auto-Stake"] and gateway.settings.autoStake or msg.Tags["Auto-Stake"] == "true",
 		}
+
+		local updatedServices = services or gateway.services
 		local observerAddress = msg.Tags["Observer-Address"] or gateway.observerAddress
-		local status, result =
-			pcall(gar.updateGatewaySettings, msg.From, updatedSettings, observerAddress, msg.Timestamp, msg.Id)
+		local status, result = pcall(
+			gar.updateGatewaySettings,
+			msg.From,
+			updatedSettings,
+			updatedServices,
+			observerAddress,
+			msg.Timestamp,
+			msg.Id
+		)
 		if not status then
 			ao.send({
 				Target = msg.From,
