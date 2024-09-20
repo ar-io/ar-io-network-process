@@ -107,19 +107,20 @@ function vaults.increaseVault(from, qty, vaultId, currentTimestamp)
 
 	balances.reduceBalance(from, qty)
 	vault.balance = vault.balance + qty
+	return vaults.getVault(from, vaultId)
 end
 
 function vaults.getVaults()
-	local vaults = utils.deepCopy(Vaults)
-	return vaults or {}
+	local _vaults = utils.deepCopy(Vaults)
+	return _vaults or {}
 end
 
 function vaults.getVault(target, id)
-	local vaults = vaults.getVaults()
-	if not vaults[target] then
+	local _vaults = vaults.getVaults()
+	if not _vaults[target] then
 		return nil
 	end
-	return vaults[target][id]
+	return _vaults[target][id]
 end
 
 function vaults.setVault(target, id, vault)

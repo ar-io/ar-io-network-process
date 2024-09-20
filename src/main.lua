@@ -141,9 +141,10 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 
 	local from = utils.formatAddress(msg.From)
 	local recipient = utils.formatAddress(msg.Tags.Recipient)
+	local quantity = tonumber(msg.Tags.Quantity)
 	ioEvent:addField("RecipientFormatted", recipient)
 
-	local status, result = pcall(balances.transfer, recipient, from, tonumber(msg.Tags.Quantity))
+	local status, result = pcall(balances.transfer, recipient, from, quantity)
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -154,6 +155,13 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 		ioEvent:printEvent()
 		return
 	end
+
+	local senderNewBalance = result[from]
+	local recipientNewBalance = result[recipient]
+	ioEvent:addField("SenderPreviousBalance", senderNewBalance + quantity)
+	ioEvent:addField("SenderNewBalance", senderNewBalance)
+	ioEvent:addField("RecipientPreviousBalance", recipientNewBalance - quantity)
+	ioEvent:addField("RecipientNewBalance", recipientNewBalance)
 	
 	-- Casting implies that the sender does not want a response - Reference: https://elixirforum.com/t/what-is-the-etymology-of-genserver-cast/33610/3
 	if not msg.Cast then
@@ -340,7 +348,7 @@ Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.Ext
 	end
 
 	local result, vaultOrError = vaults.extendVault(msg.From, extendLength , msg.Timestamp, vaultId)
-	if vaultOrError then
+	if not result then
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Extend-Vault-Notice", Error = "Invalid-Extend-Vault" },
@@ -367,6 +375,8 @@ Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.Ext
 end)
 
 Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.IncreaseVault), function(msg)
+	local ioEvent = IOEvent(msg)
+	ioEvent.addFieldsIfExist(msg.Tags, {"Vault-Id", "Quantity"})
 	local function checkAssertions()
 		assert(utils.isValidArweaveAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
 		assert(
@@ -383,23 +393,40 @@ Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.I
 			Tags = { Action = "Invalid-Increase-Vault-Notice", Error = "Bad-Input" },
 			Data = tostring(inputResult),
 		})
+		ioEvent:addField("Error", inputResult)
+		ioEvent:printEvent()
 		return
 	end
 
-	local result, err = vaults.increaseVault(msg.From, msg.Tags.Quantity, msg.Tags["Vault-Id"], msg.Timestamp)
-	if err then
+	local quantity = tonumber(msg.Tags.Quantity)
+	local vaultId = msg.Tags["Vault-Id"]
+
+	local result, vaultOrErr = vaults.increaseVault(msg.From, quantity, vaultId, msg.Timestamp)
+	if not result then
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Increase-Vault-Notice", Error = "Invalid-Increase-Vault" },
-			Data = tostring(err),
+			Data = tostring(vaultOrErr),
 		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Vault-Increased-Notice" },
-			Data = json.encode(result),
-		})
+		ioEvent:addField("Error", vaultOrErr)
+		ioEvent:printEvent()
+		return
 	end
+
+	if vaultOrErr ~= nil then
+		ioEvent:addField("Vault-Id", vaultId)
+		ioEvent:addField("VaultBalance", vaultOrErr.balance)
+		ioEvent:addField("VaultPrevBalance", vaultOrErr.balance - quantity)
+		ioEvent:addField("VaultStartTimestamp", vaultOrErr.startTimestamp)
+		ioEvent:addField("VaultEndTimestamp", vaultOrErr.endTimestamp)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Vault-Increased-Notice" },
+		Data = json.encode(result),
+	})
+	ioEvent:printEvent()
 end)
 
 Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRecord), function(msg)
