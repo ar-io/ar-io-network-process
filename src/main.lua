@@ -744,6 +744,7 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 		local newStake = gatewayOrError.delegates[from].delegatedStake
 		ioEvent:addField("PreviousStake", newStake - quantity)
 		ioEvent:addField("NewStake", newStake)
+		ioEvent:addField("GatewayTotalDelegatedStake", gatewayOrError.totalDelegatedStake)
 	end
 
 	ao.send({
@@ -758,6 +759,8 @@ Handlers.add(
 	ActionMap.CancelDelegateWithdrawl,
 	utils.hasMatchingTag("Action", ActionMap.CancelDelegateWithdrawl),
 	function(msg)
+		local ioEvent = IOEvent(msg)
+		ioEvent.addFieldsIfExist(msg.Tags, {"Target", "Address", "Vault-Id"})
 		local checkAssertions = function()
 			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
 			assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
@@ -771,13 +774,16 @@ Handlers.add(
 				Tags = { Action = "Invalid-Cancel-Delegate-Withdrawl-Notice", Error = "Bad-Input" },
 				Data = tostring(inputResult),
 			})
+			ioEvent:addField("Error", inputResult)
+			ioEvent:printEvent()
 			return
 		end
 
 		local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 		local fromAddress = utils.formatAddress(msg.From)
+		ioEvent:addField("TargetFormatted", gatewayAddress)
 
-		local status, result = pcall(gar.cancelDelegateWithdrawal, fromAddress, gatewayAddress, msg.Tags["Vault-Id"])
+		local status, resultOrError = pcall(gar.cancelDelegateWithdrawal, fromAddress, gatewayAddress, msg.Tags["Vault-Id"])
 		if not status then
 			ao.send({
 				Target = msg.From,
@@ -785,19 +791,33 @@ Handlers.add(
 					Action = "Invalid-Cancel-Delegate-Withdrawl-Notice",
 					Error = "Invalid-Cancel-Delegate-Withdrawl",
 				},
-				Data = tostring(result),
+				Data = tostring(resultOrError),
 			})
-		else
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Cancel-Delegate-Withdrawl-Notice",
-					Address = gatewayAddress,
-					["Vault-Id"] = msg.Tags["Vault-Id"],
-				},
-				Data = json.encode(result),
-			})
+			ioEvent:addField("Error", resultOrError)
+			ioEvent:printEvent()
 		end
+
+		if resultOrError ~= nil then
+			local gateway = resultOrError.gateway
+			local vault = resultOrError.vault
+			if vault ~= nil and gateway ~= nil then
+				local newStake = gateway.delegates[fromAddress].delegatedStake
+				ioEvent:addField("PreviousStake", newStake - vault.balance)
+				ioEvent:addField("NewStake", newStake)
+				ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
+			end
+		end
+
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Cancel-Delegate-Withdrawl-Notice",
+				Address = gatewayAddress,
+				["Vault-Id"] = msg.Tags["Vault-Id"],
+			},
+			Data = json.encode(resultOrError),
+		})
+		ioEvent:printEvent()
 	end
 )
 
@@ -851,6 +871,8 @@ Handlers.add(
 			local newStake = gatewayOrError.delegates[from].delegatedStake
 			ioEvent:addField("PreviousStake", newStake + quantity)
 			ioEvent:addField("NewStake", newStake)
+			ioEvent:addField("GatewayTotalDelegatedStake", gatewayOrError.totalDelegatedStake)
+			
 			local newDelegateVaults = gatewayOrError.delegates[from].vaults
 			if(newDelegateVaults ~= nil) then
 				ioEvent:addField("VaultsCount", utils.lengthOfTable(newDelegateVaults))
