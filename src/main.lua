@@ -505,16 +505,13 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 		end)
 		ioEvent:addField("df_trailingPeriodPurchases", table.concat(record.df.trailingPeriodPurchases, ","))
 		ioEvent:addField("df_trailingPeriodRevenues", table.concat(record.df.trailingPeriodRevenues, ","))
-		ioEvent:addFieldsIfExist(
-			mappedDfFields,
-			{
-				"df_currentPeriod",
-				"df_currentDemandFactor",
-				"df_consecutivePeriodsWithMinDemandFactor",
-				"df_revenueThisPeriod",
-				"df_purchasesThisPeriod",
-			}
-		)
+		ioEvent:addFieldsIfExist(mappedDfFields, {
+			"df_currentPeriod",
+			"df_currentDemandFactor",
+			"df_consecutivePeriodsWithMinDemandFactor",
+			"df_revenueThisPeriod",
+			"df_purchasesThisPeriod",
+		})
 	end
 
 	ao.send({
