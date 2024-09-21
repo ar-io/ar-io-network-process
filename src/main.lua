@@ -79,7 +79,7 @@ local ActionMap = {
 	SaveObservations = "Save-Observations",
 	DelegateStake = "Delegate-Stake",
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
-	CancelDelegateWithdrawl = "Cancel-Delegate-Withdrawl",
+	CancelDelegateWithdrawl = "Cancel-Delegate-Withdrawal",
 }
 
 local function eventingPcall(ioEvent, onError, fnToCall, ...)
@@ -831,7 +831,7 @@ Handlers.add(
 		local shouldContinue = eventingPcall(ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Invalid-Cancel-Delegate-Withdrawl-Notice", Error = "Bad-Input" },
+				Tags = { Action = "Invalid-Cancel-Delegate-Withdrawal-Notice", Error = "Bad-Input" },
 				Data = tostring(error),
 			})
 		end, checkAssertions)
@@ -847,8 +847,8 @@ Handlers.add(
 			ao.send({
 				Target = msg.From,
 				Tags = {
-					Action = "Invalid-Cancel-Delegate-Withdrawl-Notice",
-					Error = "Invalid-Cancel-Delegate-Withdrawl",
+					Action = "Invalid-Cancel-Delegate-Withdrawal-Notice",
+					Error = "Invalid-Cancel-Delegate-Withdrawal",
 				},
 				Data = tostring(error),
 			})
@@ -871,7 +871,7 @@ Handlers.add(
 		ao.send({
 			Target = msg.From,
 			Tags = {
-				Action = "Cancel-Delegate-Withdrawl-Notice",
+				Action = "Cancel-Delegate-Withdrawal-Notice",
 				Address = gatewayAddress,
 				["Vault-Id"] = msg.Tags["Vault-Id"],
 			},

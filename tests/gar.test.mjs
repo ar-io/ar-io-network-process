@@ -532,7 +532,7 @@ describe('GatewayRegistry', async () => {
           From: newStubAddress,
           Owner: newStubAddress,
           Tags: [
-            { name: 'Action', value: 'Cancel-Delegate-Withdrawl' },
+            { name: 'Action', value: 'Cancel-Delegate-Withdrawal' },
             { name: 'Address', value: STUB_ADDRESS },
             { name: 'Vault-Id', value: ''.padEnd(43, 'x') },
           ],
