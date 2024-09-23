@@ -126,7 +126,7 @@ end)
 -- Write handlers
 Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
 	local ioEvent = IOEvent(msg)
-	ioEvent.addFieldsIfExist(msg.Tags, { "Recipient", "Quantity" })
+	ioEvent:addFieldsIfExist(msg.Tags, { "Recipient", "Quantity" })
 
 	-- assert recipient is a valid arweave address
 	local function checkAssertions()
@@ -216,7 +216,7 @@ end)
 
 Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.CreateVault), function(msg)
 	local ioEvent = IOEvent(msg)
-	ioEvent.addFieldsIfExist(msg.Tags, { "Lock-Length", "Quantity" })
+	ioEvent:addFieldsIfExist(msg.Tags, { "Lock-Length", "Quantity" })
 	local function checkAssertions()
 		assert(
 			msg.Tags["Lock-Length"]
@@ -274,7 +274,7 @@ Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.Cre
 			Action = "Vault-Created-Notice",
 			["Vault-Id"] = msg.Id,
 		},
-		Data = json.encode(shouldContinue2),
+		Data = json.encode(vault),
 	})
 	ioEvent:printEvent()
 end)
@@ -335,7 +335,7 @@ end)
 
 Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.ExtendVault), function(msg)
 	local ioEvent = IOEvent(msg)
-	ioEvent.addFieldsIfExist(msg.Tags, { "Vault-Id", "Extend-Length" })
+	ioEvent:addFieldsIfExist(msg.Tags, { "Vault-Id", "Extend-Length" })
 	local checkAssertions = function()
 		assert(utils.isValidArweaveAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
 		assert(
@@ -386,7 +386,7 @@ end)
 
 Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.IncreaseVault), function(msg)
 	local ioEvent = IOEvent(msg)
-	ioEvent.addFieldsIfExist(msg.Tags, { "Vault-Id", "Quantity" })
+	ioEvent:addFieldsIfExist(msg.Tags, { "Vault-Id", "Quantity" })
 	local function checkAssertions()
 		assert(utils.isValidArweaveAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
 		assert(
@@ -766,7 +766,7 @@ Handlers.add(
 
 Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.DelegateStake), function(msg)
 	local ioEvent = IOEvent(msg)
-	ioEvent.addFieldsIfExist(msg.Tags, { "Target", "Address", "Quantity" })
+	ioEvent:addFieldsIfExist(msg.Tags, { "Target", "Address", "Quantity" })
 	local checkAssertions = function()
 		assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid target address")
 		assert(
@@ -824,7 +824,7 @@ Handlers.add(
 	utils.hasMatchingTag("Action", ActionMap.CancelDelegateWithdrawl),
 	function(msg)
 		local ioEvent = IOEvent(msg)
-		ioEvent.addFieldsIfExist(msg.Tags, { "Target", "Address", "Vault-Id" })
+		ioEvent:addFieldsIfExist(msg.Tags, { "Target", "Address", "Vault-Id" })
 		local checkAssertions = function()
 			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
 			assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
@@ -889,7 +889,7 @@ Handlers.add(
 	utils.hasMatchingTag("Action", ActionMap.DecreaseDelegateStake),
 	function(msg)
 		local ioEvent = IOEvent(msg)
-		ioEvent.addFieldsIfExist(msg.Tags, { "Target", "Address", "Quantity" })
+		ioEvent:addFieldsIfExist(msg.Tags, { "Target", "Address", "Quantity" })
 
 		local checkAssertions = function()
 			assert(utils.isValidArweaveAddress(msg.Tags.Target or msg.Tags.Address), "Invalid target address")
@@ -921,7 +921,7 @@ Handlers.add(
 				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Invalid-Decrease-Delegate-Stake" },
 				Data = tostring(error),
 			})
-		end, gar.decreaseDelegateStake, target, from, tonumber(msg.Tags.Quantity), msg.Timestamp, msg.Id)
+		end, gar.decreaseDelegateStake, target, from, quantity, msg.Timestamp, msg.Id)
 		if not shouldContinue2 then
 			return
 		end

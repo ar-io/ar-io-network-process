@@ -480,7 +480,7 @@ describe('GatewayRegistry', async () => {
       sharedMemory = delegateStakeResult.Memory;
     });
 
-    it('should allow with drawing stake from a gateway', async () => {
+    it('should allow withdrawing stake from a gateway', async () => {
       const decreaseStakeTimestamp = stubbedTimestamp + 1000 * 60 * 15; // 15 minutes after stubbedTimestamp
       const decreaseStakeResult = await handle(
         {
