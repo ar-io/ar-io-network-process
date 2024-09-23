@@ -802,17 +802,19 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 		return
 	end
 
+	local delegateResult = {}
 	if gateway ~= nil then
 		local newStake = gateway.delegates[from].delegatedStake
 		ioEvent:addField("PreviousStake", newStake - quantity)
 		ioEvent:addField("NewStake", newStake)
 		ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
+		delegateResult = gateway.delegates[from]
 	end
 
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = "Delegate-Stake-Notice", Gateway = msg.Tags.Target },
-		Data = json.encode(gateway),
+		Data = json.encode(delegateResult),
 	})
 	ioEvent:printEvent()
 end)
@@ -841,6 +843,7 @@ Handlers.add(
 
 		local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 		local fromAddress = utils.formatAddress(msg.From)
+		local vaultId = msg.Tags["Vault-Id"]
 		ioEvent:addField("TargetFormatted", gatewayAddress)
 
 		local shouldContinue2, result = eventingPcall(ioEvent, function(error)
@@ -852,19 +855,19 @@ Handlers.add(
 				},
 				Data = tostring(error),
 			})
-		end, gar.cancelDelegateWithdrawal, fromAddress, gatewayAddress, msg.Tags["Vault-Id"])
+		end, gar.cancelDelegateWithdrawal, fromAddress, gatewayAddress, vaultId)
 		if not shouldContinue2 then
 			return
 		end
 
+		local delegateResult = {}
 		if result ~= nil then
-			local gateway = result.gateway
-			local vault = result.vault
-			if vault ~= nil and gateway ~= nil then
-				local newStake = gateway.delegates[fromAddress].delegatedStake
-				ioEvent:addField("PreviousStake", newStake - vault.balance)
+			if result.delegate ~= nil then
+				delegateResult = result.delegate
+				local newStake = delegateResult.delegatedStake
+				ioEvent:addField("PreviousStake", newStake - delegateResult.vaults[vaultId].balance)
 				ioEvent:addField("NewStake", newStake)
-				ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
+				ioEvent:addField("GatewayTotalDelegatedStake", result.totalDelegatedStake)
 			end
 		end
 
@@ -875,7 +878,7 @@ Handlers.add(
 				Address = gatewayAddress,
 				["Vault-Id"] = msg.Tags["Vault-Id"],
 			},
-			Data = json.encode(result),
+			Data = json.encode(delegateResult),
 		})
 		ioEvent:printEvent()
 	end
@@ -923,13 +926,15 @@ Handlers.add(
 			return
 		end
 
+		local delegateResult = {}
 		if gateway ~= nil then
 			local newStake = gateway.delegates[from].delegatedStake
 			ioEvent:addField("PreviousStake", newStake + quantity)
 			ioEvent:addField("NewStake", newStake)
 			ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
 
-			local newDelegateVaults = gateway.delegates[from].vaults
+			delegateResult = gateway.delegates[from]
+			local newDelegateVaults = delegateResult.vaults
 			if newDelegateVaults ~= nil then
 				ioEvent:addField("VaultsCount", utils.lengthOfTable(newDelegateVaults))
 				local newDelegateVault = newDelegateVaults[msg.Id]
@@ -945,7 +950,7 @@ Handlers.add(
 		ao.send({
 			Target = from,
 			Tags = { Action = "Decrease-Delegate-Stake-Notice", Adddress = target, Quantity = msg.Tags.Quantity },
-			Data = json.encode(gateway),
+			Data = json.encode(delegateResult),
 		})
 		ioEvent:printEvent()
 	end

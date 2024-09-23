@@ -706,8 +706,8 @@ function gar.cancelDelegateWithdrawal(from, gatewayAddress, vaultId)
 	gateway.totalDelegatedStake = gateway.totalDelegatedStake + vaultBalance
 	GatewayRegistry[gatewayAddress] = gateway
 	return {
-		vault = vault,
-		gateway = gar.getGateway(gatewayAddress),
+		delegate = gar.getGateway(gatewayAddress).delegates[from],
+		totalDelegatedStake = gateway.totalDelegatedStake
 	}
 end
 
