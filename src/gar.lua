@@ -483,7 +483,7 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 	assert(type(stake) == "number", "stake is required and must be a number")
 	assert(type(settings) == "table", "settings is required and must be a table")
 	assert(
-		type(observerAddress) == "string" and utils.isValidArweaveAddress(observerAddress),
+		type(observerAddress) == "string" and utils.isValidAOAddress(observerAddress),
 		"Observer-Address is required and must be a a valid arweave address"
 	)
 	assert(type(settings.allowDelegatedStaking) == "boolean", "allowDelegatedStaking must be a boolean")
