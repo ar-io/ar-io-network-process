@@ -374,7 +374,7 @@ describe("arns", function()
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
-				}, result)
+				}, result.record)
 				assert.are.same({
 					["test-name"] = {
 						endTimestamp = timestamp + constants.oneYearMs * 5,
