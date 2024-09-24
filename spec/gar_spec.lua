@@ -113,11 +113,7 @@ describe("gar", function()
 				gar.getSettings().operators.minStake,
 				testSettings,
 				nil, -- no additional services on this gateway
-<<<<<<< HEAD
 				stubGatewayAddress,
-=======
-				"test-this-is-valid-arweave-wallet-address-1",
->>>>>>> be76626 (feat:adds new services list for each gateway.  includes unit tests.)
 				startTimestamp
 			)
 			assert.is_false(status)
@@ -160,11 +156,7 @@ describe("gar", function()
 				gar.getSettings().operators.minStake,
 				testSettings,
 				nil, -- no additional services on this gateway
-<<<<<<< HEAD
 				stubGatewayAddress,
-=======
-				"test-this-is-valid-arweave-wallet-address-1",
->>>>>>> be76626 (feat:adds new services list for each gateway.  includes unit tests.)
 				startTimestamp
 			)
 			assert.is_true(status)
@@ -408,22 +400,22 @@ describe("gar", function()
 				},
 				services = testServices,
 				status = "joined",
-				observerAddress = "test-this-is-valid-arweave-wallet-address-1",
+				observerAddress = stubGatewayAddress,
 			}
 
 			local status, result = pcall(
 				gar.joinNetwork,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				gar.getSettings().operators.minStake,
 				testSettings,
 				testServices,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				startTimestamp
 			)
 			assert.is_true(status)
-			assert.are.equal(Balances["test-this-is-valid-arweave-wallet-address-1"], 0)
+			assert.are.equal(Balances[stubGatewayAddress], 0)
 			assert.are.same(expectation, result)
-			assert.are.same(expectation, gar.getGateway("test-this-is-valid-arweave-wallet-address-1"))
+			assert.are.same(expectation, gar.getGateway(stubGatewayAddress))
 		end)
 		it("should fail to join the network with invalid services key", function()
 			local invalidServices = {
@@ -431,11 +423,11 @@ describe("gar", function()
 			}
 			local status, error = pcall(
 				gar.joinNetwork,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				gar.getSettings().operators.minStake,
 				testSettings,
 				invalidServices,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				startTimestamp
 			)
 			assert.is_false(status)
@@ -455,11 +447,11 @@ describe("gar", function()
 			}
 			local status, error = pcall(
 				gar.joinNetwork,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				gar.getSettings().operators.minStake,
 				testSettings,
 				servicesWithInvalidBundler,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				startTimestamp
 			)
 			assert.is_false(status)
@@ -480,11 +472,11 @@ describe("gar", function()
 
 			local status, error = pcall(
 				gar.joinNetwork,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				gar.getSettings().operators.minStake,
 				testSettings,
 				servicesWithTooManyBundlers,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				startTimestamp
 			)
 			assert.is_false(status)
@@ -504,11 +496,11 @@ describe("gar", function()
 
 			local status, error = pcall(
 				gar.joinNetwork,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				gar.getSettings().operators.minStake,
 				testSettings,
 				servicesWithInvalidFqdn,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				startTimestamp
 			)
 			assert.is_false(status)
@@ -528,11 +520,11 @@ describe("gar", function()
 
 			local status, error = pcall(
 				gar.joinNetwork,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				gar.getSettings().operators.minStake,
 				testSettings,
 				servicesWithInvalidPort,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				startTimestamp
 			)
 			assert.is_false(status)
@@ -552,11 +544,11 @@ describe("gar", function()
 
 			local status, error = pcall(
 				gar.joinNetwork,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				gar.getSettings().operators.minStake,
 				testSettings,
 				servicesWithInvalidProtocol,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				startTimestamp
 			)
 			assert.is_false(status)
@@ -576,11 +568,11 @@ describe("gar", function()
 
 			local status, error = pcall(
 				gar.joinNetwork,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				gar.getSettings().operators.minStake,
 				testSettings,
 				servicesWithInvalidPath,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				startTimestamp
 			)
 			assert.is_false(status)
