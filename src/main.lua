@@ -79,7 +79,7 @@ local ActionMap = {
 	SaveObservations = "Save-Observations",
 	DelegateStake = "Delegate-Stake",
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
-	CancelDelegateWithdrawl = "Cancel-Delegate-Withdrawal",
+	CancelDelegateWithdrawal = "Cancel-Delegate-Withdrawal",
 }
 
 local function eventingPcall(ioEvent, onError, fnToCall, ...)
@@ -881,8 +881,8 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 end)
 
 Handlers.add(
-	ActionMap.CancelDelegateWithdrawl,
-	utils.hasMatchingTag("Action", ActionMap.CancelDelegateWithdrawl),
+	ActionMap.CancelDelegateWithdrawal,
+	utils.hasMatchingTag("Action", ActionMap.CancelDelegateWithdrawal),
 	function(msg)
 		local ioEvent = IOEvent(msg)
 		ioEvent:addFieldsIfExist(msg.Tags, { "Target", "Address", "Vault-Id" })
