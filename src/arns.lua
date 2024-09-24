@@ -109,6 +109,7 @@ function arns.extendLease(from, name, years, currentTimestamp)
 	demand.tallyNamePurchase(totalExtensionFee)
 	return {
 		record = arns.getRecord(name),
+		totalExtensionFee = totalExtensionFee,
 		baseRegistrationFee = baseRegistrationFee,
 		remainingBalance = balances.getBalance(from),
 		protocolBalance = balances.getBalance(ao.id),
@@ -153,7 +154,16 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
 	-- Transfer tokens to the protocol balance
 	balances.transfer(ao.id, from, additionalUndernameCost)
 	demand.tallyNamePurchase(additionalUndernameCost)
-	return arns.getRecord(name)
+	return {
+		record = arns.getRecord(name),
+		additionalUndernameCost = additionalUndernameCost,
+		baseRegistrationFee = baseRegistrationFee,
+		remainingBalance = balances.getBalance(from),
+		protocolBalance = balances.getBalance(ao.id),
+		recordsCount = utils.lengthOfTable(NameRegistry.records),
+		reservedRecordsCount = utils.lengthOfTable(NameRegistry.reserved),
+		df = demand.getDemandFactor(),
+	}
 end
 
 function arns.getRecord(name)

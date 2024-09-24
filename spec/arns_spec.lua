@@ -271,7 +271,7 @@ describe("arns", function()
 					undernameLimit = 60,
 				}
 				assert.is_true(status)
-				assert.are.same(expectation, result)
+				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, arns.getRecords())
 
 				local balances = balances.getBalances()

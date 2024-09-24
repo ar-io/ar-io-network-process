@@ -93,6 +93,26 @@ local function eventingPcall(ioEvent, onError, fnToCall, ...)
 	return status, result
 end
 
+local function addRecordResultFields(ioEvent, result)
+	ioEvent:addFieldsIfExist(
+		result,
+		{ "baseRegistrationFee", "remainingBalance", "protocolBalance", "recordsCount", "reservedRecordsCount" }
+	)
+	ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
+	local mappedDfFields = utils.map(result.df, function(k, v)
+		return "df_" .. k, v
+	end)
+	ioEvent:addField("df_trailingPeriodPurchases", table.concat(recordResult.df.trailingPeriodPurchases, ","))
+	ioEvent:addField("df_trailingPeriodRevenues", table.concat(recordResult.df.trailingPeriodRevenues, ","))
+	ioEvent:addFieldsIfExist(mappedDfFields, {
+		"df_currentPeriod",
+		"df_currentDemandFactor",
+		"df_consecutivePeriodsWithMinDemandFactor",
+		"df_revenueThisPeriod",
+		"df_purchasesThisPeriod",
+	})
+end
+
 -- prune state before every interaction
 Handlers.prepend("tick", function()
 	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
@@ -494,24 +514,7 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 	local record = {}
 	if result ~= nil then
 		record = result.record
-		ioEvent:addField("previousBalance", result.remainingBalance + result.record.purchasePrice)
-		ioEvent:addFieldsIfExist(
-			result,
-			{ "baseRegistrationFee", "remainingBalance", "protocolBalance", "recordsCount", "reservedRecordsCount" }
-		)
-		ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
-		local mappedDfFields = utils.map(result.df, function(k, v)
-			return "df_" .. k, v
-		end)
-		ioEvent:addField("df_trailingPeriodPurchases", table.concat(record.df.trailingPeriodPurchases, ","))
-		ioEvent:addField("df_trailingPeriodRevenues", table.concat(record.df.trailingPeriodRevenues, ","))
-		ioEvent:addFieldsIfExist(mappedDfFields, {
-			"df_currentPeriod",
-			"df_currentDemandFactor",
-			"df_consecutivePeriodsWithMinDemandFactor",
-			"df_revenueThisPeriod",
-			"df_purchasesThisPeriod",
-		})
+		addRecordResultFields(ioEvent, result)
 	end
 
 	ao.send({
@@ -558,25 +561,9 @@ Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.Ext
 
 	local recordResult = {}
 	if result ~= nil then
-		-- TODO: DRY this out along with buyRecord handler
 		recordResult = result.record
-		ioEvent:addFieldsIfExist(
-			result,
-			{ "baseRegistrationFee", "remainingBalance", "protocolBalance", "recordsCount", "reservedRecordsCount" }
-		)
-		ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
-		local mappedDfFields = utils.map(result.df, function(k, v)
-			return "df_" .. k, v
-		end)
-		ioEvent:addField("df_trailingPeriodPurchases", table.concat(recordResult.df.trailingPeriodPurchases, ","))
-		ioEvent:addField("df_trailingPeriodRevenues", table.concat(recordResult.df.trailingPeriodRevenues, ","))
-		ioEvent:addFieldsIfExist(mappedDfFields, {
-			"df_currentPeriod",
-			"df_currentDemandFactor",
-			"df_consecutivePeriodsWithMinDemandFactor",
-			"df_revenueThisPeriod",
-			"df_purchasesThisPeriod",
-		})
+		addRecordResultFields(ioEvent, result)
+		ioEvent:addField("totalExtensionFee", recordResult.totalExtensionFee)
 	end
 
 	ao.send({
@@ -591,6 +578,8 @@ Handlers.add(
 	ActionMap.IncreaseUndernameLimit,
 	utils.hasMatchingTag("Action", ActionMap.IncreaseUndernameLimit),
 	function(msg)
+		local ioEvent = IOEvent(msg)
+		ioEvent:addFieldsIfExist(msg.Tags, { "Name", "Quantity" })
 		local checkAssertions = function()
 			assert(type(msg.Tags.Name) == "string", "Invalid name")
 			assert(
@@ -601,37 +590,49 @@ Handlers.add(
 			)
 		end
 
-		local inputStatus, inputResult = pcall(checkAssertions)
-
-		if not inputStatus then
+		local shouldContinue = eventingPcall(ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Invalid-Increase-Undername-Limit-Notice", Error = "Bad-Input" },
-				Data = tostring(inputResult),
+				Data = tostring(error),
 			})
+		end, checkAssertions)
+		if not shouldContinue then
 			return
 		end
 
-		local status, result = pcall(
+		local shouldContinue2, result = eventingPcall(
+			ioEvent,
+			function(error)
+				ao.send({
+					Target = msg.From,
+					Tags = { Action = "Invalid-Increase-Undername-Limit-Notice", Error = "Invalid-Undername-Increase" },
+					Data = tostring(error),
+				})
+			end,
 			arns.increaseundernameLimit,
 			msg.From,
 			string.lower(msg.Tags.Name),
 			tonumber(msg.Tags.Quantity),
 			msg.Timestamp
 		)
-		if not status then
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Invalid-Increase-Undername-Limit-Notice", Error = "Invalid-Undername-Increase" },
-				Data = tostring(result),
-			})
-		else
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Increase-Undername-Limit-Notice", Name = string.lower(msg.Tags.Name) },
-				Data = json.encode(result),
-			})
+		if not shouldContinue2 then
+			return
 		end
+
+		local recordResult = {}
+		if result ~= nil then
+			recordResult = result.record
+			addRecordResultFields(ioEvent, result)
+			ioEvent:addField("previousUndernameLimit", recordResult.undernameLimit - tonumber(msg.Tags.Quantity))
+			ioEvent:addField("additionalUndernameCost", recordResult.additionalUndernameCost)
+		end
+
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Increase-Undername-Limit-Notice", Name = string.lower(msg.Tags.Name) },
+			Data = json.encode(recordResult),
+		})
 	end
 )
 
