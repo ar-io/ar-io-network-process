@@ -437,6 +437,9 @@ Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.I
 end)
 
 Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRecord), function(msg)
+	local ioEvent = IOEvent(msg)
+	ioEvent:addFieldsIfExist(msg.Tags, { "Name", "Purchase-Type", "Years", "Process-Id" })
+
 	local checkAssertions = function()
 		assert(type(msg.Tags.Name) == "string", "Invalid name")
 		assert(type(msg.Tags["Purchase-Type"]) == "string", "Invalid purchase type")
@@ -451,18 +454,31 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 		end
 	end
 
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
+	local shouldContinue = eventingPcall(ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Buy-Record-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
-	local status, result = pcall(
+	ioEvent:addField("nameLength", #msg.Tags.Name)
+
+	local shouldContinue2, result = eventingPcall(
+		ioEvent,
+		function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Invalid-Buy-Record-Notice",
+					Error = "Invalid-Buy-Record",
+				},
+				Data = tostring(error),
+			})
+		end,
 		arns.buyRecord,
 		string.lower(msg.Tags.Name),
 		msg.Tags["Purchase-Type"],
@@ -471,23 +487,42 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 		msg.Timestamp,
 		msg.Tags["Process-Id"]
 	)
-	if not status then
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-Buy-Record-Notice",
-				Error = "Invalid-Buy-Record",
-			},
-			Data = tostring(result),
-		})
+	if not shouldContinue2 then
 		return
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Buy-Record-Notice", Name = msg.Tags.Name },
-			Data = json.encode(result),
-		})
 	end
+
+	local record = {}
+	if result ~= nil then
+		record = result.record
+		ioEvent:addField("previousBalance", result.remainingBalance + result.record.purchasePrice)
+		ioEvent:addFieldsIfExist(
+			result,
+			{ "baseRegistrationFee", "remainingBalance", "protocolBalance", "recordsCount", "reservedRecordsCount" }
+		)
+		ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
+		local mappedDfFields = utils.map(result.df, function(k, v)
+			return "df_" .. k, v
+		end)
+		ioEvent:addField("df_trailingPeriodPurchases", table.concat(record.df.trailingPeriodPurchases, ","))
+		ioEvent:addField("df_trailingPeriodRevenues", table.concat(record.df.trailingPeriodRevenues, ","))
+		ioEvent:addFieldsIfExist(
+			mappedDfFields,
+			{
+				"df_currentPeriod",
+				"df_currentDemandFactor",
+				"df_consecutivePeriodsWithMinDemandFactor",
+				"df_revenueThisPeriod",
+				"df_purchasesThisPeriod",
+			}
+		)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Buy-Record-Notice", Name = msg.Tags.Name },
+		Data = json.encode(record),
+	})
+	ioEvent:printEvent()
 end)
 
 Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.ExtendLease), function(msg)

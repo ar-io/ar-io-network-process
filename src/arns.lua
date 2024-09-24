@@ -21,10 +21,10 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		years = 1 -- set to 1 year by default
 	end
 
-	local baseRegistrionFee = demand.getFees()[#name]
+	local baseRegistrationFee = demand.getFees()[#name]
 
 	local totalRegistrationFee =
-		arns.calculateRegistrationFee(purchaseType, baseRegistrionFee, years, demand.getDemandFactor())
+		arns.calculateRegistrationFee(purchaseType, baseRegistrationFee, years, demand.getDemandFactor())
 
 	if balances.getBalance(from) < totalRegistrationFee then
 		error("Insufficient balance")
@@ -58,7 +58,15 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 	balances.transfer(ao.id, from, totalRegistrationFee)
 	arns.addRecord(name, newRecord)
 	demand.tallyNamePurchase(totalRegistrationFee)
-	return arns.getRecord(name)
+	return {
+		record = arns.getRecord(name),
+		baseRegistrationFee = baseRegistrationFee,
+		remainingBalance = balances.getBalance(from),
+		protocolBalance = balances.getBalance(ao.id),
+		recordsCount = utils.lengthOfTable(NameRegistry.records),
+		reservedRecordsCount = utils.lengthOfTable(NameRegistry.reserved),
+		df = demand.getDemandFactor(),
+	}
 end
 
 function arns.addRecord(name, record)
