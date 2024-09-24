@@ -1,0 +1,28 @@
+{
+  "Lua": {
+    "runtime": {
+      "version": "5.3",
+      "path": [
+        "?.lua",
+        "?/init.lua"
+      ]
+    },
+    "workspace": {
+      "library": [
+        "src",
+        "spec"
+      ]
+    },
+    "diagnostics": {
+      "enable": true,
+      "globals": [
+        "describe",
+        "it",
+        "before_each",
+        "after_each",
+        "after_all",
+        "before_all"
+      ]
+    }
+  }
+}
