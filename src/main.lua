@@ -122,7 +122,6 @@ end, function(msg)
 	local msgId = msg.Id
 	print("Pruning state at timestamp: " .. msgTimestamp)
 	-- TODO: we should copy state here and restore if tick fails, but that requires larger memory - DO NOT DO THIS UNTIL WE START PRUNING STATE of epochs and distributions
-	local status, result = pcall(tick.pruneState, msgTimestamp, msgId)
 	local previousState = {
 		Vaults = utils.deepCopy(Vaults),
 		GatewayRegistry = utils.deepCopy(GatewayRegistry),
@@ -133,13 +132,21 @@ end, function(msg)
 			Target = msg.From,
 			Action = "Invalid-Tick-Notice",
 			Error = "Invalid-Tick",
-			Data = json.encode(result),
+			Data = json.encode(resultOrError),
 		})
 		Vaults = previousState.Vaults
 		GatewayRegistry = previousState.GatewayRegistry
 		NameRegistry = previousState.NameRegistry
+		msg.tickError = resultOrError
 		return true -- stop processing here and return
 	end
+
+	if resultOrError ~= nil then
+		if #(resultOrError.prunedRecords or {}) > 0 then
+			msg.prunedRecords = resultOrError.prunedRecords
+		end
+	end
+
 	return status
 end)
 

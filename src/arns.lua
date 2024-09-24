@@ -430,7 +430,9 @@ function arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
 end
 
 function arns.removeRecord(name)
+	local record = NameRegistry.records[name]
 	NameRegistry.records[name] = nil
+	return record
 end
 
 function arns.removeReservedName(name)
@@ -439,12 +441,14 @@ end
 
 -- prune records that have expired
 function arns.pruneRecords(currentTimestamp)
+	local prunedRecords = {}
 	-- identify any records that are leases and that have expired, account for a one week grace period in seconds
 	for name, record in pairs(arns.getRecords()) do
 		if record.type == "lease" and record.endTimestamp + constants.gracePeriodMs <= currentTimestamp then
-			arns.removeRecord(name)
+			prunedRecords[name] = arns.removeRecord(name)
 		end
 	end
+	return prunedRecords
 end
 
 -- identify any reserved names that have expired, account for a one week grace period in seconds
