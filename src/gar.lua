@@ -383,8 +383,9 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 	GatewayRegistry[gatewayAddress] = gateway
 	return gar.getGateway(gatewayAddress)
 end
-function gar.isGatewayLeaving(gateway, currentTimestamp)
-	return gateway.status == "leaving" and gateway.endTimestamp <= currentTimestamp
+
+function gar.isGatewayLeaving(gateway)
+	return gateway.status == "leaving"
 end
 
 function gar.isGatewayEligibleToLeave(gateway, timestamp)
@@ -395,18 +396,17 @@ function gar.isGatewayEligibleToLeave(gateway, timestamp)
 	return isJoined
 end
 
-function gar.isGatewayActiveBetweenTimestamps(startTimestamp, endTimestamp, gateway)
+function gar.isGatewayActiveBeforeTimestamp(startTimestamp, gateway)
 	local didStartBeforeEpoch = gateway.startTimestamp <= startTimestamp
-	local didNotLeaveDuringEpoch = not gar.isGatewayLeaving(gateway, endTimestamp)
-	return didStartBeforeEpoch and didNotLeaveDuringEpoch
+	local isNotLeaving = not gar.isGatewayLeaving(gateway)
+	return didStartBeforeEpoch and isNotLeaving
 end
-
-function gar.getActiveGatewaysBetweenTimestamps(startTimestamp, endtimestamp)
+function gar.getActiveGatewaysBeforeTimestamp(startTimestamp)
 	local gateways = gar.getGateways()
 	local activeGatewayAddresses = {}
 	-- use pairs as gateways is a map
 	for address, gateway in pairs(gateways) do
-		if gar.isGatewayActiveBetweenTimestamps(startTimestamp, endtimestamp, gateway) then
+		if gar.isGatewayActiveBeforeTimestamp(startTimestamp, gateway) then
 			table.insert(activeGatewayAddresses, address)
 		end
 	end

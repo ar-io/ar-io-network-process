@@ -793,6 +793,29 @@ describe("gar", function()
 		end)
 	end)
 
+	describe("getActiveGatewaysBeforeTimestamp", function()
+		it("should return all active gateways before the timestamp", function()
+			local timestamp = 1704092400100
+			_G.GatewayRegistry = {
+				["test-this-is-valid-arweave-wallet-address-1"] = {
+					startTimestamp = timestamp - 10, -- joined before the timestamp
+					status = "joined",
+				},
+				["test-this-is-valid-arweave-wallet-address-2"] = {
+					startTimestamp = timestamp + 10, -- joined after the timestamp
+					status = "joined",
+				},
+				["test-this-is-valid-arweave-wallet-address-3"] = {
+					startTimestamp = timestamp - 10, -- joined before the timestamp, but leaving
+					endTimestamp = timestamp + 100,
+					status = "leaving",
+				},
+			}
+			local result = gar.getActiveGatewaysBeforeTimestamp(timestamp)
+			assert.are.same({ "test-this-is-valid-arweave-wallet-address-1" }, result)
+		end)
+	end)
+
 	describe("getters", function()
 		-- TODO: other tests for error conditions when joining/leaving network
 		it("should get single gateway", function()

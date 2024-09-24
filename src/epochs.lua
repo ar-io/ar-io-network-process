@@ -162,8 +162,8 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	assert(epochIndex >= 0, "Epoch index must be greater than or equal to 0")
 	assert(type(hashchain) == "string", "Hashchain must be a string")
 
-	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
-	local activeGatewayAddresses = gar.getActiveGatewaysBetweenTimestamps(epochStartTimestamp, epochEndTimestamp)
+	local epochStartTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
+	local activeGatewayAddresses = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
 	local weightedGateways = gar.getGatewayWeightsAtTimestamp(activeGatewayAddresses, epochStartTimestamp)
 
 	-- Filter out any observers that could have a normalized composite weight of 0
@@ -380,8 +380,7 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 		local gateway = gar.getGateway(failedGatewayAddress)
 
 		if gateway then
-			local gatewayPresentDuringEpoch =
-				gar.isGatewayActiveBetweenTimestamps(epochStartTimestamp, epochEndTimestamp, gateway)
+			local gatewayPresentDuringEpoch = gar.isGatewayActiveBeforeTimestamp(epochStartTimestamp, gateway)
 			if gatewayPresentDuringEpoch then
 				-- if there are none, create an array
 				if epoch.observations.failureSummaries == nil then
@@ -421,8 +420,8 @@ function epochs.updateEpochSettings(newSettings)
 end
 
 function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
-	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
-	local activeGatewayAddresses = gar.getActiveGatewaysBetweenTimestamps(epochStartTimestamp, epochEndTimestamp)
+	local epochStartTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
+	local activeGatewayAddresses = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
 	local totalEligibleRewards = math.floor(balances.getBalance(ao.id) * epochs.getSettings().rewardPercentage)
 	local eligibleGatewayReward = math.floor(totalEligibleRewards * 0.90 / #activeGatewayAddresses) -- TODO: make these setting variables
 	local eligibleObserverReward = math.floor(totalEligibleRewards * 0.10 / #prescribedObservers) -- TODO: make these setting variables
