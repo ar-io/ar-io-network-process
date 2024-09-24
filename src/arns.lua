@@ -94,8 +94,8 @@ function arns.extendLease(from, name, years, currentTimestamp)
 	local record = arns.getRecord(name)
 	-- throw error if invalid
 	arns.assertValidExtendLease(record, currentTimestamp, years)
-	local baseRegistrionFee = demand.getFees()[#name]
-	local totalExtensionFee = arns.calculateExtensionFee(baseRegistrionFee, years, demand.getDemandFactor())
+	local baseRegistrationFee = demand.getFees()[#name]
+	local totalExtensionFee = arns.calculateExtensionFee(baseRegistrationFee, years, demand.getDemandFactor())
 
 	if balances.getBalance(from) < totalExtensionFee then
 		error("Insufficient balance")
@@ -107,7 +107,15 @@ function arns.extendLease(from, name, years, currentTimestamp)
 	-- Transfer tokens to the protocol balance
 	balances.transfer(ao.id, from, totalExtensionFee)
 	demand.tallyNamePurchase(totalExtensionFee)
-	return arns.getRecord(name)
+	return {
+		record = arns.getRecord(name),
+		baseRegistrationFee = baseRegistrationFee,
+		remainingBalance = balances.getBalance(from),
+		protocolBalance = balances.getBalance(ao.id),
+		recordsCount = utils.lengthOfTable(NameRegistry.records),
+		reservedRecordsCount = utils.lengthOfTable(NameRegistry.reserved),
+		df = demand.getDemandFactor(),
+	}
 end
 
 function arns.calculateExtensionFee(baseFee, years, demandFactor)
@@ -127,9 +135,9 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
 		yearsRemaining = arns.calculateYearsBetweenTimestamps(currentTimestamp, record.endTimestamp)
 	end
 
-	local baseRegistrionFee = demand.getFees()[#name]
+	local baseRegistrationFee = demand.getFees()[#name]
 	local additionalUndernameCost =
-		arns.calculateUndernameCost(baseRegistrionFee, qty, record.type, yearsRemaining, demand.getDemandFactor())
+		arns.calculateUndernameCost(baseRegistrationFee, qty, record.type, yearsRemaining, demand.getDemandFactor())
 
 	if additionalUndernameCost < 0 then
 		error("Invalid undername cost")
@@ -230,8 +238,8 @@ end
 
 -- internal functions
 function arns.calculateLeaseFee(baseFee, years, demandFactor)
-	local annualRegistrionFee = arns.calculateAnnualRenewalFee(baseFee, years)
-	local totalLeaseCost = baseFee + annualRegistrionFee
+	local annualRegistrationFee = arns.calculateAnnualRenewalFee(baseFee, years)
+	local totalLeaseCost = baseFee + annualRegistrationFee
 	return math.floor(demandFactor * totalLeaseCost)
 end
 
