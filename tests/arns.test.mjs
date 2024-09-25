@@ -269,13 +269,13 @@ describe('ArNS', async () => {
     });
 
     const priceList = JSON.parse(priceListResult.Messages[0].Data);
-    Object.keys(priceList).forEach((key, index) => {
-      ['1', '2', '3', '4', '5', 'permabuy'].forEach((years) => {
-        assert(typeof priceList[key][years] === 'number');
-      });
-    });
-    // should return price list for names from 1 to 51
+    // check that each key has lease with years and permabuy prices
     assert(Object.keys(priceList).length == 51);
+    Object.keys(priceList).forEach((key) => {
+      assert(priceList[key].lease);
+      assert(priceList[key].permabuy);
+      assert(Object.keys(priceList[key].lease).length == 5);
+    });
   });
 
   it('should get the costs increase undername correctly', async () => {
