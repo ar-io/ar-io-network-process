@@ -325,21 +325,21 @@ function arns.getMaxAllowedYearsExtensionForRecord(record, currentTimestamp)
 end
 
 function arns.getRegistrationFees()
-	local function createPriceListForDomainLength(baseFee, demandFactor)
-		local fees = {}
-		for i = 1, 5 do
-			fees[tostring(i)] = arns.calculateRegistrationFee("lease", baseFee, i, demandFactor)
-		end
-		fees.permabuy = arns.calculateRegistrationFee("permabuy", baseFee, nil, demandFactor)
-		return fees
-	end
+	local fees = {}
+	local demandFactor = demand.getDemandFactor()
 
-	-- return full price list for each length of name
-	local priceList = {}
 	for nameLength, baseFee in pairs(demand.getFees()) do
-		priceList[tostring(nameLength)] = createPriceListForDomainLength(baseFee, demand.getDemandFactor())
+		local feesForNameLength = {
+			lease = {},
+			permabuy = 0,
+		}
+		for years = 1, constants.maxLeaseLengthYears do
+			feesForNameLength.lease[tostring(years)] = arns.calculateLeaseFee(baseFee, years, demandFactor)
+		end
+		feesForNameLength.permabuy = arns.calculatePermabuyFee(baseFee, demandFactor)
+		fees[tostring(nameLength)] = feesForNameLength
 	end
-	return priceList
+	return fees
 end
 
 function arns.getTokenCost(intendedAction)

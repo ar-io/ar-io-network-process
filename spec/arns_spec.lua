@@ -3,7 +3,7 @@ local constants = require("constants")
 local arns = require("arns")
 local balances = require("balances")
 local demand = require("demand")
-local json = require("json")
+local utils = require("utils")
 
 describe("arns", function()
 	local timestamp = 0
@@ -532,24 +532,15 @@ describe("arns", function()
 
 	describe("getRegistrationFees", function()
 		it("should return the correct registration prices", function()
-			local prices = arns.getRegistrationFees()
+			local registrationFees = arns.getRegistrationFees()
 
-			for nameLength, priceList in ipairs(prices) do
-				for type, price in pairs(priceList) do
-					-- convert type to number if not equal to permabuy
-					local purchaseType = type
-					if type ~= "permabuy" then
-						purchaseType = tonumber(type)
-					end
-					local tokenCost = arns.getTokenCost({
-						intent = "Buy-Record",
-						purchaseType = type(purchaseType) == "number" and purchaseType or purchaseType,
-						years = type(purchaseType) == "number" and purchaseType or nil,
-						name = string.rep("a", nameLength),
-					})
-					assert.are.equal(price, tokenCost)
-				end
-			end
+			-- check first, middle and last name lengths
+			assert.are.equal(utils.lengthOfTable(registrationFees), 51)
+			assert.are.equal(registrationFees["1"].lease["1"], 2400000000000)
+			assert.are.equal(registrationFees["5"].lease["3"], 6400000000)
+			assert.are.equal(registrationFees["10"].permabuy, 2500000000)
+			assert.are.equal(registrationFees["10"].lease["5"], 1000000000)
+			assert.are.equal(registrationFees["51"].lease["1"], 480000000)
 		end)
 	end)
 end)
