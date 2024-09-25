@@ -352,7 +352,7 @@ describe("epochs", function()
 							passedConsecutiveEpochs = 0,
 						},
 						settings = testSettings,
-						status = "leaving",
+						status = "leaving", -- leaving, so it is not eligible to receive stats from this epoch
 						observerAddress = "test-this-is-valid-arweave-wallet-address-4",
 					},
 				}
