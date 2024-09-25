@@ -7,17 +7,11 @@ local function IOEvent(msg, initialData)
 		Cron = msg.Cron or false,
 		Cast = msg.Cast or false,
 	})
+	event:addFields(msg.Tags or {})
 	event:addFieldsIfExist(msg, { "From", "Timestamp", "Action" })
 	event:addField("FromFormatted", utils.formatAddress(msg.From))
 	if initialData ~= nil then
 		event:addFields(initialData)
-	end
-	if msg.prunedRecords ~= nil then
-		event:addField("PrunedRecords", table.concat(msg.prunedRecords, ";"))
-		event:addField("PrunedRecordsCount", #msg.prunedRecords)
-	end
-	if msg.tickError ~= nil then
-		event:addField("TickError", msg.tickError)
 	end
 	return event
 end
