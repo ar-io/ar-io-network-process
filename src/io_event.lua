@@ -7,6 +7,7 @@ local function IOEvent(msg, initialData)
 		Cron = msg.Cron or false,
 		Cast = msg.Cast or false,
 	})
+	event:addFields(msg.Tags or {})
 	event:addFieldsIfExist(msg, { "From", "Timestamp", "Action" })
 	event:addField("FromFormatted", utils.formatAddress(msg.From))
 	if initialData ~= nil then

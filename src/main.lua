@@ -79,7 +79,7 @@ local ActionMap = {
 	SaveObservations = "Save-Observations",
 	DelegateStake = "Delegate-Stake",
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
-	CancelDelegateWithdrawl = "Cancel-Delegate-Withdrawal",
+	CancelDelegateWithdrawal = "Cancel-Delegate-Withdrawal",
 }
 
 local function eventingPcall(ioEvent, onError, fnToCall, ...)
@@ -93,16 +93,42 @@ local function eventingPcall(ioEvent, onError, fnToCall, ...)
 	return status, result
 end
 
+local function addRecordResultFields(ioEvent, result)
+	ioEvent:addFieldsIfExist(
+		result,
+		{ "baseRegistrationFee", "remainingBalance", "protocolBalance", "recordsCount", "reservedRecordsCount" }
+	)
+	ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
+	if result.df ~= nil and type(result.df) == "table" then
+		local mappedDfFields = utils.reduce(result.df, function(acc, k, v)
+			acc["df_" .. k] = v
+			return acc
+		end, {})
+		ioEvent:addField("df_trailingPeriodPurchases", table.concat(result.df.trailingPeriodPurchases or {}, ","))
+		ioEvent:addField("df_trailingPeriodRevenues", table.concat(result.df.trailingPeriodRevenues or {}, ","))
+		ioEvent:addFieldsIfExist(mappedDfFields, {
+			"df_currentPeriod",
+			"df_currentDemandFactor",
+			"df_consecutivePeriodsWithMinDemandFactor",
+			"df_revenueThisPeriod",
+			"df_purchasesThisPeriod",
+		})
+	end
+end
+
 -- prune state before every interaction
 Handlers.prepend("tick", function()
 	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
 end, function(msg)
 	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
+
+	-- Stash a new IOEvent with the message
+	msg.ioEvent = IOEvent(msg)
+
 	local msgTimestamp = tonumber(msg.Timestamp)
-	local msgId = msg.Id
 	print("Pruning state at timestamp: " .. msgTimestamp)
 	-- TODO: we should copy state here and restore if tick fails, but that requires larger memory - DO NOT DO THIS UNTIL WE START PRUNING STATE of epochs and distributions
-	local status, result = pcall(tick.pruneState, msgTimestamp, msgId)
+	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId)
 	local previousState = {
 		Vaults = utils.deepCopy(Vaults),
 		GatewayRegistry = utils.deepCopy(GatewayRegistry),
@@ -113,21 +139,28 @@ end, function(msg)
 			Target = msg.From,
 			Action = "Invalid-Tick-Notice",
 			Error = "Invalid-Tick",
-			Data = json.encode(result),
+			Data = json.encode(resultOrError),
 		})
 		Vaults = previousState.Vaults
 		GatewayRegistry = previousState.GatewayRegistry
 		NameRegistry = previousState.NameRegistry
+		msg.ioEvent:addField("TickError", tostring(resultOrError))
 		return true -- stop processing here and return
 	end
+
+	if resultOrError ~= nil then
+		local prunedRecordsCount = #(resultOrError.prunedRecords or {})
+		if prunedRecordsCount > 0 then
+			msg.ioEvent:addField("PrunedRecords", table.concat(msg.prunedRecords, ";"))
+			msg.ioEvent:addField("PrunedRecordsCount", prunedRecordsCount)
+		end
+	end
+
 	return status
 end)
 
 -- Write handlers
 Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
-	local ioEvent = IOEvent(msg)
-	ioEvent:addFieldsIfExist(msg.Tags, { "Recipient", "Quantity" })
-
 	-- assert recipient is a valid arweave address
 	local function checkAssertions()
 		assert(utils.isValidAOAddress(msg.Tags.Recipient), "Invalid recipient")
@@ -137,7 +170,7 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 		)
 	end
 
-	local shouldContinue = eventingPcall(ioEvent, function(error)
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Transfer-Notice", Error = "Transfer-Error" },
@@ -151,9 +184,9 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 	local from = utils.formatAddress(msg.From)
 	local recipient = utils.formatAddress(msg.Tags.Recipient)
 	local quantity = tonumber(msg.Tags.Quantity)
-	ioEvent:addField("RecipientFormatted", recipient)
+	msg.ioEvent:addField("RecipientFormatted", recipient)
 
-	local shouldContinue2, result = eventingPcall(ioEvent, function(error)
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Transfer-Notice", Error = "Transfer-Error" },
@@ -167,10 +200,10 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 	if result ~= nil then
 		local senderNewBalance = result[from]
 		local recipientNewBalance = result[recipient]
-		ioEvent:addField("SenderPreviousBalance", senderNewBalance + quantity)
-		ioEvent:addField("SenderNewBalance", senderNewBalance)
-		ioEvent:addField("RecipientPreviousBalance", recipientNewBalance - quantity)
-		ioEvent:addField("RecipientNewBalance", recipientNewBalance)
+		msg.ioEvent:addField("SenderPreviousBalance", senderNewBalance + quantity)
+		msg.ioEvent:addField("SenderNewBalance", senderNewBalance)
+		msg.ioEvent:addField("RecipientPreviousBalance", recipientNewBalance - quantity)
+		msg.ioEvent:addField("RecipientNewBalance", recipientNewBalance)
 	end
 
 	-- Casting implies that the sender does not want a response - Reference: https://elixirforum.com/t/what-is-the-etymology-of-genserver-cast/33610/3
@@ -200,23 +233,21 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 				debitNotice[tagName] = tagValue
 				creditNotice[tagName] = tagValue
 				didForwardTags = true
-				ioEvent:addField(tagName, tagValue)
+				msg.ioEvent:addField(tagName, tagValue)
 			end
 		end
 		if didForwardTags then
-			ioEvent:addField("ForwardedTags", "true")
+			msg.ioEvent:addField("ForwardedTags", "true")
 		end
 
 		-- Send Debit-Notice and Credit-Notice
 		ao.send(debitNotice)
 		ao.send(creditNotice)
 	end
-	ioEvent:printEvent()
+	msg.ioEvent:printEvent()
 end)
 
 Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.CreateVault), function(msg)
-	local ioEvent = IOEvent(msg)
-	ioEvent:addFieldsIfExist(msg.Tags, { "Lock-Length", "Quantity" })
 	local function checkAssertions()
 		assert(
 			msg.Tags["Lock-Length"]
@@ -230,7 +261,7 @@ Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.Cre
 		)
 	end
 
-	local shouldContinue = eventingPcall(ioEvent, function(error)
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Create-Vault-Notice", Error = "Bad-Input" },
@@ -262,10 +293,10 @@ Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.Cre
 	end
 
 	if vault ~= nil then
-		ioEvent:addField("Vault-Id", msg.Id)
-		ioEvent:addField("VaultBalance", vault.balance)
-		ioEvent:addField("VaultStartTimestamp", vault.startTimestamp)
-		ioEvent:addField("VaultEndTimestamp", vault.endTimestamp)
+		msg.ioEvent:addField("Vault-Id", msg.Id)
+		msg.ioEvent:addField("VaultBalance", vault.balance)
+		msg.ioEvent:addField("VaultStartTimestamp", vault.startTimestamp)
+		msg.ioEvent:addField("VaultEndTimestamp", vault.endTimestamp)
 	end
 
 	ao.send({
@@ -276,7 +307,7 @@ Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.Cre
 		},
 		Data = json.encode(vault),
 	})
-	ioEvent:printEvent()
+	msg.ioEvent:printEvent()
 end)
 
 Handlers.add(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap.VaultedTransfer), function(msg)
@@ -334,8 +365,6 @@ Handlers.add(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap
 end)
 
 Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.ExtendVault), function(msg)
-	local ioEvent = IOEvent(msg)
-	ioEvent:addFieldsIfExist(msg.Tags, { "Vault-Id", "Extend-Length" })
 	local checkAssertions = function()
 		assert(utils.isValidArweaveAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
 		assert(
@@ -346,7 +375,7 @@ Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.Ext
 
 	local vaultId = msg.Tags["Vault-Id"]
 	local extendLength = tonumber(msg.Tags["Extend-Length"])
-	local shouldContinue = eventingPcall(ioEvent, function(error)
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Extend-Vault-Notice", Error = "Bad-Input" },
@@ -357,7 +386,7 @@ Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.Ext
 		return
 	end
 
-	local shouldContinue2, vault = eventingPcall(ioEvent, function(error)
+	local shouldContinue2, vault = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Extend-Vault-Notice", Error = "Invalid-Extend-Vault" },
@@ -369,11 +398,11 @@ Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.Ext
 	end
 
 	if vault ~= nil then
-		ioEvent:addField("Vault-Id", vaultId)
-		ioEvent:addField("VaultBalance", vault.balance)
-		ioEvent:addField("VaultStartTimestamp", vault.startTimestamp)
-		ioEvent:addField("VaultEndTimestamp", vault.endTimestamp)
-		ioEvent:addField("VaultPrevEndTimestamp", vault.endTimestamp - extendLength)
+		msg.ioEvent:addField("Vault-Id", vaultId)
+		msg.ioEvent:addField("VaultBalance", vault.balance)
+		msg.ioEvent:addField("VaultStartTimestamp", vault.startTimestamp)
+		msg.ioEvent:addField("VaultEndTimestamp", vault.endTimestamp)
+		msg.ioEvent:addField("VaultPrevEndTimestamp", vault.endTimestamp - extendLength)
 	end
 
 	ao.send({
@@ -381,12 +410,10 @@ Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.Ext
 		Tags = { Action = "Vault-Extended-Notice" },
 		Data = json.encode(vault),
 	})
-	ioEvent:printEvent()
+	msg.ioEvent:printEvent()
 end)
 
 Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.IncreaseVault), function(msg)
-	local ioEvent = IOEvent(msg)
-	ioEvent:addFieldsIfExist(msg.Tags, { "Vault-Id", "Quantity" })
 	local function checkAssertions()
 		assert(utils.isValidArweaveAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
 		assert(
@@ -395,7 +422,7 @@ Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.I
 		)
 	end
 
-	local shouldContinue = eventingPcall(ioEvent, function(error)
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Increase-Vault-Notice", Error = "Bad-Input" },
@@ -409,7 +436,7 @@ Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.I
 	local quantity = tonumber(msg.Tags.Quantity)
 	local vaultId = msg.Tags["Vault-Id"]
 
-	local shouldContinue2, vault = eventingPcall(ioEvent, function(error)
+	local shouldContinue2, vault = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Increase-Vault-Notice", Error = "Invalid-Increase-Vault" },
@@ -421,11 +448,11 @@ Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.I
 	end
 
 	if vault ~= nil then
-		ioEvent:addField("Vault-Id", vaultId)
-		ioEvent:addField("VaultBalance", vault.balance)
-		ioEvent:addField("VaultPrevBalance", vault.balance - quantity)
-		ioEvent:addField("VaultStartTimestamp", vault.startTimestamp)
-		ioEvent:addField("VaultEndTimestamp", vault.endTimestamp)
+		msg.ioEvent:addField("Vault-Id", vaultId)
+		msg.ioEvent:addField("VaultBalance", vault.balance)
+		msg.ioEvent:addField("VaultPrevBalance", vault.balance - quantity)
+		msg.ioEvent:addField("VaultStartTimestamp", vault.startTimestamp)
+		msg.ioEvent:addField("VaultEndTimestamp", vault.endTimestamp)
 	end
 
 	ao.send({
@@ -433,7 +460,7 @@ Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.I
 		Tags = { Action = "Vault-Increased-Notice" },
 		Data = json.encode(vault),
 	})
-	ioEvent:printEvent()
+	msg.ioEvent:printEvent()
 end)
 
 Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRecord), function(msg)
@@ -451,18 +478,31 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 		end
 	end
 
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Buy-Record-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
-	local status, result = pcall(
+	msg.ioEvent:addField("nameLength", #msg.Tags.Name)
+
+	local shouldContinue2, result = eventingPcall(
+		msg.ioEvent,
+		function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Invalid-Buy-Record-Notice",
+					Error = "Invalid-Buy-Record",
+				},
+				Data = tostring(error),
+			})
+		end,
 		arns.buyRecord,
 		string.lower(msg.Tags.Name),
 		msg.Tags["Purchase-Type"],
@@ -471,23 +511,22 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 		msg.Timestamp,
 		msg.Tags["Process-Id"]
 	)
-	if not status then
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-Buy-Record-Notice",
-				Error = "Invalid-Buy-Record",
-			},
-			Data = tostring(result),
-		})
+	if not shouldContinue2 then
 		return
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Buy-Record-Notice", Name = msg.Tags.Name },
-			Data = json.encode(result),
-		})
 	end
+
+	local record = {}
+	if result ~= nil then
+		record = result.record
+		addRecordResultFields(msg.ioEvent, result)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Buy-Record-Notice", Name = msg.Tags.Name },
+		Data = json.encode(record),
+	})
+	msg.ioEvent:printEvent()
 end)
 
 Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.ExtendLease), function(msg)
@@ -499,32 +538,41 @@ Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.Ext
 		)
 	end
 
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Extend-Lease-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
-	local status, result =
-		pcall(arns.extendLease, msg.From, string.lower(msg.Tags.Name), tonumber(msg.Tags.Years), msg.Timestamp)
-	if not status then
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Extend-Lease-Notice", Error = "Invalid-Extend-Lease" },
-			Data = tostring(result),
+			Data = tostring(error),
 		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Extend-Lease-Notice", Name = string.lower(msg.Tags.Name) },
-			Data = json.encode(result),
-		})
+	end, arns.extendLease, msg.From, string.lower(msg.Tags.Name), tonumber(msg.Tags.Years), msg.Timestamp)
+	if not shouldContinue2 then
+		return
 	end
+
+	local recordResult = {}
+	if result ~= nil then
+		recordResult = result.record
+		addRecordResultFields(msg.ioEvent, result)
+		msg.ioEvent:addField("totalExtensionFee", recordResult.totalExtensionFee)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Extend-Lease-Notice", Name = string.lower(msg.Tags.Name) },
+		Data = json.encode(recordResult),
+	})
+	msg.ioEvent:printEvent()
 end)
 
 Handlers.add(
@@ -541,37 +589,49 @@ Handlers.add(
 			)
 		end
 
-		local inputStatus, inputResult = pcall(checkAssertions)
-
-		if not inputStatus then
+		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Invalid-Increase-Undername-Limit-Notice", Error = "Bad-Input" },
-				Data = tostring(inputResult),
+				Data = tostring(error),
 			})
+		end, checkAssertions)
+		if not shouldContinue then
 			return
 		end
 
-		local status, result = pcall(
+		local shouldContinue2, result = eventingPcall(
+			ioEvent,
+			function(error)
+				ao.send({
+					Target = msg.From,
+					Tags = { Action = "Invalid-Increase-Undername-Limit-Notice", Error = "Invalid-Undername-Increase" },
+					Data = tostring(error),
+				})
+			end,
 			arns.increaseundernameLimit,
 			msg.From,
 			string.lower(msg.Tags.Name),
 			tonumber(msg.Tags.Quantity),
 			msg.Timestamp
 		)
-		if not status then
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Invalid-Increase-Undername-Limit-Notice", Error = "Invalid-Undername-Increase" },
-				Data = tostring(result),
-			})
-		else
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Increase-Undername-Limit-Notice", Name = string.lower(msg.Tags.Name) },
-				Data = json.encode(result),
-			})
+		if not shouldContinue2 then
+			return
 		end
+
+		local recordResult = {}
+		if result ~= nil then
+			recordResult = result.record
+			addRecordResultFields(msg.ioEvent, result)
+			msg.ioEvent:addField("previousUndernameLimit", recordResult.undernameLimit - tonumber(msg.Tags.Quantity))
+			msg.ioEvent:addField("additionalUndernameCost", recordResult.additionalUndernameCost)
+		end
+
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Increase-Undername-Limit-Notice", Name = string.lower(msg.Tags.Name) },
+			Data = json.encode(recordResult),
+		})
 	end
 )
 
@@ -765,8 +825,6 @@ Handlers.add(
 )
 
 Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.DelegateStake), function(msg)
-	local ioEvent = IOEvent(msg)
-	ioEvent:addFieldsIfExist(msg.Tags, { "Target", "Address", "Quantity" })
 	local checkAssertions = function()
 		assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid target address")
 		assert(
@@ -775,7 +833,7 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 		)
 	end
 
-	local shouldContinue = eventingPcall(ioEvent, function(error)
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Bad-Input" },
@@ -789,9 +847,9 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 	local from = utils.formatAddress(msg.From)
 	local quantity = tonumber(msg.Tags.Quantity)
-	ioEvent:addField("TargetFormatted", target)
+	msg.ioEvent:addField("TargetFormatted", target)
 
-	local shouldContinue2, gateway = eventingPcall(ioEvent, function(error)
+	local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = from,
 			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Invalid-Delegate-Stake", Message = error }, -- TODO: is this still right?
@@ -805,9 +863,9 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 	local delegateResult = {}
 	if gateway ~= nil then
 		local newStake = gateway.delegates[from].delegatedStake
-		ioEvent:addField("PreviousStake", newStake - quantity)
-		ioEvent:addField("NewStake", newStake)
-		ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
+		msg.ioEvent:addField("PreviousStake", newStake - quantity)
+		msg.ioEvent:addField("NewStake", newStake)
+		msg.ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
 		delegateResult = gateway.delegates[from]
 	end
 
@@ -816,21 +874,19 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 		Tags = { Action = "Delegate-Stake-Notice", Gateway = msg.Tags.Target },
 		Data = json.encode(delegateResult),
 	})
-	ioEvent:printEvent()
+	msg.ioEvent:printEvent()
 end)
 
 Handlers.add(
-	ActionMap.CancelDelegateWithdrawl,
-	utils.hasMatchingTag("Action", ActionMap.CancelDelegateWithdrawl),
+	ActionMap.CancelDelegateWithdrawal,
+	utils.hasMatchingTag("Action", ActionMap.CancelDelegateWithdrawal),
 	function(msg)
-		local ioEvent = IOEvent(msg)
-		ioEvent:addFieldsIfExist(msg.Tags, { "Target", "Address", "Vault-Id" })
 		local checkAssertions = function()
 			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
 			assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
 		end
 
-		local shouldContinue = eventingPcall(ioEvent, function(error)
+		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Invalid-Cancel-Delegate-Withdrawal-Notice", Error = "Bad-Input" },
@@ -844,9 +900,9 @@ Handlers.add(
 		local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 		local fromAddress = utils.formatAddress(msg.From)
 		local vaultId = msg.Tags["Vault-Id"]
-		ioEvent:addField("TargetFormatted", gatewayAddress)
+		msg.ioEvent:addField("TargetFormatted", gatewayAddress)
 
-		local shouldContinue2, result = eventingPcall(ioEvent, function(error)
+		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = {
@@ -865,9 +921,9 @@ Handlers.add(
 			if result.delegate ~= nil then
 				delegateResult = result.delegate
 				local newStake = delegateResult.delegatedStake
-				ioEvent:addField("PreviousStake", newStake - delegateResult.vaults[vaultId].balance)
-				ioEvent:addField("NewStake", newStake)
-				ioEvent:addField("GatewayTotalDelegatedStake", result.totalDelegatedStake)
+				msg.ioEvent:addField("PreviousStake", newStake - delegateResult.vaults[vaultId].balance)
+				msg.ioEvent:addField("NewStake", newStake)
+				msg.ioEvent:addField("GatewayTotalDelegatedStake", result.totalDelegatedStake)
 			end
 		end
 
@@ -880,7 +936,7 @@ Handlers.add(
 			},
 			Data = json.encode(delegateResult),
 		})
-		ioEvent:printEvent()
+		msg.ioEvent:printEvent()
 	end
 )
 
@@ -888,9 +944,6 @@ Handlers.add(
 	ActionMap.DecreaseDelegateStake,
 	utils.hasMatchingTag("Action", ActionMap.DecreaseDelegateStake),
 	function(msg)
-		local ioEvent = IOEvent(msg)
-		ioEvent:addFieldsIfExist(msg.Tags, { "Target", "Address", "Quantity" })
-
 		local checkAssertions = function()
 			assert(utils.isValidArweaveAddress(msg.Tags.Target or msg.Tags.Address), "Invalid target address")
 			assert(
@@ -899,7 +952,7 @@ Handlers.add(
 			)
 		end
 
-		local shouldContinue = eventingPcall(ioEvent, function(error)
+		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Bad-Input" },
@@ -913,9 +966,9 @@ Handlers.add(
 		local from = utils.formatAddress(msg.From)
 		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 		local quantity = tonumber(msg.Tags.Quantity)
-		ioEvent:addField("TargetFormatted", target)
+		msg.ioEvent:addField("TargetFormatted", target)
 
-		local shouldContinue2, gateway = eventingPcall(ioEvent, function(error)
+		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = from,
 				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Invalid-Decrease-Delegate-Stake" },
@@ -929,20 +982,20 @@ Handlers.add(
 		local delegateResult = {}
 		if gateway ~= nil then
 			local newStake = gateway.delegates[from].delegatedStake
-			ioEvent:addField("PreviousStake", newStake + quantity)
-			ioEvent:addField("NewStake", newStake)
-			ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
+			msg.ioEvent:addField("PreviousStake", newStake + quantity)
+			msg.ioEvent:addField("NewStake", newStake)
+			msg.ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
 
 			delegateResult = gateway.delegates[from]
 			local newDelegateVaults = delegateResult.vaults
 			if newDelegateVaults ~= nil then
-				ioEvent:addField("VaultsCount", utils.lengthOfTable(newDelegateVaults))
+				msg.ioEvent:addField("VaultsCount", utils.lengthOfTable(newDelegateVaults))
 				local newDelegateVault = newDelegateVaults[msg.Id]
 				if newDelegateVault ~= nil then
-					ioEvent:addField("Vault-Id", msg.Id)
-					ioEvent:addField("VaultBalance", newDelegateVault.balance)
-					ioEvent:addField("VaultStartTimestamp", newDelegateVault.startTimestamp)
-					ioEvent:addField("VaultEndTimestamp", newDelegateVault.endTimestamp)
+					msg.ioEvent:addField("Vault-Id", msg.Id)
+					msg.ioEvent:addField("VaultBalance", newDelegateVault.balance)
+					msg.ioEvent:addField("VaultStartTimestamp", newDelegateVault.startTimestamp)
+					msg.ioEvent:addField("VaultEndTimestamp", newDelegateVault.endTimestamp)
 				end
 			end
 		end
@@ -952,7 +1005,7 @@ Handlers.add(
 			Tags = { Action = "Decrease-Delegate-Stake-Notice", Adddress = target, Quantity = msg.Tags.Quantity },
 			Data = json.encode(delegateResult),
 		})
-		ioEvent:printEvent()
+		msg.ioEvent:printEvent()
 	end
 )
 
