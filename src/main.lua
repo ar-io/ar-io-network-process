@@ -764,7 +764,7 @@ Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.Joi
 		Tags = { Action = "Join-Network-Notice" },
 		Data = json.encode(gateway),
 	})
-	ioEvent:printEvent()
+	msg.ioEvent:printEvent()
 end)
 
 Handlers.add(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", ActionMap.LeaveNetwork), function(msg)
