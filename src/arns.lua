@@ -21,10 +21,10 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		years = 1 -- set to 1 year by default
 	end
 
-	local baseRegistrionFee = demand.getFees()[#name]
+	local baseRegistrationFee = demand.getFees()[#name]
 
 	local totalRegistrationFee =
-		arns.calculateRegistrationFee(purchaseType, baseRegistrionFee, years, demand.getDemandFactor())
+		arns.calculateRegistrationFee(purchaseType, baseRegistrationFee, years, demand.getDemandFactor())
 
 	if balances.getBalance(from) < totalRegistrationFee then
 		error("Insufficient balance")
@@ -58,7 +58,15 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 	balances.transfer(ao.id, from, totalRegistrationFee)
 	arns.addRecord(name, newRecord)
 	demand.tallyNamePurchase(totalRegistrationFee)
-	return arns.getRecord(name)
+	return {
+		record = arns.getRecord(name),
+		baseRegistrationFee = baseRegistrationFee,
+		remainingBalance = balances.getBalance(from),
+		protocolBalance = balances.getBalance(ao.id),
+		recordsCount = utils.lengthOfTable(NameRegistry.records),
+		reservedRecordsCount = utils.lengthOfTable(NameRegistry.reserved),
+		df = demand.getDemandFactorInfo(),
+	}
 end
 
 function arns.addRecord(name, record)
@@ -86,8 +94,8 @@ function arns.extendLease(from, name, years, currentTimestamp)
 	local record = arns.getRecord(name)
 	-- throw error if invalid
 	arns.assertValidExtendLease(record, currentTimestamp, years)
-	local baseRegistrionFee = demand.getFees()[#name]
-	local totalExtensionFee = arns.calculateExtensionFee(baseRegistrionFee, years, demand.getDemandFactor())
+	local baseRegistrationFee = demand.getFees()[#name]
+	local totalExtensionFee = arns.calculateExtensionFee(baseRegistrationFee, years, demand.getDemandFactor())
 
 	if balances.getBalance(from) < totalExtensionFee then
 		error("Insufficient balance")
@@ -99,7 +107,14 @@ function arns.extendLease(from, name, years, currentTimestamp)
 	-- Transfer tokens to the protocol balance
 	balances.transfer(ao.id, from, totalExtensionFee)
 	demand.tallyNamePurchase(totalExtensionFee)
-	return arns.getRecord(name)
+	return {
+		record = arns.getRecord(name),
+		totalExtensionFee = totalExtensionFee,
+		baseRegistrationFee = baseRegistrationFee,
+		remainingBalance = balances.getBalance(from),
+		protocolBalance = balances.getBalance(ao.id),
+		df = demand.getDemandFactorInfo(),
+	}
 end
 
 function arns.calculateExtensionFee(baseFee, years, demandFactor)
@@ -119,9 +134,9 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
 		yearsRemaining = arns.calculateYearsBetweenTimestamps(currentTimestamp, record.endTimestamp)
 	end
 
-	local baseRegistrionFee = demand.getFees()[#name]
+	local baseRegistrationFee = demand.getFees()[#name]
 	local additionalUndernameCost =
-		arns.calculateUndernameCost(baseRegistrionFee, qty, record.type, yearsRemaining, demand.getDemandFactor())
+		arns.calculateUndernameCost(baseRegistrationFee, qty, record.type, yearsRemaining, demand.getDemandFactor())
 
 	if additionalUndernameCost < 0 then
 		error("Invalid undername cost")
@@ -137,7 +152,16 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
 	-- Transfer tokens to the protocol balance
 	balances.transfer(ao.id, from, additionalUndernameCost)
 	demand.tallyNamePurchase(additionalUndernameCost)
-	return arns.getRecord(name)
+	return {
+		record = arns.getRecord(name),
+		additionalUndernameCost = additionalUndernameCost,
+		baseRegistrationFee = baseRegistrationFee,
+		remainingBalance = balances.getBalance(from),
+		protocolBalance = balances.getBalance(ao.id),
+		recordsCount = utils.lengthOfTable(NameRegistry.records),
+		reservedRecordsCount = utils.lengthOfTable(NameRegistry.reserved),
+		df = demand.getDemandFactorInfo(),
+	}
 end
 
 function arns.getRecord(name)
@@ -222,8 +246,8 @@ end
 
 -- internal functions
 function arns.calculateLeaseFee(baseFee, years, demandFactor)
-	local annualRegistrionFee = arns.calculateAnnualRenewalFee(baseFee, years)
-	local totalLeaseCost = baseFee + annualRegistrionFee
+	local annualRegistrationFee = arns.calculateAnnualRenewalFee(baseFee, years)
+	local totalLeaseCost = baseFee + annualRegistrationFee
 	return math.floor(demandFactor * totalLeaseCost)
 end
 
@@ -422,7 +446,9 @@ function arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
 end
 
 function arns.removeRecord(name)
+	local record = NameRegistry.records[name]
 	NameRegistry.records[name] = nil
+	return record
 end
 
 function arns.removeReservedName(name)
@@ -431,12 +457,14 @@ end
 
 -- prune records that have expired
 function arns.pruneRecords(currentTimestamp)
+	local prunedRecords = {}
 	-- identify any records that are leases and that have expired, account for a one week grace period in seconds
 	for name, record in pairs(arns.getRecords()) do
 		if record.type == "lease" and record.endTimestamp + constants.gracePeriodMs <= currentTimestamp then
-			arns.removeRecord(name)
+			prunedRecords[name] = arns.removeRecord(name)
 		end
 	end
+	return prunedRecords
 end
 
 -- identify any reserved names that have expired, account for a one week grace period in seconds

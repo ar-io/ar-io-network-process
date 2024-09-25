@@ -45,7 +45,7 @@ describe("arns", function()
 						processId = testProcessId,
 						startTimestamp = 0,
 						endTimestamp = timestamp + constants.oneYearMs * 1,
-					}, result)
+					}, result.record)
 					assert.are.same({
 						["test-name"] = {
 							purchasePrice = 600000000,
@@ -78,7 +78,7 @@ describe("arns", function()
 						processId = testProcessId,
 						startTimestamp = 0,
 						endTimestamp = timestamp + constants.oneYearMs,
-					}, result)
+					}, result.record)
 					assert.are.same({
 						purchasePrice = 600000000,
 						type = "lease",
@@ -168,7 +168,7 @@ describe("arns", function()
 					undernameLimit = 10,
 				}
 				assert.is_true(status)
-				assert.are.same(expectation, result)
+				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, arns.getRecords())
 
 				local balances = balances.getBalances()
@@ -272,7 +272,7 @@ describe("arns", function()
 					undernameLimit = 60,
 				}
 				assert.is_true(status)
-				assert.are.same(expectation, result)
+				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, arns.getRecords())
 
 				local balances = balances.getBalances()
@@ -375,7 +375,7 @@ describe("arns", function()
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
-				}, result)
+				}, result.record)
 				assert.are.same({
 					["test-name"] = {
 						endTimestamp = timestamp + constants.oneYearMs * 5,

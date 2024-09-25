@@ -675,14 +675,22 @@ describe("gar", function()
 						},
 					},
 				}
-			local status, err = pcall(
+			local status, result = pcall(
 				gar.cancelDelegateWithdrawal,
 				"test-this-is-valid-arweave-wallet-address-2",
 				"test-this-is-valid-arweave-wallet-address-1",
 				"some-previous-withdrawal-id"
 			)
 			assert.is_true(status)
-			assert.is_nil(err)
+			assert.are.same(
+			result,
+			{
+				totalDelegatedStake = 1000,
+				delegate = {
+					delegatedStake = 1000,
+					vaults = {},
+				},
+			})
 			-- assert the vault is removed and the delegated stake is added back to the delegate
 			assert.are.equal(
 				1000, -- added back to the delegate

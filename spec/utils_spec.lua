@@ -51,4 +51,24 @@ describe("utils", function()
 			assert.are.same(nil, utils.findInArray(array, predicate))
 		end)
 	end)
+
+	describe("reduce", function()
+		it("should return the starting value if the input table is empty", function()
+			local input = {}
+			local stubReducer = function(acc, value)
+				return acc + value
+			end
+			assert.are.same(0, utils.reduce(input, stubReducer, 0))
+			assert.are.same({}, utils.reduce(input, stubReducer, {}))
+			assert.are.same("foo", utils.reduce(input, stubReducer, "foo"))
+		end)
+
+		it("should return the reduced value", function()
+			local input = { 1, 2, 3, 4, 5 }
+			local reducer = function(acc, value)
+				return acc + value
+			end
+			assert.are.same(15, utils.reduce(input, reducer, 0))
+		end)
+	end)
 end)
