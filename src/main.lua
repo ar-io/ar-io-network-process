@@ -726,8 +726,18 @@ Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.Joi
 		autoStake = msg.Tags["Auto-Stake"] == "true",
 	}
 	local observerAddress = msg.Tags["Observer-Address"] or msg.Tags.From
+	msg.ioEvent:addField("ResolvedObserverAddress", observerAddress)
+	msg.ioEvent:addField("SenderPreviousBalance", balances[msg.From])
 
-	local status, result = pcall(
+	local shouldContinue, gateway = eventingPcall(
+		msg.ioEvent,
+		function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-Join-Network-Notice", Error = "Invalid-Join-Network" },
+				Data = tostring(error),
+			})
+		end,
 		gar.joinNetwork,
 		msg.From,
 		tonumber(msg.Tags["Operator-Stake"]),
@@ -735,19 +745,18 @@ Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.Joi
 		observerAddress,
 		msg.Timestamp
 	)
-	if not status then
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-Join-Network-Notice", Error = "Invalid-Join-Network" },
-			Data = tostring(result),
-		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Join-Network-Notice" },
-			Data = json.encode(result),
-		})
+	if not shouldContinue then
+		return
 	end
+
+	msg.ioEvent:addField("SenderNewBalance", balances[msg.From])
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Join-Network-Notice" },
+		Data = json.encode(gateway),
+	})
+	ioEvent:printEvent()
 end)
 
 Handlers.add(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", ActionMap.LeaveNetwork), function(msg)
