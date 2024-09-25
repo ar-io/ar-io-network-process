@@ -113,8 +113,6 @@ function arns.extendLease(from, name, years, currentTimestamp)
 		baseRegistrationFee = baseRegistrationFee,
 		remainingBalance = balances.getBalance(from),
 		protocolBalance = balances.getBalance(ao.id),
-		recordsCount = utils.lengthOfTable(NameRegistry.records),
-		reservedRecordsCount = utils.lengthOfTable(NameRegistry.reserved),
 		df = demand.getDemandFactorInfo(),
 	}
 end
