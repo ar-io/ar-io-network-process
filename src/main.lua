@@ -99,18 +99,21 @@ local function addRecordResultFields(ioEvent, result)
 		{ "baseRegistrationFee", "remainingBalance", "protocolBalance", "recordsCount", "reservedRecordsCount" }
 	)
 	ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
-	local mappedDfFields = utils.map(result.df, function(k, v)
-		return "df_" .. k, v
-	end)
-	ioEvent:addField("df_trailingPeriodPurchases", table.concat(recordResult.df.trailingPeriodPurchases, ","))
-	ioEvent:addField("df_trailingPeriodRevenues", table.concat(recordResult.df.trailingPeriodRevenues, ","))
-	ioEvent:addFieldsIfExist(mappedDfFields, {
-		"df_currentPeriod",
-		"df_currentDemandFactor",
-		"df_consecutivePeriodsWithMinDemandFactor",
-		"df_revenueThisPeriod",
-		"df_purchasesThisPeriod",
-	})
+	if result.df ~= nil and type(result.df) == "table" then
+		local mappedDfFields = utils.reduce(result.df, function(acc, k, v)
+			acc["df_" .. k] = v
+			return acc
+		end, {})
+		ioEvent:addField("df_trailingPeriodPurchases", table.concat(result.df.trailingPeriodPurchases or {}, ","))
+		ioEvent:addField("df_trailingPeriodRevenues", table.concat(result.df.trailingPeriodRevenues or {}, ","))
+		ioEvent:addFieldsIfExist(mappedDfFields, {
+			"df_currentPeriod",
+			"df_currentDemandFactor",
+			"df_consecutivePeriodsWithMinDemandFactor",
+			"df_revenueThisPeriod",
+			"df_purchasesThisPeriod",
+		})
+	end
 end
 
 -- prune state before every interaction
@@ -119,9 +122,9 @@ Handlers.prepend("tick", function()
 end, function(msg)
 	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
 	local msgTimestamp = tonumber(msg.Timestamp)
-	local msgId = msg.Id
 	print("Pruning state at timestamp: " .. msgTimestamp)
 	-- TODO: we should copy state here and restore if tick fails, but that requires larger memory - DO NOT DO THIS UNTIL WE START PRUNING STATE of epochs and distributions
+	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId)
 	local previousState = {
 		Vaults = utils.deepCopy(Vaults),
 		GatewayRegistry = utils.deepCopy(GatewayRegistry),
@@ -137,7 +140,7 @@ end, function(msg)
 		Vaults = previousState.Vaults
 		GatewayRegistry = previousState.GatewayRegistry
 		NameRegistry = previousState.NameRegistry
-		msg.tickError = resultOrError
+		msg.tickError = tostring(resultOrError)
 		return true -- stop processing here and return
 	end
 

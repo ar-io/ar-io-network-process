@@ -16,7 +16,7 @@ local function IOEvent(msg, initialData)
 		event:addField("PrunedRecords", table.concat(msg.prunedRecords, ";"))
 		event:addField("PrunedRecordsCount", #msg.prunedRecords)
 	end
-	if msg.tickError then
+	if msg.tickError ~= nil then
 		event:addField("TickError", msg.tickError)
 	end
 	return event

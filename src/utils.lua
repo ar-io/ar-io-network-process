@@ -302,4 +302,12 @@ function utils.checkAndConvertTimestamptoMs(timestamp)
 	return error("Timestamp is out of range")
 end
 
+function utils.reduce(tbl, fn, init)
+	local acc = init
+	for k, v in pairs(tbl) do
+		acc = fn(acc, k, v)
+	end
+	return acc
+end
+
 return utils

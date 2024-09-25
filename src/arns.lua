@@ -65,7 +65,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		protocolBalance = balances.getBalance(ao.id),
 		recordsCount = utils.lengthOfTable(NameRegistry.records),
 		reservedRecordsCount = utils.lengthOfTable(NameRegistry.reserved),
-		df = demand.getDemandFactor(),
+		df = demand.getDemandFactorInfo(),
 	}
 end
 
@@ -115,7 +115,7 @@ function arns.extendLease(from, name, years, currentTimestamp)
 		protocolBalance = balances.getBalance(ao.id),
 		recordsCount = utils.lengthOfTable(NameRegistry.records),
 		reservedRecordsCount = utils.lengthOfTable(NameRegistry.reserved),
-		df = demand.getDemandFactor(),
+		df = demand.getDemandFactorInfo(),
 	}
 end
 
@@ -162,7 +162,7 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
 		protocolBalance = balances.getBalance(ao.id),
 		recordsCount = utils.lengthOfTable(NameRegistry.records),
 		reservedRecordsCount = utils.lengthOfTable(NameRegistry.reserved),
-		df = demand.getDemandFactor(),
+		df = demand.getDemandFactorInfo(),
 	}
 end
 
