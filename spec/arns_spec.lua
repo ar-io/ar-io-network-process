@@ -3,6 +3,7 @@ local constants = require("constants")
 local arns = require("arns")
 local balances = require("balances")
 local demand = require("demand")
+local utils = require("utils")
 
 describe("arns", function()
 	local timestamp = 0
@@ -526,6 +527,20 @@ describe("arns", function()
 					endTimestamp = currentTimestamp + 1000000, -- far in the future
 				},
 			}, _G.NameRegistry.reserved)
+		end)
+	end)
+
+	describe("getRegistrationFees", function()
+		it("should return the correct registration prices", function()
+			local registrationFees = arns.getRegistrationFees()
+
+			-- check first, middle and last name lengths
+			assert.are.equal(utils.lengthOfTable(registrationFees), 51)
+			assert.are.equal(registrationFees["1"].lease["1"], 2400000000000)
+			assert.are.equal(registrationFees["5"].lease["3"], 6400000000)
+			assert.are.equal(registrationFees["10"].permabuy, 2500000000)
+			assert.are.equal(registrationFees["10"].lease["5"], 1000000000)
+			assert.are.equal(registrationFees["51"].lease["1"], 480000000)
 		end)
 	end)
 end)

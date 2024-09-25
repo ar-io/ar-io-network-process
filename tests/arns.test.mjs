@@ -263,6 +263,21 @@ describe('ArNS', async () => {
     assert.equal(tokenCost, 600000000);
   });
 
+  it('should get registration fees', async () => {
+    const priceListResult = await handle({
+      Tags: [{ name: 'Action', value: 'Get-Registration-Fees' }],
+    });
+
+    const priceList = JSON.parse(priceListResult.Messages[0].Data);
+    // check that each key has lease with years and permabuy prices
+    assert(Object.keys(priceList).length == 51);
+    Object.keys(priceList).forEach((key) => {
+      assert(priceList[key].lease);
+      assert(priceList[key].permabuy);
+      assert(Object.keys(priceList[key].lease).length == 5);
+    });
+  });
+
   it('should get the costs increase undername correctly', async () => {
     const buyUndernameResult = await handle({
       Tags: [

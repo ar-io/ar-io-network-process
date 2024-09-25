@@ -56,6 +56,7 @@ local ActionMap = {
 	ReservedNames = "Reserved-Names",
 	ReservedName = "Reserved-Name",
 	TokenCost = "Token-Cost",
+	GetRegistrationFees = "Get-Registration-Fees",
 	-- GATEWAY REGISTRY READ APIS
 	Gateway = "Gateway",
 	Gateways = "Gateways",
@@ -547,6 +548,24 @@ Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.Token
 			Target = msg.From,
 			Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(result) },
 			Data = json.encode(result),
+		})
+	end
+end)
+
+Handlers.add(ActionMap.GetRegistrationFees, utils.hasMatchingTag("Action", ActionMap.GetRegistrationFees), function(msg)
+	local status, priceList = pcall(arns.getRegistrationFees)
+
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-Get-Registration-Fees-Notice", Error = "Invalid-Get-Registration-Fees" },
+			Data = tostring(priceList),
+		})
+	else
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Get-Registration-Fees-Notice" },
+			Data = json.encode(priceList),
 		})
 	end
 end)

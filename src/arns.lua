@@ -324,6 +324,24 @@ function arns.getMaxAllowedYearsExtensionForRecord(record, currentTimestamp)
 	return constants.maxLeaseLengthYears - yearsRemainingOnLease
 end
 
+function arns.getRegistrationFees()
+	local fees = {}
+	local demandFactor = demand.getDemandFactor()
+
+	for nameLength, baseFee in pairs(demand.getFees()) do
+		local feesForNameLength = {
+			lease = {},
+			permabuy = 0,
+		}
+		for years = 1, constants.maxLeaseLengthYears do
+			feesForNameLength.lease[tostring(years)] = arns.calculateLeaseFee(baseFee, years, demandFactor)
+		end
+		feesForNameLength.permabuy = arns.calculatePermabuyFee(baseFee, demandFactor)
+		fees[tostring(nameLength)] = feesForNameLength
+	end
+	return fees
+end
+
 function arns.getTokenCost(intendedAction)
 	local tokenCost = 0
 	if intendedAction.intent == "Buy-Record" then
