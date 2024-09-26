@@ -36,6 +36,30 @@ describe('setup', () => {
     await compose.down();
   });
 
+  describe('handlers', () => {
+    it('should always have correct number of handlers', async () => {
+      const expectedHandlerCount = 50; // TODO: update this if more handlers are added
+      const { Handlers: handlerList } = await io.getInfo();
+      // assert _eval, _default and prune are first
+      assert.ok(
+        handlersList.indexOf('_eval') === 0,
+        '_eval should be first handler',
+      );
+      assert.ok(
+        handlersList.indexOf('_default') === 1,
+        '_default should be second handler',
+      );
+      assert.ok(
+        handlersList.indexOf('prune') === 2,
+        'prune should be third handler',
+      );
+      assert.ok(
+        handlersList.length === expectedHandlerCount,
+        `should only have ${expectedHandlerCount} handlers`,
+      ); // forces us to think critically about the order of handlers so intended to be sensitive to changes
+    });
+  });
+
   describe('distribution totals', () => {
     it('should always have correct eligible rewards for the current epoch (within 10 mIO)', async () => {
       const { distributions: currentEpochDistributions } =
