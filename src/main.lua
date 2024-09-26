@@ -118,7 +118,7 @@ local function addRecordResultFields(ioEvent, result)
 end
 
 -- prune state before every interaction
-Handlers.prepend("tick", function()
+Handlers.after("_default").add("prune", function()
 	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
 end, function(msg)
 	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
