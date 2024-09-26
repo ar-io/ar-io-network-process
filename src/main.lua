@@ -1281,7 +1281,7 @@ Handlers.add(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", ActionMap.I
 			Owner = Owner,
 			Denomination = Denomination,
 			LastTickedEpochIndex = LastTickedEpochIndex,
-			Handlers = json.encode(handlerNames),
+			Handlers = handlerNames,
 		}),
 	})
 end)

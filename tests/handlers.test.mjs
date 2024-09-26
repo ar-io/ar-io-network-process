@@ -30,8 +30,7 @@ describe('handlers', async () => {
         },
       ],
     });
-    const output = JSON.parse(handlers.Messages[0].Data);
-    const handlersList = JSON.parse(output.Handlers);
+    const { Handlers: handlersList } = JSON.parse(handlers.Messages[0].Data);
     assert.ok(handlersList.includes('_eval'));
     assert.ok(handlersList.includes('_default'));
     assert.ok(handlersList.includes('prune'));
