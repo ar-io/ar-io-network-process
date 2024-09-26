@@ -38,24 +38,38 @@ describe('setup', () => {
 
   describe('handlers', () => {
     it('should always have correct number of handlers', async () => {
-      const expectedHandlerCount = 50; // TODO: update this if more handlers are added
-      const { Handlers: handlerList } = await io.getInfo();
-      // assert _eval, _default and prune are first
+      const expectedHandlerCount = 52; // TODO: update this if more handlers are added
+      const { Handlers } = await io.getInfo();
+      const handlersList = JSON.parse(Handlers);
+      /**
+       * There are two security handlers before _eval and _default, so count is 52
+       * {
+       *   handle = function: 0x912128,
+       *   pattern = function: 0xd37708,
+       *   name = "Assignment-Check"
+       *   },
+       *   {
+       *     handle = function: 0x755910,
+       *     pattern = function: 0x929600,
+       *     name = "sec-patch-6-5-2024"
+       * }
+       */
       assert.ok(
-        handlersList.indexOf('_eval') === 0,
-        '_eval should be first handler',
+        handlersList.indexOf('_eval') === 2,
+        '_eval should be first handler, got: ' + handlersList.indexOf('_eval'),
       );
       assert.ok(
-        handlersList.indexOf('_default') === 1,
-        '_default should be second handler',
+        handlersList.indexOf('_default') === 3,
+        '_default should be second handler, got: ' +
+          handlersList.indexOf('_default'),
       );
       assert.ok(
-        handlersList.indexOf('prune') === 2,
-        'prune should be third handler',
+        handlersList.indexOf('prune') === 4,
+        'prune should be third handler, got: ' + handlersList.indexOf('prune'),
       );
       assert.ok(
         handlersList.length === expectedHandlerCount,
-        `should only have ${expectedHandlerCount} handlers`,
+        `should only have ${expectedHandlerCount} handlers, got: ${handlersList.length}`,
       ); // forces us to think critically about the order of handlers so intended to be sensitive to changes
     });
   });
