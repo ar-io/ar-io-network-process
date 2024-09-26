@@ -118,7 +118,7 @@ local function addRecordResultFields(ioEvent, result)
 end
 
 -- prune state before every interaction
-Handlers.prepend("tick", function()
+Handlers.after("_default").add("prune", function()
 	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
 end, function(msg)
 	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
@@ -1185,7 +1185,7 @@ Handlers.add("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Token-Sup
 	})
 end)
 
--- TICK HANDLER - TODO: this may be better as a "Distribute" rewards handler
+-- TICK HANDLER - TODO: this may be better as a "Distribute" rewards handler instead of `Tick` tag
 Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
 	local msgTimestamp = tonumber(msg.Timestamp)
@@ -1256,6 +1256,12 @@ end)
 -- READ HANDLERS
 
 Handlers.add(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", ActionMap.Info), function(msg)
+	local handlers = Handlers.list
+	local handlerNames = {}
+	for _, handler in ipairs(handlers) do
+		table.insert(handlerNames, handler.name)
+	end
+
 	ao.send({
 		Target = msg.From,
 		Action = "Info-Notice",
@@ -1266,6 +1272,7 @@ Handlers.add(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", ActionMap.I
 			Owner = Owner,
 			Denomination = tostring(Denomination),
 			LastTickedEpochIndex = tostring(LastTickedEpochIndex),
+			Handlers = json.encode(handlerNames),
 		},
 		Data = json.encode({
 			Name = Name,
@@ -1274,6 +1281,7 @@ Handlers.add(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", ActionMap.I
 			Owner = Owner,
 			Denomination = Denomination,
 			LastTickedEpochIndex = LastTickedEpochIndex,
+			Handlers = json.encode(handlerNames),
 		}),
 	})
 end)
@@ -1581,51 +1589,6 @@ Handlers.add(ActionMap.Vault, utils.hasMatchingTag("Action", ActionMap.Vault), f
 	end
 end)
 
--- END READ HANDLERS
-
--- UTILITY HANDLERS USED FOR MIGRATION
-Handlers.add("addGateway", utils.hasMatchingTag("Action", "AddGateway"), function(msg)
-	if msg.From ~= Owner then
-		ao.send({ Target = msg.From, Data = "Unauthorized" })
-		return
-	end
-	local operatorStake = tonumber(json.decode(msg.Data).operatorStake)
-	assert(operatorStake > 0, "Operator stake must be greater than 0")
-	local status, result = pcall(gar.addGateway, msg.Tags.Address, json.decode(msg.Data))
-	balances.reduceBalance(Owner, operatorStake)
-	if status then
-		ao.send({ Target = msg.From, Data = json.encode(result) })
-	else
-		ao.send({ Target = msg.From, Data = json.encode(result) })
-	end
-end)
-
-Handlers.add("addRecord", utils.hasMatchingTag("Action", "AddRecord"), function(msg)
-	if msg.From ~= Owner then
-		ao.send({ Target = msg.From, Data = "Unauthorized" })
-		return
-	end
-	local status, result = pcall(arns.addRecord, string.lower(msg.Tags.Name), json.decode(msg.Data))
-	if status then
-		ao.send({ Target = msg.From, Data = json.encode(result) })
-	else
-		ao.send({ Target = msg.From, Data = json.encode(result) })
-	end
-end)
-
-Handlers.add("addReservedName", utils.hasMatchingTag("Action", "AddReservedName"), function(msg)
-	if msg.From ~= Owner then
-		ao.send({ Target = msg.From, Data = "Unauthorized" })
-		return
-	end
-	local status, result = pcall(arns.addReservedName, string.lower(msg.Tags.Name), json.decode(msg.Data))
-	if status then
-		ao.send({ Target = msg.From, Data = json.encode(result) })
-	else
-		ao.send({ Target = msg.From, Data = json.encode(result) })
-	end
-end)
-
 -- Pagination handlers
 
 Handlers.add("paginatedRecords", utils.hasMatchingTag("Action", "Paginated-Records"), function(msg)
@@ -1676,6 +1639,6 @@ Handlers.add("paginatedBalances", utils.hasMatchingTag("Action", "Paginated-Bala
 	end
 end)
 
--- END UTILITY HANDLERS USED FOR MIGRATION
+-- END READ HANDLERS
 
 return process
