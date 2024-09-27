@@ -163,14 +163,14 @@ end, function(msg)
 
 		local prunedGatewaysCount = #(resultOrError.prunedGateways or {})
 		if prunedGatewaysCount > 0 then
-			msg.ioEvent:addField("PrunedGateways", table.concat(msg.prunedGateways, ";"))
-			msg.ioEvent:addField("PrunedGatewaysCount", prunedGatewaysCount)
+			msg.ioEvent:addField("Pruned-Gateways", table.concat(msg.prunedGateways, ";"))
+			msg.ioEvent:addField("Pruned-Gateways-Count", prunedGatewaysCount)
 		end
 
 		local slashedGatewaysCount = #(resultOrError.slashedGateways or {})
 		if slashedGatewaysCount > 0 then
-			msg.ioEvent:addField("SlashedGateways", table.concat(msg.slashedGateways, ";"))
-			msg.ioEvent:addField("SlashedGatewaysCount", slashedGatewaysCount)
+			msg.ioEvent:addField("Slashed-Gateways", table.concat(msg.slashedGateways, ";"))
+			msg.ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
 		end
 	end
 
