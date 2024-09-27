@@ -742,8 +742,8 @@ Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.Joi
 		autoStake = msg.Tags["Auto-Stake"] == "true",
 	}
 	local observerAddress = msg.Tags["Observer-Address"] or msg.Tags.From
-	msg.ioEvent:addField("ResolvedObserverAddress", observerAddress)
-	msg.ioEvent:addField("SenderPreviousBalance", balances[msg.From])
+	msg.ioEvent:addField("Resolved-Observer-Address", observerAddress)
+	msg.ioEvent:addField("Sender-Previous-Balance", balances[msg.From])
 
 	local shouldContinue, gateway = eventingPcall(
 		msg.ioEvent,
