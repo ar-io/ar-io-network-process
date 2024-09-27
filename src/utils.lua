@@ -314,12 +314,17 @@ function utils.toTrainCase(str)
 	-- Replace underscores and spaces with hyphens
 	str = str:gsub("[_%s]+", "-")
 
-	-- Handle camelCase and PascalCase by adding a hyphen before uppercase letters
+	-- Handle camelCase and PascalCase by adding a hyphen before uppercase letters that follow lowercase letters
 	str = str:gsub("(%l)(%u)", "%1-%2")
 
-	-- Ensure the first letter of every word is capitalized and the rest are lowercase
+	-- Capitalize the first letter of every word (after hyphen) and convert to Train-Case
 	str = str:gsub("(%a)([%w]*)", function(first, rest)
-		return first:upper() .. rest:lower()
+		-- If the word is all uppercase (like "GW"), preserve it
+		if first:upper() == first and rest:upper() == rest then
+			return first:upper() .. rest
+		else
+			return first:upper() .. rest:lower()
+		end
 	end)
 	return str
 end
