@@ -58,6 +58,19 @@ local function AOEvent(initialData)
 		return self
 	end
 
+	function event:addFieldsWithPrefixIfExist(table, prefix, fields)
+		if type(table) ~= "table" or fields ~= "table" then
+			print("ERROR: table and fields must be provided as a table.")
+			return self
+		end
+		for _, key in pairs(fields) do
+			if table[key] ~= nil then
+				self:addField(prefix .. key, table[key])
+			end
+		end
+		return self
+	end
+
 	-- Helper function to escape JSON control characters in strings
 	local function escapeString(s)
 		-- Escape backslashes first
