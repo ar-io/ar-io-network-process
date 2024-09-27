@@ -310,4 +310,18 @@ function utils.reduce(tbl, fn, init)
 	return acc
 end
 
+function utils.toTrainCase(str)
+	-- Replace underscores and spaces with hyphens
+	str = str:gsub("[_%s]+", "-")
+
+	-- Handle camelCase and PascalCase by adding a hyphen before uppercase letters
+	str = str:gsub("(%l)(%u)", "%1-%2")
+
+	-- Ensure the first letter of every word is capitalized and the rest are lowercase
+	str = str:gsub("(%a)([%w]*)", function(first, rest)
+		return first:upper() .. rest:lower()
+	end)
+	return str
+end
+
 return utils
