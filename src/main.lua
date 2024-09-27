@@ -640,6 +640,7 @@ Handlers.add(
 			Tags = { Action = "Increase-Undername-Limit-Notice", Name = string.lower(msg.Tags.Name) },
 			Data = json.encode(recordResult),
 		})
+		msg.ioEvent:printEvent()
 	end
 )
 
