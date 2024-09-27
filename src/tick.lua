@@ -8,9 +8,10 @@ function tick.pruneState(timestamp, msgId)
 	arns.pruneReservedNames(timestamp)
 	vaults.pruneVaults(timestamp)
 	gar.pruneGateways(timestamp, msgId)
-	epochs.pruneEpochs(timestamp)
+	local prunedEpochs = epochs.pruneEpochs(timestamp)
 	return {
 		prunedRecords = prunedRecords,
+		prunedEpochs = prunedEpochs,
 	}
 end
 

@@ -631,11 +631,14 @@ end
 
 -- prune epochs older than 14 days
 function epochs.pruneEpochs(timestamp)
+	local prunedEpochs = {}
 	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)
 	local cutoffEpochIndex = currentEpochIndex - epochs.getSettings().pruneEpochsCount
 	for epochIndex = 0, cutoffEpochIndex do
 		Epochs[epochIndex] = nil
+		table.insert(prunedEpochs, epochIndex)
 	end
+	return prunedEpochs
 end
 
 return epochs

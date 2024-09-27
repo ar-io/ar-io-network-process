@@ -60,12 +60,12 @@ function demand.isDemandIncreasing()
 	end
 
 	local purchasesInCurrentPeriod = demand.getCurrentPeriodPurchases()
-	local revunueInCurrentPeriod = demand.getCurrentPeriodRevenue()
+	local revenueInCurrentPeriod = demand.getCurrentPeriodRevenue()
 	local mvgAvgOfTrailingNamePurchases = demand.mvgAvgTrailingPurchaseCounts()
 	local mvgAvgOfTrailingRevenue = demand.mvgAvgTrailingRevenues()
 
 	if settings.criteria == "revenue" then
-		return revunueInCurrentPeriod > 0 and (revunueInCurrentPeriod > mvgAvgOfTrailingRevenue)
+		return revenueInCurrentPeriod > 0 and (revenueInCurrentPeriod > mvgAvgOfTrailingRevenue)
 	else
 		return purchasesInCurrentPeriod > 0 and (purchasesInCurrentPeriod > mvgAvgOfTrailingNamePurchases)
 	end
@@ -132,6 +132,8 @@ function demand.updateDemandFactor(timestamp)
 	demand.resetPurchasesThisPeriod()
 	demand.resetRevenueThisPeriod()
 	demand.incrementCurrentPeriod(1)
+
+	return demand.getDemandFactor()
 end
 
 function demand.updateFees(multiplier)
