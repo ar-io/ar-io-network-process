@@ -15,7 +15,6 @@ GatewayRegistrySettings = GatewayRegistrySettings
 		operators = {
 			minStake = 50000 * 1000000, -- 50,000 IO
 			withdrawLengthMs = 30 * 24 * 60 * 60 * 1000, -- 30 days to lower operator stake
-			maxDelegates = 10000,
 			leaveLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days that balance will be vaulted
 			failedEpochCountMax = 30, -- number of epochs failed before marked as leaving
 			failedEpochSlashPercentage = 0.2, -- 20% of stake is returned to protocol balance
@@ -294,15 +293,6 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 		error(
 			"This Gateway does not allow delegated staking. Only allowed delegates can delegate stake to this Gateway."
 		)
-	end
-
-	local count = 0
-	for _ in pairs(gateway.delegates) do
-		count = count + 1
-	end
-
-	if count > gar.getSettings().operators.maxDelegates then
-		error("This Gateway has reached its maximum amount of delegated stakers.")
 	end
 
 	-- Assuming `gateway` is a table and `fromAddress` is defined
