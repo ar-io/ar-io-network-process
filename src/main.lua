@@ -156,8 +156,13 @@ end, function(msg)
 	if resultOrError ~= nil then
 		local prunedRecordsCount = #(resultOrError.prunedRecords or {})
 		if prunedRecordsCount > 0 then
-			msg.ioEvent:addField("PrunedRecords", table.concat(msg.prunedRecords, ";"))
-			msg.ioEvent:addField("PrunedRecordsCount", prunedRecordsCount)
+			msg.ioEvent:addField("Pruned-Records", table.concat(resultOrError.prunedRecords, ";"))
+			msg.ioEvent:addField("Pruned-Records-Count", prunedRecordsCount)
+		end
+		local prunedEpochsCount = #(resultOrError.prunedEpochs or {})
+		if prunedEpochsCount > 0 then
+			msg.ioEvent:addField("Pruned-Epochs", table.concat(resultOrError.prunedEpochs, ";"))
+			msg.ioEvent:addField("Pruned-Epochs-Count", prunedEpochsCount)
 		end
 	end
 
@@ -637,6 +642,7 @@ Handlers.add(
 			Tags = { Action = "Increase-Undername-Limit-Notice", Name = string.lower(msg.Tags.Name) },
 			Data = json.encode(recordResult),
 		})
+		msg.ioEvent:printEvent()
 	end
 )
 
@@ -1194,17 +1200,25 @@ Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
 	local msgTimestamp = tonumber(msg.Timestamp)
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
-	local function tickEpochs(timestamp, blockHeight, hashchain)
+	local function tickEpoch(timestamp, blockHeight, hashchain)
 		-- update demand factor if necessary
-		demand.updateDemandFactor(timestamp)
+		local demandFactor = demand.updateDemandFactor(timestamp)
 		epochs.distributeRewardsForEpoch(timestamp)
-		epochs.createEpoch(timestamp, tonumber(blockHeight), hashchain)
+		local epoch = epochs.createEpoch(timestamp, tonumber(blockHeight), hashchain)
+		return {
+			maybeEpoch = epoch,
+			maybeDemandFactor = demandFactor,
+		}
 	end
 
 	local lastTickedEpochIndex = LastTickedEpochIndex
-	local currentEpochIndex = epochs.getEpochIndexForTimestamp(msgTimestamp)
+	local targetCurrentEpochIndex = epochs.getEpochIndexForTimestamp(msgTimestamp)
+	msg.ioEvent:addField("Last-Ticked-Epoch-Index", lastTickedEpochIndex)
+	msg.ioEvent:addField("Current-Epoch-Index", lastTickedEpochIndex + 1)
+	msg.ioEvent:addField("Target-Current-Epoch-Index", targetCurrentEpochIndex)
+
 	-- if epoch index is -1 then we are before the genesis epoch and we should not tick
-	if currentEpochIndex < 0 then
+	if targetCurrentEpochIndex < 0 then
 		-- do nothing and just send a notice back to the sender
 		ao.send({
 			Target = msg.From,
@@ -1215,7 +1229,10 @@ Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	end
 
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
-	for i = lastTickedEpochIndex + 1, currentEpochIndex do
+	local tickedEpochIndexes = {}
+	local newEpochIndexes = {}
+	local newDemandFactors = {}
+	for i = lastTickedEpochIndex + 1, targetCurrentEpochIndex do
 		print("Ticking epoch: " .. i)
 		local previousState = {
 			Balances = utils.deepCopy(Balances),
@@ -1228,18 +1245,25 @@ Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 		-- use the minimum of the msg timestamp or the epoch distribution timestamp, this ensures an epoch gets created for the genesis block and that we don't try and distribute before an epoch is created
 		local tickTimestamp = math.min(msgTimestamp or 0, epochDistributionTimestamp)
 		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height, we should set the prescribed observers and names to empty arrays and distribute rewards accordingly
-		local status, result = pcall(tickEpochs, tickTimestamp, msg["Block-Height"], msg["Hash-Chain"])
-		if status then
+		local tickSuceeded, resultOrError = pcall(tickEpoch, tickTimestamp, msg["Block-Height"], msg["Hash-Chain"])
+		if tickSuceeded then
 			if tickTimestamp == epochDistributionTimestamp then
 				-- if we are distributing rewards, we should update the last ticked epoch index to the current epoch index
 				LastTickedEpochIndex = i
+				table.insert(tickedEpochIndexes, i)
 			end
 			ao.send({
 				Target = msg.From,
 				Action = "Tick-Notice",
 				LastTickedEpochIndex = LastTickedEpochIndex,
-				Data = json.encode(result),
+				Data = json.encode(resultOrError),
 			})
+			if resultOrError.maybeEpoch ~= nil then
+				table.insert(newEpochIndexes, resultOrError.maybeEpoch.epochIndex)
+			end
+			if resultOrError.maybeDemandFactor ~= nil then
+				table.insert(newDemandFactors, resultOrError.maybeDemandFactor)
+			end
 		else
 			-- reset the state to previous state
 			Balances = previousState.Balances
@@ -1251,10 +1275,21 @@ Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 				Target = msg.From,
 				Action = "Invalid-Tick-Notice",
 				Error = "Invalid-Tick",
-				Data = json.encode(result),
+				Data = json.encode(resultOrError),
 			})
+			-- TODO: But keep ticking ahead?!? We just need be to robust against potential failures here
 		end
 	end
+	if #tickedEpochIndexes > 0 then
+		msg.ioEvent:addField("Ticked-Epoch-Indexes", table.concat(tickedEpochIndexes, ";"))
+	end
+	if #newEpochIndexes > 0 then
+		msg.ioEvent:addField("New-Epoch-Indexes", table.concat(newEpochIndexes, ";"))
+	end
+	if #newDemandFactors > 0 then
+		msg.ioEvent:addField("New-Demand-Factors", table.concat(newDemandFactors, ";"))
+	end
+	msg.ioEvent:printEvent()
 end)
 
 -- READ HANDLERS
