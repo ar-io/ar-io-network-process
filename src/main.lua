@@ -130,13 +130,14 @@ end, function(msg)
 
 	local msgTimestamp = tonumber(msg.Timestamp)
 	print("Pruning state at timestamp: " .. msgTimestamp)
-	-- TODO: we should copy state here and restore if tick fails, but that requires larger memory - DO NOT DO THIS UNTIL WE START PRUNING STATE of epochs and distributions
-	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId)
 	local previousState = {
 		Vaults = utils.deepCopy(Vaults),
 		GatewayRegistry = utils.deepCopy(GatewayRegistry),
 		NameRegistry = utils.deepCopy(NameRegistry),
+		Epochs = utils.deepCopy(Epochs),
+		-- TODO: add vaults and balances
 	}
+	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId)
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -147,6 +148,7 @@ end, function(msg)
 		Vaults = previousState.Vaults
 		GatewayRegistry = previousState.GatewayRegistry
 		NameRegistry = previousState.NameRegistry
+		Epochs = previousState.Epochs
 		msg.ioEvent:addField("TickError", tostring(resultOrError))
 		return true -- stop processing here and return
 	end
