@@ -580,9 +580,13 @@ end
 function gar.pruneGateways(currentTimestamp, msgId)
 	local gateways = gar.getGateways()
 	local garSettings = gar.getSettings()
+	local result = {
+		prunedGateways = {},
+		slashedGateways = {},
+	}
 
 	if next(gateways) == nil then
-		return
+		return result
 	end
 
 	-- we take a deep copy so we can operate directly on the gateway object
@@ -624,14 +628,17 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				local slashAmount = math.floor(slashedOperatorStake * garSettings.operators.failedEpochSlashPercentage)
 				gar.slashOperatorStake(address, slashAmount)
 				gar.leaveNetwork(address, currentTimestamp, msgId)
+				table.insert(result.slashedGateways, address)
 			else
 				if gateway.status == "leaving" and gateway.endTimestamp <= currentTimestamp then
 					-- if the timestamp is after gateway end timestamp, mark the gateway as nil
 					GatewayRegistry[address] = nil
+					table.insert(result.prunedGateways, address)
 				end
 			end
 		end
 	end
+	return result
 end
 
 function gar.slashOperatorStake(address, slashAmount)

@@ -160,6 +160,18 @@ end, function(msg)
 			msg.ioEvent:addField("Pruned-Epochs", table.concat(resultOrError.prunedEpochs, ";"))
 			msg.ioEvent:addField("Pruned-Epochs-Count", prunedEpochsCount)
 		end
+
+		local prunedGatewaysCount = #(resultOrError.prunedGateways or {})
+		if prunedGatewaysCount > 0 then
+			msg.ioEvent:addField("PrunedGateways", table.concat(msg.prunedGateways, ";"))
+			msg.ioEvent:addField("PrunedGatewaysCount", prunedGatewaysCount)
+		end
+
+		local slashedGatewaysCount = #(resultOrError.slashedGateways or {})
+		if slashedGatewaysCount > 0 then
+			msg.ioEvent:addField("SlashedGateways", table.concat(msg.slashedGateways, ";"))
+			msg.ioEvent:addField("SlashedGatewaysCount", slashedGatewaysCount)
+		end
 	end
 
 	return status
