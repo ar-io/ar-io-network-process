@@ -1,3 +1,4 @@
+local utils = require("utils")
 -- Factory function for creating an "AOEvent"
 local function AOEvent(initialData)
 	local event = {
@@ -29,7 +30,7 @@ local function AOEvent(initialData)
 			)
 			return self
 		end
-		self.data[key] = value
+		self.data[utils.toTrainCase(key)] = value
 		return self
 	end
 
