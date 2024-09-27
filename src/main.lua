@@ -1096,28 +1096,40 @@ Handlers.add(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMa
 		end
 	end
 
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Save-Observations-Notice", Error = "Invalid-Save-Observations" },
-			Data = tostring(inputResult),
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
-	local status, result = pcall(epochs.saveObservations, msg.From, reportTxId, failedGateways, msg.Timestamp)
-	if status then
-		ao.send({ Target = msg.From, Action = "Save-Observations-Notice", Data = json.encode(result) })
-	else
+	local shouldContinue2, observations = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Action = "Invalid-Save-Observations-Notice",
 			Error = "Invalid-Saved-Observations",
-			Data = json.encode(result),
+			Data = json.encode(error),
 		})
+	end, epochs.saveObservations, msg.From, reportTxId, failedGateways, msg.Timestamp)
+	if not shouldContinue2 then
+		return
 	end
+
+	if observations ~= nil then
+		if #(observations.failureSummaries or {}) > 0 then
+			msg.ioEvent:addField("Failure-Summaries-Count", #(observations.failureSummaries or {}))
+		end
+		if #(observations.reports or {}) > 0 then
+			msg.ioEvent:addField("Reports-Count", #(observations.reports or {}))
+		end
+	end
+
+	ao.send({ Target = msg.From, Action = "Save-Observations-Notice", Data = json.encode(observations) })
+	msg.ioEvent:printEvent()
 end)
 
 Handlers.add(ActionMap.EpochSettings, utils.hasMatchingTag("Action", ActionMap.EpochSettings), function(msg)
@@ -1285,6 +1297,12 @@ Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	end
 	if #newEpochIndexes > 0 then
 		msg.ioEvent:addField("New-Epoch-Indexes", table.concat(newEpochIndexes, ";"))
+		-- Only print the prescribed observers of the newest epoch
+		local newestEpoch = epochs.getEpoch(math.max(table.unpack(newEpochIndexes)))
+		local prescribedObserverAddresses = utils.map(newestEpoch.prescribedObservers, function(observer)
+			return observer.address
+		end)
+		msg.ioEvent:addField("Prescribed-Observers", table.concat(prescribedObserverAddresses, ";"))
 	end
 	if #newDemandFactors > 0 then
 		msg.ioEvent:addField("New-Demand-Factors", table.concat(newDemandFactors, ";"))
