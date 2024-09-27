@@ -58,14 +58,14 @@ local function AOEvent(initialData)
 		return self
 	end
 
-	function event:addFieldsWithPrefixIfExist(table, prefix, fields)
-		if type(table) ~= "table" or fields ~= "table" then
+	function event:addFieldsWithPrefixIfExist(srcTable, prefix, fields)
+		if type(srcTable) ~= "table" or type(fields) ~= "table" then
 			print("ERROR: table and fields must be provided as a table.")
 			return self
 		end
 		for _, key in pairs(fields) do
-			if table[key] ~= nil then
-				self:addField(prefix .. key, table[key])
+			if srcTable[key] ~= nil then
+				self:addField(prefix .. key, srcTable[key])
 			end
 		end
 		return self
