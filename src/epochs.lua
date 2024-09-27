@@ -635,8 +635,10 @@ function epochs.pruneEpochs(timestamp)
 	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)
 	local cutoffEpochIndex = currentEpochIndex - epochs.getSettings().pruneEpochsCount
 	for epochIndex = 0, cutoffEpochIndex do
+		if Epochs[epochIndex] ~= nil then
+			table.insert(prunedEpochs, epochIndex)
+		end
 		Epochs[epochIndex] = nil
-		table.insert(prunedEpochs, epochIndex)
 	end
 	return prunedEpochs
 end
