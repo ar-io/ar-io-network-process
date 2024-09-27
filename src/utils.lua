@@ -310,6 +310,14 @@ function utils.reduce(tbl, fn, init)
 	return acc
 end
 
+function utils.map(tbl, fn)
+	local newTbl = {}
+	for k, v in pairs(tbl) do
+		newTbl[k] = fn(k, v)
+	end
+	return newTbl
+end
+
 function utils.toTrainCase(str)
 	-- Replace underscores and spaces with hyphens
 	str = str:gsub("[_%s]+", "-")

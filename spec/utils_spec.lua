@@ -72,6 +72,16 @@ describe("utils", function()
 		end)
 	end)
 
+	describe("map", function()
+		it("should return a new table with the mapped values", function()
+			local input = { 1, 2, 3, 4, 5 }
+			local mapper = function(value)
+				return value * 2
+			end
+			assert.are.same({ 2, 4, 6, 8, 10 }, utils.map(input, mapper))
+		end)
+	end)
+
 	describe("toTrainCase", function()
 		it("should convert a string to Train-Case", function()
 			assert.are.same("Hello-World", utils.toTrainCase("Hello World"))
