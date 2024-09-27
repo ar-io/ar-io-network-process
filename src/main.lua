@@ -101,18 +101,14 @@ local function addRecordResultFields(ioEvent, result)
 	)
 	ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
 	if result.df ~= nil and type(result.df) == "table" then
-		local mappedDfFields = utils.reduce(result.df, function(acc, k, v)
-			acc["df_" .. k] = v
-			return acc
-		end, {})
-		ioEvent:addField("df_trailingPeriodPurchases", table.concat(result.df.trailingPeriodPurchases or {}, ","))
-		ioEvent:addField("df_trailingPeriodRevenues", table.concat(result.df.trailingPeriodRevenues or {}, ","))
-		ioEvent:addFieldsIfExist(mappedDfFields, {
-			"df_currentPeriod",
-			"df_currentDemandFactor",
-			"df_consecutivePeriodsWithMinDemandFactor",
-			"df_revenueThisPeriod",
-			"df_purchasesThisPeriod",
+		ioEvent:addField("DF-Trailing-Period-Purchases", table.concat(result.df.trailingPeriodPurchases or {}, ","))
+		ioEvent:addField("DF-Trailing-Period-Revenues", table.concat(result.df.trailingPeriodRevenues or {}, ","))
+		ioEvent:addFieldsWithPrefixIfExist(result.df, "DF-", {
+			"currentPeriod",
+			"currentDemandFactor",
+			"consecutivePeriodsWithMinDemandFactor",
+			"revenueThisPeriod",
+			"purchasesThisPeriod",
 		})
 	end
 end
@@ -749,7 +745,10 @@ Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.Joi
 		return
 	end
 
-	msg.ioEvent:addField("SenderNewBalance", balances[msg.From])
+	msg.ioEvent:addField("Sender-New-Balance", balances[msg.From])
+	if gateway ~= nil then
+		msg.ioEvent:addField("GW-Start-Timestamp", gateway.startTimestamp)
+	end
 
 	ao.send({
 		Target = msg.From,
@@ -760,20 +759,52 @@ Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.Joi
 end)
 
 Handlers.add(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", ActionMap.LeaveNetwork), function(msg)
-	local status, result = pcall(gar.leaveNetwork, msg.From, msg.Timestamp, msg.Id)
-	if not status then
+	local shouldContinue, gateway = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Leave-Network-Notice", Error = "Invalid-Leave-Network" },
-			Data = tostring(result),
+			Data = tostring(error),
 		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Leave-Network-Notice" },
-			Data = json.encode(result),
-		})
+	end, gar.leaveNetwork, msg.From, msg.Timestamp, msg.Id)
+	if not shouldContinue then
+		return
 	end
+
+	if gateway ~= nil then
+		msg.ioEvent:addField("GW-Vaults-Count", #(gateway.vaults or {}))
+		local exitVault = gateway.vaults[msg.From]
+		local withdrawVault = gateway.vaults[msg.Id]
+		local previousStake = exitVault.balance
+		if exitVault ~= nil then
+			msg.ioEvent:addFieldsWithPrefixIfExist(
+				exitVault,
+				"Exit-Vault-",
+				{ "balance", "startTimestamp", "endTimestamp" }
+			)
+		end
+		if withdrawVault ~= nil then
+			previousStake = previousStake + withdrawVault.balance
+			msg.ioEvent:addFieldsWithPrefixIfExist(
+				withdrawVault,
+				"Withdraw-Vault-",
+				{ "balance", "startTimestamp", "endTimestamp" }
+			)
+		end
+		msg.ioEvent:addField("Previous-Operator-Stake", previousStake)
+		msg.ioEvent:addFieldsWithPrefixIfExist(
+			gateway,
+			"GW-",
+			{ "totalDelegatedStake", "observerAddress", "startTimestamp", "endTimestamp" }
+		)
+		msg.ioEvent:addFields(gateway.stats or {})
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Leave-Network-Notice" },
+		Data = json.encode(gateway),
+	})
+	msg.ioEvent:printEvent()
 end)
 
 Handlers.add(
