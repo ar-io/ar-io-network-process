@@ -1297,12 +1297,13 @@ Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	end
 	if #newEpochIndexes > 0 then
 		msg.ioEvent:addField("New-Epoch-Indexes", table.concat(newEpochIndexes, ";"))
+		-- TODO: REPAIR LATER
 		-- Only print the prescribed observers of the newest epoch
-		local newestEpoch = epochs.getEpoch(math.max(table.unpack(newEpochIndexes)))
-		local prescribedObserverAddresses = utils.map(newestEpoch.prescribedObservers, function(observer)
-			return observer.address
-		end)
-		msg.ioEvent:addField("Prescribed-Observers", table.concat(prescribedObserverAddresses, ";"))
+		-- local newestEpoch = epochs.getEpoch(math.max(table.unpack(newEpochIndexes)))
+		-- local prescribedObserverAddresses = utils.map(newestEpoch.prescribedObservers, function(observer)
+		-- 	return observer.address
+		-- end)
+		-- msg.ioEvent:addField("Prescribed-Observers", table.concat(prescribedObserverAddresses, ";"))
 	end
 	if #newDemandFactors > 0 then
 		msg.ioEvent:addField("New-Demand-Factors", table.concat(newDemandFactors, ";"))
