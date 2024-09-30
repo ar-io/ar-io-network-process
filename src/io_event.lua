@@ -9,7 +9,8 @@ local function IOEvent(msg, initialData)
 	})
 	event:addFields(msg.Tags or {})
 	event:addFieldsIfExist(msg, { "From", "Timestamp", "Action" })
-	event:addField("FromFormatted", utils.formatAddress(msg.From))
+	event:addField("Message-Id", msg.Id)
+	event:addField("From-Formatted", utils.formatAddress(msg.From))
 	if initialData ~= nil then
 		event:addFields(initialData)
 	end
