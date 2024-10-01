@@ -865,8 +865,8 @@ Handlers.add(
 
 		msg.ioEvent:addField("Sender-New-Balance", balances[msg.From])
 		if gateway ~= nil then
-			msg.ioEvent:addField("GW-New-Operator-Stake", gateway.operatorStake)
-			msg.ioEvent:addField("GW-Previous-Operator-Stake", gateway.operatorStake - quantity)
+			msg.ioEvent:addField("New-Operator-Stake", gateway.operatorStake)
+			msg.ioEvent:addField("Previous-Operator-Stake", gateway.operatorStake - quantity)
 		end
 
 		ao.send({
@@ -917,8 +917,8 @@ Handlers.add(
 		msg.ioEvent:addField("Sender-New-Balance", balances[msg.From]) -- should be unchanged
 		if gateway ~= nil then
 			local previousStake = gateway.operatorStake + quantity
-			msg.ioEvent:addField("GW-New-Operator-Stake", gateway.operatorStake)
-			msg.ioEvent:addField("GW-Previous-Operator-Stake", previousStake)
+			msg.ioEvent:addField("New-Operator-Stake", gateway.operatorStake)
+			msg.ioEvent:addField("Previous-Operator-Stake", previousStake)
 			msg.ioEvent:addField("GW-Vaults-Count", #(gateway.vaults or {}))
 			local decreaseStakeVault = gateway.vaults[msg.Id]
 			if decreaseStakeVault ~= nil then
