@@ -838,31 +838,43 @@ Handlers.add(
 			)
 		end
 
-		local inputStatus, inputResult = pcall(checkAssertions)
-
-		if not inputStatus then
+		local shouldContinue = eventingPCall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Invalid-Increase-Operator-Stake-Notice", Error = "Bad-Input" },
-				Data = tostring(inputResult),
+				Data = tostring(error),
 			})
+		end, checkAssertions)
+		if not shouldContinue then
 			return
 		end
 
-		local result, err = gar.increaseOperatorStake(msg.From, tonumber(msg.Tags.Quantity))
-		if err then
+		msg.ioEvent:addField("Sender-Previous-Balance", balances[msg.From])
+		local quantity = tonumber(msg.Tags.Quantity)
+
+		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Invalid-Increase-Operator-Stake-Notice" },
-				Data = tostring(err),
+				Data = tostring(error),
 			})
-		else
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Increase-Operator-Stake-Notice" },
-				Data = json.encode(result),
-			})
+		end, gar.increaseOperatorStake, msg.From, quantity)
+		if not shouldContinue2 then
+			return
 		end
+
+		msg.ioEvent:addField("Sender-New-Balance", balances[msg.From])
+		if gateway ~= nil then
+			msg.ioEvent:addField("GW-New-Operator-Stake", gateway.operatorStake)
+			msg.ioEvent:addField("GW-Previous-Operator-Stake", gateway.operatorStake - quantity)
+		end
+
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Increase-Operator-Stake-Notice" },
+			Data = json.encode(gateway),
+		})
+		msg.ioEvent:printEvent()
 	end
 )
 
