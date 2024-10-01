@@ -84,6 +84,8 @@ describe("utils", function()
 
 	describe("toTrainCase", function()
 		it("should convert a string to Train-Case", function()
+			assert.are.same("Hello", utils.toTrainCase("hello"))
+			assert.are.same("Hello", utils.toTrainCase("Hello"))
 			assert.are.same("Hello-World", utils.toTrainCase("Hello World"))
 			assert.are.same("Hello-World", utils.toTrainCase("hello world"))
 			assert.are.same("Hello-World", utils.toTrainCase("hello-world"))
