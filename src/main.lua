@@ -838,7 +838,7 @@ Handlers.add(
 			)
 		end
 
-		local shouldContinue = eventingPCall(msg.ioEvent, function(error)
+		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Invalid-Increase-Operator-Stake-Notice", Error = "Bad-Input" },
