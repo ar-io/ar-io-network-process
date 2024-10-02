@@ -101,6 +101,7 @@ local function addRecordResultFields(ioEvent, result)
 	)
 	ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
 	if result.df ~= nil and type(result.df) == "table" then
+		-- TODO: provide array data rather than delimited strings
 		ioEvent:addField("DF-Trailing-Period-Purchases", table.concat(result.df.trailingPeriodPurchases or {}, ","))
 		ioEvent:addField("DF-Trailing-Period-Revenues", table.concat(result.df.trailingPeriodRevenues or {}, ","))
 		ioEvent:addFieldsWithPrefixIfExist(result.df, "DF-", {
@@ -152,23 +153,27 @@ end, function(msg)
 	if resultOrError ~= nil then
 		local prunedRecordsCount = #(resultOrError.prunedRecords or {})
 		if prunedRecordsCount > 0 then
+			-- TODO: provide array data rather than delimited string
 			msg.ioEvent:addField("Pruned-Records", table.concat(resultOrError.prunedRecords, ";"))
 			msg.ioEvent:addField("Pruned-Records-Count", prunedRecordsCount)
 		end
 		local prunedEpochsCount = #(resultOrError.prunedEpochs or {})
 		if prunedEpochsCount > 0 then
+			-- TODO: provide array data rather than delimited string
 			msg.ioEvent:addField("Pruned-Epochs", table.concat(resultOrError.prunedEpochs, ";"))
 			msg.ioEvent:addField("Pruned-Epochs-Count", prunedEpochsCount)
 		end
 
 		local prunedGatewaysCount = #(resultOrError.prunedGateways or {})
 		if prunedGatewaysCount > 0 then
+			-- TODO: provide array data rather than delimited string
 			msg.ioEvent:addField("Pruned-Gateways", table.concat(msg.prunedGateways, ";"))
 			msg.ioEvent:addField("Pruned-Gateways-Count", prunedGatewaysCount)
 		end
 
 		local slashedGatewaysCount = #(resultOrError.slashedGateways or {})
 		if slashedGatewaysCount > 0 then
+			-- TODO: provide array data rather than delimited string
 			msg.ioEvent:addField("Slashed-Gateways", table.concat(msg.slashedGateways, ";"))
 			msg.ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
 		end
@@ -1380,19 +1385,22 @@ Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 		end
 	end
 	if #tickedEpochIndexes > 0 then
+		-- TODO: provide array data rather than delimited string
 		msg.ioEvent:addField("Ticked-Epoch-Indexes", table.concat(tickedEpochIndexes, ";"))
 	end
 	if #newEpochIndexes > 0 then
+		-- TODO: provide array data rather than delimited string
 		msg.ioEvent:addField("New-Epoch-Indexes", table.concat(newEpochIndexes, ";"))
-		-- TODO: REPAIR LATER
 		-- Only print the prescribed observers of the newest epoch
-		-- local newestEpoch = epochs.getEpoch(math.max(table.unpack(newEpochIndexes)))
-		-- local prescribedObserverAddresses = utils.map(newestEpoch.prescribedObservers, function(observer)
-		-- 	return observer.address
-		-- end)
-		-- msg.ioEvent:addField("Prescribed-Observers", table.concat(prescribedObserverAddresses, ";"))
+		local newestEpoch = epochs.getEpoch(math.max(table.unpack(newEpochIndexes)))
+		local prescribedObserverAddresses = utils.map(newestEpoch.prescribedObservers, function(_, observer)
+			return observer.gatewayAddress
+		end)
+		-- TODO: provide array data rather than delimited string
+		msg.ioEvent:addField("Prescribed-Observers", table.concat(prescribedObserverAddresses, ";"))
 	end
 	if #newDemandFactors > 0 then
+		-- TODO: provide array data rather than delimited string
 		msg.ioEvent:addField("New-Demand-Factors", table.concat(newDemandFactors, ";"))
 	end
 	msg.ioEvent:printEvent()
