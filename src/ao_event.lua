@@ -14,13 +14,25 @@ local function AOEvent(initialData)
 		event.data = initialData
 	end
 
+	local function isValidTableValueType(table)
+		local valueType = type(value)
+		return valueType == "string" or valueType == "number" or valueType == "boolean" or value == nil
+	end
+
 	local function isValidType(value)
 		local valueType = type(value)
-		return valueType == "string"
-			or valueType == "number"
-			or valueType == "boolean"
-			or valueType == "table"
-			or value == nil
+		if valueType == "string" or valueType == "number" or valueType == "boolean" or value == nil then
+			return true
+		elseif valueType == "table" then
+			-- Prevent nested tables
+			for _, v in pairs(value) do
+				if not isValidTableValueType(v) then
+					return false
+				end
+			end
+			return true
+		end
+		return false
 	end
 
 	function event:addField(key, value)
