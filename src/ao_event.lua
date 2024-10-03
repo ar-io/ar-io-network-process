@@ -21,7 +21,7 @@ local function AOEvent(initialData)
 
 	local function isValidType(value)
 		local valueType = type(value)
-		if valueType == "string" or valueType == "number" or valueType == "boolean" or value == nil then
+		if isValidTableValueType(value) then
 			return true
 		elseif valueType == "table" then
 			-- Prevent nested tables
