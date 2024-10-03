@@ -1,4 +1,6 @@
 local utils = require("utils")
+local json = require("json")
+
 -- Factory function for creating an "AOEvent"
 local function AOEvent(initialData)
 	local event = {
@@ -14,7 +16,11 @@ local function AOEvent(initialData)
 
 	local function isValidType(value)
 		local valueType = type(value)
-		return valueType == "string" or valueType == "number" or valueType == "boolean" or value == nil
+		return valueType == "string"
+			or valueType == "number"
+			or valueType == "boolean"
+			or valueType == "table"
+			or value == nil
 	end
 
 	function event:addField(key, value)
@@ -85,41 +91,9 @@ local function AOEvent(initialData)
 	end
 
 	function event:printEvent()
-		local serializedData = "{"
-
-		-- The _e: 1 flag signifies that this is an event
-		serializedData = serializedData .. '"_e": 1, '
-
-		-- Serialize event data
-		for key, value in pairs(self.data) do
-			local function processValue()
-				local serializedValue
-
-				if type(value) == "string" then
-					serializedValue = '"' .. escapeString(value) .. '"'
-				elseif type(value) == "number" or type(value) == "boolean" then
-					serializedValue = tostring(value)
-				elseif value == nil then
-					serializedValue = "null"
-				else
-					print("ERROR: Unsupported data type: " .. type(value))
-					return
-				end
-
-				serializedData = serializedData .. '"' .. key .. '": ' .. serializedValue .. ", "
-			end
-
-			processValue()
-		end
-
-		-- Remove trailing comma and space, if any
-		if string.sub(serializedData, -2) == ", " then
-			serializedData = string.sub(serializedData, 1, -3)
-		end
-
-		serializedData = serializedData .. "}"
-
-		print(serializedData)
+		-- The _e: 1 flag signifies that this is an event. Ensure it is set.
+		self.data["_e"] = 1
+		print(json.encode(self.data))
 	end
 
 	return event

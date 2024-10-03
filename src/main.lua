@@ -101,9 +101,8 @@ local function addRecordResultFields(ioEvent, result)
 	)
 	ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
 	if result.df ~= nil and type(result.df) == "table" then
-		-- TODO: provide array data rather than delimited strings
-		ioEvent:addField("DF-Trailing-Period-Purchases", table.concat(result.df.trailingPeriodPurchases or {}, ","))
-		ioEvent:addField("DF-Trailing-Period-Revenues", table.concat(result.df.trailingPeriodRevenues or {}, ","))
+		ioEvent:addField("DF-Trailing-Period-Purchases", (result.df.trailingPeriodPurchases or {}))
+		ioEvent:addField("DF-Trailing-Period-Revenues", (result.df.trailingPeriodRevenues or {}))
 		ioEvent:addFieldsWithPrefixIfExist(result.df, "DF-", {
 			"currentPeriod",
 			"currentDemandFactor",
@@ -169,22 +168,23 @@ end, function(msg)
 	if resultOrError ~= nil then
 		local prunedRecordsCount = #(resultOrError.prunedRecords or {})
 		if prunedRecordsCount > 0 then
-			-- TODO: provide array data rather than delimited string
-			msg.ioEvent:addField("Pruned-Records", table.concat(resultOrError.prunedRecords, ";"))
+			local prunedRecordNames = {}
+			for name, _ in pairs(resultOrError.prunedRecords) do
+				table.insert(prunedRecordNames, name)
+			end
+			msg.ioEvent:addField("Pruned-Records", prunedRecordNames)
 			msg.ioEvent:addField("Pruned-Records-Count", prunedRecordsCount)
 			msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
 		end
 		local prunedEpochsCount = #(resultOrError.prunedEpochs or {})
 		if prunedEpochsCount > 0 then
-			-- TODO: provide array data rather than delimited string
-			msg.ioEvent:addField("Pruned-Epochs", table.concat(resultOrError.prunedEpochs, ";"))
+			msg.ioEvent:addField("Pruned-Epochs", resultOrError.prunedEpochs)
 			msg.ioEvent:addField("Pruned-Epochs-Count", prunedEpochsCount)
 		end
 
 		local prunedGatewaysCount = #(resultOrError.prunedGateways or {})
 		if prunedGatewaysCount > 0 then
-			-- TODO: provide array data rather than delimited string
-			msg.ioEvent:addField("Pruned-Gateways", table.concat(msg.prunedGateways, ";"))
+			msg.ioEvent:addField("Pruned-Gateways", resultOrError.prunedGateways)
 			msg.ioEvent:addField("Pruned-Gateways-Count", prunedGatewaysCount)
 			local gwStats = gatewayStats()
 			msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
@@ -193,8 +193,7 @@ end, function(msg)
 
 		local slashedGatewaysCount = #(resultOrError.slashedGateways or {})
 		if slashedGatewaysCount > 0 then
-			-- TODO: provide array data rather than delimited string
-			msg.ioEvent:addField("Slashed-Gateways", table.concat(msg.slashedGateways, ";"))
+			msg.ioEvent:addField("Slashed-Gateways", resultOrError.slashedGateways)
 			msg.ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
 		end
 	end
@@ -1414,23 +1413,19 @@ Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 		end
 	end
 	if #tickedEpochIndexes > 0 then
-		-- TODO: provide array data rather than delimited string
-		msg.ioEvent:addField("Ticked-Epoch-Indexes", table.concat(tickedEpochIndexes, ";"))
+		msg.ioEvent:addField("Ticked-Epoch-Indexes", tickedEpochIndexes)
 	end
 	if #newEpochIndexes > 0 then
-		-- TODO: provide array data rather than delimited string
-		msg.ioEvent:addField("New-Epoch-Indexes", table.concat(newEpochIndexes, ";"))
+		msg.ioEvent:addField("New-Epoch-Indexes", newEpochIndexes)
 		-- Only print the prescribed observers of the newest epoch
 		local newestEpoch = epochs.getEpoch(math.max(table.unpack(newEpochIndexes)))
 		local prescribedObserverAddresses = utils.map(newestEpoch.prescribedObservers, function(_, observer)
 			return observer.gatewayAddress
 		end)
-		-- TODO: provide array data rather than delimited string
-		msg.ioEvent:addField("Prescribed-Observers", table.concat(prescribedObserverAddresses, ";"))
+		msg.ioEvent:addField("Prescribed-Observers", prescribedObserverAddresses)
 	end
 	if #newDemandFactors > 0 then
-		-- TODO: provide array data rather than delimited string
-		msg.ioEvent:addField("New-Demand-Factors", table.concat(newDemandFactors, ";"))
+		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors, ";")
 	end
 	msg.ioEvent:printEvent()
 end)
