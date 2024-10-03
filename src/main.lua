@@ -564,6 +564,8 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 		addRecordResultFields(msg.ioEvent, result)
 	end
 
+	msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
+
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = "Buy-Record-Notice", Name = msg.Tags.Name },
