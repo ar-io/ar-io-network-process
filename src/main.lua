@@ -114,6 +114,22 @@ local function addRecordResultFields(ioEvent, result)
 	end
 end
 
+local function gatewayStats()
+	local numJoinedGateways = 0
+	local numLeavingGateways = 0
+	for _, gateway in pairs(GatewayRegistry) do
+		if gateway.status == "joined" then
+			numJoinedGateways = numJoinedGateways + 1
+		else
+			numLeavingGateways = numLeavingGateways + 1
+		end
+	end
+	return {
+		joined = numJoinedGateways,
+		leaving = numLeavingGateways,
+	}
+end
+
 -- prune state before every interaction
 Handlers.add("prune", function()
 	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
@@ -156,6 +172,7 @@ end, function(msg)
 			-- TODO: provide array data rather than delimited string
 			msg.ioEvent:addField("Pruned-Records", table.concat(resultOrError.prunedRecords, ";"))
 			msg.ioEvent:addField("Pruned-Records-Count", prunedRecordsCount)
+			msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
 		end
 		local prunedEpochsCount = #(resultOrError.prunedEpochs or {})
 		if prunedEpochsCount > 0 then
@@ -169,6 +186,9 @@ end, function(msg)
 			-- TODO: provide array data rather than delimited string
 			msg.ioEvent:addField("Pruned-Gateways", table.concat(msg.prunedGateways, ";"))
 			msg.ioEvent:addField("Pruned-Gateways-Count", prunedGatewaysCount)
+			local gwStats = gatewayStats()
+			msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
+			msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
 		end
 
 		local slashedGatewaysCount = #(resultOrError.slashedGateways or {})
@@ -774,6 +794,9 @@ Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.Joi
 	if gateway ~= nil then
 		msg.ioEvent:addField("GW-Start-Timestamp", gateway.startTimestamp)
 	end
+	local gwStats = gatewayStats()
+	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
+	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
 
 	ao.send({
 		Target = msg.From,
@@ -823,6 +846,10 @@ Handlers.add(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", ActionMap.Le
 		)
 		msg.ioEvent:addFields(gateway.stats or {})
 	end
+
+	local gwStats = gatewayStats()
+	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
+	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
 
 	ao.send({
 		Target = msg.From,
