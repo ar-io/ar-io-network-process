@@ -51,4 +51,50 @@ describe("utils", function()
 			assert.are.same(nil, utils.findInArray(array, predicate))
 		end)
 	end)
+
+	describe("reduce", function()
+		it("should return the starting value if the input table is empty", function()
+			local input = {}
+			local stubReducer = function(acc, value)
+				return acc + value
+			end
+			assert.are.same(0, utils.reduce(input, stubReducer, 0))
+			assert.are.same({}, utils.reduce(input, stubReducer, {}))
+			assert.are.same("foo", utils.reduce(input, stubReducer, "foo"))
+		end)
+
+		it("should return the reduced value", function()
+			local input = { 1, 2, 3, 4, 5 }
+			local reducer = function(acc, value)
+				return acc + value
+			end
+			assert.are.same(15, utils.reduce(input, reducer, 0))
+		end)
+	end)
+
+	describe("map", function()
+		it("should return a new table with the mapped values", function()
+			local input = { 1, 2, 3, 4, 5 }
+			local mapper = function(value)
+				return value * 2
+			end
+			assert.are.same({ 2, 4, 6, 8, 10 }, utils.map(input, mapper))
+		end)
+	end)
+
+	describe("toTrainCase", function()
+		it("should convert a string to Train-Case", function()
+			assert.are.same("Hello", utils.toTrainCase("hello"))
+			assert.are.same("Hello", utils.toTrainCase("Hello"))
+			assert.are.same("Hello-World", utils.toTrainCase("Hello World"))
+			assert.are.same("Hello-World", utils.toTrainCase("hello world"))
+			assert.are.same("Hello-World", utils.toTrainCase("hello-world"))
+			assert.are.same("Hello-World", utils.toTrainCase("hello_world"))
+			assert.are.same("Hello-World", utils.toTrainCase("helloWorld"))
+			assert.are.same("Hello-World", utils.toTrainCase("HelloWorld"))
+			assert.are.same("Hello-World", utils.toTrainCase("Hello-World"))
+			assert.are.same("Hello-Worl-D", utils.toTrainCase("Hello-WorlD"))
+			assert.are.same("HW-Hello-World", utils.toTrainCase("HW-helloWorld"))
+		end)
+	end)
 end)

@@ -480,7 +480,7 @@ describe('GatewayRegistry', async () => {
       sharedMemory = delegateStakeResult.Memory;
     });
 
-    it('should allow with drawing stake from a gateway', async () => {
+    it('should allow withdrawing stake from a gateway', async () => {
       const decreaseStakeTimestamp = stubbedTimestamp + 1000 * 60 * 15; // 15 minutes after stubbedTimestamp
       const decreaseStakeResult = await handle(
         {
@@ -532,7 +532,7 @@ describe('GatewayRegistry', async () => {
           From: newStubAddress,
           Owner: newStubAddress,
           Tags: [
-            { name: 'Action', value: 'Cancel-Delegate-Withdrawl' },
+            { name: 'Action', value: 'Cancel-Delegate-Withdrawal' },
             { name: 'Address', value: STUB_ADDRESS },
             { name: 'Vault-Id', value: ''.padEnd(43, 'x') },
           ],

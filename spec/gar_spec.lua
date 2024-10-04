@@ -625,9 +625,12 @@ describe("gar", function()
 
 				-- Call pruneGateways
 				local protocolBalanceBefore = _G.Balances[ao.id] or 0
-				local status, err = pcall(gar.pruneGateways, currentTimestamp, msgId)
+				local status, result = pcall(gar.pruneGateways, currentTimestamp, msgId)
 				assert.is_true(status)
-				assert.is_nil(err)
+				assert.are.same({
+					prunedGateways = { "address1" },
+					slashedGateways = { "address3" },
+				}, result)
 
 				local expectedSlashedStake = math.floor(gar.getSettings().operators.minStake * 0.2)
 				local expectedRemainingStake = math.floor(gar.getSettings().operators.minStake * 0.8) + 10000
@@ -675,14 +678,20 @@ describe("gar", function()
 						},
 					},
 				}
-			local status, err = pcall(
+			local status, result = pcall(
 				gar.cancelDelegateWithdrawal,
 				"test-this-is-valid-arweave-wallet-address-2",
 				"test-this-is-valid-arweave-wallet-address-1",
 				"some-previous-withdrawal-id"
 			)
 			assert.is_true(status)
-			assert.is_nil(err)
+			assert.are.same(result, {
+				totalDelegatedStake = 1000,
+				delegate = {
+					delegatedStake = 1000,
+					vaults = {},
+				},
+			})
 			-- assert the vault is removed and the delegated stake is added back to the delegate
 			assert.are.equal(
 				1000, -- added back to the delegate

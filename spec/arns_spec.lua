@@ -3,6 +3,7 @@ local constants = require("constants")
 local arns = require("arns")
 local balances = require("balances")
 local demand = require("demand")
+local utils = require("utils")
 
 describe("arns", function()
 	local timestamp = 0
@@ -44,7 +45,7 @@ describe("arns", function()
 						processId = testProcessId,
 						startTimestamp = 0,
 						endTimestamp = timestamp + constants.oneYearMs * 1,
-					}, result)
+					}, result.record)
 					assert.are.same({
 						["test-name"] = {
 							purchasePrice = 600000000,
@@ -77,7 +78,7 @@ describe("arns", function()
 						processId = testProcessId,
 						startTimestamp = 0,
 						endTimestamp = timestamp + constants.oneYearMs,
-					}, result)
+					}, result.record)
 					assert.are.same({
 						purchasePrice = 600000000,
 						type = "lease",
@@ -167,7 +168,7 @@ describe("arns", function()
 					undernameLimit = 10,
 				}
 				assert.is_true(status)
-				assert.are.same(expectation, result)
+				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, arns.getRecords())
 
 				local balances = balances.getBalances()
@@ -271,7 +272,7 @@ describe("arns", function()
 					undernameLimit = 60,
 				}
 				assert.is_true(status)
-				assert.are.same(expectation, result)
+				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, arns.getRecords())
 
 				local balances = balances.getBalances()
@@ -374,7 +375,7 @@ describe("arns", function()
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
-				}, result)
+				}, result.record)
 				assert.are.same({
 					["test-name"] = {
 						endTimestamp = timestamp + constants.oneYearMs * 5,
@@ -526,6 +527,20 @@ describe("arns", function()
 					endTimestamp = currentTimestamp + 1000000, -- far in the future
 				},
 			}, _G.NameRegistry.reserved)
+		end)
+	end)
+
+	describe("getRegistrationFees", function()
+		it("should return the correct registration prices", function()
+			local registrationFees = arns.getRegistrationFees()
+
+			-- check first, middle and last name lengths
+			assert.are.equal(utils.lengthOfTable(registrationFees), 51)
+			assert.are.equal(registrationFees["1"].lease["1"], 2400000000000)
+			assert.are.equal(registrationFees["5"].lease["3"], 6400000000)
+			assert.are.equal(registrationFees["10"].permabuy, 2500000000)
+			assert.are.equal(registrationFees["10"].lease["5"], 1000000000)
+			assert.are.equal(registrationFees["51"].lease["1"], 480000000)
 		end)
 	end)
 end)

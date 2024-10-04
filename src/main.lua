@@ -1,6 +1,7 @@
 -- Adjust package.path to include the current directory
 local process = { _version = "0.0.1" }
 local constants = require("constants")
+local IOEvent = require("io_event")
 
 Name = Name or "Testnet IO"
 Ticker = Ticker or "tIO"
@@ -56,6 +57,7 @@ local ActionMap = {
 	ReservedNames = "Reserved-Names",
 	ReservedName = "Reserved-Name",
 	TokenCost = "Token-Cost",
+	GetRegistrationFees = "Get-Registration-Fees",
 	-- GATEWAY REGISTRY READ APIS
 	Gateway = "Gateway",
 	Gateways = "Gateways",
@@ -78,41 +80,137 @@ local ActionMap = {
 	SaveObservations = "Save-Observations",
 	DelegateStake = "Delegate-Stake",
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
-	CancelDelegateWithdrawl = "Cancel-Delegate-Withdrawl",
+	CancelDelegateWithdrawal = "Cancel-Delegate-Withdrawal",
 }
 
+local function eventingPcall(ioEvent, onError, fnToCall, ...)
+	local status, result = pcall(fnToCall, ...)
+	if not status then
+		onError(result)
+		ioEvent:addField("Error", result)
+		return status
+	end
+	return status, result
+end
+
+local function addRecordResultFields(ioEvent, result)
+	ioEvent:addFieldsIfExist(
+		result,
+		{ "baseRegistrationFee", "remainingBalance", "protocolBalance", "recordsCount", "reservedRecordsCount" }
+	)
+	ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
+	if result.df ~= nil and type(result.df) == "table" then
+		ioEvent:addField("DF-Trailing-Period-Purchases", (result.df.trailingPeriodPurchases or {}))
+		ioEvent:addField("DF-Trailing-Period-Revenues", (result.df.trailingPeriodRevenues or {}))
+		ioEvent:addFieldsWithPrefixIfExist(result.df, "DF-", {
+			"currentPeriod",
+			"currentDemandFactor",
+			"consecutivePeriodsWithMinDemandFactor",
+			"revenueThisPeriod",
+			"purchasesThisPeriod",
+		})
+	end
+end
+
+local function gatewayStats()
+	local numJoinedGateways = 0
+	local numLeavingGateways = 0
+	for _, gateway in pairs(GatewayRegistry) do
+		if gateway.status == "joined" then
+			numJoinedGateways = numJoinedGateways + 1
+		else
+			numLeavingGateways = numLeavingGateways + 1
+		end
+	end
+	return {
+		joined = numJoinedGateways,
+		leaving = numLeavingGateways,
+	}
+end
+
+local function addEventingHandler(handlerName, pattern, handleFn)
+	Handlers.add(handlerName, pattern, function(msg)
+		eventingPcall(msg.ioEvent, function()
+			-- No op
+		end, handleFn, msg)
+		msg.ioEvent:printEvent()
+	end)
+end
+
 -- prune state before every interaction
-Handlers.prepend("tick", function()
+Handlers.add("prune", function()
 	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
 end, function(msg)
 	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
+
+	-- Stash a new IOEvent with the message
+	msg.ioEvent = IOEvent(msg)
+	local epochIndex = epochs.getEpochIndexForTimestamp(tonumber(msg.Tags.Timestamp or msg.Timestamp))
+	msg.ioEvent:addField("epochIndex", epochIndex)
+
 	local msgTimestamp = tonumber(msg.Timestamp)
-	local msgId = msg.Id
 	print("Pruning state at timestamp: " .. msgTimestamp)
-	-- TODO: we should copy state here and restore if tick fails, but that requires larger memory - DO NOT DO THIS UNTIL WE START PRUNING STATE of epochs and distributions
-	local status, result = pcall(tick.pruneState, msgTimestamp, msgId)
 	local previousState = {
 		Vaults = utils.deepCopy(Vaults),
 		GatewayRegistry = utils.deepCopy(GatewayRegistry),
 		NameRegistry = utils.deepCopy(NameRegistry),
+		Epochs = utils.deepCopy(Epochs),
+		-- TODO: add vaults and balances
 	}
+	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId)
 	if not status then
 		ao.send({
 			Target = msg.From,
 			Action = "Invalid-Tick-Notice",
 			Error = "Invalid-Tick",
-			Data = json.encode(result),
+			Data = json.encode(resultOrError),
 		})
 		Vaults = previousState.Vaults
 		GatewayRegistry = previousState.GatewayRegistry
 		NameRegistry = previousState.NameRegistry
+		Epochs = previousState.Epochs
+		msg.ioEvent:addField("TickError", tostring(resultOrError))
 		return true -- stop processing here and return
 	end
+
+	if resultOrError ~= nil then
+		local prunedRecordsCount = utils.lengthOfTable(resultOrError.prunedRecords or {})
+		if prunedRecordsCount > 0 then
+			local prunedRecordNames = {}
+			for name, _ in pairs(resultOrError.prunedRecords) do
+				table.insert(prunedRecordNames, name)
+			end
+			msg.ioEvent:addField("Pruned-Records", prunedRecordNames)
+			msg.ioEvent:addField("Pruned-Records-Count", prunedRecordsCount)
+			msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
+		end
+		local prunedEpochsCount = utils.lengthOfTable(resultOrError.prunedEpochs or {})
+		if prunedEpochsCount > 0 then
+			msg.ioEvent:addField("Pruned-Epochs", resultOrError.prunedEpochs)
+			msg.ioEvent:addField("Pruned-Epochs-Count", prunedEpochsCount)
+		end
+
+		local prunedGatewaysCount = utils.lengthOfTable(resultOrError.prunedGateways or {})
+		if prunedGatewaysCount > 0 then
+			msg.ioEvent:addField("Pruned-Gateways", resultOrError.prunedGateways)
+			msg.ioEvent:addField("Pruned-Gateways-Count", prunedGatewaysCount)
+			local gwStats = gatewayStats()
+			msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
+			msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
+		end
+
+		local slashedGatewaysCount = utils.lengthOfTable(resultOrError.slashedGateways or {})
+		if slashedGatewaysCount > 0 then
+			msg.ioEvent:addField("Slashed-Gateways", resultOrError.slashedGateways)
+			msg.ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
+		end
+	end
+
 	return status
 end)
 
 -- Write handlers
-Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
+addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
 	-- assert recipient is a valid arweave address
 	local function checkAssertions()
 		assert(utils.isValidAOAddress(msg.Tags.Recipient), "Invalid recipient")
@@ -122,64 +220,83 @@ Handlers.add(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transf
 		)
 	end
 
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Transfer-Notice", Error = "Transfer-Error" },
-			Data = tostring(inputResult),
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
 	local from = utils.formatAddress(msg.From)
 	local recipient = utils.formatAddress(msg.Tags.Recipient)
+	local quantity = tonumber(msg.Tags.Quantity)
+	msg.ioEvent:addField("RecipientFormatted", recipient)
 
-	local status, result = pcall(balances.transfer, recipient, from, tonumber(msg.Tags.Quantity))
-	if not status then
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Transfer-Notice", Error = "Transfer-Error" },
-			Data = tostring(result),
+			Data = tostring(error),
 		})
-	else
-		-- Casting implies that the sender does not want a response - Reference: https://elixirforum.com/t/what-is-the-etymology-of-genserver-cast/33610/3
-		if not msg.Cast then
-			-- Debit-Notice message template, that is sent to the Sender of the transfer
-			local debitNotice = {
-				Target = msg.From,
-				Action = "Debit-Notice",
-				Recipient = recipient,
-				Quantity = msg.Tags.Quantity,
-				Data = "You transferred " .. msg.Tags.Quantity .. " to " .. recipient,
-			}
-			-- Credit-Notice message template, that is sent to the Recipient of the transfer
-			local creditNotice = {
-				Target = recipient,
-				Action = "Credit-Notice",
-				Sender = msg.From,
-				Quantity = msg.Tags.Quantity,
-				Data = "You received " .. msg.Tags.Quantity .. " from " .. msg.From,
-			}
+	end, balances.transfer, recipient, from, quantity)
+	if not shouldContinue2 then
+		return
+	end
 
-			-- Add forwarded tags to the credit and debit notice messages
-			for tagName, tagValue in pairs(msg) do
-				-- Tags beginning with "X-" are forwarded
-				if string.sub(tagName, 1, 2) == "X-" then
-					debitNotice[tagName] = tagValue
-					creditNotice[tagName] = tagValue
-				end
+	if result ~= nil then
+		local senderNewBalance = result[from]
+		local recipientNewBalance = result[recipient]
+		msg.ioEvent:addField("SenderPreviousBalance", senderNewBalance + quantity)
+		msg.ioEvent:addField("SenderNewBalance", senderNewBalance)
+		msg.ioEvent:addField("RecipientPreviousBalance", recipientNewBalance - quantity)
+		msg.ioEvent:addField("RecipientNewBalance", recipientNewBalance)
+	end
+
+	-- Casting implies that the sender does not want a response - Reference: https://elixirforum.com/t/what-is-the-etymology-of-genserver-cast/33610/3
+	if not msg.Cast then
+		-- Debit-Notice message template, that is sent to the Sender of the transfer
+		local debitNotice = {
+			Target = msg.From,
+			Action = "Debit-Notice",
+			Recipient = recipient,
+			Quantity = msg.Tags.Quantity,
+			Data = "You transferred " .. msg.Tags.Quantity .. " to " .. recipient,
+		}
+		-- Credit-Notice message template, that is sent to the Recipient of the transfer
+		local creditNotice = {
+			Target = recipient,
+			Action = "Credit-Notice",
+			Sender = msg.From,
+			Quantity = msg.Tags.Quantity,
+			Data = "You received " .. msg.Tags.Quantity .. " from " .. msg.From,
+		}
+
+		-- Add forwarded tags to the credit and debit notice messages
+		local didForwardTags = false
+		for tagName, tagValue in pairs(msg) do
+			-- Tags beginning with "X-" are forwarded
+			if string.sub(tagName, 1, 2) == "X-" then
+				debitNotice[tagName] = tagValue
+				creditNotice[tagName] = tagValue
+				didForwardTags = true
+				msg.ioEvent:addField(tagName, tagValue)
 			end
-
-			-- Send Debit-Notice and Credit-Notice
-			ao.send(debitNotice)
-			ao.send(creditNotice)
 		end
+		if didForwardTags then
+			msg.ioEvent:addField("ForwardedTags", "true")
+		end
+
+		-- Send Debit-Notice and Credit-Notice
+		ao.send(debitNotice)
+		ao.send(creditNotice)
 	end
 end)
 
-Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.CreateVault), function(msg)
+addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.CreateVault), function(msg)
 	local function checkAssertions()
 		assert(
 			msg.Tags["Lock-Length"]
@@ -193,43 +310,55 @@ Handlers.add(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.Cre
 		)
 	end
 
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Create-Vault-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
-	local result, err = vaults.createVault(
+	local shouldContinue2, vault = eventingPcall(
+		ioEvent,
+		function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-Create-Vault-Notice", Error = "Invalid-Create-Vault" },
+				Data = tostring(error),
+			})
+		end,
+		vaults.createVault,
 		msg.From,
 		tonumber(msg.Tags.Quantity),
 		tonumber(msg.Tags["Lock-Length"]),
 		tonumber(msg.Timestamp),
 		msg.Id
 	)
-	if err then
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-Create-Vault-Notice", Error = "Invalid-Create-Vault" },
-			Data = tostring(err),
-		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Vault-Created-Notice",
-				["Vault-Id"] = msg.Id,
-			},
-			Data = json.encode(result),
-		})
+	if not shouldContinue2 then
+		return
 	end
+
+	if vault ~= nil then
+		msg.ioEvent:addField("Vault-Id", msg.Id)
+		msg.ioEvent:addField("VaultBalance", vault.balance)
+		msg.ioEvent:addField("VaultStartTimestamp", vault.startTimestamp)
+		msg.ioEvent:addField("VaultEndTimestamp", vault.endTimestamp)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = {
+			Action = "Vault-Created-Notice",
+			["Vault-Id"] = msg.Id,
+		},
+		Data = json.encode(vault),
+	})
 end)
 
-Handlers.add(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap.VaultedTransfer), function(msg)
+addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap.VaultedTransfer), function(msg)
 	local function checkAssertions()
 		assert(utils.isValidArweaveAddress(msg.Tags.Recipient), "Invalid recipient")
 		assert(
@@ -283,7 +412,7 @@ Handlers.add(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap
 	end
 end)
 
-Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.ExtendVault), function(msg)
+addEventingHandler(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.ExtendVault), function(msg)
 	local checkAssertions = function()
 		assert(utils.isValidArweaveAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
 		assert(
@@ -292,34 +421,46 @@ Handlers.add(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.Ext
 		)
 	end
 
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
+	local vaultId = msg.Tags["Vault-Id"]
+	local extendLength = tonumber(msg.Tags["Extend-Length"])
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Extend-Vault-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
-	local result, err = vaults.extendVault(msg.From, msg.Tags["Extend-Length"], msg.Timestamp, msg.Tags["Vault-Id"])
-	if err then
+	local shouldContinue2, vault = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Extend-Vault-Notice", Error = "Invalid-Extend-Vault" },
-			Data = tostring(err),
+			Data = tostring(error),
 		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Vault-Extended-Notice" },
-			Data = json.encode(result),
-		})
+	end, vaults.extendVault, msg.From, extendLength, msg.Timestamp, vaultId)
+	if not shouldContinue2 then
+		return
 	end
+
+	if vault ~= nil then
+		msg.ioEvent:addField("Vault-Id", vaultId)
+		msg.ioEvent:addField("VaultBalance", vault.balance)
+		msg.ioEvent:addField("VaultStartTimestamp", vault.startTimestamp)
+		msg.ioEvent:addField("VaultEndTimestamp", vault.endTimestamp)
+		msg.ioEvent:addField("VaultPrevEndTimestamp", vault.endTimestamp - extendLength)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Vault-Extended-Notice" },
+		Data = json.encode(vault),
+	})
 end)
 
-Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.IncreaseVault), function(msg)
+addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.IncreaseVault), function(msg)
 	local function checkAssertions()
 		assert(utils.isValidArweaveAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
 		assert(
@@ -328,34 +469,47 @@ Handlers.add(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.I
 		)
 	end
 
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Increase-Vault-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
-	local result, err = vaults.increaseVault(msg.From, msg.Tags.Quantity, msg.Tags["Vault-Id"], msg.Timestamp)
-	if err then
+	local quantity = tonumber(msg.Tags.Quantity)
+	local vaultId = msg.Tags["Vault-Id"]
+
+	local shouldContinue2, vault = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Increase-Vault-Notice", Error = "Invalid-Increase-Vault" },
-			Data = tostring(err),
+			Data = tostring(error),
 		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Vault-Increased-Notice" },
-			Data = json.encode(result),
-		})
+	end, vaults.increaseVault, msg.From, quantity, vaultId, msg.Timestamp)
+	if not shouldContinue2 then
+		return
 	end
+
+	if vault ~= nil then
+		msg.ioEvent:addField("Vault-Id", vaultId)
+		msg.ioEvent:addField("VaultBalance", vault.balance)
+		msg.ioEvent:addField("VaultPrevBalance", vault.balance - quantity)
+		msg.ioEvent:addField("VaultStartTimestamp", vault.startTimestamp)
+		msg.ioEvent:addField("VaultEndTimestamp", vault.endTimestamp)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Vault-Increased-Notice" },
+		Data = json.encode(vault),
+	})
 end)
 
-Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRecord), function(msg)
+addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRecord), function(msg)
 	local checkAssertions = function()
 		assert(type(msg.Tags.Name) == "string", "Invalid name")
 		assert(type(msg.Tags["Purchase-Type"]) == "string", "Invalid purchase type")
@@ -370,18 +524,31 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 		end
 	end
 
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Buy-Record-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
-	local status, result = pcall(
+	msg.ioEvent:addField("nameLength", #msg.Tags.Name)
+
+	local shouldContinue2, result = eventingPcall(
+		msg.ioEvent,
+		function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Invalid-Buy-Record-Notice",
+					Error = "Invalid-Buy-Record",
+				},
+				Data = tostring(error),
+			})
+		end,
 		arns.buyRecord,
 		string.lower(msg.Tags.Name),
 		msg.Tags["Purchase-Type"],
@@ -390,26 +557,26 @@ Handlers.add(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRe
 		msg.Timestamp,
 		msg.Tags["Process-Id"]
 	)
-	if not status then
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-Buy-Record-Notice",
-				Error = "Invalid-Buy-Record",
-			},
-			Data = tostring(result),
-		})
+	if not shouldContinue2 then
 		return
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Buy-Record-Notice", Name = msg.Tags.Name },
-			Data = json.encode(result),
-		})
 	end
+
+	local record = {}
+	if result ~= nil then
+		record = result.record
+		addRecordResultFields(msg.ioEvent, result)
+	end
+
+	msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Buy-Record-Notice", Name = msg.Tags.Name },
+		Data = json.encode(record),
+	})
 end)
 
-Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.ExtendLease), function(msg)
+addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.ExtendLease), function(msg)
 	local checkAssertions = function()
 		assert(type(msg.Tags.Name) == "string", "Invalid name")
 		assert(
@@ -418,35 +585,43 @@ Handlers.add(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.Ext
 		)
 	end
 
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Extend-Lease-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
-	local status, result =
-		pcall(arns.extendLease, msg.From, string.lower(msg.Tags.Name), tonumber(msg.Tags.Years), msg.Timestamp)
-	if not status then
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Extend-Lease-Notice", Error = "Invalid-Extend-Lease" },
-			Data = tostring(result),
+			Data = tostring(error),
 		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Extend-Lease-Notice", Name = string.lower(msg.Tags.Name) },
-			Data = json.encode(result),
-		})
+	end, arns.extendLease, msg.From, string.lower(msg.Tags.Name), tonumber(msg.Tags.Years), msg.Timestamp)
+	if not shouldContinue2 then
+		return
 	end
+
+	local recordResult = {}
+	if result ~= nil then
+		recordResult = result.record
+		addRecordResultFields(msg.ioEvent, result)
+		msg.ioEvent:addField("totalExtensionFee", recordResult.totalExtensionFee)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Extend-Lease-Notice", Name = string.lower(msg.Tags.Name) },
+		Data = json.encode(recordResult),
+	})
 end)
 
-Handlers.add(
+addEventingHandler(
 	ActionMap.IncreaseUndernameLimit,
 	utils.hasMatchingTag("Action", ActionMap.IncreaseUndernameLimit),
 	function(msg)
@@ -460,41 +635,53 @@ Handlers.add(
 			)
 		end
 
-		local inputStatus, inputResult = pcall(checkAssertions)
-
-		if not inputStatus then
+		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Invalid-Increase-Undername-Limit-Notice", Error = "Bad-Input" },
-				Data = tostring(inputResult),
+				Data = tostring(error),
 			})
+		end, checkAssertions)
+		if not shouldContinue then
 			return
 		end
 
-		local status, result = pcall(
+		local shouldContinue2, result = eventingPcall(
+			ioEvent,
+			function(error)
+				ao.send({
+					Target = msg.From,
+					Tags = { Action = "Invalid-Increase-Undername-Limit-Notice", Error = "Invalid-Undername-Increase" },
+					Data = tostring(error),
+				})
+			end,
 			arns.increaseundernameLimit,
 			msg.From,
 			string.lower(msg.Tags.Name),
 			tonumber(msg.Tags.Quantity),
 			msg.Timestamp
 		)
-		if not status then
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Invalid-Increase-Undername-Limit-Notice", Error = "Invalid-Undername-Increase" },
-				Data = tostring(result),
-			})
-		else
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Increase-Undername-Limit-Notice", Name = string.lower(msg.Tags.Name) },
-				Data = json.encode(result),
-			})
+		if not shouldContinue2 then
+			return
 		end
+
+		local recordResult = {}
+		if result ~= nil then
+			recordResult = result.record
+			addRecordResultFields(msg.ioEvent, result)
+			msg.ioEvent:addField("previousUndernameLimit", recordResult.undernameLimit - tonumber(msg.Tags.Quantity))
+			msg.ioEvent:addField("additionalUndernameCost", recordResult.additionalUndernameCost)
+		end
+
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Increase-Undername-Limit-Notice", Name = string.lower(msg.Tags.Name) },
+			Data = json.encode(recordResult),
+		})
 	end
 )
 
-Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.TokenCost), function(msg)
+addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.TokenCost), function(msg)
 	local checkAssertions = function()
 		assert(
 			type(msg.Tags.Intent) == "string",
@@ -503,8 +690,7 @@ Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.Token
 				or msg.Tags.Intent == ActionMap.ExtendLease
 				or msg.Tags.Intent == ActionMap.IncreaseUndernameLimit,
 			"Intent must be valid registry interaction (e.g. BuyRecord, ExtendLease, IncreaseUndernameLimit). Provided intent: "
-					.. msg.Tags.Intent
-				or "nil"
+				.. (msg.Tags.Intent or "nil")
 		)
 		-- if years is provided, assert it is a number and integer between 1 and 5
 		if msg.Tags.Years then
@@ -551,7 +737,29 @@ Handlers.add(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.Token
 	end
 end)
 
-Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.JoinNetwork), function(msg)
+addEventingHandler(
+	ActionMap.GetRegistrationFees,
+	utils.hasMatchingTag("Action", ActionMap.GetRegistrationFees),
+	function(msg)
+		local status, priceList = pcall(arns.getRegistrationFees)
+
+		if not status then
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-Get-Registration-Fees-Notice", Error = "Invalid-Get-Registration-Fees" },
+				Data = tostring(priceList),
+			})
+		else
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Get-Registration-Fees-Notice" },
+				Data = json.encode(priceList),
+			})
+		end
+	end
+)
+
+addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.JoinNetwork), function(msg)
 	local updatedSettings = {
 		label = msg.Tags.Label,
 		note = msg.Tags.Note,
@@ -565,8 +773,18 @@ Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.Joi
 		autoStake = msg.Tags["Auto-Stake"] == "true",
 	}
 	local observerAddress = msg.Tags["Observer-Address"] or msg.Tags.From
+	msg.ioEvent:addField("Resolved-Observer-Address", observerAddress)
+	msg.ioEvent:addField("Sender-Previous-Balance", balances[msg.From])
 
-	local status, result = pcall(
+	local shouldContinue, gateway = eventingPcall(
+		msg.ioEvent,
+		function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-Join-Network-Notice", Error = "Invalid-Join-Network" },
+				Data = tostring(error),
+			})
+		end,
 		gar.joinNetwork,
 		msg.From,
 		tonumber(msg.Tags["Operator-Stake"]),
@@ -574,39 +792,78 @@ Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.Joi
 		observerAddress,
 		msg.Timestamp
 	)
-	if not status then
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-Join-Network-Notice", Error = "Invalid-Join-Network" },
-			Data = tostring(result),
-		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Join-Network-Notice" },
-			Data = json.encode(result),
-		})
+	if not shouldContinue then
+		return
 	end
+
+	msg.ioEvent:addField("Sender-New-Balance", balances[msg.From])
+	if gateway ~= nil then
+		msg.ioEvent:addField("GW-Start-Timestamp", gateway.startTimestamp)
+	end
+	local gwStats = gatewayStats()
+	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
+	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Join-Network-Notice" },
+		Data = json.encode(gateway),
+	})
 end)
 
-Handlers.add(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", ActionMap.LeaveNetwork), function(msg)
-	local status, result = pcall(gar.leaveNetwork, msg.From, msg.Timestamp, msg.Id)
-	if not status then
+addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", ActionMap.LeaveNetwork), function(msg)
+	local shouldContinue, gateway = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Leave-Network-Notice", Error = "Invalid-Leave-Network" },
-			Data = tostring(result),
+			Data = tostring(error),
 		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Leave-Network-Notice" },
-			Data = json.encode(result),
-		})
+	end, gar.leaveNetwork, msg.From, msg.Timestamp, msg.Id)
+	if not shouldContinue then
+		return
 	end
+
+	if gateway ~= nil then
+		msg.ioEvent:addField("GW-Vaults-Count", utils.lengthOfTable(gateway.vaults or {}))
+		local exitVault = gateway.vaults[msg.From]
+		local withdrawVault = gateway.vaults[msg.Id]
+		local previousStake = exitVault.balance
+		if exitVault ~= nil then
+			msg.ioEvent:addFieldsWithPrefixIfExist(
+				exitVault,
+				"Exit-Vault-",
+				{ "balance", "startTimestamp", "endTimestamp" }
+			)
+		end
+		if withdrawVault ~= nil then
+			previousStake = previousStake + withdrawVault.balance
+			msg.ioEvent:addFieldsWithPrefixIfExist(
+				withdrawVault,
+				"Withdraw-Vault-",
+				{ "balance", "startTimestamp", "endTimestamp" }
+			)
+		end
+		msg.ioEvent:addField("Previous-Operator-Stake", previousStake)
+		msg.ioEvent:addFieldsWithPrefixIfExist(
+			gateway,
+			"GW-",
+			{ "totalDelegatedStake", "observerAddress", "startTimestamp", "endTimestamp" }
+		)
+		msg.ioEvent:addFields(gateway.stats or {})
+	end
+
+	local gwStats = gatewayStats()
+	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
+	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Leave-Network-Notice" },
+		Data = json.encode(gateway),
+	})
 end)
 
-Handlers.add(
+addEventingHandler(
 	ActionMap.IncreaseOperatorStake,
 	utils.hasMatchingTag("Action", ActionMap.IncreaseOperatorStake),
 	function(msg)
@@ -617,35 +874,46 @@ Handlers.add(
 			)
 		end
 
-		local inputStatus, inputResult = pcall(checkAssertions)
-
-		if not inputStatus then
+		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Invalid-Increase-Operator-Stake-Notice", Error = "Bad-Input" },
-				Data = tostring(inputResult),
+				Data = tostring(error),
 			})
+		end, checkAssertions)
+		if not shouldContinue then
 			return
 		end
 
-		local result, err = gar.increaseOperatorStake(msg.From, tonumber(msg.Tags.Quantity))
-		if err then
+		msg.ioEvent:addField("Sender-Previous-Balance", balances[msg.From])
+		local quantity = tonumber(msg.Tags.Quantity)
+
+		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Invalid-Increase-Operator-Stake-Notice" },
-				Data = tostring(err),
+				Data = tostring(error),
 			})
-		else
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Increase-Operator-Stake-Notice" },
-				Data = json.encode(result),
-			})
+		end, gar.increaseOperatorStake, msg.From, quantity)
+		if not shouldContinue2 then
+			return
 		end
+
+		msg.ioEvent:addField("Sender-New-Balance", balances[msg.From])
+		if gateway ~= nil then
+			msg.ioEvent:addField("New-Operator-Stake", gateway.operatorStake)
+			msg.ioEvent:addField("Previous-Operator-Stake", gateway.operatorStake - quantity)
+		end
+
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Increase-Operator-Stake-Notice" },
+			Data = json.encode(gateway),
+		})
 	end
 )
 
-Handlers.add(
+addEventingHandler(
 	ActionMap.DecreaseOperatorStake,
 	utils.hasMatchingTag("Action", ActionMap.DecreaseOperatorStake),
 	function(msg)
@@ -656,35 +924,57 @@ Handlers.add(
 			)
 		end
 
-		local inputStatus, inputResult = pcall(checkAssertions)
-
-		if not inputStatus then
+		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Invalid-Decrease-Operator-Stake-Notice", Error = "Bad-Input" },
-				Data = tostring(inputResult),
+				Data = tostring(error),
 			})
+		end, checkAssertions)
+		if not shouldContinue then
 			return
 		end
-		local status, result =
-			pcall(gar.decreaseOperatorStake, msg.From, tonumber(msg.Tags.Quantity), msg.Timestamp, msg.Id)
-		if not status then
+
+		local quantity = tonumber(msg.Tags.Quantity)
+		msg.ioEvent:addField("Sender-Previous-Balance", balances[msg.From])
+
+		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Invalid-Decrease-Operator-Stake-Notice", Error = "Invalid-Stake-Decrease" },
-				Data = tostring(result),
+				Data = tostring(error),
 			})
-		else
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Decrease-Operator-Stake-Notice" },
-				Data = json.encode(result),
-			})
+		end, gar.decreaseOperatorStake, msg.From, quantity, msg.Timestamp, msg.Id)
+		if not shouldContinue2 then
+			return
 		end
+
+		msg.ioEvent:addField("Sender-New-Balance", balances[msg.From]) -- should be unchanged
+		if gateway ~= nil then
+			local previousStake = gateway.operatorStake + quantity
+			msg.ioEvent:addField("New-Operator-Stake", gateway.operatorStake)
+			msg.ioEvent:addField("Previous-Operator-Stake", previousStake)
+			msg.ioEvent:addField("GW-Vaults-Count", utils.lengthOfTable(gateway.vaults or {}))
+			local decreaseStakeVault = gateway.vaults[msg.Id]
+			if decreaseStakeVault ~= nil then
+				previousStake = previousStake + decreaseStakeVault.balance
+				msg.ioEvent:addFieldsWithPrefixIfExist(
+					decreaseStakeVault,
+					"Decrease-Stake-Vault-",
+					{ "balance", "startTimestamp", "endTimestamp" }
+				)
+			end
+		end
+
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Decrease-Operator-Stake-Notice" },
+			Data = json.encode(gateway),
+		})
 	end
 )
 
-Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.DelegateStake), function(msg)
+addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.DelegateStake), function(msg)
 	local checkAssertions = function()
 		assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid target address")
 		assert(
@@ -693,84 +983,112 @@ Handlers.add(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.D
 		)
 	end
 
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
 	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 	local from = utils.formatAddress(msg.From)
+	local quantity = tonumber(msg.Tags.Quantity)
+	msg.ioEvent:addField("TargetFormatted", target)
 
-	local status, result = pcall(gar.delegateStake, from, target, tonumber(msg.Tags.Quantity), tonumber(msg.Timestamp))
-	if not status then
+	local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = from,
-			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Invalid-Delegate-Stake", Message = result },
-			Data = json.encode(result),
+			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Invalid-Delegate-Stake", Message = error }, -- TODO: is this still right?
+			Data = json.encode(error),
 		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Delegate-Stake-Notice", Gateway = msg.Tags.Target },
-			Data = json.encode(result),
-		})
+	end, gar.delegateStake, from, target, quantity, tonumber(msg.Timestamp))
+	if not shouldContinue2 then
+		return
 	end
+
+	local delegateResult = {}
+	if gateway ~= nil then
+		local newStake = gateway.delegates[from].delegatedStake
+		msg.ioEvent:addField("PreviousStake", newStake - quantity)
+		msg.ioEvent:addField("NewStake", newStake)
+		msg.ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
+		delegateResult = gateway.delegates[from]
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Delegate-Stake-Notice", Gateway = msg.Tags.Target },
+		Data = json.encode(delegateResult),
+	})
 end)
 
-Handlers.add(
-	ActionMap.CancelDelegateWithdrawl,
-	utils.hasMatchingTag("Action", ActionMap.CancelDelegateWithdrawl),
+addEventingHandler(
+	ActionMap.CancelDelegateWithdrawal,
+	utils.hasMatchingTag("Action", ActionMap.CancelDelegateWithdrawal),
 	function(msg)
 		local checkAssertions = function()
 			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
 			assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
 		end
 
-		local inputStatus, inputResult = pcall(checkAssertions)
-
-		if not inputStatus then
+		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Invalid-Cancel-Delegate-Withdrawl-Notice", Error = "Bad-Input" },
-				Data = tostring(inputResult),
+				Tags = { Action = "Invalid-Cancel-Delegate-Withdrawal-Notice", Error = "Bad-Input" },
+				Data = tostring(error),
 			})
+		end, checkAssertions)
+		if not shouldContinue then
 			return
 		end
 
 		local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 		local fromAddress = utils.formatAddress(msg.From)
+		local vaultId = msg.Tags["Vault-Id"]
+		msg.ioEvent:addField("TargetFormatted", gatewayAddress)
 
-		local status, result = pcall(gar.cancelDelegateWithdrawal, fromAddress, gatewayAddress, msg.Tags["Vault-Id"])
-		if not status then
+		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = {
-					Action = "Invalid-Cancel-Delegate-Withdrawl-Notice",
-					Error = "Invalid-Cancel-Delegate-Withdrawl",
+					Action = "Invalid-Cancel-Delegate-Withdrawal-Notice",
+					Error = "Invalid-Cancel-Delegate-Withdrawal",
 				},
-				Data = tostring(result),
+				Data = tostring(error),
 			})
-		else
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Cancel-Delegate-Withdrawl-Notice",
-					Address = gatewayAddress,
-					["Vault-Id"] = msg.Tags["Vault-Id"],
-				},
-				Data = json.encode(result),
-			})
+		end, gar.cancelDelegateWithdrawal, fromAddress, gatewayAddress, vaultId)
+		if not shouldContinue2 then
+			return
 		end
+
+		local delegateResult = {}
+		if result ~= nil then
+			if result.delegate ~= nil then
+				delegateResult = result.delegate
+				local newStake = delegateResult.delegatedStake
+				msg.ioEvent:addField("PreviousStake", newStake - delegateResult.vaults[vaultId].balance)
+				msg.ioEvent:addField("NewStake", newStake)
+				msg.ioEvent:addField("GatewayTotalDelegatedStake", result.totalDelegatedStake)
+			end
+		end
+
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Cancel-Delegate-Withdrawal-Notice",
+				Address = gatewayAddress,
+				["Vault-Id"] = msg.Tags["Vault-Id"],
+			},
+			Data = json.encode(delegateResult),
+		})
 	end
 )
 
-Handlers.add(
+addEventingHandler(
 	ActionMap.DecreaseDelegateStake,
 	utils.hasMatchingTag("Action", ActionMap.DecreaseDelegateStake),
 	function(msg)
@@ -782,39 +1100,63 @@ Handlers.add(
 			)
 		end
 
-		local inputStatus, inputResult = pcall(checkAssertions)
-
-		if not inputStatus then
+		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Bad-Input" },
-				Data = tostring(inputResult),
+				Data = tostring(error),
 			})
+		end, checkAssertions)
+		if not shouldContinue then
 			return
 		end
 
 		local from = utils.formatAddress(msg.From)
 		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
+		local quantity = tonumber(msg.Tags.Quantity)
+		msg.ioEvent:addField("TargetFormatted", target)
 
-		local status, result =
-			pcall(gar.decreaseDelegateStake, target, from, tonumber(msg.Tags.Quantity), msg.Timestamp, msg.Id)
-		if not status then
+		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = from,
 				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Invalid-Decrease-Delegate-Stake" },
-				Data = tostring(result),
+				Data = tostring(error),
 			})
-		else
-			ao.send({
-				Target = from,
-				Tags = { Action = "Decrease-Delegate-Stake-Notice", Adddress = target, Quantity = msg.Tags.Quantity },
-				Data = json.encode(result),
-			})
+		end, gar.decreaseDelegateStake, target, from, quantity, msg.Timestamp, msg.Id)
+		if not shouldContinue2 then
+			return
 		end
+
+		local delegateResult = {}
+		if gateway ~= nil then
+			local newStake = gateway.delegates[from].delegatedStake
+			msg.ioEvent:addField("PreviousStake", newStake + quantity)
+			msg.ioEvent:addField("NewStake", newStake)
+			msg.ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
+
+			delegateResult = gateway.delegates[from]
+			local newDelegateVaults = delegateResult.vaults
+			if newDelegateVaults ~= nil then
+				msg.ioEvent:addField("VaultsCount", utils.lengthOfTable(newDelegateVaults))
+				local newDelegateVault = newDelegateVaults[msg.Id]
+				if newDelegateVault ~= nil then
+					msg.ioEvent:addField("Vault-Id", msg.Id)
+					msg.ioEvent:addField("VaultBalance", newDelegateVault.balance)
+					msg.ioEvent:addField("VaultStartTimestamp", newDelegateVault.startTimestamp)
+					msg.ioEvent:addField("VaultEndTimestamp", newDelegateVault.endTimestamp)
+				end
+			end
+		end
+
+		ao.send({
+			Target = from,
+			Tags = { Action = "Decrease-Delegate-Stake-Notice", Adddress = target, Quantity = msg.Tags.Quantity },
+			Data = json.encode(delegateResult),
+		})
 	end
 )
 
-Handlers.add(
+addEventingHandler(
 	ActionMap.UpdateGatewaySettings,
 	utils.hasMatchingTag("Action", ActionMap.UpdateGatewaySettings),
 	function(msg)
@@ -862,7 +1204,7 @@ Handlers.add(
 	end
 )
 
-Handlers.add(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
+addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
 	local reportTxId = msg.Tags["Report-Tx-Id"]
 	local failedGateways = utils.splitString(msg.Tags["Failed-Gateways"], ",")
 	local checkAssertions = function()
@@ -872,31 +1214,44 @@ Handlers.add(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMa
 		end
 	end
 
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Save-Observations-Notice", Error = "Invalid-Save-Observations" },
-			Data = tostring(inputResult),
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
-	local status, result = pcall(epochs.saveObservations, msg.From, reportTxId, failedGateways, msg.Timestamp)
-	if status then
-		ao.send({ Target = msg.From, Action = "Save-Observations-Notice", Data = json.encode(result) })
-	else
+	local shouldContinue2, observations = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Action = "Invalid-Save-Observations-Notice",
 			Error = "Invalid-Saved-Observations",
-			Data = json.encode(result),
+			Data = json.encode(error),
 		})
+	end, epochs.saveObservations, msg.From, reportTxId, failedGateways, msg.Timestamp)
+	if not shouldContinue2 then
+		return
 	end
+
+	if observations ~= nil then
+		local failureSummariesCount = utils.lengthOfTable(observations.failureSummaries or {})
+		if failureSummariesCount > 0 then
+			msg.ioEvent:addField("Failure-Summaries-Count", failureSummariesCount)
+		end
+		local reportsCount = utils.lengthOfTable(observations.reports or {})
+		if reportsCount > 0 then
+			msg.ioEvent:addField("Reports-Count", reportsCount)
+		end
+	end
+
+	ao.send({ Target = msg.From, Action = "Save-Observations-Notice", Data = json.encode(observations) })
 end)
 
-Handlers.add(ActionMap.EpochSettings, utils.hasMatchingTag("Action", ActionMap.EpochSettings), function(msg)
+addEventingHandler(ActionMap.EpochSettings, utils.hasMatchingTag("Action", ActionMap.EpochSettings), function(msg)
 	local epochSettings = epochs.getSettings()
 	ao.send({
 		Target = msg.From,
@@ -905,7 +1260,7 @@ Handlers.add(ActionMap.EpochSettings, utils.hasMatchingTag("Action", ActionMap.E
 	})
 end)
 
-Handlers.add(
+addEventingHandler(
 	ActionMap.DemandFactorSettings,
 	utils.hasMatchingTag("Action", ActionMap.DemandFactorSettings),
 	function(msg)
@@ -918,7 +1273,7 @@ Handlers.add(
 	end
 )
 
-Handlers.add(
+addEventingHandler(
 	ActionMap.GatewayRegistrySettings,
 	utils.hasMatchingTag("Action", ActionMap.GatewayRegistrySettings),
 	function(msg)
@@ -931,7 +1286,7 @@ Handlers.add(
 	end
 )
 
-Handlers.add("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Token-Supply"), function(msg)
+addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Token-Supply"), function(msg)
 	-- add all the balances
 	local totalSupply = 0
 	local balances = balances.getBalances()
@@ -971,22 +1326,30 @@ Handlers.add("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Token-Sup
 	})
 end)
 
--- TICK HANDLER - TODO: this may be better as a "Distribute" rewards handler
-Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
+-- TICK HANDLER - TODO: this may be better as a "Distribute" rewards handler instead of `Tick` tag
+addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
 	local msgTimestamp = tonumber(msg.Timestamp)
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
-	local function tickEpochs(timestamp, blockHeight, hashchain)
+	local function tickEpoch(timestamp, blockHeight, hashchain)
 		-- update demand factor if necessary
-		demand.updateDemandFactor(timestamp)
+		local demandFactor = demand.updateDemandFactor(timestamp)
 		epochs.distributeRewardsForEpoch(timestamp)
-		epochs.createEpoch(timestamp, tonumber(blockHeight), hashchain)
+		local epoch = epochs.createEpoch(timestamp, tonumber(blockHeight), hashchain)
+		return {
+			maybeEpoch = epoch,
+			maybeDemandFactor = demandFactor,
+		}
 	end
 
 	local lastTickedEpochIndex = LastTickedEpochIndex
-	local currentEpochIndex = epochs.getEpochIndexForTimestamp(msgTimestamp)
+	local targetCurrentEpochIndex = epochs.getEpochIndexForTimestamp(msgTimestamp)
+	msg.ioEvent:addField("Last-Ticked-Epoch-Index", lastTickedEpochIndex)
+	msg.ioEvent:addField("Current-Epoch-Index", lastTickedEpochIndex + 1)
+	msg.ioEvent:addField("Target-Current-Epoch-Index", targetCurrentEpochIndex)
+
 	-- if epoch index is -1 then we are before the genesis epoch and we should not tick
-	if currentEpochIndex < 0 then
+	if targetCurrentEpochIndex < 0 then
 		-- do nothing and just send a notice back to the sender
 		ao.send({
 			Target = msg.From,
@@ -997,7 +1360,10 @@ Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	end
 
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
-	for i = lastTickedEpochIndex + 1, currentEpochIndex do
+	local tickedEpochIndexes = {}
+	local newEpochIndexes = {}
+	local newDemandFactors = {}
+	for i = lastTickedEpochIndex + 1, targetCurrentEpochIndex do
 		print("Ticking epoch: " .. i)
 		local previousState = {
 			Balances = utils.deepCopy(Balances),
@@ -1010,18 +1376,25 @@ Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 		-- use the minimum of the msg timestamp or the epoch distribution timestamp, this ensures an epoch gets created for the genesis block and that we don't try and distribute before an epoch is created
 		local tickTimestamp = math.min(msgTimestamp or 0, epochDistributionTimestamp)
 		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height, we should set the prescribed observers and names to empty arrays and distribute rewards accordingly
-		local status, result = pcall(tickEpochs, tickTimestamp, msg["Block-Height"], msg["Hash-Chain"])
-		if status then
+		local tickSuceeded, resultOrError = pcall(tickEpoch, tickTimestamp, msg["Block-Height"], msg["Hash-Chain"])
+		if tickSuceeded then
 			if tickTimestamp == epochDistributionTimestamp then
 				-- if we are distributing rewards, we should update the last ticked epoch index to the current epoch index
 				LastTickedEpochIndex = i
+				table.insert(tickedEpochIndexes, i)
 			end
 			ao.send({
 				Target = msg.From,
 				Action = "Tick-Notice",
 				LastTickedEpochIndex = LastTickedEpochIndex,
-				Data = json.encode(result),
+				Data = json.encode(resultOrError),
 			})
+			if resultOrError.maybeEpoch ~= nil then
+				table.insert(newEpochIndexes, resultOrError.maybeEpoch.epochIndex)
+			end
+			if resultOrError.maybeDemandFactor ~= nil then
+				table.insert(newDemandFactors, resultOrError.maybeDemandFactor)
+			end
 		else
 			-- reset the state to previous state
 			Balances = previousState.Balances
@@ -1033,15 +1406,38 @@ Handlers.add("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 				Target = msg.From,
 				Action = "Invalid-Tick-Notice",
 				Error = "Invalid-Tick",
-				Data = json.encode(result),
+				Data = json.encode(resultOrError),
 			})
+			-- TODO: But keep ticking ahead?!? We just need be to robust against potential failures here
 		end
 	end
+	if #tickedEpochIndexes > 0 then
+		msg.ioEvent:addField("Ticked-Epoch-Indexes", tickedEpochIndexes)
+	end
+	if #newEpochIndexes > 0 then
+		msg.ioEvent:addField("New-Epoch-Indexes", newEpochIndexes)
+		-- Only print the prescribed observers of the newest epoch
+		local newestEpoch = epochs.getEpoch(math.max(table.unpack(newEpochIndexes)))
+		local prescribedObserverAddresses = utils.map(newestEpoch.prescribedObservers, function(_, observer)
+			return observer.gatewayAddress
+		end)
+		msg.ioEvent:addField("Prescribed-Observers", prescribedObserverAddresses)
+	end
+	if #newDemandFactors > 0 then
+		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors, ";")
+	end
+	msg.ioEvent:printEvent()
 end)
 
 -- READ HANDLERS
 
-Handlers.add(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", ActionMap.Info), function(msg)
+addEventingHandler(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", ActionMap.Info), function(msg)
+	local handlers = Handlers.list
+	local handlerNames = {}
+	for _, handler in ipairs(handlers) do
+		table.insert(handlerNames, handler.name)
+	end
+
 	ao.send({
 		Target = msg.From,
 		Action = "Info-Notice",
@@ -1052,6 +1448,7 @@ Handlers.add(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", ActionMap.I
 			Owner = Owner,
 			Denomination = tostring(Denomination),
 			LastTickedEpochIndex = tostring(LastTickedEpochIndex),
+			Handlers = json.encode(handlerNames),
 		},
 		Data = json.encode({
 			Name = Name,
@@ -1060,11 +1457,12 @@ Handlers.add(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", ActionMap.I
 			Owner = Owner,
 			Denomination = Denomination,
 			LastTickedEpochIndex = LastTickedEpochIndex,
+			Handlers = handlerNames,
 		}),
 	})
 end)
 
-Handlers.add(ActionMap.State, Handlers.utils.hasMatchingTag("Action", ActionMap.State), function(msg)
+addEventingHandler(ActionMap.State, Handlers.utils.hasMatchingTag("Action", ActionMap.State), function(msg)
 	ao.send({
 		Target = msg.From,
 		Action = "State-Notice",
@@ -1082,7 +1480,7 @@ Handlers.add(ActionMap.State, Handlers.utils.hasMatchingTag("Action", ActionMap.
 	})
 end)
 
-Handlers.add(ActionMap.Gateways, Handlers.utils.hasMatchingTag("Action", ActionMap.Gateways), function(msg)
+addEventingHandler(ActionMap.Gateways, Handlers.utils.hasMatchingTag("Action", ActionMap.Gateways), function(msg)
 	local gateways = gar.getGateways()
 	ao.send({
 		Target = msg.From,
@@ -1091,7 +1489,7 @@ Handlers.add(ActionMap.Gateways, Handlers.utils.hasMatchingTag("Action", ActionM
 	})
 end)
 
-Handlers.add(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", ActionMap.Gateway), function(msg)
+addEventingHandler(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", ActionMap.Gateway), function(msg)
 	local gateway = gar.getGateway(msg.Tags.Address or msg.From)
 	ao.send({
 		Target = msg.From,
@@ -1101,7 +1499,7 @@ Handlers.add(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", ActionMa
 	})
 end)
 
-Handlers.add(ActionMap.Balances, Handlers.utils.hasMatchingTag("Action", ActionMap.Balances), function(msg)
+addEventingHandler(ActionMap.Balances, Handlers.utils.hasMatchingTag("Action", ActionMap.Balances), function(msg)
 	ao.send({
 		Target = msg.From,
 		Action = "Balances-Notice",
@@ -1109,7 +1507,7 @@ Handlers.add(ActionMap.Balances, Handlers.utils.hasMatchingTag("Action", ActionM
 	})
 end)
 
-Handlers.add(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMap.Balance), function(msg)
+addEventingHandler(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMap.Balance), function(msg)
 	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From)
 
 	-- TODO: arconnect et. all expect to accept Target
@@ -1125,7 +1523,7 @@ Handlers.add(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMa
 	})
 end)
 
-Handlers.add(ActionMap.DemandFactor, utils.hasMatchingTag("Action", ActionMap.DemandFactor), function(msg)
+addEventingHandler(ActionMap.DemandFactor, utils.hasMatchingTag("Action", ActionMap.DemandFactor), function(msg)
 	-- wrap in a protected call, and return the result or error accoringly to sender
 	local status, result = pcall(demand.getDemandFactor)
 	if status then
@@ -1140,7 +1538,7 @@ Handlers.add(ActionMap.DemandFactor, utils.hasMatchingTag("Action", ActionMap.De
 	end
 end)
 
-Handlers.add(ActionMap.DemandFactorInfo, utils.hasMatchingTag("Action", ActionMap.DemandFactorInfo), function(msg)
+addEventingHandler(ActionMap.DemandFactorInfo, utils.hasMatchingTag("Action", ActionMap.DemandFactorInfo), function(msg)
 	local status, result = pcall(demand.getDemandFactorInfo)
 	if status then
 		ao.send({ Target = msg.From, Action = "Demand-Factor-Info-Notice", Data = json.encode(result) })
@@ -1154,7 +1552,7 @@ Handlers.add(ActionMap.DemandFactorInfo, utils.hasMatchingTag("Action", ActionMa
 	end
 end)
 
-Handlers.add(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Record), function(msg)
+addEventingHandler(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Record), function(msg)
 	local record = arns.getRecord(msg.Tags.Name)
 
 	local recordNotice = {
@@ -1176,7 +1574,7 @@ Handlers.add(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Record),
 	ao.send(recordNotice)
 end)
 
-Handlers.add(ActionMap.Records, utils.hasMatchingTag("Action", ActionMap.Records), function(msg)
+addEventingHandler(ActionMap.Records, utils.hasMatchingTag("Action", ActionMap.Records), function(msg)
 	local records = arns.getRecords()
 
 	-- Credit-Notice message template, that is sent to the Recipient of the transfer
@@ -1198,7 +1596,7 @@ Handlers.add(ActionMap.Records, utils.hasMatchingTag("Action", ActionMap.Records
 	ao.send(recordsNotice)
 end)
 
-Handlers.add(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
+addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local checkAssertions = function()
 		assert(msg.Tags["Epoch-Index"] or msg.Tags.Timestamp or msg.Timestamp, "Epoch index or timestamp is required")
@@ -1221,34 +1619,42 @@ Handlers.add(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), f
 	ao.send({ Target = msg.From, Action = "Epoch-Notice", Data = json.encode(epoch) })
 end)
 
-Handlers.add(ActionMap.Epochs, utils.hasMatchingTag("Action", ActionMap.Epochs), function(msg)
+addEventingHandler(ActionMap.Epochs, utils.hasMatchingTag("Action", ActionMap.Epochs), function(msg)
 	local epochs = epochs.getEpochs()
 	ao.send({ Target = msg.From, Action = "Epochs-Notice", Data = epochs })
 end)
 
-Handlers.add(ActionMap.PrescribedObservers, utils.hasMatchingTag("Action", ActionMap.PrescribedObservers), function(msg)
-	-- check if the epoch number is provided, if not get the epoch number from the timestamp
-	local checkAssertions = function()
-		assert(msg.Tags["Epoch-Index"] or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
+addEventingHandler(
+	ActionMap.PrescribedObservers,
+	utils.hasMatchingTag("Action", ActionMap.PrescribedObservers),
+	function(msg)
+		-- check if the epoch number is provided, if not get the epoch number from the timestamp
+		local checkAssertions = function()
+			assert(
+				msg.Tags["Epoch-Index"] or msg.Timestamp or msg.Tags.Timestamp,
+				"Epoch index or timestamp is required"
+			)
+		end
+
+		local inputStatus, inputResult = pcall(checkAssertions)
+
+		if not inputStatus then
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-Prescribed-Observers-Notice", Error = "Bad-Input" },
+				Data = tostring(inputResult),
+			})
+			return
+		end
+
+		local epochIndex = tonumber(msg.Tags["Epoch-Index"])
+			or epochs.getEpochIndexForTimestamp(tonumber(msg.Timestamp))
+		local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
+		ao.send({ Target = msg.From, Action = "Prescribed-Observers-Notice", Data = json.encode(prescribedObservers) })
 	end
+)
 
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-Prescribed-Observers-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
-		})
-		return
-	end
-
-	local epochIndex = tonumber(msg.Tags["Epoch-Index"]) or epochs.getEpochIndexForTimestamp(tonumber(msg.Timestamp))
-	local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
-	ao.send({ Target = msg.From, Action = "Prescribed-Observers-Notice", Data = json.encode(prescribedObservers) })
-end)
-
-Handlers.add(ActionMap.Observations, utils.hasMatchingTag("Action", ActionMap.Observations), function(msg)
+addEventingHandler(ActionMap.Observations, utils.hasMatchingTag("Action", ActionMap.Observations), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local checkAssertions = function()
 		assert(msg.Tags["Epoch-Index"] or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
@@ -1276,7 +1682,7 @@ Handlers.add(ActionMap.Observations, utils.hasMatchingTag("Action", ActionMap.Ob
 	})
 end)
 
-Handlers.add(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", ActionMap.PrescribedNames), function(msg)
+addEventingHandler(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", ActionMap.PrescribedNames), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local checkAssertions = function()
 		assert(msg.Tags["Epoch-Index"] or msg.Tags.Timestamp or msg.Timestamp, "Epoch index or timestamp is required")
@@ -1299,7 +1705,7 @@ Handlers.add(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", ActionMap
 	ao.send({ Target = msg.From, Action = "Prescribed-Names-Notice", Data = json.encode(prescribedNames) })
 end)
 
-Handlers.add(ActionMap.Distributions, utils.hasMatchingTag("Action", ActionMap.Distributions), function(msg)
+addEventingHandler(ActionMap.Distributions, utils.hasMatchingTag("Action", ActionMap.Distributions), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local checkAssertions = function()
 		assert(msg.Tags["Epoch-Index"] or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
@@ -1322,12 +1728,12 @@ Handlers.add(ActionMap.Distributions, utils.hasMatchingTag("Action", ActionMap.D
 	ao.send({ Target = msg.From, Action = "Distributions-Notice", Data = json.encode(distributions) })
 end)
 
-Handlers.add(ActionMap.ReservedNames, utils.hasMatchingTag("Action", ActionMap.ReservedNames), function(msg)
+addEventingHandler(ActionMap.ReservedNames, utils.hasMatchingTag("Action", ActionMap.ReservedNames), function(msg)
 	local reservedNames = arns.getReservedNames()
 	ao.send({ Target = msg.From, Action = "Reserved-Names-Notice", Data = json.encode(reservedNames) })
 end)
 
-Handlers.add(ActionMap.ReservedName, utils.hasMatchingTag("Action", ActionMap.ReservedName), function(msg)
+addEventingHandler(ActionMap.ReservedName, utils.hasMatchingTag("Action", ActionMap.ReservedName), function(msg)
 	local reservedName = arns.getReservedName(msg.Tags.Name)
 	ao.send({
 		Target = msg.From,
@@ -1337,11 +1743,11 @@ Handlers.add(ActionMap.ReservedName, utils.hasMatchingTag("Action", ActionMap.Re
 	})
 end)
 
-Handlers.add(ActionMap.Vaults, utils.hasMatchingTag("Action", ActionMap.Vaults), function(msg)
+addEventingHandler(ActionMap.Vaults, utils.hasMatchingTag("Action", ActionMap.Vaults), function(msg)
 	ao.send({ Target = msg.From, Action = "Vaults-Notice", Data = json.encode(Vaults) })
 end)
 
-Handlers.add(ActionMap.Vault, utils.hasMatchingTag("Action", ActionMap.Vault), function(msg)
+addEventingHandler(ActionMap.Vault, utils.hasMatchingTag("Action", ActionMap.Vault), function(msg)
 	local address = msg.Tags.Address or msg.From
 	local vaultId = msg.Tags["Vault-Id"]
 	local vault = vaults.getVault(address, vaultId)
@@ -1367,54 +1773,9 @@ Handlers.add(ActionMap.Vault, utils.hasMatchingTag("Action", ActionMap.Vault), f
 	end
 end)
 
--- END READ HANDLERS
-
--- UTILITY HANDLERS USED FOR MIGRATION
-Handlers.add("addGateway", utils.hasMatchingTag("Action", "AddGateway"), function(msg)
-	if msg.From ~= Owner then
-		ao.send({ Target = msg.From, Data = "Unauthorized" })
-		return
-	end
-	local operatorStake = tonumber(json.decode(msg.Data).operatorStake)
-	assert(operatorStake > 0, "Operator stake must be greater than 0")
-	local status, result = pcall(gar.addGateway, msg.Tags.Address, json.decode(msg.Data))
-	balances.reduceBalance(Owner, operatorStake)
-	if status then
-		ao.send({ Target = msg.From, Data = json.encode(result) })
-	else
-		ao.send({ Target = msg.From, Data = json.encode(result) })
-	end
-end)
-
-Handlers.add("addRecord", utils.hasMatchingTag("Action", "AddRecord"), function(msg)
-	if msg.From ~= Owner then
-		ao.send({ Target = msg.From, Data = "Unauthorized" })
-		return
-	end
-	local status, result = pcall(arns.addRecord, string.lower(msg.Tags.Name), json.decode(msg.Data))
-	if status then
-		ao.send({ Target = msg.From, Data = json.encode(result) })
-	else
-		ao.send({ Target = msg.From, Data = json.encode(result) })
-	end
-end)
-
-Handlers.add("addReservedName", utils.hasMatchingTag("Action", "AddReservedName"), function(msg)
-	if msg.From ~= Owner then
-		ao.send({ Target = msg.From, Data = "Unauthorized" })
-		return
-	end
-	local status, result = pcall(arns.addReservedName, string.lower(msg.Tags.Name), json.decode(msg.Data))
-	if status then
-		ao.send({ Target = msg.From, Data = json.encode(result) })
-	else
-		ao.send({ Target = msg.From, Data = json.encode(result) })
-	end
-end)
-
 -- Pagination handlers
 
-Handlers.add("paginatedRecords", utils.hasMatchingTag("Action", "Paginated-Records"), function(msg)
+addEventingHandler("paginatedRecords", utils.hasMatchingTag("Action", "Paginated-Records"), function(msg)
 	local page = utils.parsePaginationTags(msg)
 	local status, result =
 		pcall(arns.getPaginatedRecords, page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
@@ -1430,7 +1791,7 @@ Handlers.add("paginatedRecords", utils.hasMatchingTag("Action", "Paginated-Recor
 	end
 end)
 
-Handlers.add("paginatedGateways", utils.hasMatchingTag("Action", "Paginated-Gateways"), function(msg)
+addEventingHandler("paginatedGateways", utils.hasMatchingTag("Action", "Paginated-Gateways"), function(msg)
 	local page = utils.parsePaginationTags(msg)
 	local status, result =
 		pcall(gar.getPaginatedGateways, page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
@@ -1446,7 +1807,7 @@ Handlers.add("paginatedGateways", utils.hasMatchingTag("Action", "Paginated-Gate
 	end
 end)
 
-Handlers.add("paginatedBalances", utils.hasMatchingTag("Action", "Paginated-Balances"), function(msg)
+addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginated-Balances"), function(msg)
 	local page = utils.parsePaginationTags(msg)
 	local status, result =
 		pcall(balances.getPaginatedBalances, page.cursor, page.limit, page.sortBy or "balance", page.sortOrder)
@@ -1462,6 +1823,6 @@ Handlers.add("paginatedBalances", utils.hasMatchingTag("Action", "Paginated-Bala
 	end
 end)
 
--- END UTILITY HANDLERS USED FOR MIGRATION
+-- END READ HANDLERS
 
 return process

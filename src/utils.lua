@@ -302,4 +302,39 @@ function utils.checkAndConvertTimestamptoMs(timestamp)
 	return error("Timestamp is out of range")
 end
 
+function utils.reduce(tbl, fn, init)
+	local acc = init
+	for k, v in pairs(tbl) do
+		acc = fn(acc, k, v)
+	end
+	return acc
+end
+
+function utils.map(tbl, fn)
+	local newTbl = {}
+	for k, v in pairs(tbl) do
+		newTbl[k] = fn(k, v)
+	end
+	return newTbl
+end
+
+function utils.toTrainCase(str)
+	-- Replace underscores and spaces with hyphens
+	str = str:gsub("[_%s]+", "-")
+
+	-- Handle camelCase and PascalCase by adding a hyphen before uppercase letters that follow lowercase letters
+	str = str:gsub("(%l)(%u)", "%1-%2")
+
+	-- Capitalize the first letter of every word (after hyphen) and convert to Train-Case
+	str = str:gsub("(%a)([%w]*)", function(first, rest)
+		-- If the word is all uppercase (like "GW"), preserve it
+		if first:upper() == first and rest:upper() == rest then
+			return first:upper() .. rest
+		else
+			return first:upper() .. rest:lower()
+		end
+	end)
+	return str
+end
+
 return utils
