@@ -209,12 +209,9 @@ function arns.modifyRecordundernameLimit(name, qty)
 	if not record then
 		error("Name is not registered")
 	end
-	-- if qty brings it over the limit, throw error
-	if record.undernameLimit + qty > constants.MAX_ALLOWED_UNDERNAMES then
-		error(constants.ARNS_MAX_UNDERNAME_MESSAGE)
-	end
 
 	NameRegistry.records[name].undernameLimit = record.undernameLimit + qty
+	return arns.getRecord(name)
 end
 
 function arns.modifyRecordEndTimestamp(name, newEndTimestamp)
@@ -433,13 +430,8 @@ function arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
 		error("Name is expired")
 	end
 
-	if qty < 1 or qty > 9990 or not utils.isInteger(qty) then
+	if qty < 1 or not utils.isInteger(qty) then
 		error("Qty is invalid")
-	end
-
-	-- the new total qty
-	if record.undernameLimit + qty > constants.MAX_ALLOWED_UNDERNAMES then
-		error(constants.ARNS_MAX_UNDERNAME_MESSAGE)
 	end
 
 	return true
