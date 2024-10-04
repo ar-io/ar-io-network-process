@@ -824,7 +824,7 @@ addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", Action
 	end
 
 	if gateway ~= nil then
-		msg.ioEvent:addField("GW-Vaults-Count", #(gateway.vaults or {}))
+		msg.ioEvent:addField("GW-Vaults-Count", utils.lengthOfTable(gateway.vaults or {}))
 		local exitVault = gateway.vaults[msg.From]
 		local withdrawVault = gateway.vaults[msg.Id]
 		local previousStake = exitVault.balance
@@ -954,7 +954,7 @@ addEventingHandler(
 			local previousStake = gateway.operatorStake + quantity
 			msg.ioEvent:addField("New-Operator-Stake", gateway.operatorStake)
 			msg.ioEvent:addField("Previous-Operator-Stake", previousStake)
-			msg.ioEvent:addField("GW-Vaults-Count", #(gateway.vaults or {}))
+			msg.ioEvent:addField("GW-Vaults-Count", utils.lengthOfTable(gateway.vaults or {}))
 			local decreaseStakeVault = gateway.vaults[msg.Id]
 			if decreaseStakeVault ~= nil then
 				previousStake = previousStake + decreaseStakeVault.balance
@@ -1238,11 +1238,13 @@ addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", Ac
 	end
 
 	if observations ~= nil then
-		if #(observations.failureSummaries or {}) > 0 then
-			msg.ioEvent:addField("Failure-Summaries-Count", #(observations.failureSummaries or {}))
+		local failureSummariesCount = utils.lengthOfTable(observations.failureSummaries or {})
+		if failureSummariesCount > 0 then
+			msg.ioEvent:addField("Failure-Summaries-Count", failureSummariesCount)
 		end
-		if #(observations.reports or {}) > 0 then
-			msg.ioEvent:addField("Reports-Count", #(observations.reports or {}))
+		local reportsCount = utils.lengthOfTable(observations.reports or {})
+		if reportsCount > 0 then
+			msg.ioEvent:addField("Reports-Count", reportsCount)
 		end
 	end
 
