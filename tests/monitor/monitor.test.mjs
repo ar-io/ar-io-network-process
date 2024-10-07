@@ -54,21 +54,31 @@ describe('setup', () => {
        * }
        */
       assert.ok(
+        handlersList.indexOf('Assignment-Check') === 0,
+        'Assignment-Check should be the first handler, got: ' +
+          handlersList.indexOf('Assignment-Check'),
+      );
+      assert.ok(
+        handlersList.indexOf('sec-patch-6-5-2024') === 1,
+        'sec-patch-6-5-2024 should be the second handler, got: ' +
+          handlersList.indexOf('sec-patch-6-5-2024'),
+      );
+      assert.ok(
         handlersList.indexOf('_eval') === 2,
-        '_eval should be first handler, got: ' + handlersList.indexOf('_eval'),
+        '_eval should be the third handler, got: ' + handlersList.indexOf('_eval'),
       );
       assert.ok(
         handlersList.indexOf('_default') === 3,
-        '_default should be second handler, got: ' +
+        '_default should be the fourth handler, got: ' +
           handlersList.indexOf('_default'),
       );
       assert.ok(
         handlersList.indexOf('prune') === 4,
-        'prune should be third handler, got: ' + handlersList.indexOf('prune'),
+        'prune should be the fifth handler, got: ' + handlersList.indexOf('prune'),
       );
       assert.ok(
         handlersList.length === expectedHandlerCount,
-        `should only have ${expectedHandlerCount} handlers, got: ${handlersList.length}`,
+        `should have ${expectedHandlerCount} handlers, got: ${handlersList.length}`,
       ); // forces us to think critically about the order of handlers so intended to be sensitive to changes
     });
   });
