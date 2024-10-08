@@ -10,6 +10,10 @@ NameRegistry = NameRegistry or {
 	records = {},
 	-- TODO: auctions
 }
+
+PrimaryNameRegistry = PrimaryNameRegistry or {}
+PrimaryNameClaims = PrimaryNameClaims or {}
+
 function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 	-- don't catch, let the caller handle the error
 	arns.assertValidBuyRecord(name, years, purchaseType, processId)
@@ -475,6 +479,133 @@ function arns.pruneReservedNames(currentTimestamp)
 			arns.removeReservedName(name)
 		end
 	end
+end
+
+-- primary name protocols
+function arns.calculatePrimaryNameCost(demandFactor)
+	return math.floor(constants.PRIMARY_NAME_FEE * demandFactor)
+end
+
+function arns.assertValidClaimPrimaryName(record, record)
+	if not record then
+		error("Name is not registered")
+	end
+end
+
+function arns.claimPrimaryName(name, from, timestamp)
+	-- validate record exists
+	local record = arns.getRecord(name)
+
+	arns.assertValidClaimPrimaryName(record)
+
+	local totalPrimaryNameFee = arns.calculateRegistrationFee(demand.getDemandFactor())
+
+	if balances.getBalance(from) < totalPrimaryNameFee then
+		error("Insufficient balance")
+	end
+
+	-- Transfer tokens to the protocol balance
+	balances.transfer(ao.id, from, totalPrimaryNameFee)
+
+	if from == name.processId then
+		PrimaryNameRegistry[from] = {
+			primaryName = name,
+			startTimestamp = timestamp,
+		}
+		NameRegistry[name].primaryNameOwner = from
+	else
+		PrimaryNameClaims[from] = {
+			primaryName = name,
+			startTimestamp = timestamp,
+		}
+	end
+	return { record = arns.getRecord(name) }
+end
+
+function arns.assertValidMatchPrimaryName(record, primaryNameClaim, name, from, owner)
+	if not record then
+		error("Name is not registered")
+	end
+
+	if not primaryNameClaim then
+		error("This name has not been claimed by this owner")
+	end
+
+	if primaryNameClaim.primaryName ~= name then
+		error("A different name was claimed by this owner")
+	end
+
+	if record.processId ~= from then
+		error("This ANT is not authorized to set this name")
+	end
+end
+
+function arns.matchPrimaryName(name, from, owner, timestamp)
+	local record = arns.getRecord(name)
+	local primaryNameClaim = arns.getPrimaryNameClaim(owner)
+	arns.assertValidMatchPrimaryName(record, primaryNameClaim, name, from, owner)
+
+	PrimaryNameClaims[owner] = nil
+
+	PrimaryNameRegistry[owner] = {
+		primaryName = name,
+		startTime = timestamp,
+	}
+
+	NameRegistry[name].primaryNameOwner = owner
+	return {
+		record = arns.getRecord(name),
+	}
+end
+
+function arns.removePrimaryName(from)
+	local nameToRemove = arns.getPrimaryName(from)
+
+	if not nameToRemove then
+		error("Primary Name is not set for this user")
+	end
+
+	local name = nameToRemove.primaryName
+	if NameRegistry[name] then
+		NameRegistry[name].primaryNameOwner = nil
+	end
+
+	PrimaryNameRegistry[from] = nil
+	return {
+		record = arns.getRecord(name),
+	}
+end
+
+function arns.getPaginatedPrimaryNames(cursor, limit, sortBy, sortOrder)
+	local primaryNames = arns.getPrimaryNames()
+	local primaryNamesArray = {}
+	local cursorField = "name" -- the cursor will be the name
+	for name, primaryName in pairs(primaryNames) do
+		primaryName.name = name
+		table.insert(primaryNamesArray, primaryName)
+	end
+
+	return utils.paginateTableWithCursor(primaryNamesArray, cursor, cursorField, limit, sortBy, sortOrder)
+end
+
+function arns.getPrimaryNames()
+	local primaryNames = utils.deepCopy(PrimaryNameRegistry)
+	return primaryNames or {}
+end
+
+function arns.getPrimaryName(address)
+	local primaryNames = arns.getPrimaryNames()
+	return primaryNames[address]
+end
+
+function arns.getPrimaryNameClaim(address)
+	local primaryNameClaims = arns.getPrimaryNameClaims()
+	return primaryNameClaims[address]
+end
+
+function arns.getPrimaryNameClaims(address)
+	local primaryNameClaims = utils.deepCopy(PrimaryNameClaims)
+	return primaryNameClaims or {}
 end
 
 return arns
