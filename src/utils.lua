@@ -178,6 +178,18 @@ function utils.formatAddress(address)
 	return address
 end
 
+function utils.safeDecodeJson(jsonString)
+	if not jsonString then
+		return nil
+	end
+	local status, result = pcall(json.decode, jsonString)
+	if not status then
+		print("Failed to decode JSON: " .. jsonString)
+		return nil
+	end
+	return result
+end
+
 function utils.validateFQDN(fqdn)
 	-- Check if the fqdn is not nil and not empty
 	if not fqdn or fqdn == "" then
