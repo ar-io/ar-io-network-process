@@ -738,7 +738,6 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 	end
 end)
 
-<<<<<<< HEAD
 addEventingHandler(
 	ActionMap.GetRegistrationFees,
 	utils.hasMatchingTag("Action", ActionMap.GetRegistrationFees),
@@ -746,21 +745,11 @@ addEventingHandler(
 		local status, priceList = pcall(arns.getRegistrationFees)
 
 		if not status then
-=======
-Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.JoinNetwork), function(msg)
-	local services = nil
-	if msg.Tags.Services then
-		local status, result = pcall(json.decode, msg.Tags.Services)
-		if status then
-			services = result
-		else
->>>>>>> 1e16e2d (fix:used stylua to cleanup formatting)
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Invalid-Get-Registration-Fees-Notice", Error = "Invalid-Get-Registration-Fees" },
 				Data = tostring(priceList),
 			})
-<<<<<<< HEAD
 		else
 			ao.send({
 				Target = msg.From,
@@ -770,11 +759,6 @@ Handlers.add(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.Joi
 		end
 	end
 )
-=======
-			return
-		end
-	end
->>>>>>> 1e16e2d (fix:used stylua to cleanup formatting)
 
 addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.JoinNetwork), function(msg)
 	local updatedSettings = {

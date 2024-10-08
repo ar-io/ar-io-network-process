@@ -222,7 +222,6 @@ describe("arns", function()
 				assert.match("Insufficient balance", error)
 			end)
 
-
 			it("should throw an error if the name is in the grace period [" .. addressType .. "]", function()
 				NameRegistry.records["test-name"] = {
 					endTimestamp = timestamp + constants.oneYearMs,
