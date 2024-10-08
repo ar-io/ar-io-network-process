@@ -8,8 +8,11 @@ local arns = {}
 NameRegistry = NameRegistry or {
 	reserved = {},
 	records = {},
-	-- TODO: auctions
+	auctions = {},
 }
+
+local json = require("json")
+
 function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 	-- don't catch, let the caller handle the error
 	arns.assertValidBuyRecord(name, years, purchaseType, processId)
@@ -60,6 +63,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 	demand.tallyNamePurchase(totalRegistrationFee)
 	return {
 		record = arns.getRecord(name),
+		totalRegistrationFee = totalRegistrationFee,
 		baseRegistrationFee = baseRegistrationFee,
 		remainingBalance = balances.getBalance(from),
 		protocolBalance = balances.getBalance(ao.id),
@@ -435,6 +439,107 @@ function arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
 	end
 
 	return true
+end
+
+-- AUCTIONS
+function arns.createAuction(name, type, timestamp, initiator)
+	if arns.getAuction(name) then
+		error("Auction already exists for name")
+	end
+	local auctionDurationMs = 60 * 1000 * 60 * 24 * 14 -- 14 days in milliseconds
+	local endTimestamp = timestamp + auctionDurationMs
+	local baseFee = demand.getFees()[#name]
+	local demandFactor = demand.getDemandFactor()
+	local floorPrice = arns.calculateRegistrationFee(type, baseFee, 1, demandFactor)
+	local startPriceMultiplier = 50
+	local startPrice = floorPrice * startPriceMultiplier
+	local auction = {
+		name = name,
+		type = type,
+		startTimestamp = timestamp,
+		endTimestamp = endTimestamp,
+		startPrice = startPrice,
+		floorPrice = floorPrice,
+		initiator = initiator,
+	}
+	local prices = arns.computePricesForAuction(auction)
+	auction.prices = prices
+	NameRegistry.auctions[name] = auction
+	return auction
+end
+
+function arns.getAuction(name)
+	return NameRegistry.auctions[name]
+end
+
+function arns.computePriceForAuctionAtTimestamp(auction, timestamp)
+	local exponentialDecayRate = 0.000002
+	local scalingExponent = 190
+	local auctionIntervalMs = 1000 * 60 * 2 -- ~2 min per price interval
+	local intervalsSinceStart = math.floor((timestamp - auction.startTimestamp) / auctionIntervalMs)
+	local totalDecaySinceStart = math.min(1, exponentialDecayRate * intervalsSinceStart)
+	local decayFactor = (1 - totalDecaySinceStart) ^ scalingExponent
+	local requiredBid = math.max(auction.startPrice * decayFactor, auction.floorPrice)
+	return math.floor(requiredBid)
+end
+
+function arns.computePricesForAuction(auction)
+	local prices = {}
+	local auctionPriceIntervalMs = 1000 * 60 * 2 -- ~2 min per price interval
+	for timestamp = auction.startTimestamp, auction.endTimestamp, auctionPriceIntervalMs do
+		local price = arns.computePriceForAuctionAtTimestamp(auction, timestamp)
+		prices[timestamp] = price
+	end
+	return prices
+end
+
+function arns.getCurrentBidPriceForAuction(auction, timestamp)
+	-- find the timestamp nearest to the interval based on auction timestamp
+	local auctionIntervalMs = 1000 * 60 * 2 -- ~2 min per price interval
+	local auctionIntervalCount = math.floor((timestamp - auction.startTimestamp) / auctionIntervalMs)
+	local nearestPriceTimestamp = auction.startTimestamp + (auctionIntervalCount * auctionIntervalMs)
+	return auction.prices[nearestPriceTimestamp]
+end
+
+function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId)
+	local auction = arns.getAuction(name)
+	if not auction then
+		error("Auction does not exist")
+	end
+	local requiredBid = arns.getCurrentBidPriceForAuction(auction, timestamp)
+
+	if bidAmount < requiredBid then
+		error("Bid amount is less than the required bid")
+	end
+
+	local finalBidAmount = math.min(bidAmount, requiredBid)
+
+	-- check the balance of the bidder
+	local bidderBalance = balances.getBalance(bidder)
+	if bidderBalance < finalBidAmount then
+		error("Insufficient balance")
+	end
+
+	local record = {
+		processId = processId,
+		startTimestamp = timestamp,
+		type = auction.type,
+		undernameLimit = constants.DEFAULT_UNDERNAME_COUNT,
+		purchasePrice = finalBidAmount,
+	}
+
+	local rewardForInitiator = math.floor(finalBidAmount * 0.5)
+	local rewardForProtocol = finalBidAmount - rewardForInitiator
+	-- reduce bidder balance by the final bid amount
+	balances.transfer(auction.initiator, bidder, rewardForInitiator)
+	balances.transfer(ao.id, bidder, rewardForProtocol)
+	arns.removeAuction(name)
+	arns.addRecord(name, record)
+	return arns.getRecord(name)
+end
+
+function arns.removeAuction(name)
+	NameRegistry.auctions[name] = nil
 end
 
 function arns.removeRecord(name)
