@@ -761,6 +761,8 @@ addEventingHandler(
 )
 
 addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.JoinNetwork), function(msg)
+	-- TODO: add assertions on all the provided input, although the joinNetwork function will throw an error if the input is invalid
+
 	local updatedSettings = {
 		label = msg.Tags.Label,
 		note = msg.Tags.Note,
@@ -772,9 +774,18 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 		delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"]) or 0,
 		properties = msg.Tags.Properties or "FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44",
 		autoStake = msg.Tags["Auto-Stake"] == "true",
-		services = json.decode(msg.Tags.Services) or {},
 	}
 
+	local updatedServices = utils.safeDecodeJson(msg.Tags.Services)
+
+	if msg.Tags.Services and not updatedServices then
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-Join-Network-Notice", Error = "Invalid-Join-Network-Input" },
+			Data = tostring("Failed to decode Services JSON: " .. msg.Tags.Services),
+		})
+		return
+	end
 	-- format join network and observer address
 	local fromAddress = utils.formatAddress(msg.From)
 	local observerAddress = msg.Tags["Observer-Address"] or fromAddress
@@ -787,7 +798,7 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 
 	local shouldContinue, gateway = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
-			Target = msg.From,
+			Target = fromAddress,
 			Tags = { Action = "Invalid-Join-Network-Notice", Error = "Invalid-Join-Network" },
 			Data = tostring(error),
 		})
@@ -891,7 +902,7 @@ addEventingHandler(
 		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Invalid-Increase-Operator-Stake-Notice" },
+				Tags = { Action = "Invalid-Increase-Operator-Stake-Notice", Error = "Invalid-Increase-Operator-Stake" },
 				Data = tostring(error),
 			})
 		end, gar.increaseOperatorStake, msg.From, quantity)
@@ -1002,8 +1013,8 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 	local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = from,
-			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Invalid-Delegate-Stake", Message = error }, -- TODO: is this still right?
-			Data = json.encode(error),
+			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = tostring(error) },
+			Data = tostring(error),
 		})
 	end, gar.delegateStake, from, target, quantity, tonumber(msg.Timestamp))
 	if not shouldContinue2 then
@@ -1170,23 +1181,15 @@ addEventingHandler(
 			return
 		end
 
-		local services = nil
-		if msg.Tags.Services then
-			local status, result = pcall(json.decode, msg.Tags.Services)
-			if status then
-				services = result
-			else
-				-- Handle JSON decoding error
-				ao.send({
-					Target = msg.From,
-					Tags = {
-						Action = "Invalid-Update-Gateway-Settings-Notice",
-						Error = "Failed-Update-Gateway-Settings",
-					},
-					Data = "Failed to decode Services JSON: " .. tostring(result),
-				})
-				return
-			end
+		local updatedServices = utils.safeDecodeJson(msg.Tags.Services)
+
+		if msg.Tags.Services and not updatedServices then
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-Join-Network-Notice", Error = "Invalid-Join-Network-Input" },
+				Data = tostring("Failed to decode Services JSON: " .. msg.Tags.Services),
+			})
+			return
 		end
 
 		-- keep defaults, but update any new ones
@@ -1205,15 +1208,18 @@ addEventingHandler(
 			autoStake = not msg.Tags["Auto-Stake"] and gateway.settings.autoStake or msg.Tags["Auto-Stake"] == "true",
 		}
 
-		local updatedServices = services or gateway.services
+		-- TODO: we could standardize this on our prepended handler to inject and ensure formatted addresses and converted values
 		local observerAddress = msg.Tags["Observer-Address"] or gateway.observerAddress
+		local formattedAddress = utils.formatAddress(msg.From)
+		local formattedObserverAddress = utils.formatAddress(observerAddress)
+		local timestamp = tonumber(msg.Timestamp)
 		local status, result = pcall(
 			gar.updateGatewaySettings,
-			msg.From,
+			formattedAddress,
 			updatedSettings,
 			updatedServices,
-			observerAddress,
-			msg.Timestamp,
+			formattedObserverAddress,
+			timestamp,
 			msg.Id
 		)
 		if not status then
