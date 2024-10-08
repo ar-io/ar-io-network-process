@@ -19,6 +19,7 @@ constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE = 0.005
 constants.oneYearMs = 31536000 * 1000
 constants.gracePeriodMs = 14 * 24 * 60 * 60 * 1000 -- 2 weeks
 constants.maxLeaseLengthYears = 5
+constants.PRIMARY_NAME_FEE = 1 -- One IO token to set the primary name
 
 -- DEMAND
 constants.demandSettings = {

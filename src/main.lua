@@ -19,6 +19,7 @@ end
 Vaults = Vaults or {}
 GatewayRegistry = GatewayRegistry or {}
 NameRegistry = NameRegistry or {}
+PrimaryNameRegistry = PrimaryNameRegistry or {}
 Epochs = Epochs or {}
 LastTickedEpochIndex = LastTickedEpochIndex or -1
 
@@ -56,6 +57,8 @@ local ActionMap = {
 	Records = "Records",
 	ReservedNames = "Reserved-Names",
 	ReservedName = "Reserved-Name",
+	PrimaryName = "Primary-Name",
+	PrimaryNames = "Primary-Names",
 	TokenCost = "Token-Cost",
 	GetRegistrationFees = "Get-Registration-Fees",
 	-- GATEWAY REGISTRY READ APIS
@@ -70,6 +73,9 @@ local ActionMap = {
 	ExtendVault = "Extend-Vault",
 	IncreaseVault = "Increase-Vault",
 	BuyRecord = "Buy-Record",
+	ClaimPrimaryName = "Claim-Primary-Name",
+	MatchPrimaryName = "Match-Primary-Name",
+	RemovePrimaryName = "Remove-Primary-Name",
 	ExtendLease = "Extend-Lease",
 	IncreaseUndernameLimit = "Increase-Undername-Limit",
 	JoinNetwork = "Join-Network",
@@ -94,11 +100,17 @@ local function eventingPcall(ioEvent, onError, fnToCall, ...)
 end
 
 local function addRecordResultFields(ioEvent, result)
+	ioEvent:addFieldsIfExist(result, {
+		"baseRegistrationFee",
+		"remainingBalance",
+		"protocolBalance",
+		"recordsCount",
+		"reservedRecordsCount",
+	})
 	ioEvent:addFieldsIfExist(
-		result,
-		{ "baseRegistrationFee", "remainingBalance", "protocolBalance", "recordsCount", "reservedRecordsCount" }
+		result.record,
+		{ "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice", "primaryNameOwner" }
 	)
-	ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
 	if result.df ~= nil and type(result.df) == "table" then
 		ioEvent:addField("DF-Trailing-Period-Purchases", (result.df.trailingPeriodPurchases or {}))
 		ioEvent:addField("DF-Trailing-Period-Revenues", (result.df.trailingPeriodRevenues or {}))
@@ -575,6 +587,143 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 		Data = json.encode(record),
 	})
 end)
+
+addEventingHandler(ActionMap.ClaimPrimaryName, utils.hasMatchingTag("Action", ActionMap.ClaimPrimaryName), function(msg)
+	local checkAssertions = function()
+		assert(type(msg.Tags.Name) == "string", "Invalid name")
+	end
+
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-Claim-Primary-Name-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
+
+	msg.ioEvent:addField("claimPrimaryName", msg.Tags.Name)
+	msg.ioEvent:addField("claimPrimaryNameFrom", msg.From)
+
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Invalid-Claim-Primary-Name-Notice",
+				Error = "Invalid-Claim-Primary-Name",
+			},
+			Data = tostring(error),
+		})
+	end, arns.claimPrimaryName, string.lower(msg.Tags.Name), msg.From, msg.Timestamp)
+	if not shouldContinue2 then
+		return
+	end
+
+	local record = {}
+	if result ~= nil then
+		record = result.record
+		addRecordResultFields(msg.ioEvent, result)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Claim-Primary-Name-Notice", Name = msg.Tags.Name },
+		Data = json.encode(record),
+	})
+	msg.ioEvent:printEvent()
+end)
+
+addEventingHandler(ActionMap.MatchPrimaryName, utils.hasMatchingTag("Action", ActionMap.MatchPrimaryName), function(msg)
+	local function checkAssertions()
+		assert(utils.isValidAOAddress(msg.Tags.Owner), "Invalid owner address")
+		assert(type(msg.Tags.Name) == "string", "Invalid name")
+	end
+
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-Match-Primary-Name-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
+
+	msg.ioEvent:addField("matchPrimaryName", msg.Tags.Name)
+	msg.ioEvent:addField("matchPrimaryNameFrom", msg.From)
+	msg.ioEvent:addField("matchPrimaryNameOwner", msg.Tags.Owner)
+
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Invalid-Match-Primary-Name-Notice",
+				Error = "Invalid-Match-Primary-Name",
+			},
+			Data = tostring(error),
+		})
+	end, arns.matchPrimaryName, string.lower(msg.Tags.Name), msg.From, msg.Tags.Owner, msg.Timestamp)
+	if not shouldContinue2 then
+		return
+	end
+
+	local record = {}
+	if result ~= nil then
+		record = result.record
+		addRecordResultFields(msg.ioEvent, result)
+	end
+
+	-- Send to the ANT that matched the name and the original user who claimed it
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Match-Primary-Name-Notice", Name = msg.Tags.Name, Owner = msg.Tags.Owner },
+		Data = json.encode(record),
+	})
+	ao.send({
+		Target = msg.Tags.Owner,
+		Tags = { Action = "Match-Primary-Name-Notice", Name = msg.Tags.Name, Owner = msg.Tags.Owner },
+		Data = json.encode(record),
+	})
+	msg.ioEvent:printEvent()
+end)
+
+addEventingHandler(
+	ActionMap.RemovePrimaryName,
+	utils.hasMatchingTag("Action", ActionMap.RemovePrimaryName),
+	function(msg)
+		msg.ioEvent:addField("removePrimaryNameFrom", msg.From)
+		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Invalid-Remove-Primary-Name-Notice",
+					Error = "Invalid-Remove-Primary-Name",
+				},
+				Data = tostring(error),
+			})
+		end, arns.removePrimaryName, msg.From)
+		if not shouldContinue2 then
+			return
+		end
+
+		local record = {}
+		if result ~= nil then
+			msg.ioEvent:addField("removePrimaryName", result.removePrimaryName)
+			record = result.record
+			addRecordResultFields(msg.ioEvent, result)
+		end
+
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Remove-Primary-Name-Notice" },
+			Data = json.encode(record),
+		})
+		msg.ioEvent:printEvent()
+	end
+)
 
 addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.ExtendLease), function(msg)
 	local checkAssertions = function()
@@ -1773,6 +1922,54 @@ addEventingHandler(ActionMap.Vault, utils.hasMatchingTag("Action", ActionMap.Vau
 	end
 end)
 
+addEventingHandler(ActionMap.PrimaryName, utils.hasMatchingTag("Action", ActionMap.PrimaryName), function(msg)
+	assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid target address")
+
+	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From)
+	local primaryName = arns.getPrimaryName(target)
+	local primaryNameRecord = arns.getRecord(primaryName)
+
+	local primaryNameNotice = {
+		Target = msg.From,
+		Action = "Primary-Name-Notice",
+		PrimaryName = primaryName,
+		PrimaryNameOwner = target,
+		Data = json.encode(primaryNameRecord),
+	}
+
+	-- Add forwarded tags to the notice message
+	for tagName, tagValue in pairs(msg) do
+		-- Tags beginning with "X-" are forwarded
+		if string.sub(tagName, 1, 2) == "X-" then
+			primaryNameNotice[tagName] = tagValue
+		end
+	end
+
+	-- Send Primary-Name-Notice
+	ao.send(primaryNameNotice)
+end)
+
+addEventingHandler(ActionMap.PrimaryNames, utils.hasMatchingTag("Action", ActionMap.PrimaryNames), function(msg)
+	local primaryNames = arns.getPrimaryNames()
+
+	local primaryNamesNotice = {
+		Target = msg.From,
+		Action = "Primary-Names-Notice",
+		Data = json.encode(primaryNames),
+	}
+
+	-- Add forwarded tags to the records notice message
+	for tagName, tagValue in pairs(msg) do
+		-- Tags beginning with "X-" are forwarded
+		if string.sub(tagName, 1, 2) == "X-" then
+			primaryNamesNotice[tagName] = tagValue
+		end
+	end
+
+	-- Send Primary-Names-Notice
+	ao.send(primaryNamesNotice)
+end)
+
 -- Pagination handlers
 
 addEventingHandler("paginatedRecords", utils.hasMatchingTag("Action", "Paginated-Records"), function(msg)
@@ -1820,6 +2017,22 @@ addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginate
 		})
 	else
 		ao.send({ Target = msg.From, Action = "Balances-Notice", Data = json.encode(result) })
+	end
+end)
+
+addEventingHandler("paginatedPrimaryNames", utils.hasMatchingTag("Action", "Paginated-Primary-Names"), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local status, result =
+		pcall(arns.getPaginatedPrimaryNames, page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-Primary-Names-Notice",
+			Error = "Pagination-Error",
+			Data = json.encode(result),
+		})
+	else
+		ao.send({ Target = msg.From, Action = "Primary-Names-Notice", Data = json.encode(result) })
 	end
 end)
 
