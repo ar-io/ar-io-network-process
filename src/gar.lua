@@ -197,6 +197,10 @@ function gar.updateGatewaySettings(from, updatedSettings, observerAddress, curre
 		error("Gateway does not exist")
 	end
 
+	if gateway.status == "leaving" then
+		error("Gateway is leaving the network and cannot be updated")
+	end
+
 	gar.assertValidGatewayParameters(from, gateway.operatorStake, updatedSettings, observerAddress)
 
 	if
