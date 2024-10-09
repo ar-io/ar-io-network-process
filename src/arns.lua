@@ -472,23 +472,16 @@ function arns.getAuction(name)
 	return NameRegistry.auctions[name]
 end
 
-function arns.computePriceForAuctionAtTimestamp(auction, timestamp)
-	local exponentialDecayRate = 0.000002
-	local scalingExponent = 190
-	local auctionIntervalMs = 1000 * 60 * 2 -- ~2 min per price interval
-	local intervalsSinceStart = math.floor((timestamp - auction.startTimestamp) / auctionIntervalMs)
-	local totalDecaySinceStart = math.min(1, exponentialDecayRate * intervalsSinceStart)
-	local decayFactor = (1 - totalDecaySinceStart) ^ scalingExponent
-	local requiredBid = math.max(auction.startPrice * decayFactor, auction.floorPrice)
-	return math.floor(requiredBid)
-end
-
 function arns.computePricesForAuction(auction)
 	local prices = {}
 	local auctionPriceIntervalMs = 1000 * 60 * 2 -- ~2 min per price interval
-	for timestamp = auction.startTimestamp, auction.endTimestamp, auctionPriceIntervalMs do
-		local price = arns.computePriceForAuctionAtTimestamp(auction, timestamp)
-		prices[timestamp] = price
+	local exponentialDecayRate = 0.000002
+	local scalingExponent = 190
+	for timestampAtInterval = auction.startTimestamp, auction.endTimestamp - auctionPriceIntervalMs, auctionPriceIntervalMs do
+		local intervalsSinceStart = math.floor((timestampAtInterval - auction.startTimestamp) / auctionPriceIntervalMs)
+		local totalDecaySinceStart = math.min(1, exponentialDecayRate * intervalsSinceStart)
+		local priceAtInterval = math.floor(auction.startPrice * ((1 - totalDecaySinceStart) ^ scalingExponent))
+		prices[timestampAtInterval] = priceAtInterval
 	end
 	return prices
 end

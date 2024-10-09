@@ -569,18 +569,29 @@ describe("arns", function()
 		it("should return the correct price for an auction at a given timestamp", function()
 			local startTimestamp = 1000000
 			local auction = arns.createAuction("test-name", "permabuy", startTimestamp, "test-initiator")
+			local expectedEndTimestamp = startTimestamp + 1000 * 60 * 60 * 24 * 14 -- 14 days
 			local auctionIntervalMs = 1000 * 60 * 2 -- ~2 min per price interval
-			local intervalsSinceStart = 1
-			local totalDecaySinceStart = math.min(1, 0.000002 * intervalsSinceStart)
-			local secondIntervalPrice = math.floor(auction.startPrice * ((1 - totalDecaySinceStart) ^ 190))
-			assert.are.equal(secondIntervalPrice, auction.prices[startTimestamp + auctionIntervalMs])
+			local expectedPrices = {}
+			-- check timestamp at every interval
+			for timestampAtInterval = startTimestamp, expectedEndTimestamp - auctionIntervalMs, auctionIntervalMs do
+				local intervalsSinceStart = math.floor((timestampAtInterval - startTimestamp) / auctionIntervalMs)
+				local totalDecaySinceStart = math.min(1, 0.000002 * intervalsSinceStart)
+				local priceAtInterval = math.floor(auction.startPrice * ((1 - totalDecaySinceStart) ^ 190))
+				expectedPrices[timestampAtInterval] = priceAtInterval
+				-- assert the price is correct at that timestamp
+				assert.are.equal(priceAtInterval, auction.prices[timestampAtInterval])
+			end
+			-- ensure the full object matches and # of prices is correct
+			assert.are.equal(utils.lengthOfTable(expectedPrices), utils.lengthOfTable(auction.prices))
+			assert.are.same(expectedPrices, auction.prices)
 		end)
 
 		it(
 			"should accept bid on an existing auction and transfer tokens to the auction initiator and protocol balance, and create the record",
 			function()
-				local auction = arns.createAuction("test-name", "permabuy", 1000000, "test-initiator")
-				local bid = arns.submitAuctionBid(
+				local startTimestamp = 1000000
+				local auction = arns.createAuction("test-name", "permabuy", startTimestamp, "test-initiator")
+				local wonAuctionRecord = arns.submitAuctionBid(
 					"test-name",
 					auction.startPrice,
 					testAddressArweave,
@@ -590,17 +601,19 @@ describe("arns", function()
 				local balances = balances.getBalances()
 				-- no time passed between creation and bid
 				local expectedPrice = auction.startPrice
-				assert.are.equal(balances["test-initiator"], expectedPrice * 0.5)
-				assert.are.equal(balances[_G.ao.id], expectedPrice * 0.5)
-				assert.are.equal(NameRegistry.auctions["test-name"], nil)
-				assert.same({
+				local expectedRecord = {
 					endTimestamp = nil,
 					processId = "test-process-id",
 					purchasePrice = expectedPrice,
-					startTimestamp = 1000000,
+					startTimestamp = startTimestamp,
 					type = "permabuy",
 					undernameLimit = 10,
-				}, NameRegistry.records["test-name"])
+				}
+				assert.are.equal(balances["test-initiator"], expectedPrice * 0.5)
+				assert.are.equal(balances[_G.ao.id], expectedPrice * 0.5)
+				assert.are.equal(NameRegistry.auctions["test-name"], nil)
+				assert.same(expectedRecord, NameRegistry.records["test-name"])
+				assert.same(expectedRecord, wonAuctionRecord)
 			end
 		)
 
@@ -611,74 +624,4 @@ describe("arns", function()
 			assert.match("Auction does not exist", error)
 		end)
 	end)
-
-	-- describe("getPricesForAuction", function()
-	-- 	it("should return the correct prices for an auction", function()
-	-- 		local auction = {
-	-- 			startTimestamp = 1000000,
-	-- 			endTimestamp = 10000000,
-	-- 			startPrice = 1000000000,
-	-- 		}
-	-- 		local prices = arns.getPricesForAuction(auction)
-	-- 		assert.are.equal(utils.lengthOfTable(prices), 151)
-	-- 		assert.are.equal(prices[1000000], 1000000000)
-	-- 		assert.are.equal(prices[10000000], 1000000000)
-	-- 	end)
-	-- end)
-
-	-- describe("getPriceForAuctionAtTimestamp", function()
-	-- 	it("should return the correct price for an auction at a given timestamp", function()
-	-- 		local auction = {
-	-- 			startTimestamp = 1000000,
-	-- 			endTimestamp = 10000000,
-	-- 			startPrice = 5000000000,
-	-- 			floorPrice = 100000000,
-	-- 		}
-	-- 		local price = arns.getPriceForAuctionAtTimestamp(auction, 1000000)
-	-- 		assert.are.equal(price, 1000000000)
-	-- 	end)
-	-- end)
-
-	-- describe("createAuction", function()
-	-- 	it("should create an auction", function()
-	-- 		local auction = arns.createAuction("test-name", "permabuy", 1000000, "test-initiator")
-	-- 		assert.are.equal(auction.name, "test-name")
-	-- 		assert.are.equal(auction.type, "permabuy")
-	-- 		assert.are.equal(auction.startTimestamp, 1000000)
-	-- 		assert.are.equal(auction.endTimestamp, 10000000)
-	-- 		assert.are.equal(auction.startPrice, 1000000000)
-	-- 	end)
-	-- end)
-
-	-- describe("submitAuctionBid", function()
-	-- 	it("should submit a bid", function()
-	-- 		local auction = arns.createAuction("test-name", "permabuy", 1000000, "test-initiator")
-	-- 		local bid = arns.submitAuctionBid(auction, 1000000000, "test-bidder", 1000000)
-	-- 		assert.are.equal(bid.name, "test-name")
-	-- 		assert.are.equal(bid.type, "permabuy")
-	-- 		assert.are.equal(bid.startTimestamp, 1000000)
-	-- 		assert.are.equal(bid.endTimestamp, 10000000)
-	-- 		assert.are.equal(bid.startPrice, 1000000000)
-	-- 	end)
-
-	-- 	it("should throw an error if the bid is less than the required bid", function()
-	-- 		local auction = arns.createAuction("test-name", "permabuy", 1000000, "test-initiator")
-	-- 		local status, error = pcall(arns.submitAuctionBid, auction, 1000000, "test-bidder", 1000000)
-	-- 		assert.is_false(status)
-	-- 		assert.match("Bid amount is less than the required bid", error)
-	-- 	end)
-
-	-- 	it("should throw an error if the auction is not found", function()
-	-- 		local status, error = pcall(arns.submitAuctionBid, "test-name", 1000000000, "test-bidder", 1000000)
-	-- 		assert.is_false(status)
-	-- 		assert.match("Auction does not exist", error)
-	-- 	end)
-
-	-- 	it("should throw an error if the bidder has insufficient balance", function()
-	-- 		local auction = arns.createAuction("test-name", "permabuy", 1000000, testAddressEth)
-	-- 		local status, error = pcall(arns.submitAuctionBid, auction, 1000000000, testAddressArweave, 1000000)
-	-- 		assert.is_false(status)
-	-- 		assert.match("Insufficient balance", error)
-	-- 	end)
-	-- end)
 end)
