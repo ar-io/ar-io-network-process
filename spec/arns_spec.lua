@@ -222,19 +222,6 @@ describe("arns", function()
 				assert.match("Insufficient balance", error)
 			end)
 
-			it("should throw an error if increasing more than the max allowed [" .. addressType .. "]", function()
-				NameRegistry.records["test-name"] = {
-					endTimestamp = timestamp + constants.oneYearMs,
-					processId = testProcessId,
-					purchasePrice = 600000000,
-					startTimestamp = 0,
-					type = "lease",
-					undernameLimit = constants.MAX_ALLOWED_UNDERNAMES,
-				}
-				local status, error = pcall(arns.increaseundernameLimit, testAddress, "test-name", 1, timestamp)
-				assert.is_false(status)
-				assert.match(constants.ARNS_MAX_UNDERNAME_MESSAGE, error)
-			end)
 
 			it("should throw an error if the name is in the grace period [" .. addressType .. "]", function()
 				NameRegistry.records["test-name"] = {

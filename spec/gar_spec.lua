@@ -13,6 +13,7 @@ local testSettings = {
 }
 
 local startTimestamp = 0
+local stubObserverAddress = "test-this-is-valid-arweave-wallet-address-2"
 local testGateway = {
 	operatorStake = gar.getSettings().operators.minStake,
 	totalDelegatedStake = 0,
@@ -30,7 +31,7 @@ local testGateway = {
 	},
 	settings = testSettings,
 	status = "joined",
-	observerAddress = "test-this-is-valid-arweave-wallet-address-1",
+	observerAddress = stubObserverAddress,
 }
 
 describe("gar", function()
@@ -371,6 +372,51 @@ describe("gar", function()
 			assert.is_true(status)
 			assert.are.same(expectation, result)
 			assert.are.same(expectation, gar.getGateway("test-this-is-valid-arweave-wallet-address-1"))
+		end)
+
+		it("should not allow editing of gateway settings for a gateway that is leaving", function()
+			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+				startTimestamp = startTimestamp,
+				stats = {
+					prescribedEpochCount = 0,
+					observedEpochCount = 0,
+					totalEpochCount = 0,
+					passedEpochCount = 0,
+					failedEpochCount = 0,
+					failedConsecutiveEpochs = 0,
+					passedConsecutiveEpochs = 0,
+				},
+				settings = testSettings,
+				status = "leaving",
+				observerAddress = "observerAddress",
+			}
+			local updatedSettings = {
+				fqdn = "example.com",
+				port = 80,
+				protocol = "https",
+				properties = "NdZ3YRwMB2AMwwFYjKn1g88Y9nRybTo0qhS1ORq_E7g",
+				note = "This is a test update.",
+				label = "Test Label Update",
+				autoStake = true,
+				allowDelegatedStaking = false,
+				delegateRewardShareRatio = 15,
+				minDelegatedStake = gar.getSettings().delegates.minStake + 5,
+			}
+			local status, err = pcall(
+				gar.updateGatewaySettings,
+				"test-this-is-valid-arweave-wallet-address-1",
+				updatedSettings,
+				stubObserverAddress,
+				startTimestamp,
+				"msgId"
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Gateway is leaving the network and cannot be updated", err)
 		end)
 	end)
 
