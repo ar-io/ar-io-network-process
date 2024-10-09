@@ -5,17 +5,22 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export const STUB_ADDRESS = ''.padEnd(43, '1');
+export const PROCESS_ID = ''.padEnd(43, '0');
+export const PROCESS_OWNER = ''.padEnd(43, '1');
+export const STUB_ADDRESS = ''.padEnd(43, '2');
+export const INITIAL_PROTOCOL_BALANCE = 50_000_000_000_000; // 50M IO
+export const INITIAL_OWNER_BALANCE = 950_000_000_000_000; // 950M IO
 export const STUB_TIMESTAMP = 1704088800000; // 01-01-2024 00:00:00
+export const STUB_MESSAGE_ID = ''.padEnd(43, 'm');
 /* ao READ-ONLY Env Variables */
 export const AO_LOADER_HANDLER_ENV = {
   Process: {
-    Id: STUB_ADDRESS,
-    Owner: STUB_ADDRESS,
+    Id: PROCESS_ID,
+    Owner: PROCESS_OWNER,
     Tags: [{ name: 'Authority', value: 'XXXXXX' }],
   },
   Module: {
-    Id: ''.padEnd(43, 'a'),
+    Id: PROCESS_ID,
     Tags: [{ name: 'Authority', value: 'YYYYYY' }],
   },
 };
@@ -42,13 +47,13 @@ export const BUNDLED_SOURCE_CODE = fs.readFileSync(
 );
 
 export const DEFAULT_HANDLE_OPTIONS = {
-  Id: ''.padEnd(43, '1'),
-  ['Block-Height']: '1',
-  // important to set the address so that that `Authority` check passes. Else the `isTrusted` with throw an error.
-  Owner: STUB_ADDRESS,
+  Id: STUB_MESSAGE_ID,
+  Target: PROCESS_ID,
   Module: 'ANT',
-  Target: ''.padEnd(43, '1'),
-  From: STUB_ADDRESS,
+  ['Block-Height']: '1',
+  // important to set the address to match the FROM address so that that `Authority` check passes. Else the `isTrusted` with throw an error.
+  Owner: PROCESS_OWNER,
+  From: PROCESS_OWNER,
   Timestamp: STUB_TIMESTAMP,
 };
 
@@ -57,7 +62,7 @@ export const validGatewayTags = [
   { name: 'Label', value: 'test-gateway' },
   { name: 'Note', value: 'test-note' },
   { name: 'FQDN', value: 'test-fqdn' },
-  { name: 'Operator-Stake', value: '50000000000' }, // 50K IO
+  { name: 'Operator-Stake', value: '100000000000' }, // 100K IO
   { name: 'Port', value: '443' },
   { name: 'Protocol', value: 'https' },
   { name: 'Allow-Delegated-Staking', value: 'true' },

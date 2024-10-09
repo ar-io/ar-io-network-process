@@ -10,9 +10,9 @@ Denomination = 6
 DemandFactor = DemandFactor or {}
 Owner = Owner or ao.env.Process.Owner
 Balances = Balances or {}
-if not Balances[ao.id] then -- initialize the balance for the process id
+if not Balances[ao.env.Process.Id] then -- initialize the balance for the process id
 	Balances = {
-		[ao.id] = math.floor(50000000 * 1000000), -- 50M IO
+		[ao.env.Process.Id] = math.floor(50000000 * 1000000), -- 50M IO
 		[Owner] = math.floor(constants.totalTokenSupply - (50000000 * 1000000)), -- 950M IO
 	}
 end
@@ -85,6 +85,7 @@ local ActionMap = {
 	-- auctions
 	AuctionInfo = "Auction-Info",
 	ReleaseName = "Release-Name",
+	AuctionBid = "Auction-Bid",
 }
 
 local function eventingPcall(ioEvent, onError, fnToCall, ...)
@@ -1006,8 +1007,8 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 	local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = from,
-			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Invalid-Delegate-Stake", Message = error }, -- TODO: is this still right?
-			Data = json.encode(error),
+			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Invalid-Delegate-Stake" }, -- TODO: is this still right?
+			Data = tostring(error),
 		})
 	end, gar.delegateStake, from, target, quantity, tonumber(msg.Timestamp))
 	if not shouldContinue2 then
@@ -1902,6 +1903,91 @@ addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.Aucti
 			years = auction.years,
 			currentPrice = arns.getCurrentBidPriceForAuction(auction, msg.Timestamp),
 			-- TODO: prices may take up too much memory, we may need to paginate the response or slice the array
+		}),
+	})
+end)
+
+addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.AuctionBid), function(msg)
+	local name = string.lower(msg.Tags.Name)
+	local bidAmount = msg.Tags.Quantity and tonumber(msg.Tags.Quantity) or nil -- if nil, we use the current bid price
+	local bidder = utils.formatAddress(msg.From)
+	local processId = utils.formatAddress(msg.Tags["Process-Id"])
+	local timestamp = tonumber(msg.Timestamp)
+
+	-- assert name, bidder, processId are provided
+	local checkAssertions = function()
+		assert(name and #name > 0, "Name is required")
+		assert(bidder and utils.isValidAOAddress(bidder), "Bidder is required")
+		assert(processId and utils.isValidAOAddress(processId), "Process-Id is required")
+		assert(timestamp and timestamp > 0, "Timestamp is required")
+		-- if bidAmount is not nil assert that it is a number
+		if bidAmount then
+			assert(
+				type(bidAmount) == "number" and bidAmount > 0 and utils.isInteger(bidAmount),
+				"Bid amount must be a positive integer"
+			)
+		end
+	end
+
+	local validateStatus, errorMessage = pcall(checkAssertions)
+	if not validateStatus then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice",
+			Error = "Bad-Input",
+			Data = tostring(errorMessage),
+		})
+		return
+	end
+
+	local auction = arns.getAuction(name)
+	if not auction then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice",
+			Error = "Auction-Not-Found",
+		})
+		return
+	end
+
+	local status, result = pcall(arns.submitAuctionBid, name, bidAmount, bidder, timestamp, processId)
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice",
+			Error = "Auction-Bid-Error",
+			Data = tostring(result),
+		})
+		return
+	end
+
+	-- send buy record notice and auction close notice?
+	ao.send({
+		Target = bidder,
+		Action = ActionMap.BuyRecord .. "-Notice",
+		Data = json.encode(result.record),
+	})
+
+	ao.send({
+		Target = auction.initiator,
+		Action = "Debit-Notice",
+		Quantity = tostring(result.rewardForInitiator),
+		Data = json.encode({
+			auction = {
+				name = name,
+				startTimestamp = auction.startTimestamp,
+				endTimestamp = auction.endTimestamp,
+				startPrice = auction.startPrice,
+				floorPrice = auction.floorPrice,
+				initiator = auction.initiator,
+				type = auction.type,
+				years = auction.years,
+			},
+			bidder = result.bidder,
+			bidAmount = result.bidAmount,
+			rewardForInitiator = result.rewardForInitiator,
+			rewardForProtocol = result.rewardForProtocol,
+			record = result.record,
 		}),
 	})
 end)

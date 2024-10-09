@@ -527,6 +527,7 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId)
 	local record = {
 		processId = processId,
 		startTimestamp = timestamp,
+		endTimestamp = auction.type == "lease" and timestamp + constants.oneYearMs * auction.years or nil,
 		type = auction.type,
 		undernameLimit = constants.DEFAULT_UNDERNAME_COUNT,
 		purchasePrice = finalBidAmount,
@@ -539,7 +540,14 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId)
 	balances.transfer(ao.id, bidder, rewardForProtocol)
 	arns.removeAuction(name)
 	arns.addRecord(name, record)
-	return arns.getRecord(name)
+	return {
+		auction = auction,
+		bidder = bidder,
+		bidAmount = finalBidAmount,
+		rewardForInitiator = rewardForInitiator,
+		rewardForProtocol = rewardForProtocol,
+		record = record,
+	}
 end
 
 function arns.removeAuction(name)

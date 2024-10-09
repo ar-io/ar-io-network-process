@@ -6,6 +6,7 @@ import {
   DEFAULT_HANDLE_OPTIONS,
   STUB_ADDRESS,
   validGatewayTags,
+  PROCESS_OWNER,
 } from '../tools/constants.mjs';
 
 describe('Tick', async () => {
@@ -22,6 +23,33 @@ describe('Tick', async () => {
       AO_LOADER_HANDLER_ENV,
     );
   }
+
+    const transfer = async ({
+      recipient = STUB_ADDRESS,
+      quantity = 100_000_000_000,
+    } = {}) => {
+      const transferResult = await handle(
+        {
+          From: PROCESS_OWNER,
+          Owner: PROCESS_OWNER,
+          Tags: [
+            { name: 'Action', value: 'Transfer' },
+            { name: 'Recipient', value: recipient },
+            { name: 'Quantity', value: quantity },
+            { name: 'Cast', value: false },
+          ],
+        },
+        // memory
+      );
+
+      // assert no error tag
+      const errorTag = transferResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.Name === 'Error',
+      );
+      assert.strictEqual(errorTag, undefined);
+
+    return transferResult.Memory;
+  };
 
   it('should prune record that are expired and after the grace period', async () => {
     let mem = startMemory;
@@ -97,9 +125,23 @@ describe('Tick', async () => {
   });
 
   it('should prune gateways that are expired', async () => {
+    const memory = await transfer({
+      recipient: STUB_ADDRESS,
+      quantity: 100_000_000_000,
+    });
+
     const joinNetworkResult = await handle({
       Tags: validGatewayTags,
-    });
+      From: STUB_ADDRESS,
+      Owner: STUB_ADDRESS,
+    }, memory);
+
+    // assert no error tag
+    const errorTag = joinNetworkResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.strictEqual(errorTag, undefined);
+
     // check the gateway record from contract
     const gateway = await handle(
       {
@@ -116,6 +158,8 @@ describe('Tick', async () => {
     // leave the network
     const leaveNetworkResult = await handle(
       {
+        From: STUB_ADDRESS,
+        Owner: STUB_ADDRESS,
         Tags: [{ name: 'Action', value: 'Leave-Network' }],
       },
       joinNetworkResult.Memory,

@@ -644,7 +644,7 @@ describe("arns", function()
 					local auctionIntervalMs = 1000 * 60 * 2 -- ~2 min per price interval
 					local bidTimestamp = startTimestamp + auctionIntervalMs - 1 -- 1 ms before the next price interval
 					local auction = arns.createAuction("test-name", "permabuy", startTimestamp, "test-initiator")
-					local wonAuctionRecord = arns.submitAuctionBid(
+					local result = arns.submitAuctionBid(
 						"test-name",
 						auction.startPrice,
 						testAddressArweave,
@@ -665,7 +665,7 @@ describe("arns", function()
 					assert.are.equal(balances[_G.ao.id], expectedPrice * 0.5)
 					assert.are.equal(NameRegistry.auctions["test-name"], nil)
 					assert.same(expectedRecord, NameRegistry.records["test-name"])
-					assert.same(expectedRecord, wonAuctionRecord)
+					assert.same(expectedRecord, result.record)
 				end
 			)
 
