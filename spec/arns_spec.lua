@@ -4,7 +4,6 @@ local arns = require("arns")
 local balances = require("balances")
 local demand = require("demand")
 local utils = require("utils")
-local json = require("json")
 
 describe("arns", function()
 	local timestamp = 0
@@ -533,23 +532,45 @@ describe("arns", function()
 	end)
 
 	describe("auctions", function()
-		it("should create an auction", function()
-			local auction = arns.createAuction("test-name", "permabuy", 1000000, "test-initiator")
-			local twoWeeksMs = 1000 * 60 * 60 * 24 * 14
-			assert.are.equal(auction.name, "test-name")
-			assert.are.equal(auction.type, "permabuy")
-			assert.are.equal(auction.startTimestamp, 1000000)
-			assert.are.equal(auction.endTimestamp, twoWeeksMs + 1000000) -- 14 days late
-			assert.are.equal(auction.startPrice, 125000000000)
-			assert.are.equal(auction.floorPrice, 2500000000)
-			assert.are.equal(auction.initiator, "test-initiator")
-		end)
+		describe("createAuction", function()
+			it("should create an auction", function()
+				local auction = arns.createAuction("test-name", "permabuy", 1000000, "test-initiator")
+				local twoWeeksMs = 1000 * 60 * 60 * 24 * 14
+				assert.are.equal(auction.name, "test-name")
+				assert.are.equal(auction.type, "permabuy")
+				assert.are.equal(auction.startTimestamp, 1000000)
+				assert.are.equal(auction.endTimestamp, twoWeeksMs + 1000000) -- 14 days late
+				assert.are.equal(auction.startPrice, 125000000000)
+				assert.are.equal(auction.floorPrice, 2500000000)
+				assert.are.equal(auction.initiator, "test-initiator")
+			end)
 
-		it("should throw an error if the name is already in the auction map", function()
-			local auction = arns.createAuction("test-name", "permabuy", 1000000, "test-initiator")
-			local status, error = pcall(arns.createAuction, "test-name", "permabuy", 1000000, "test-initiator")
-			assert.is_false(status)
-			assert.match("Auction already exists", error)
+			it("should return the correct price for an auction at a given timestamp", function()
+				local startTimestamp = 1000000
+				local auction = arns.createAuction("test-name", "permabuy", startTimestamp, "test-initiator")
+				local expectedEndTimestamp = startTimestamp + 1000 * 60 * 60 * 24 * 14 -- 14 days
+				local auctionIntervalMs = 1000 * 60 * 2 -- ~2 min per price interval
+				local expectedPrices = {}
+				-- check timestamp at every interval
+				for timestampAtInterval = startTimestamp, expectedEndTimestamp - auctionIntervalMs, auctionIntervalMs do
+					local intervalsSinceStart = math.floor((timestampAtInterval - startTimestamp) / auctionIntervalMs)
+					local totalDecaySinceStart = math.min(1, 0.000002 * intervalsSinceStart)
+					local priceAtInterval = math.floor(auction.startPrice * ((1 - totalDecaySinceStart) ^ 190))
+					expectedPrices[timestampAtInterval] = priceAtInterval
+					-- assert the price is correct at that timestamp
+					assert.are.equal(priceAtInterval, auction.prices[timestampAtInterval])
+				end
+				-- ensure the full object matches and # of prices is correct
+				assert.are.equal(utils.lengthOfTable(expectedPrices), utils.lengthOfTable(auction.prices))
+				assert.are.same(expectedPrices, auction.prices)
+			end)
+
+			it("should throw an error if the name is already in the auction map", function()
+				local auction = arns.createAuction("test-name", "permabuy", 1000000, "test-initiator")
+				local status, error = pcall(arns.createAuction, "test-name", "permabuy", 1000000, "test-initiator")
+				assert.is_false(status)
+				assert.match("Auction already exists", error)
+			end)
 		end)
 
 		describe("getAuction", function()
@@ -560,68 +581,72 @@ describe("arns", function()
 			end)
 		end)
 
-		it("should return the correct price for an auction at a given timestamp", function()
-			local startTimestamp = 1000000
-			local auction = arns.createAuction("test-name", "permabuy", startTimestamp, "test-initiator")
-			assert.are.equal(auction.startPrice, auction.prices[startTimestamp])
-		end)
-
-		it("should return the correct price for an auction at a given timestamp", function()
-			local startTimestamp = 1000000
-			local auction = arns.createAuction("test-name", "permabuy", startTimestamp, "test-initiator")
-			local expectedEndTimestamp = startTimestamp + 1000 * 60 * 60 * 24 * 14 -- 14 days
-			local auctionIntervalMs = 1000 * 60 * 2 -- ~2 min per price interval
-			local expectedPrices = {}
-			-- check timestamp at every interval
-			for timestampAtInterval = startTimestamp, expectedEndTimestamp - auctionIntervalMs, auctionIntervalMs do
-				local intervalsSinceStart = math.floor((timestampAtInterval - startTimestamp) / auctionIntervalMs)
-				local totalDecaySinceStart = math.min(1, 0.000002 * intervalsSinceStart)
-				local priceAtInterval = math.floor(auction.startPrice * ((1 - totalDecaySinceStart) ^ 190))
-				expectedPrices[timestampAtInterval] = priceAtInterval
-				-- assert the price is correct at that timestamp
-				assert.are.equal(priceAtInterval, auction.prices[timestampAtInterval])
-			end
-			-- ensure the full object matches and # of prices is correct
-			assert.are.equal(utils.lengthOfTable(expectedPrices), utils.lengthOfTable(auction.prices))
-			assert.are.same(expectedPrices, auction.prices)
-		end)
-
-		it(
-			"should accept bid on an existing auction and transfer tokens to the auction initiator and protocol balance, and create the record",
-			function()
+		describe("getCurrentBidPriceForAuction", function()
+			it("should return the correct price for an auction at a given timestamp", function()
 				local startTimestamp = 1000000
 				local auction = arns.createAuction("test-name", "permabuy", startTimestamp, "test-initiator")
-				local wonAuctionRecord = arns.submitAuctionBid(
+				local randomTimestampDuringAuction = startTimestamp + 1000 * 60 * 60 * 24 * 7 -- 1 week into the auction
+				local priceAtRandomTimestamp = arns.getCurrentBidPriceForAuction(auction, randomTimestampDuringAuction)
+				assert.are.equal(priceAtRandomTimestamp, auction.prices[randomTimestampDuringAuction])
+			end)
+		end)
+
+		describe("submitAuctionBid", function()
+			it(
+				"should accept bid on an existing auction and transfer tokens to the auction initiator and protocol balance, and create the record",
+				function()
+					local startTimestamp = 1000000
+					local auctionIntervalMs = 1000 * 60 * 2 -- ~2 min per price interval
+					local bidTimestamp = startTimestamp + auctionIntervalMs - 1 -- 1 ms before the next price interval
+					local auction = arns.createAuction("test-name", "permabuy", startTimestamp, "test-initiator")
+					local wonAuctionRecord = arns.submitAuctionBid(
+						"test-name",
+						auction.startPrice,
+						testAddressArweave,
+						bidTimestamp,
+						"test-process-id"
+					)
+					local balances = balances.getBalances()
+					local expectedPrice = auction.startPrice -- bid submitted before next price interval
+					local expectedRecord = {
+						endTimestamp = nil,
+						processId = "test-process-id",
+						purchasePrice = expectedPrice,
+						startTimestamp = bidTimestamp,
+						type = "permabuy",
+						undernameLimit = 10,
+					}
+					assert.are.equal(balances["test-initiator"], expectedPrice * 0.5)
+					assert.are.equal(balances[_G.ao.id], expectedPrice * 0.5)
+					assert.are.equal(NameRegistry.auctions["test-name"], nil)
+					assert.same(expectedRecord, NameRegistry.records["test-name"])
+					assert.same(expectedRecord, wonAuctionRecord)
+				end
+			)
+
+			it("should throw an error if the auction is not found", function()
+				local status, error =
+					pcall(arns.submitAuctionBid, "test-name-2", 1000000000, "test-bidder", 1000000, "test-process-id")
+				assert.is_false(status)
+				assert.match("Auction does not exist", error)
+			end)
+
+			it("should throw an error if the bidder does not have enough balance", function()
+				local startTimestamp = 1000000
+				local auction = arns.createAuction("test-name", "permabuy", startTimestamp, "test-initiator")
+				-- set balance to current price - 1
+				Balances[testAddressArweave] = arns.getCurrentBidPriceForAuction(auction, startTimestamp) - 1
+				local status, error = pcall(
+					arns.submitAuctionBid,
 					"test-name",
-					auction.startPrice,
+					arns.getCurrentBidPriceForAuction(auction, startTimestamp),
 					testAddressArweave,
-					1000000,
+					startTimestamp,
 					"test-process-id"
 				)
-				local balances = balances.getBalances()
-				-- no time passed between creation and bid
-				local expectedPrice = auction.startPrice
-				local expectedRecord = {
-					endTimestamp = nil,
-					processId = "test-process-id",
-					purchasePrice = expectedPrice,
-					startTimestamp = startTimestamp,
-					type = "permabuy",
-					undernameLimit = 10,
-				}
-				assert.are.equal(balances["test-initiator"], expectedPrice * 0.5)
-				assert.are.equal(balances[_G.ao.id], expectedPrice * 0.5)
-				assert.are.equal(NameRegistry.auctions["test-name"], nil)
-				assert.same(expectedRecord, NameRegistry.records["test-name"])
-				assert.same(expectedRecord, wonAuctionRecord)
-			end
-		)
-
-		it("should throw an error if the auction is not found", function()
-			local status, error =
-				pcall(arns.submitAuctionBid, "test-name-2", 1000000000, "test-bidder", 1000000, "test-process-id")
-			assert.is_false(status)
-			assert.match("Auction does not exist", error)
+				assert.is_false(status)
+				assert.match("Insufficient balance", error)
+			end)
 		end)
 	end)
 end)
