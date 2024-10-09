@@ -517,6 +517,51 @@ describe("arns", function()
 		end)
 	end)
 
+	describe("pruneAuctions", function()
+		it("should remove expired auctions", function()
+			local currentTimestamp = 1000000
+			_G.NameRegistry.auctions = {
+				["active-auction"] = {
+					name = "active-auction",
+					type = "permabuy",
+					startPrice = 1000000000,
+					floorPrice = 100000000,
+					startTimestamp = currentTimestamp,
+					endTimestamp = currentTimestamp + 1000000, -- far in the future
+				},
+				["expired-auction"] = {
+					name = "expired-auction",
+					type = "permabuy",
+					startPrice = 1000000000,
+					floorPrice = 100000000,
+					startTimestamp = currentTimestamp,
+					endTimestamp = currentTimestamp - 1000, -- expired
+				},
+			}
+			local prunedAuctions = arns.pruneAuctions(currentTimestamp)
+			assert.are.same({
+				["expired-auction"] = {
+					name = "expired-auction",
+					type = "permabuy",
+					startPrice = 1000000000,
+					floorPrice = 100000000,
+					startTimestamp = currentTimestamp,
+					endTimestamp = currentTimestamp - 1000, -- expired
+				},
+			}, prunedAuctions)
+			assert.are.same({
+				["active-auction"] = {
+					name = "active-auction",
+					type = "permabuy",
+					startPrice = 1000000000,
+					floorPrice = 100000000,
+					startTimestamp = currentTimestamp,
+					endTimestamp = currentTimestamp + 1000000, -- far in the future
+				},
+			}, _G.NameRegistry.auctions)
+		end)
+	end)
+
 	describe("getRegistrationFees", function()
 		it("should return the correct registration prices", function()
 			local registrationFees = arns.getRegistrationFees()
@@ -629,6 +674,21 @@ describe("arns", function()
 					pcall(arns.submitAuctionBid, "test-name-2", 1000000000, "test-bidder", 1000000, "test-process-id")
 				assert.is_false(status)
 				assert.match("Auction does not exist", error)
+			end)
+
+			it("should throw an error if the bid is not high enough", function()
+				local startTimestamp = 1000000
+				local auction = arns.createAuction("test-name", "permabuy", startTimestamp, "test-initiator")
+				local status, error = pcall(
+					arns.submitAuctionBid,
+					"test-name",
+					auction.startPrice - 1,
+					testAddressArweave,
+					startTimestamp,
+					"test-process-id"
+				)
+				assert.is_false(status)
+				assert.match("Bid amount is less than the required bid of " .. auction.startPrice, error)
 			end)
 
 			it("should throw an error if the bidder does not have enough balance", function()

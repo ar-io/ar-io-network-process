@@ -511,12 +511,12 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId)
 		error("Auction does not exist")
 	end
 	local requiredBid = arns.getCurrentBidPriceForAuction(auction, timestamp)
-
-	if bidAmount < requiredBid then
-		error("Bid amount is less than the required bid")
+	local requiredOrBidAmount = bidAmount or requiredBid
+	if requiredOrBidAmount < requiredBid then
+		error("Bid amount is less than the required bid of " .. requiredBid)
 	end
 
-	local finalBidAmount = math.min(bidAmount, requiredBid)
+	local finalBidAmount = math.min(requiredOrBidAmount, requiredBid)
 
 	-- check the balance of the bidder
 	local bidderBalance = balances.getBalance(bidder)
