@@ -643,6 +643,8 @@ describe("arns", function()
 					local startTimestamp = 1000000
 					local auctionIntervalMs = 1000 * 60 * 2 -- ~2 min per price interval
 					local bidTimestamp = startTimestamp + auctionIntervalMs - 1 -- 1 ms before the next price interval
+					local demandBefore = demand.getCurrentPeriodPurchases()
+					local revenueBefore = demand.getCurrentPeriodRevenue()
 					local auction = arns.createAuction("test-name", "permabuy", startTimestamp, "test-initiator")
 					local result = arns.submitAuctionBid(
 						"test-name",
@@ -666,6 +668,8 @@ describe("arns", function()
 					assert.are.equal(NameRegistry.auctions["test-name"], nil)
 					assert.same(expectedRecord, NameRegistry.records["test-name"])
 					assert.same(expectedRecord, result.record)
+					assert.are.equal(demand.getCurrentPeriodPurchases(), demandBefore + 1)
+					assert.are.equal(demand.getCurrentPeriodRevenue(), revenueBefore + expectedPrice)
 				end
 			)
 

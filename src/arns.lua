@@ -540,6 +540,9 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId)
 	balances.transfer(ao.id, bidder, rewardForProtocol)
 	arns.removeAuction(name)
 	arns.addRecord(name, record)
+	-- make sure we tally name purchase given, even though only half goes to protocol
+	-- TODO: DO WE WANT TO TALLY THE ENTIRE AMOUNT OR JUST THE REWARD FOR THE PROTOCOL?
+	demand.tallyNamePurchase(finalBidAmount)
 	return {
 		auction = auction,
 		bidder = bidder,

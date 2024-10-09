@@ -8,6 +8,7 @@ import {
   PROCESS_OWNER,
   STUB_ADDRESS,
   INITIAL_PROTOCOL_BALANCE,
+  STUB_MESSAGE_ID,
 } from '../tools/constants.mjs';
 
 // EIP55-formatted test address
@@ -89,36 +90,37 @@ describe('ArNS', async () => {
     const expectedRemainingBalance = {
       '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa': 0,
       [PROCESS_OWNER]: 950000000000000,
+      [PROCESS_ID]: 50000600000000,
       [sender]: 0,
     };
-    // assert.deepEqual(buyRecordEvent, {
-    //   _e: 1,
-    //   'Purchase-Type': 'lease',
-    //   'DF-Purchases-This-Period': 1,
-    //   'DF-Revenue-This-Period': 600000000,
-    //   'DF-Current-Demand-Factor': 1,
-    //   Action: 'Buy-Record',
-    //   'Name-Length': 9,
-    //   'Purchase-Price': 600000000,
-    //   'Base-Registration-Fee': 500000000,
-    //   'DF-Current-Period': 1,
-    //   'DF-Trailing-Period-Revenues': [0, 0, 0, 0, 0, 0],
-    //   'DF-Trailing-Period-Purchases': [0, 0, 0, 0, 0, 0, 0],
-    //   Cron: false,
-    //   Cast: false,
-    //   'Undername-Limit': 10,
-    //   Name: name,
-    //   Years: '1',
-    //   'DF-Consecutive-Periods-With-Min-Demand-Factor': 0,
-    //   'Process-Id': processId,
-    //   From: sender,
-    //   'From-Formatted': sender,
-    //   'Message-Id': '1111111111111111111111111111111111111111111',
-    //   'Records-Count': 1,
-    //   'Protocol-Balance': 950000000000000,
-    //   'Reserved-Records-Count': 0,
-    //   'Remaining-Balance': expectedRemainingBalance[sender],
-    // });
+    assert.deepEqual(buyRecordEvent, {
+      _e: 1,
+      'Purchase-Type': 'lease',
+      'DF-Purchases-This-Period': 1,
+      'DF-Revenue-This-Period': 600000000,
+      'DF-Current-Demand-Factor': 1,
+      Action: 'Buy-Record',
+      'Name-Length': 9,
+      'Purchase-Price': 600000000,
+      'Base-Registration-Fee': 500000000,
+      'DF-Current-Period': 1,
+      'DF-Trailing-Period-Revenues': [0, 0, 0, 0, 0, 0],
+      'DF-Trailing-Period-Purchases': [0, 0, 0, 0, 0, 0, 0],
+      Cron: false,
+      Cast: false,
+      'Undername-Limit': 10,
+      Name: name,
+      Years: '1',
+      'DF-Consecutive-Periods-With-Min-Demand-Factor': 0,
+      'Process-Id': processId,
+      From: sender,
+      'From-Formatted': sender,
+      'Message-Id': STUB_MESSAGE_ID,
+      'Records-Count': 1,
+      'Protocol-Balance': expectedRemainingBalance[PROCESS_ID],
+      'Reserved-Records-Count': 0,
+      'Remaining-Balance': expectedRemainingBalance[sender],
+    });
 
     // fetch the record
     const realRecord = await handle(
