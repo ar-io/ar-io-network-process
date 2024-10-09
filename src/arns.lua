@@ -11,8 +11,6 @@ NameRegistry = NameRegistry or {
 	auctions = {},
 }
 
-local json = require("json")
-
 function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 	-- don't catch, let the caller handle the error
 	arns.assertValidBuyRecord(name, years, purchaseType, processId)
@@ -447,6 +445,9 @@ function arns.createAuction(name, type, timestamp, initiator)
 		error("Auction already exists for name")
 	end
 	local auctionDurationMs = 60 * 1000 * 60 * 24 * 14 -- 14 days in milliseconds
+	local auctionPriceIntervalMs = 1000 * 60 * 2 -- ~2 min per price interval
+	local exponentialDecayRate = 0.000002
+	local scalingExponent = 190
 	local endTimestamp = timestamp + auctionDurationMs
 	local baseFee = demand.getFees()[#name]
 	local demandFactor = demand.getDemandFactor()
@@ -461,9 +462,14 @@ function arns.createAuction(name, type, timestamp, initiator)
 		startPrice = startPrice,
 		floorPrice = floorPrice,
 		initiator = initiator,
+		years = type == "permabuy" and nil or 1,
+		prices = arns.computePricesForAuction(startPrice, timestamp, endTimestamp, {
+			auctionPriceIntervalMs = auctionPriceIntervalMs, -- ~2 min per price interval
+			exponentialDecayRate = exponentialDecayRate,
+			scalingExponent = scalingExponent,
+		}),
 	}
-	local prices = arns.computePricesForAuction(auction)
-	auction.prices = prices
+	-- auction.prices = arns.computePricesForAuction(startPrice, timestamp, endTimestamp, auction.settings)
 	NameRegistry.auctions[name] = auction
 	return auction
 end
@@ -472,15 +478,20 @@ function arns.getAuction(name)
 	return NameRegistry.auctions[name]
 end
 
-function arns.computePricesForAuction(auction)
+function arns.getAuctions()
+	local auctions = utils.deepCopy(NameRegistry.auctions)
+	return auctions or {}
+end
+
+function arns.computePricesForAuction(startPrice, startTimestamp, endTimestamp, settings)
 	local prices = {}
-	local auctionPriceIntervalMs = 1000 * 60 * 2 -- ~2 min per price interval
-	local exponentialDecayRate = 0.000002
-	local scalingExponent = 190
-	for timestampAtInterval = auction.startTimestamp, auction.endTimestamp - auctionPriceIntervalMs, auctionPriceIntervalMs do
-		local intervalsSinceStart = math.floor((timestampAtInterval - auction.startTimestamp) / auctionPriceIntervalMs)
+	local auctionPriceIntervalMs = settings.auctionPriceIntervalMs
+	local exponentialDecayRate = settings.exponentialDecayRate
+	local scalingExponent = settings.scalingExponent
+	for timestampAtInterval = startTimestamp, endTimestamp - auctionPriceIntervalMs, auctionPriceIntervalMs do
+		local intervalsSinceStart = math.floor((timestampAtInterval - startTimestamp) / auctionPriceIntervalMs)
 		local totalDecaySinceStart = math.min(1, exponentialDecayRate * intervalsSinceStart)
-		local priceAtInterval = math.floor(auction.startPrice * ((1 - totalDecaySinceStart) ^ scalingExponent))
+		local priceAtInterval = math.floor(startPrice * ((1 - totalDecaySinceStart) ^ scalingExponent))
 		prices[timestampAtInterval] = priceAtInterval
 	end
 	return prices
@@ -532,7 +543,9 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId)
 end
 
 function arns.removeAuction(name)
+	local auction = arns.getAuction(name)
 	NameRegistry.auctions[name] = nil
+	return auction
 end
 
 function arns.removeRecord(name)
@@ -542,7 +555,9 @@ function arns.removeRecord(name)
 end
 
 function arns.removeReservedName(name)
+	local reserved = NameRegistry.reserved[name]
 	NameRegistry.reserved[name] = nil
+	return reserved
 end
 
 -- prune records that have expired
@@ -557,14 +572,26 @@ function arns.pruneRecords(currentTimestamp)
 	return prunedRecords
 end
 
--- identify any reserved names that have expired, account for a one week grace period in seconds
-function arns.pruneReservedNames(currentTimestamp)
-	local reserved = arns.getReservedNames()
-	for name, details in pairs(reserved) do
-		if details.endTimestamp and details.endTimestamp <= currentTimestamp then
-			arns.removeReservedName(name)
+-- prune auctions that have expired
+function arns.pruneAuctions(currentTimestamp)
+	local prunedAuctions = {}
+	for name, auction in pairs(arns.getAuctions()) do
+		if auction.endTimestamp <= currentTimestamp then
+			prunedAuctions[name] = arns.removeAuction(name)
 		end
 	end
+	return prunedAuctions
+end
+
+-- identify any reserved names that have expired, account for a one week grace period in seconds
+function arns.pruneReservedNames(currentTimestamp)
+	local prunedReserved = {}
+	for name, details in pairs(arns.getReservedNames()) do
+		if details.endTimestamp and details.endTimestamp <= currentTimestamp then
+			prunedReserved[name] = arns.removeReservedName(name)
+		end
+	end
+	return prunedReserved
 end
 
 return arns

@@ -81,6 +81,10 @@ local ActionMap = {
 	DelegateStake = "Delegate-Stake",
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
 	CancelDelegateWithdrawal = "Cancel-Delegate-Withdrawal",
+
+	-- auctions
+	AuctionInfo = "Auction-Info",
+	ReleaseName = "Release-Name",
 }
 
 local function eventingPcall(ioEvent, onError, fnToCall, ...)
@@ -1824,5 +1828,82 @@ addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginate
 end)
 
 -- END READ HANDLERS
+
+-- AUCTION HANDLER
+addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.ReleaseName), function(msg)
+	-- validate the name and process id exist, then create the auction using the auction function
+	local name = msg.Tags.Name
+	local processId = msg.From
+	local record = arns.getRecord(name)
+	local initiator = msg.Tags.Initiator
+
+	-- TODO: validate processId and initiator are valid addresses
+	if not record then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Record-Not-Found",
+		})
+		return
+	end
+
+	if record.processId ~= processId then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Process-Id-Mismatch",
+		})
+		return
+	end
+
+	-- we should be able to create the auction here
+	local status, result = pcall(arns.createAuction, name, record.type, msg.Timestamp, initiator)
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Auction-Creation-Error",
+			Data = tostring(result),
+		})
+		return
+	end
+	ao.send({
+		Target = msg.From, -- TODO: this could also be the auction initiator
+		Action = "Auction-Notice",
+		Name = name,
+		["Purchase-Type"] = record.type,
+	})
+	return
+end)
+
+-- hadnler to get auction for a name
+addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.AuctionInfo), function(msg)
+	local name = string.lower(msg.Tags.Name)
+	local auction = arns.getAuction(name)
+	if not auction then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionInfo .. "-Notice",
+			Error = "Auction-Not-Found",
+		})
+		return
+	end
+	ao.send({
+		Target = msg.From,
+		Action = ActionMap.AuctionInfo .. "-Notice",
+		Data = json.encode({
+			name = name,
+			startTimestamp = auction.startTimestamp,
+			endTimestamp = auction.endTimestamp,
+			startPrice = auction.startPrice,
+			floorPrice = auction.floorPrice,
+			initiator = auction.initiator,
+			type = auction.type,
+			years = auction.years,
+			currentPrice = arns.getCurrentBidPriceForAuction(auction, msg.Timestamp),
+			-- TODO: prices may take up too much memory, we may need to paginate the response or slice the array
+		}),
+	})
+end)
 
 return process

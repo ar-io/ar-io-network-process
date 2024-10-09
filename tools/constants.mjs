@@ -6,6 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const STUB_ADDRESS = ''.padEnd(43, '1');
+export const STUB_TIMESTAMP = 1704088800000; // 01-01-2024 00:00:00
 /* ao READ-ONLY Env Variables */
 export const AO_LOADER_HANDLER_ENV = {
   Process: {
@@ -23,7 +24,7 @@ export const AO_LOADER_OPTIONS = {
   format: 'wasm64-unknown-emscripten-draft_2024_02_15',
   inputEncoding: 'JSON-1',
   outputEncoding: 'JSON-1',
-  memoryLimit: '524288000', // in bytes
+  memoryLimit: '1073741824', // in bytes (1GiB)
   computeLimit: (9e12).toString(),
   extensions: [],
 };
@@ -48,7 +49,7 @@ export const DEFAULT_HANDLE_OPTIONS = {
   Module: 'ANT',
   Target: ''.padEnd(43, '1'),
   From: STUB_ADDRESS,
-  Timestamp: Date.now(),
+  Timestamp: STUB_TIMESTAMP,
 };
 
 export const validGatewayTags = [

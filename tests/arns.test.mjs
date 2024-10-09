@@ -6,6 +6,7 @@ import {
   DEFAULT_HANDLE_OPTIONS,
   STUB_ADDRESS,
 } from '../tools/constants.mjs';
+import { release } from 'node:os';
 
 // EIP55-formatted test address
 const testEthAddress = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa';
@@ -33,8 +34,12 @@ describe('ArNS', async () => {
     assert(tokenInfo);
   });
 
-  const runBuyRecord = async (sender) => {
-    let mem = startMemory;
+  const runBuyRecord = async ({
+    sender,
+    processId = ''.padEnd(43, 'a'),
+    name = 'test-name',
+    mem = startMemory,
+  }) => {
     if (sender != STUB_ADDRESS) {
       const transferResult = await handle({
         Tags: [
@@ -53,32 +58,61 @@ describe('ArNS', async () => {
         Owner: sender,
         Tags: [
           { name: 'Action', value: 'Buy-Record' },
-          { name: 'Name', value: 'test-name' },
+          { name: 'Name', value: name },
           { name: 'Purchase-Type', value: 'lease' },
           { name: 'Years', value: '1' },
-          { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+          { name: 'Process-Id', value: processId },
         ],
       },
       mem,
     );
 
     const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
-    const buyRecordEvent = JSON.parse(buyRecordResult.Output.data.split('\n')[1]);
-    
+    const buyRecordEvent = JSON.parse(
+      buyRecordResult.Output.data.split('\n')[1],
+    );
+
     // Fields based on timestamps will be unstable for testing, but verify their type
-    assert.equal("number", typeof buyRecordEvent.Timestamp);
-    assert.equal("number", typeof buyRecordEvent['Epoch-Index']);
-    assert.equal("number", typeof buyRecordEvent['Start-Timestamp']);
-    assert.equal("number", typeof buyRecordEvent['End-Timestamp']);
+    assert.equal('number', typeof buyRecordEvent.Timestamp);
+    assert.equal('number', typeof buyRecordEvent['Epoch-Index']);
+    assert.equal('number', typeof buyRecordEvent['Start-Timestamp']);
+    assert.equal('number', typeof buyRecordEvent['End-Timestamp']);
     delete buyRecordEvent.Timestamp;
     delete buyRecordEvent['Epoch-Index'];
     delete buyRecordEvent['Start-Timestamp'];
     delete buyRecordEvent['End-Timestamp'];
     const expectedRemainingBalance = {
-      "0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa": 0,
-      "1111111111111111111111111111111111111111111": 950000000000000,
-    }
-    assert.deepEqual(buyRecordEvent, { _e: 1, 'Purchase-Type': 'lease', 'DF-Purchases-This-Period': 1, 'DF-Revenue-This-Period': 600000000, 'DF-Current-Demand-Factor': 1, Action: 'Buy-Record', 'Name-Length': 9, 'Purchase-Price': 600000000, 'Base-Registration-Fee': 500000000, 'DF-Current-Period': 1, 'DF-Trailing-Period-Revenues': [0,0,0,0,0,0], 'DF-Trailing-Period-Purchases': [0,0,0,0,0,0,0], Cron: false, Cast: false, 'Undername-Limit': 10, Name: 'test-name', Years: '1', 'DF-Consecutive-Periods-With-Min-Demand-Factor': 0, 'Process-Id': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', From: sender, 'From-Formatted': sender, 'Message-Id': '1111111111111111111111111111111111111111111', 'Records-Count': 1, 'Protocol-Balance': 950000000000000, 'Reserved-Records-Count': 0, 'Remaining-Balance': expectedRemainingBalance[sender] });
+      '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa': 0,
+      '1111111111111111111111111111111111111111111': 950000000000000,
+    };
+    assert.deepEqual(buyRecordEvent, {
+      _e: 1,
+      'Purchase-Type': 'lease',
+      'DF-Purchases-This-Period': 1,
+      'DF-Revenue-This-Period': 600000000,
+      'DF-Current-Demand-Factor': 1,
+      Action: 'Buy-Record',
+      'Name-Length': 9,
+      'Purchase-Price': 600000000,
+      'Base-Registration-Fee': 500000000,
+      'DF-Current-Period': 1,
+      'DF-Trailing-Period-Revenues': [0, 0, 0, 0, 0, 0],
+      'DF-Trailing-Period-Purchases': [0, 0, 0, 0, 0, 0, 0],
+      Cron: false,
+      Cast: false,
+      'Undername-Limit': 10,
+      Name: name,
+      Years: '1',
+      'DF-Consecutive-Periods-With-Min-Demand-Factor': 0,
+      'Process-Id': processId,
+      From: sender,
+      'From-Formatted': sender,
+      'Message-Id': '1111111111111111111111111111111111111111111',
+      'Records-Count': 1,
+      'Protocol-Balance': 950000000000000,
+      'Reserved-Records-Count': 0,
+      'Remaining-Balance': expectedRemainingBalance[sender],
+    });
 
     // fetch the record
     const realRecord = await handle(
@@ -87,7 +121,7 @@ describe('ArNS', async () => {
         Owner: sender,
         Tags: [
           { name: 'Action', value: 'Record' },
-          { name: 'Name', value: 'test-name' },
+          { name: 'Name', value: name },
         ],
       },
       buyRecordResult.Memory,
@@ -95,21 +129,26 @@ describe('ArNS', async () => {
 
     const record = JSON.parse(realRecord.Messages[0].Data);
     assert.deepEqual(record, {
-      processId: ''.padEnd(43, 'a'),
+      processId: processId,
       purchasePrice: 600000000,
       startTimestamp: buyRecordData.startTimestamp,
       endTimestamp: buyRecordData.endTimestamp,
       type: 'lease',
       undernameLimit: 10,
     });
+
+    return {
+      record,
+      mem: buyRecordResult.Memory,
+    };
   };
 
   it('should buy a record with Ethereum address', async () => {
-    await runBuyRecord(STUB_ADDRESS);
+    await runBuyRecord({ sender: STUB_ADDRESS });
   });
 
   it('should buy a record with an Ethereum address', async () => {
-    await runBuyRecord(testEthAddress);
+    await runBuyRecord({ sender: testEthAddress });
   });
 
   it('should fail to buy a permanently registered record', async () => {
@@ -364,6 +403,62 @@ describe('ArNS', async () => {
       record.endTimestamp,
       recordBefore.endTimestamp + 60 * 1000 * 60 * 24 * 365,
     );
+  });
+
+  it('should create an auction on a record owned by a process id', async () => {
+    // buy the name first
+    const processId = ''.padEnd(43, 'a');
+    const { mem } = await runBuyRecord({ sender: STUB_ADDRESS, processId });
+
+    const releaseNameResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Release-Name' },
+          { name: 'Name', value: 'test-name' },
+          { name: 'Initiator', value: 'test-owner-of-ant' }, // simulate who the owner is of the ANT process when sending the message
+        ],
+        From: processId,
+        Owner: processId,
+      },
+      mem,
+    );
+
+    // assert no error tag
+    const releaseNameErrorTag = releaseNameResult.Messages[0].Tags.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.equal(releaseNameErrorTag, undefined);
+
+    // fetch the auction
+    const auctionResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Auction-Info' },
+          { name: 'Name', value: 'test-name' },
+        ],
+      },
+      releaseNameResult.Memory,
+    );
+    // assert no error tag
+    const auctionErrorTag = auctionResult.Messages[0].Tags.find(
+      (tag) => tag.name === 'Error',
+    );
+
+    assert.equal(auctionErrorTag, undefined);
+    const auction = JSON.parse(auctionResult.Messages[0].Data);
+    const expectedStartPrice = 30000000000;
+    const expectedFloorPrice = 600000000;
+    assert.deepEqual(auction, {
+      name: 'test-name',
+      type: 'lease',
+      startPrice: expectedStartPrice,
+      floorPrice: expectedFloorPrice,
+      years: 1,
+      initiator: 'test-owner-of-ant',
+      startTimestamp: auction.startTimestamp,
+      endTimestamp: auction.endTimestamp,
+      currentPrice: auction.startPrice,
+    });
   });
 
   // TODO: add several error scenarios
