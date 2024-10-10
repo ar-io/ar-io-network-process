@@ -1440,7 +1440,10 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 		msg.ioEvent:addField("Ticked-Reward-Distributions", tickedRewardDistributions)
 		msg.ioEvent:addField("Total-Ticked-Rewards-Distributed", totalTickedRewardsDistributed)
 	end
-	msg.ioEvent:printEvent()
+
+	local gwStats = gatewayStats()
+	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
+	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
 end)
 
 -- READ HANDLERS
