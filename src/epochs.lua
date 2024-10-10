@@ -492,7 +492,6 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 		return
 	end
 
-	-- TODO: look at the potential rewards recorded in the epoch and compare against the behavior of the gateway
 	-- check if already distributed rewards for epoch
 	if epoch.distributions.distributedTimestamp then
 		print("Rewards already distributed for epoch: " .. epochIndex)

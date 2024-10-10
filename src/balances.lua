@@ -5,8 +5,6 @@ Balances = Balances or {}
 local balances = {}
 local utils = require("utils")
 
--- TODO: if we need to append state at all we would do it here on token
-
 function balances.transfer(recipient, from, qty)
 	assert(type(recipient) == "string", "Recipient is required!")
 	assert(type(from) == "string", "From is required!")

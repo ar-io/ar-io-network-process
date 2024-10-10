@@ -1518,8 +1518,6 @@ end)
 
 addEventingHandler(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMap.Balance), function(msg)
 	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From)
-
-	-- TODO: arconnect et. all expect to accept Target
 	local balance = balances.getBalance(target)
 	-- must adhere to token.lua spec for arconnect compatibility
 	ao.send({
@@ -1883,7 +1881,7 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 		return
 	end
 	ao.send({
-		Target = msg.From, -- TODO: this could also be the auction initiator
+		Target = initiator,
 		Action = "Auction-Notice",
 		Name = name,
 		Data = json.encode({

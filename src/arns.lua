@@ -39,7 +39,6 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		error("Name is already registered")
 	end
 
-	-- TODO: handle reserved name timestamps (they should be pruned, so not immediately necessary)
 	if arns.getReservedName(name) and arns.getReservedName(name).target ~= from then
 		error("Name is reserved")
 	end
