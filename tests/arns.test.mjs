@@ -9,6 +9,7 @@ import {
   STUB_ADDRESS,
   INITIAL_PROTOCOL_BALANCE,
   STUB_MESSAGE_ID,
+  STUB_TIMESTAMP,
 } from '../tools/constants.mjs';
 
 // EIP55-formatted test address
@@ -40,7 +41,9 @@ describe('ArNS', async () => {
   const runBuyRecord = async ({
     sender = STUB_ADDRESS,
     processId = ''.padEnd(43, 'a'),
+    transferQty = 1_000_000_000_000,
     name = 'test-name',
+    type = 'lease',
     mem = startMemory,
   }) => {
     if (sender != PROCESS_OWNER) {
@@ -51,7 +54,7 @@ describe('ArNS', async () => {
         Tags: [
           { name: 'Action', value: 'Transfer' },
           { name: 'Recipient', value: sender },
-          { name: 'Quantity', value: 600000000 },
+          { name: 'Quantity', value: transferQty },
           { name: 'Cast', value: true },
         ],
       });
@@ -65,9 +68,9 @@ describe('ArNS', async () => {
         Tags: [
           { name: 'Action', value: 'Buy-Record' },
           { name: 'Name', value: name },
-          { name: 'Purchase-Type', value: 'lease' },
-          { name: 'Years', value: '1' },
+          { name: 'Purchase-Type', value: type },
           { name: 'Process-Id', value: processId },
+          { name: 'Years', value: '1' }
         ],
       },
       mem,
@@ -78,39 +81,33 @@ describe('ArNS', async () => {
       buyRecordResult.Output.data.split('\n')[1],
     );
 
-    // Fields based on timestamps will be unstable for testing, but verify their type
-    assert.equal('number', typeof buyRecordEvent.Timestamp);
-    assert.equal('number', typeof buyRecordEvent['Epoch-Index']);
-    assert.equal('number', typeof buyRecordEvent['Start-Timestamp']);
-    assert.equal('number', typeof buyRecordEvent['End-Timestamp']);
-    delete buyRecordEvent.Timestamp;
-    delete buyRecordEvent['Epoch-Index'];
-    delete buyRecordEvent['Start-Timestamp'];
-    delete buyRecordEvent['End-Timestamp'];
     const expectedRemainingBalance = {
       '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa': 0,
-      [PROCESS_OWNER]: 950000000000000,
-      [PROCESS_ID]: 50000600000000,
-      [sender]: 0,
+      [PROCESS_OWNER]: 950000000000000 - transferQty,
+      [PROCESS_ID]: 50_000_000_000_000 + buyRecordData.purchasePrice,
+      [sender]: transferQty - buyRecordData.purchasePrice,
     };
-    assert.deepEqual(buyRecordEvent, {
+    const expectedEvent = {
       _e: 1,
-      'Purchase-Type': 'lease',
+      Timestamp: STUB_TIMESTAMP,
+      'Start-Timestamp': STUB_TIMESTAMP,
+      ...(type == 'lease' && { 'End-Timestamp': STUB_TIMESTAMP + 31536000000 }), // 1 year in ms
+      'Purchase-Type': type,
+      Years: 1, // Note: this added because we are sending the tag, but not relevant for permabuys
+      'Undername-Limit': 10,
+      'Purchase-Price': buyRecordData.purchasePrice,
       'DF-Purchases-This-Period': 1,
-      'DF-Revenue-This-Period': 600000000,
+      'DF-Revenue-This-Period': buyRecordData.purchasePrice,
       'DF-Current-Demand-Factor': 1,
       Action: 'Buy-Record',
       'Name-Length': 9,
-      'Purchase-Price': 600000000,
       'Base-Registration-Fee': 500000000,
       'DF-Current-Period': 1,
       'DF-Trailing-Period-Revenues': [0, 0, 0, 0, 0, 0],
       'DF-Trailing-Period-Purchases': [0, 0, 0, 0, 0, 0, 0],
       Cron: false,
       Cast: false,
-      'Undername-Limit': 10,
       Name: name,
-      Years: '1',
       'DF-Consecutive-Periods-With-Min-Demand-Factor': 0,
       'Process-Id': processId,
       From: sender,
@@ -120,7 +117,10 @@ describe('ArNS', async () => {
       'Protocol-Balance': expectedRemainingBalance[PROCESS_ID],
       'Reserved-Records-Count': 0,
       'Remaining-Balance': expectedRemainingBalance[sender],
-    });
+      'Epoch-Index': -183
+    };
+    assert.deepEqual(buyRecordEvent, expectedEvent);
+
 
     // fetch the record
     const realRecord = await handle(
@@ -138,11 +138,11 @@ describe('ArNS', async () => {
     const record = JSON.parse(realRecord.Messages[0].Data);
     assert.deepEqual(record, {
       processId: processId,
-      purchasePrice: 600000000,
+      purchasePrice: buyRecordData.purchasePrice,
       startTimestamp: buyRecordData.startTimestamp,
-      endTimestamp: buyRecordData.endTimestamp,
-      type: 'lease',
+      type: type,
       undernameLimit: 10,
+      ...(type == "lease" && { endTimestamp: buyRecordData.endTimestamp }),
     });
 
     return {
@@ -415,12 +415,13 @@ describe('ArNS', async () => {
     );
   });
 
-  it('should create an auction on a record owned by a process id, accept a bid and add the record to the registry', async () => {
+  it('should create an auction for an existing permabuy record owned by a process id, accept a bid and add the new record to the registry', async () => {
     // buy the name first
     const processId = ''.padEnd(43, 'a');
     const { mem, record: initialRecord } = await runBuyRecord({
       sender: STUB_ADDRESS,
       processId,
+      type: "permabuy"
     });
 
     const releaseNameResult = await handle(
@@ -459,14 +460,13 @@ describe('ArNS', async () => {
 
     assert.equal(auctionErrorTag, undefined);
     const auction = JSON.parse(auctionResult.Messages[0].Data);
-    const expectedStartPrice = 30000000000;
-    const expectedFloorPrice = 600000000;
+    const expectedStartPrice = 125000000000;
+    const expectedFloorPrice = 2500000000;
     assert.deepEqual(auction, {
       name: 'test-name',
-      type: 'lease',
+      type: 'permabuy',
       startPrice: expectedStartPrice,
       floorPrice: expectedFloorPrice,
-      years: 1,
       initiator: 'test-owner-of-ant',
       startTimestamp: auction.startTimestamp,
       endTimestamp: auction.endTimestamp,
@@ -493,6 +493,7 @@ describe('ArNS', async () => {
       (tag) => tag.name === 'Error',
     );
 
+    assert.equal(transferErrorTag, undefined);
     const bidTimestamp = auction.startTimestamp + 60 * 1000; // same as the original interval but 1 minute after the auction has started
     const submitBidResult = await handle(
       {
@@ -542,17 +543,15 @@ describe('ArNS', async () => {
       submitBidResult.Memory,
     );
 
-    const expectedEndTimestamp = bidTimestamp + 60 * 1000 * 60 * 24 * 365;
-    const expectedRewardForInitiator = 30000000000 * 0.5;
-    const expectedRewardForProtocol = 30000000000 - expectedRewardForInitiator;
+    const expectedRewardForInitiator = expectedStartPrice * 0.5;
+    const expectedRewardForProtocol = expectedStartPrice - expectedRewardForInitiator;
 
     const record = JSON.parse(recordResult.Messages[0].Data);
     assert.deepEqual(record, {
       processId,
-      purchasePrice: 30000000000,
+      purchasePrice: expectedStartPrice,
       startTimestamp: bidTimestamp,
-      endTimestamp: expectedEndTimestamp,
-      type: 'lease',
+      type: 'permabuy',
       undernameLimit: 10,
     });
 

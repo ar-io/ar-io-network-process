@@ -542,26 +542,23 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 
 	msg.ioEvent:addField("nameLength", #msg.Tags.Name)
 
-	local shouldContinue2, result = eventingPcall(
-		msg.ioEvent,
-		function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Invalid-Buy-Record-Notice",
-					Error = "Invalid-Buy-Record",
-				},
-				Data = tostring(error),
-			})
-		end,
-		arns.buyRecord,
-		string.lower(msg.Tags.Name),
-		msg.Tags["Purchase-Type"],
-		tonumber(msg.Tags.Years),
-		msg.From,
-		msg.Timestamp,
-		msg.Tags["Process-Id"]
-	)
+	local name = string.lower(msg.Tags.Name)
+	local purchaseType = string.lower(msg.Tags["Purchase-Type"])
+	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
+	local from = utils.formatAddress(msg.From)
+	local processId = msg.Tags["Process-Id"]
+	local timestamp = tonumber(msg.Timestamp)
+
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Invalid-Buy-Record-Notice",
+				Error = "Invalid-Buy-Record",
+			},
+			Data = tostring(error),
+		})
+	end, arns.buyRecord, name, purchaseType, years, from, timestamp, processId)
 	if not shouldContinue2 then
 		return
 	end
@@ -577,7 +574,14 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = "Buy-Record-Notice", Name = msg.Tags.Name },
-		Data = json.encode(record),
+		Data = json.encode({
+			name = name,
+			startTimestamp = record.startTimestamp,
+			endTimestamp = record.endTimestamp,
+			undernameLimit = record.undernameLimit,
+			purchasePrice = record.purchasePrice,
+			processId = record.processId,
+		}),
 	})
 end)
 
@@ -1857,8 +1861,18 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 		return
 	end
 
+	if record.type ~= "permabuy" then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Invalid-Record-Type",
+			-- only permabought names can be released by the process that owns the name
+		})
+		return
+	end
+
 	-- we should be able to create the auction here
-	local status, result = pcall(arns.createAuction, name, record.type, msg.Timestamp, initiator)
+	local status, result = pcall(arns.createAuction, name, tonumber(msg.Timestamp), initiator)
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -1872,7 +1886,16 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 		Target = msg.From, -- TODO: this could also be the auction initiator
 		Action = "Auction-Notice",
 		Name = name,
-		["Purchase-Type"] = record.type,
+		Data = json.encode({
+			startTimestamp = result.startTimestamp,
+			endTimestamp = result.endTimestamp,
+			startPrice = result.startPrice,
+			floorPrice = result.floorPrice,
+			currentPrice = result.startPrice,
+			initiator = result.initiator,
+			type = result.type,
+			years = result.years,
+		}),
 	})
 	return
 end)

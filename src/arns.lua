@@ -18,7 +18,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		purchaseType = "lease" -- set to lease by default
 	end
 
-	if years == nil then
+	if years == nil and purchaseType == "lease" then
 		years = 1 -- set to 1 year by default
 	end
 
@@ -31,10 +31,11 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		error("Insufficient balance")
 	end
 
-	if
-		arns.getRecord(name) ~= nil and arns.getRecord(name).endTimestamp == nil
-		or arns.getRecord(name) ~= nil and arns.getRecord(name).endTimestamp + constants.gracePeriodMs > timestamp
-	then
+	local record = arns.getRecord(name)
+	local isPermabuy = record ~= nil and record.type == "permabuy"
+	local isActiveLease = record ~= nil and (record.endTimestamp or 0) + constants.gracePeriodMs > timestamp
+
+	if isPermabuy or isActiveLease then
 		error("Name is already registered")
 	end
 
@@ -49,12 +50,10 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		type = purchaseType,
 		undernameLimit = constants.DEFAULT_UNDERNAME_COUNT,
 		purchasePrice = totalRegistrationFee,
+		endTimestamp = purchaseType == "lease" and timestamp + constants.oneYearMs * years or nil,
 	}
 
 	-- Register the leased or permabought name
-	if purchaseType == "lease" then
-		newRecord.endTimestamp = timestamp + constants.oneYearMs * years
-	end
 	-- Transfer tokens to the protocol balance
 	balances.transfer(ao.id, from, totalRegistrationFee)
 	arns.addRecord(name, newRecord)
@@ -296,7 +295,7 @@ function arns.assertValidBuyRecord(name, years, purchaseType, processId)
 	assert(name:match("^%w") and name:match("%w$") and name:match("^[%w-]+$"), "Name pattern is invalid.")
 
 	-- assert purchase type if present is lease or permabuy
-	assert(purchaseType == nil or purchaseType == "lease" or purchaseType == "permabuy", "PurchaseType is invalid.")
+	assert(purchaseType == nil or purchaseType == "lease" or purchaseType == "permabuy", "Purchase-Type is invalid.")
 
 	if purchaseType == "lease" or purchaseType == nil then
 		-- only check on leases (nil is set to lease)
@@ -440,10 +439,14 @@ function arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
 end
 
 -- AUCTIONS
-function arns.createAuction(name, type, timestamp, initiator)
+function arns.createAuction(name, timestamp, initiator)
+	if not arns.getRecord(name) then
+		error("Name is not registered. Auctions must be created for registered names.")
+	end
 	if arns.getAuction(name) then
 		error("Auction already exists for name")
 	end
+	local record = arns.getRecord(name)
 	local auctionDurationMs = 60 * 1000 * 60 * 24 * 14 -- 14 days in milliseconds
 	local auctionPriceIntervalMs = 1000 * 60 * 2 -- ~2 min per price interval
 	local exponentialDecayRate = 0.000002
@@ -451,18 +454,19 @@ function arns.createAuction(name, type, timestamp, initiator)
 	local endTimestamp = timestamp + auctionDurationMs
 	local baseFee = demand.getFees()[#name]
 	local demandFactor = demand.getDemandFactor()
-	local floorPrice = arns.calculateRegistrationFee(type, baseFee, 1, demandFactor)
+	local floorPrice = arns.calculateRegistrationFee(record.type, baseFee, 1, demandFactor)
 	local startPriceMultiplier = 50
 	local startPrice = floorPrice * startPriceMultiplier
 	local auction = {
 		name = name,
-		type = type,
+		type = record.type,
 		startTimestamp = timestamp,
 		endTimestamp = endTimestamp,
 		startPrice = startPrice,
 		floorPrice = floorPrice,
 		initiator = initiator,
-		years = type == "permabuy" and nil or 1,
+		years = record.type == "lease" and 1 or nil,
+		-- TODO: this requires storing 10080 prices, which is a lot of memory - we may want to just store the settings below and compute on the fly (or have clients use the settings to compute the price at any given timestamp)
 		prices = arns.computePricesForAuction(startPrice, timestamp, endTimestamp, {
 			auctionPriceIntervalMs = auctionPriceIntervalMs, -- ~2 min per price interval
 			exponentialDecayRate = exponentialDecayRate,
@@ -471,6 +475,8 @@ function arns.createAuction(name, type, timestamp, initiator)
 	}
 	-- auction.prices = arns.computePricesForAuction(startPrice, timestamp, endTimestamp, auction.settings)
 	NameRegistry.auctions[name] = auction
+	-- ensure the name is removed from the registry
+	arns.removeRecord(name)
 	return auction
 end
 
@@ -532,7 +538,6 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId)
 		undernameLimit = constants.DEFAULT_UNDERNAME_COUNT,
 		purchasePrice = finalBidAmount,
 	}
-
 	local rewardForInitiator = math.floor(finalBidAmount * 0.5)
 	local rewardForProtocol = finalBidAmount - rewardForInitiator
 	-- reduce bidder balance by the final bid amount
