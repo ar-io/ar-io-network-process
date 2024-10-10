@@ -627,6 +627,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 
 	-- update the epoch
 	Epochs[epochIndex] = epoch
+	return epochs.getEpoch(epochIndex)
 end
 
 -- prune epochs older than 14 days
