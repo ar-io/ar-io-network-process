@@ -24,29 +24,29 @@ describe('Tick', async () => {
     );
   }
 
-    const transfer = async ({
-      recipient = STUB_ADDRESS,
-      quantity = 100_000_000_000,
-    } = {}) => {
-      const transferResult = await handle(
-        {
-          From: PROCESS_OWNER,
-          Owner: PROCESS_OWNER,
-          Tags: [
-            { name: 'Action', value: 'Transfer' },
-            { name: 'Recipient', value: recipient },
-            { name: 'Quantity', value: quantity },
-            { name: 'Cast', value: false },
-          ],
-        },
-        // memory
-      );
+  const transfer = async ({
+    recipient = STUB_ADDRESS,
+    quantity = 100_000_000_000,
+  } = {}) => {
+    const transferResult = await handle(
+      {
+        From: PROCESS_OWNER,
+        Owner: PROCESS_OWNER,
+        Tags: [
+          { name: 'Action', value: 'Transfer' },
+          { name: 'Recipient', value: recipient },
+          { name: 'Quantity', value: quantity },
+          { name: 'Cast', value: false },
+        ],
+      },
+      // memory
+    );
 
-      // assert no error tag
-      const errorTag = transferResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.Name === 'Error',
-      );
-      assert.strictEqual(errorTag, undefined);
+    // assert no error tag
+    const errorTag = transferResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.Name === 'Error',
+    );
+    assert.strictEqual(errorTag, undefined);
 
     return transferResult.Memory;
   };
@@ -130,11 +130,14 @@ describe('Tick', async () => {
       quantity: 100_000_000_000,
     });
 
-    const joinNetworkResult = await handle({
-      Tags: validGatewayTags,
-      From: STUB_ADDRESS,
-      Owner: STUB_ADDRESS,
-    }, memory);
+    const joinNetworkResult = await handle(
+      {
+        Tags: validGatewayTags,
+        From: STUB_ADDRESS,
+        Owner: STUB_ADDRESS,
+      },
+      memory,
+    );
 
     // assert no error tag
     const errorTag = joinNetworkResult.Messages?.[0]?.Tags?.find(
