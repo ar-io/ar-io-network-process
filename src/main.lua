@@ -1338,9 +1338,9 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 		-- update demand factor if necessary
 		local demandFactor = demand.updateDemandFactor(timestamp)
 		local distributedEpoch = epochs.distributeRewardsForEpoch(timestamp)
-		if distributedEpoch ~= nil then
-			-- tickedRewardDistributions[distributedEpoch.epochIndex] =
-			-- 	distributedEpoch.distributions.totalDistributedRewards
+		if distributedEpoch ~= nil and distributedEpoch.epochIndex ~= nil then
+			tickedRewardDistributions[distributedEpoch.epochIndex] =
+				distributedEpoch.distributions.totalDistributedRewards
 			totalTickedRewardsDistributed = totalTickedRewardsDistributed
 				+ distributedEpoch.distributions.totalDistributedRewards
 		end
