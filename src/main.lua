@@ -1332,7 +1332,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
 	local msgTimestamp = tonumber(msg.Timestamp)
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
-	-- local tickedRewardDistributions = {}
+	local tickedRewardDistributions = {}
 	local totalTickedRewardsDistributed = 0
 	local function tickEpoch(timestamp, blockHeight, hashchain)
 		-- update demand factor if necessary
@@ -1437,7 +1437,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors, ";")
 	end
 	if totalTickedRewardsDistributed > 0 then
-		-- msg.ioEvent:addField("Ticked-Reward-Distributions", tickedRewardDistributions)
+		msg.ioEvent:addField("Ticked-Reward-Distributions", tickedRewardDistributions)
 		msg.ioEvent:addField("Total-Ticked-Rewards-Distributed", totalTickedRewardsDistributed)
 	end
 
