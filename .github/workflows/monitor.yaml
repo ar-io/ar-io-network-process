@@ -3,7 +3,7 @@ name: IO Process Status
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */4 * * *' # Run every 4 hours
+    - cron: '0 */1 * * *' # Run every 1 hour
 
 jobs:
   monitor:
