@@ -1527,7 +1527,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	if #newDemandFactors > 0 then
 		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors, ";")
 	end
-	if totalTickedRewardsDistributed > 0 then
+	if utils.lengthOfTable(tickedRewardDistributions) > 0 then
 		msg.ioEvent:addField("Ticked-Reward-Distributions", tickedRewardDistributions)
 		msg.ioEvent:addField("Total-Ticked-Rewards-Distributed", totalTickedRewardsDistributed)
 	end
