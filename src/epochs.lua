@@ -9,7 +9,7 @@ Epochs = Epochs or {}
 EpochSettings = EpochSettings
 	or {
 		pruneEpochsCount = 14, -- prune epochs older than 14 days
-		prescribedNameCount = 5,
+		prescribedNameCount = 2,
 		rewardPercentage = 0.0005, -- 0.05%
 		maxObservers = 50,
 		epochZeroStartTimestamp = 1719900000000, -- July 9th, 00:00:00 UTC
