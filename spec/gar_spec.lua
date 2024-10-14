@@ -1,19 +1,39 @@
 local gar = require("gar")
 local utils = require("utils")
+
+local startTimestamp = 0
+local stubGatewayAddress = "test-this-is-valid-arweave-wallet-address-1"
+local stubObserverAddress = "test-this-is-valid-arweave-wallet-address-2"
+local stubRandomAddress = "test-this-is-valid-arweave-wallet-address-3"
+local stubMessageId = "stub-message-id"
 local testSettings = {
 	fqdn = "test.com",
 	protocol = "https",
 	port = 443,
 	allowDelegatedStaking = true,
-	minDelegatedStake = gar.getSettings().delegates.minStake,
+	minDelegatedStake = 500000000,
 	autoStake = true,
 	label = "test",
 	delegateRewardShareRatio = 0,
-	properties = "test-this-is-valid-arweave-wallet-address-1",
+	properties = stubGatewayAddress,
+}
+local testServices = {
+	bundlers = {
+		{
+			fqdn = "bundler1.example.com",
+			port = 443,
+			protocol = "https",
+			path = "/bundler1",
+		},
+		{
+			fqdn = "bundler2.example.com",
+			port = 443,
+			protocol = "https",
+			path = "/bundler2",
+		},
+	},
 }
 
-local startTimestamp = 0
-local stubObserverAddress = "test-this-is-valid-arweave-wallet-address-2"
 local testGateway = {
 	operatorStake = gar.getSettings().operators.minStake,
 	totalDelegatedStake = 0,
@@ -37,7 +57,7 @@ local testGateway = {
 describe("gar", function()
 	before_each(function()
 		_G.Balances = {
-			["test-this-is-valid-arweave-wallet-address-1"] = gar.getSettings().operators.minStake,
+			[stubGatewayAddress] = gar.getSettings().operators.minStake,
 		}
 		_G.Epochs = {
 			[0] = {
@@ -52,7 +72,7 @@ describe("gar", function()
 
 	describe("joinNetwork", function()
 		it("should fail if the gateway is already in the network", function()
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {},
@@ -69,14 +89,15 @@ describe("gar", function()
 				},
 				settings = testSettings,
 				status = "joined",
-				observerAddress = "test-this-is-valid-arweave-wallet-address-1",
+				observerAddress = stubGatewayAddress,
 			}
 			local status, error = pcall(
 				gar.joinNetwork,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				gar.getSettings().operators.minStake,
 				testSettings,
-				"test-this-is-valid-arweave-wallet-address-1",
+				nil, -- no additional services on this gateway
+				stubGatewayAddress,
 				startTimestamp
 			)
 			assert.is_false(status)
@@ -111,26 +132,234 @@ describe("gar", function()
 					properties = testSettings.properties,
 				},
 				status = "joined",
-				observerAddress = "test-this-is-valid-arweave-wallet-address-1",
+				observerAddress = stubGatewayAddress,
 			}
 			local status, result = pcall(
 				gar.joinNetwork,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				gar.getSettings().operators.minStake,
 				testSettings,
-				"test-this-is-valid-arweave-wallet-address-1",
+				nil, -- no additional services on this gateway
+				stubGatewayAddress,
 				startTimestamp
 			)
 			assert.is_true(status)
-			assert.are.equal(Balances["test-this-is-valid-arweave-wallet-address-1"], 0)
+			assert.are.equal(Balances[stubGatewayAddress], 0)
 			assert.are.same(expectation, result)
-			assert.are.same(expectation, gar.getGateway("test-this-is-valid-arweave-wallet-address-1"))
+			assert.are.same(expectation, gar.getGateway(stubGatewayAddress))
+		end)
+		it("should join the network with services and bundlers", function()
+			local expectation = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+				startTimestamp = startTimestamp,
+				stats = {
+					prescribedEpochCount = 0,
+					observedEpochCount = 0,
+					totalEpochCount = 0,
+					passedEpochCount = 0,
+					failedEpochCount = 0,
+					failedConsecutiveEpochs = 0,
+					passedConsecutiveEpochs = 0,
+				},
+				settings = {
+					allowDelegatedStaking = testSettings.allowDelegatedStaking,
+					delegateRewardShareRatio = testSettings.delegateRewardShareRatio,
+					autoStake = testSettings.autoStake,
+					minDelegatedStake = testSettings.minDelegatedStake,
+					label = testSettings.label,
+					fqdn = testSettings.fqdn,
+					protocol = testSettings.protocol,
+					port = testSettings.port,
+					properties = testSettings.properties,
+				},
+				services = testServices,
+				status = "joined",
+				observerAddress = stubGatewayAddress,
+			}
+
+			local status, result = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				gar.getSettings().operators.minStake,
+				testSettings,
+				testServices,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_true(status)
+			assert.are.equal(Balances[stubGatewayAddress], 0)
+			assert.are.same(expectation, result)
+			assert.are.same(expectation, gar.getGateway(stubGatewayAddress))
+		end)
+		it("should fail to join the network with invalid services key", function()
+			local invalidServices = {
+				invalidKey = {}, -- Invalid key not allowed
+			}
+			local status, error = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				gar.getSettings().operators.minStake,
+				testSettings,
+				invalidServices,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("services contains an invalid key", error)
+		end)
+		it("should fail to join the network with invalid bundler keys", function()
+			local servicesWithInvalidBundler = {
+				bundlers = {
+					{
+						fqdn = "bundler1.example.com",
+						port = 443,
+						protocol = "https",
+						path = "/bundler1",
+						invalidKey = "invalid", -- Invalid key in bundler
+					},
+				},
+			}
+			local status, error = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithInvalidBundler,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("bundler contains an invalid key", error)
+		end)
+		it("should fail to join the network with too many bundlers", function()
+			local servicesWithTooManyBundlers = {
+				bundlers = {},
+			}
+			for i = 1, 21 do -- Exceeding the maximum of 20 bundlers
+				table.insert(servicesWithTooManyBundlers.bundlers, {
+					fqdn = "bundler" .. i .. ".example.com",
+					port = 443,
+					protocol = "https",
+					path = "/bundler" .. i,
+				})
+			end
+
+			local status, error = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithTooManyBundlers,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("No more than 20 bundlers allowed", error)
+		end)
+		it("should fail to join the network with invalid bundler fqdn", function()
+			local servicesWithInvalidFqdn = {
+				bundlers = {
+					{
+						fqdn = 20, -- Invalid fqdn (a number)
+						port = 443,
+						protocol = "https",
+						path = "/bundler",
+					},
+				},
+			}
+
+			local status, error = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithInvalidFqdn,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("bundler.fqdn is required and must be a string", error)
+		end)
+		it("should fail to join the network with invalid bundler port", function()
+			local servicesWithInvalidPort = {
+				bundlers = {
+					{
+						fqdn = "bundler.example.com",
+						port = -1, -- Invalid port (negative number)
+						protocol = "https",
+						path = "/bundler",
+					},
+				},
+			}
+
+			local status, error = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithInvalidPort,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("bundler.port must be an integer between 0 and 65535", error)
+		end)
+		it("should fail to join the network with invalid bundler protocol", function()
+			local servicesWithInvalidProtocol = {
+				bundlers = {
+					{
+						fqdn = "bundler.example.com",
+						port = 443,
+						protocol = "ftp", -- Invalid protocol (should be 'https')
+						path = "/bundler",
+					},
+				},
+			}
+
+			local status, error = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithInvalidProtocol,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("bundler.protocol is required and must be 'https'", error)
+		end)
+		it("should fail to join the network with invalid bundler path", function()
+			local servicesWithInvalidPath = {
+				bundlers = {
+					{
+						fqdn = "bundler.example.com",
+						port = 443,
+						protocol = "https",
+						path = nil, -- Invalid path (nil value)
+					},
+				},
+			}
+
+			local status, error = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithInvalidPath,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("bundler.path is required and must be a string", error)
 		end)
 	end)
 
 	describe("leaveNetwork", function()
 		it("should leave the network", function()
-			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+			GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = (gar.getSettings().operators.minStake + 1000),
 				totalDelegatedStake = gar.getSettings().delegates.minStake,
 				vaults = {},
@@ -146,9 +375,9 @@ describe("gar", function()
 				},
 				settings = testSettings,
 				status = "joined",
-				observerAddress = "observerAddress",
+				observerAddress = stubObserverAddress,
 				delegates = {
-					["test-this-is-valid-arweave-wallet-address-2"] = {
+					[stubRandomAddress] = {
 						delegatedStake = gar.getSettings().delegates.minStake,
 						startTimestamp = 0,
 						vaults = {},
@@ -156,30 +385,29 @@ describe("gar", function()
 				},
 			}
 
-			local status, result =
-				pcall(gar.leaveNetwork, "test-this-is-valid-arweave-wallet-address-1", startTimestamp, "msgId")
+			local status, result = pcall(gar.leaveNetwork, stubGatewayAddress, startTimestamp, stubMessageId)
 			assert.is_true(status)
 			assert.are.same(result, {
 				operatorStake = 0,
 				totalDelegatedStake = 0,
 				vaults = {
-					["test-this-is-valid-arweave-wallet-address-1"] = {
+					[stubGatewayAddress] = {
 						balance = gar.getSettings().operators.minStake,
 						startTimestamp = startTimestamp,
 						endTimestamp = gar.getSettings().operators.leaveLengthMs,
 					},
-					msgId = {
+					[stubMessageId] = {
 						balance = 1000,
 						startTimestamp = startTimestamp,
 						endTimestamp = gar.getSettings().operators.withdrawLengthMs,
 					},
 				},
 				delegates = {
-					["test-this-is-valid-arweave-wallet-address-2"] = {
+					[stubRandomAddress] = {
 						delegatedStake = 0,
 						startTimestamp = 0,
 						vaults = {
-							msgId = {
+							[stubMessageId] = {
 								balance = gar.getSettings().delegates.minStake,
 								startTimestamp = startTimestamp,
 								endTimestamp = gar.getSettings().delegates.withdrawLengthMs,
@@ -200,15 +428,15 @@ describe("gar", function()
 				},
 				settings = testSettings,
 				status = "leaving",
-				observerAddress = "observerAddress",
+				observerAddress = stubObserverAddress,
 			})
 		end)
 	end)
 
 	describe("increaseOperatorStake", function()
 		it("should increase operator stake", function()
-			Balances["test-this-is-valid-arweave-wallet-address-1"] = 1000
-			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+			Balances[stubGatewayAddress] = 1000
+			GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {},
@@ -225,10 +453,10 @@ describe("gar", function()
 				},
 				settings = testSettings,
 				status = "joined",
-				observerAddress = "observerAddress",
+				observerAddress = stubObserverAddress,
 			}
-			local result, err = gar.increaseOperatorStake("test-this-is-valid-arweave-wallet-address-1", 1000)
-			assert.are.equal(Balances["test-this-is-valid-arweave-wallet-address-1"], 0)
+			local result, err = gar.increaseOperatorStake(stubGatewayAddress, 1000)
+			assert.are.equal(Balances[stubGatewayAddress], 0)
 			assert.are.same(result, {
 				operatorStake = gar.getSettings().operators.minStake + 1000,
 				totalDelegatedStake = 0,
@@ -246,14 +474,14 @@ describe("gar", function()
 				},
 				settings = testSettings,
 				status = "joined",
-				observerAddress = "observerAddress",
+				observerAddress = stubObserverAddress,
 			})
 		end)
 	end)
 
 	describe("decreaseOperatorStake", function()
 		it("should decrease operator stake", function()
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake + 1000,
 				totalDelegatedStake = 0,
 				vaults = {},
@@ -270,24 +498,19 @@ describe("gar", function()
 				},
 				settings = testSettings,
 				status = "joined",
-				observerAddress = "observerAddress",
+				observerAddress = stubObserverAddress,
 			}
-			local status, result = pcall(
-				gar.decreaseOperatorStake,
-				"test-this-is-valid-arweave-wallet-address-1",
-				1000,
-				startTimestamp,
-				"msgId"
-			)
+			local status, result =
+				pcall(gar.decreaseOperatorStake, stubGatewayAddress, 1000, startTimestamp, stubMessageId)
 			assert.is_true(status)
 			assert.are.same(result, {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {
-					msgId = {
+					[stubMessageId] = {
 						balance = 1000,
 						startTimestamp = startTimestamp,
-						endTimestamp = startTimestamp + gar.getSettings().operators.withdrawLengthMs,
+						endTimestamp = startTimestamp + (30 * 24 * 60 * 60 * 1000), -- 30 days
 					},
 				},
 				delegates = {},
@@ -303,14 +526,14 @@ describe("gar", function()
 				},
 				settings = testSettings,
 				status = "joined",
-				observerAddress = "observerAddress",
+				observerAddress = stubObserverAddress,
 			})
 		end)
 	end)
 
 	describe("updateGatewaySettings", function()
 		it("should update gateway settings", function()
-			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+			GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {},
@@ -329,7 +552,7 @@ describe("gar", function()
 				status = "joined",
 				observerAddress = "test-this-is-valid-arweave-wallet-address-0",
 			}
-			local newObserverWallet = "test-this-is-valid-arweave-wallet-address-1"
+			local newObserverWallet = stubGatewayAddress
 			local updatedSettings = {
 				fqdn = "example.com",
 				port = 80,
@@ -363,67 +586,20 @@ describe("gar", function()
 			}
 			local status, result = pcall(
 				gar.updateGatewaySettings,
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubGatewayAddress,
 				updatedSettings,
+				nil, -- no additional services on this gateway
 				newObserverWallet,
 				startTimestamp,
-				"msgId"
+				stubMessageId
 			)
 			assert.is_true(status)
 			assert.are.same(expectation, result)
-			assert.are.same(expectation, gar.getGateway("test-this-is-valid-arweave-wallet-address-1"))
+			assert.are.same(expectation, gar.getGateway(stubGatewayAddress))
 		end)
 
-		it("should not allow editing of gateway settings for a gateway that is leaving", function()
-			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
-				operatorStake = gar.getSettings().operators.minStake,
-				totalDelegatedStake = 0,
-				vaults = {},
-				delegates = {},
-				startTimestamp = startTimestamp,
-				stats = {
-					prescribedEpochCount = 0,
-					observedEpochCount = 0,
-					totalEpochCount = 0,
-					passedEpochCount = 0,
-					failedEpochCount = 0,
-					failedConsecutiveEpochs = 0,
-					passedConsecutiveEpochs = 0,
-				},
-				settings = testSettings,
-				status = "leaving",
-				observerAddress = "observerAddress",
-			}
-			local updatedSettings = {
-				fqdn = "example.com",
-				port = 80,
-				protocol = "https",
-				properties = "NdZ3YRwMB2AMwwFYjKn1g88Y9nRybTo0qhS1ORq_E7g",
-				note = "This is a test update.",
-				label = "Test Label Update",
-				autoStake = true,
-				allowDelegatedStaking = false,
-				delegateRewardShareRatio = 15,
-				minDelegatedStake = gar.getSettings().delegates.minStake + 5,
-			}
-			local status, err = pcall(
-				gar.updateGatewaySettings,
-				"test-this-is-valid-arweave-wallet-address-1",
-				updatedSettings,
-				stubObserverAddress,
-				startTimestamp,
-				"msgId"
-			)
-			assert.is_false(status)
-			assert.is_not_nil(err)
-			assert.matches("Gateway is leaving the network and cannot be updated", err)
-		end)
-	end)
-
-	describe("delegateStake", function()
-		it("should delegate stake to a gateway", function()
-			Balances["test-this-is-valid-arweave-wallet-address-2"] = gar.getSettings().delegates.minStake
-			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+		it("should allow updating gateway services", function()
+			GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {},
@@ -440,21 +616,132 @@ describe("gar", function()
 				},
 				settings = testSettings,
 				status = "joined",
-				observerAddress = "observerAddress",
+				observerAddress = stubObserverAddress,
 			}
-			local result, err = gar.delegateStake(
-				"test-this-is-valid-arweave-wallet-address-2",
-				"test-this-is-valid-arweave-wallet-address-1",
+
+			local updatedServices = {
+				bundlers = {
+					{ fqdn = "example.com", port = 80, protocol = "https", path = "/path" },
+				},
+			}
+
+			local status, result = pcall(
+				gar.updateGatewaySettings,
+				stubGatewayAddress,
+				testSettings,
+				updatedServices,
+				stubObserverAddress,
+				startTimestamp,
+				stubMessageId
+			)
+			assert.is_true(status)
+			assert.are.same({
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+				startTimestamp = startTimestamp,
+				stats = {
+					prescribedEpochCount = 0,
+					observedEpochCount = 0,
+					totalEpochCount = 0,
+					passedEpochCount = 0,
+					failedEpochCount = 0,
+					failedConsecutiveEpochs = 0,
+					passedConsecutiveEpochs = 0,
+				},
+				settings = testSettings,
+				status = "joined",
+				observerAddress = stubObserverAddress,
+				services = updatedServices,
+			}, result)
+		end)
+
+		it("should not allow editing of gateway settings for a gateway that is leaving", function()
+			GatewayRegistry[stubGatewayAddress] = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+				startTimestamp = startTimestamp,
+				stats = {
+					prescribedEpochCount = 0,
+					observedEpochCount = 0,
+					totalEpochCount = 0,
+					passedEpochCount = 0,
+					failedEpochCount = 0,
+					failedConsecutiveEpochs = 0,
+					passedConsecutiveEpochs = 0,
+				},
+				settings = testSettings,
+				status = "leaving",
+				observerAddress = stubObserverAddress,
+			}
+
+			local updatedSettings = {
+				fqdn = "example.com",
+				port = 80,
+				protocol = "https",
+				properties = "NdZ3YRwMB2AMwwFYjKn1g88Y9nRybTo0qhS1ORq_E7g",
+				note = "This is a test update.",
+				label = "Test Label Update",
+				autoStake = true,
+				allowDelegatedStaking = false,
+				delegateRewardShareRatio = 15,
+				minDelegatedStake = gar.getSettings().delegates.minStake + 5,
+			}
+			local status, err = pcall(
+				gar.updateGatewaySettings,
+				stubGatewayAddress,
+				updatedSettings,
+				nil,
+				stubObserverAddress,
+				startTimestamp,
+				stubMessageId
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Gateway is leaving the network and cannot be updated", err)
+		end)
+	end)
+
+	describe("delegateStake", function()
+		it("should delegate stake to a gateway", function()
+			Balances[stubRandomAddress] = gar.getSettings().delegates.minStake
+			GatewayRegistry[stubGatewayAddress] = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+				startTimestamp = startTimestamp,
+				stats = {
+					prescribedEpochCount = 0,
+					observedEpochCount = 0,
+					totalEpochCount = 0,
+					passedEpochCount = 0,
+					failedEpochCount = 0,
+					failedConsecutiveEpochs = 0,
+					passedConsecutiveEpochs = 0,
+				},
+				settings = testSettings,
+				status = "joined",
+				observerAddress = stubObserverAddress,
+			}
+			local status, result = pcall(
+				gar.delegateStake,
+				stubRandomAddress,
+				stubGatewayAddress,
 				gar.getSettings().delegates.minStake,
 				startTimestamp
 			)
-			assert.are.equal(Balances["test-this-is-valid-arweave-wallet-address-2"], 0)
+			assert.is_true(status)
+			assert.are.equal(Balances[stubRandomAddress], 0)
 			assert.are.same(result, {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = gar.getSettings().delegates.minStake,
 				vaults = {},
 				delegates = {
-					["test-this-is-valid-arweave-wallet-address-2"] = {
+					[stubRandomAddress] = {
 						delegatedStake = gar.getSettings().delegates.minStake,
 						startTimestamp = startTimestamp,
 						vaults = {},
@@ -472,12 +759,12 @@ describe("gar", function()
 				},
 				settings = testSettings,
 				status = "joined",
-				observerAddress = "observerAddress",
+				observerAddress = stubObserverAddress,
 			})
 		end)
 
 		it("should decrease delegated stake", function()
-			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+			GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = gar.getSettings().delegates.minStake + 1000,
 				vaults = {},
@@ -493,9 +780,9 @@ describe("gar", function()
 				},
 				settings = testSettings,
 				status = "joined",
-				observerAddress = "observerAddress",
+				observerAddress = stubObserverAddress,
 				delegates = {
-					["test-this-is-valid-arweave-wallet-address-2"] = {
+					[stubRandomAddress] = {
 						delegatedStake = gar.getSettings().delegates.minStake + 1000,
 						startTimestamp = 0,
 						vaults = {},
@@ -508,11 +795,11 @@ describe("gar", function()
 				totalDelegatedStake = gar.getSettings().delegates.minStake,
 				vaults = {},
 				delegates = {
-					["test-this-is-valid-arweave-wallet-address-2"] = {
+					[stubRandomAddress] = {
 						delegatedStake = gar.getSettings().delegates.minStake,
 						startTimestamp = 0,
 						vaults = {
-							msgId = {
+							[stubMessageId] = {
 								balance = 1000,
 								startTimestamp = startTimestamp,
 								endTimestamp = gar.getSettings().delegates.withdrawLengthMs,
@@ -532,19 +819,19 @@ describe("gar", function()
 				},
 				settings = testSettings,
 				status = "joined",
-				observerAddress = "observerAddress",
+				observerAddress = stubObserverAddress,
 			}
 			local status, result = pcall(
 				gar.decreaseDelegateStake,
-				"test-this-is-valid-arweave-wallet-address-1",
-				"test-this-is-valid-arweave-wallet-address-2",
+				stubGatewayAddress,
+				stubRandomAddress,
 				1000,
 				startTimestamp,
-				"msgId"
+				stubMessageId
 			)
 			assert.is_true(status)
 			assert.are.same(expectation, result)
-			assert.are.same(expectation, gar.getGateway("test-this-is-valid-arweave-wallet-address-1"))
+			assert.are.same(expectation, gar.getGateway(stubGatewayAddress))
 		end)
 	end)
 
@@ -552,19 +839,18 @@ describe("gar", function()
 		it("should slash operator stake by the provided slash amount and return it to the protocol balance", function()
 			local slashAmount = 10000
 			Balances[ao.id] = 0
-			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+			GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {},
 				delegates = {},
 			}
-			local status, err =
-				pcall(gar.slashOperatorStake, "test-this-is-valid-arweave-wallet-address-1", slashAmount)
+			local status, err = pcall(gar.slashOperatorStake, stubGatewayAddress, slashAmount)
 			assert.is_true(status)
 			assert.is_nil(err)
 			assert.are.equal(
 				gar.getSettings().operators.minStake - slashAmount,
-				GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].operatorStake
+				GatewayRegistry[stubGatewayAddress].operatorStake
 			)
 			assert.are.equal(slashAmount, Balances[ao.id])
 		end)
@@ -572,7 +858,7 @@ describe("gar", function()
 
 	describe("getGatewayWeightsAtTimestamp", function()
 		it("shoulud properly compute weights based on gateways for a given timestamp", function()
-			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+			GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {},
@@ -589,7 +875,7 @@ describe("gar", function()
 				},
 				settings = testSettings,
 				status = "joined",
-				observerAddress = "observerAddress",
+				observerAddress = stubObserverAddress,
 			}
 			local timestamp = 100
 			local expectedTenureWeight = timestamp / gar.getSettings().observers.tenureWeightPeriod
@@ -603,8 +889,8 @@ describe("gar", function()
 				* expectedObserverRatioWeight
 			local expectation = {
 				{
-					gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
-					observerAddress = "observerAddress",
+					gatewayAddress = stubGatewayAddress,
+					observerAddress = stubObserverAddress,
 					stake = gar.getSettings().operators.minStake,
 					startTimestamp = 0,
 					stakeWeight = expectedStakeWeight,
@@ -615,8 +901,7 @@ describe("gar", function()
 					normalizedCompositeWeight = 1, -- there is only one gateway
 				},
 			}
-			local status, result =
-				pcall(gar.getGatewayWeightsAtTimestamp, { "test-this-is-valid-arweave-wallet-address-1" }, timestamp)
+			local status, result = pcall(gar.getGatewayWeightsAtTimestamp, { stubGatewayAddress }, timestamp)
 			assert.is_true(status)
 			assert.are.same(expectation, result)
 		end)
@@ -627,7 +912,6 @@ describe("gar", function()
 			"should remove gateways with endTimestamp < currentTimestamp, slash gateways with failedConsecutiveEpochs > 30 and mark them for leaving",
 			function()
 				local currentTimestamp = 1000000
-				local msgId = "msgId"
 
 				-- Set up test gateways
 				_G.GatewayRegistry = {
@@ -712,22 +996,21 @@ describe("gar", function()
 
 	describe("cancelDelegateWithdrawal", function()
 		it("should cancel a withdrawal", function()
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"] =
-				{
-					delegatedStake = 0,
-					vaults = {
-						["some-previous-withdrawal-id"] = {
-							balance = 1000,
-							startTimestamp = 0,
-							endTimestamp = 1000,
-						},
+			_G.GatewayRegistry[stubGatewayAddress] = testGateway
+			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = {
+				delegatedStake = 0,
+				vaults = {
+					["some-previous-withdrawal-id"] = {
+						balance = 1000,
+						startTimestamp = 0,
+						endTimestamp = 1000,
 					},
-				}
+				},
+			}
 			local status, result = pcall(
 				gar.cancelDelegateWithdrawal,
-				"test-this-is-valid-arweave-wallet-address-2",
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubRandomAddress,
+				stubGatewayAddress,
 				"some-previous-withdrawal-id"
 			)
 			assert.is_true(status)
@@ -741,60 +1024,55 @@ describe("gar", function()
 			-- assert the vault is removed and the delegated stake is added back to the delegate
 			assert.are.equal(
 				1000, -- added back to the delegate
-				GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"].delegatedStake
+				GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress].delegatedStake
 			)
 			assert.are.equal(
 				nil,
-				GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"].vaults["some-previous-withdrawal-id"]
+				GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress].vaults["some-previous-withdrawal-id"]
 			)
-			assert.are.equal(1000, GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].totalDelegatedStake)
+			assert.are.equal(1000, GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
 		end)
 		it("should not cancel a withdrawal if the gateway does not allow staking", function()
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].settings.allowDelegatedStaking = false
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"] =
-				{
-					delegatedStake = 0,
-					vaults = {
-						["some-previous-withdrawal-id"] = {
-							balance = 1000,
-							startTimestamp = 0,
-							endTimestamp = 1000,
-						},
+			_G.GatewayRegistry[stubGatewayAddress] = testGateway
+			_G.GatewayRegistry[stubGatewayAddress].settings.allowDelegatedStaking = false
+			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = {
+				delegatedStake = 0,
+				vaults = {
+					["some-previous-withdrawal-id"] = {
+						balance = 1000,
+						startTimestamp = 0,
+						endTimestamp = 1000,
 					},
-				}
+				},
+			}
 			local status, err = pcall(
 				gar.cancelDelegateWithdrawal,
-				"test-this-is-valid-arweave-wallet-address-2",
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubRandomAddress,
+				stubGatewayAddress,
 				"some-previous-withdrawal-id"
 			)
 			assert.is_false(status)
 			assert.is_not_nil(err)
 			assert.matches("Gateway does not allow staking", err)
-			assert.are.same(
-				{
-					delegatedStake = 0,
-					vaults = {
-						["some-previous-withdrawal-id"] = {
-							balance = 1000,
-							startTimestamp = 0,
-							endTimestamp = 1000,
-						},
+			assert.are.same({
+				delegatedStake = 0,
+				vaults = {
+					["some-previous-withdrawal-id"] = {
+						balance = 1000,
+						startTimestamp = 0,
+						endTimestamp = 1000,
 					},
 				},
-				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"]
-			)
+			}, _G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress])
 		end)
 		it("should not cancel a withdrawal if the delegate does not exist", function()
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"] =
-				nil
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].settings.allowDelegatedStaking = true
+			_G.GatewayRegistry[stubGatewayAddress] = testGateway
+			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = nil
+			_G.GatewayRegistry[stubGatewayAddress].settings.allowDelegatedStaking = true
 			local status, err = pcall(
 				gar.cancelDelegateWithdrawal,
-				"test-this-is-valid-arweave-wallet-address-2",
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubRandomAddress,
+				stubGatewayAddress,
 				"some-previous-withdrawal-id"
 			)
 			assert.is_false(status)
@@ -802,18 +1080,17 @@ describe("gar", function()
 			assert.matches("Delegate does not exist", err)
 		end)
 		it("should not cancel a withdrawal if the withdrawal does not exist", function()
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"] =
-				{
-					delegatedStake = 0,
-					vaults = {},
-					startTimestamp = 0,
-				}
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].settings.allowDelegatedStaking = true
+			_G.GatewayRegistry[stubGatewayAddress] = testGateway
+			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = {
+				delegatedStake = 0,
+				vaults = {},
+				startTimestamp = 0,
+			}
+			_G.GatewayRegistry[stubGatewayAddress].settings.allowDelegatedStaking = true
 			local status, err = pcall(
 				gar.cancelDelegateWithdrawal,
-				"test-this-is-valid-arweave-wallet-address-2",
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubRandomAddress,
+				stubGatewayAddress,
 				"some-previous-withdrawal-id"
 			)
 			assert.is_false(status)
@@ -821,25 +1098,24 @@ describe("gar", function()
 			assert.matches("Vault does not exist", err)
 		end)
 		it("should not cancel a withdrawal if the gateway is leaving", function()
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].settings.allowDelegatedStaking = true
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["test-this-is-valid-arweave-wallet-address-2"] =
-				{
-					delegatedStake = 0,
-					vaults = {
-						["some-previous-withdrawal-id"] = {
-							balance = 1000,
-							startTimestamp = 0,
-							endTimestamp = 1000,
-						},
+			_G.GatewayRegistry[stubGatewayAddress] = testGateway
+			_G.GatewayRegistry[stubGatewayAddress].settings.allowDelegatedStaking = true
+			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = {
+				delegatedStake = 0,
+				vaults = {
+					["some-previous-withdrawal-id"] = {
+						balance = 1000,
+						startTimestamp = 0,
+						endTimestamp = 1000,
 					},
-					startTimestamp = 0,
-				}
-			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].status = "leaving"
+				},
+				startTimestamp = 0,
+			}
+			_G.GatewayRegistry[stubGatewayAddress].status = "leaving"
 			local status, err = pcall(
 				gar.cancelDelegateWithdrawal,
-				"test-this-is-valid-arweave-wallet-address-2",
-				"test-this-is-valid-arweave-wallet-address-1",
+				stubRandomAddress,
+				stubGatewayAddress,
 				"some-previous-withdrawal-id"
 			)
 			assert.is_false(status)
@@ -852,11 +1128,11 @@ describe("gar", function()
 		it("should return all active gateways before the timestamp", function()
 			local timestamp = 1704092400100
 			_G.GatewayRegistry = {
-				["test-this-is-valid-arweave-wallet-address-1"] = {
+				[stubGatewayAddress] = {
 					startTimestamp = timestamp - 10, -- joined before the timestamp
 					status = "joined",
 				},
-				["test-this-is-valid-arweave-wallet-address-2"] = {
+				[stubRandomAddress] = {
 					startTimestamp = timestamp + 10, -- joined after the timestamp
 					status = "joined",
 				},
@@ -867,25 +1143,25 @@ describe("gar", function()
 				},
 			}
 			local result = gar.getActiveGatewaysBeforeTimestamp(timestamp)
-			assert.are.same({ "test-this-is-valid-arweave-wallet-address-1" }, result)
+			assert.are.same({ stubGatewayAddress }, result)
 		end)
 	end)
 
 	describe("getters", function()
 		-- TODO: other tests for error conditions when joining/leaving network
 		it("should get single gateway", function()
-			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
-			local result = gar.getGateway("test-this-is-valid-arweave-wallet-address-1")
+			GatewayRegistry[stubGatewayAddress] = testGateway
+			local result = gar.getGateway(stubGatewayAddress)
 			assert.are.same(result, testGateway)
 		end)
 
 		it("should get multiple gateways", function()
-			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = testGateway
-			GatewayRegistry["test-this-is-valid-arweave-wallet-address-2"] = testGateway
+			GatewayRegistry[stubGatewayAddress] = testGateway
+			GatewayRegistry[stubRandomAddress] = testGateway
 			local result = gar.getGateways()
 			assert.are.same(result, {
-				["test-this-is-valid-arweave-wallet-address-1"] = testGateway,
-				["test-this-is-valid-arweave-wallet-address-2"] = testGateway,
+				[stubGatewayAddress] = testGateway,
+				[stubRandomAddress] = testGateway,
 			})
 		end)
 	end)

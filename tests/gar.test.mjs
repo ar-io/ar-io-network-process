@@ -24,8 +24,13 @@ describe('GatewayRegistry', async () => {
     );
   }
 
+  // Helper function to ensure all tags are in an array format
+  function normalizeTags(tags) {
+    return Array.isArray(tags) ? tags : [tags];
+  }
+
   describe('Join-Network', () => {
-    it('should allow joining of the network record', async () => {
+    it('should allow joining of the network without services and bundlers', async () => {
       const joinNetworkResult = await handle({
         Tags: validGatewayTags,
       });
@@ -74,6 +79,94 @@ describe('GatewayRegistry', async () => {
       });
     });
 
+    it('should allow joining of the network with valid services and bundlers', async () => {
+      const validGatewayTagsWithServices = [
+        ...validGatewayTags,
+        {
+          name: 'Services',
+          value: JSON.stringify({
+            bundlers: [
+              {
+                fqdn: 'bundler1.example.com',
+                port: 443,
+                protocol: 'https',
+                path: '/bundler1',
+              },
+              {
+                fqdn: 'bundler2.example.com',
+                port: 443,
+                protocol: 'https',
+                path: '/',
+              },
+            ],
+          }),
+        },
+      ];
+
+      const joinNetworkResult = await handle({
+        Tags: validGatewayTagsWithServices,
+      });
+
+      const joinNetworkData = JSON.parse(joinNetworkResult.Messages[0].Data);
+      const gateway = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Gateway' },
+            { name: 'Address', value: STUB_ADDRESS },
+          ],
+        },
+        joinNetworkResult.Memory,
+      );
+
+      const gatewayData = JSON.parse(gateway.Messages[0].Data);
+      assert.deepEqual(gatewayData, {
+        observerAddress: STUB_ADDRESS,
+        operatorStake: 50_000_000_000,
+        totalDelegatedStake: 0,
+        status: 'joined',
+        delegates: [],
+        vaults: [],
+        startTimestamp: joinNetworkData.startTimestamp,
+        settings: {
+          label: 'test-gateway',
+          note: 'test-note',
+          fqdn: 'test-fqdn',
+          port: 443,
+          protocol: 'https',
+          allowDelegatedStaking: true,
+          minDelegatedStake: 500_000_000,
+          delegateRewardShareRatio: 0,
+          properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
+          autoStake: true,
+        },
+        stats: {
+          passedConsecutiveEpochs: 0,
+          failedConsecutiveEpochs: 0,
+          totalEpochCount: 0,
+          failedEpochCount: 0,
+          passedEpochCount: 0,
+          prescribedEpochCount: 0,
+          observedEpochCount: 0,
+        },
+        services: {
+          bundlers: [
+            {
+              fqdn: 'bundler1.example.com',
+              port: 443,
+              protocol: 'https',
+              path: '/bundler1',
+            },
+            {
+              fqdn: 'bundler2.example.com',
+              port: 443,
+              protocol: 'https',
+              path: '/',
+            },
+          ],
+        },
+      });
+    });
+
     // bad inputs
     const badInputTags = [
       // invalid observer
@@ -88,25 +181,89 @@ describe('GatewayRegistry', async () => {
       [{ name: 'Min-Delegated-Stake', value: '499999999' }],
       // invalid properties
       [{ name: 'Properties', value: 'invalid' }],
+      // improperly formatted services
+      [{ name: 'Services', value: 'not-json' }],
+      // incorrect structure within services
+      {
+        name: 'Services',
+        value: JSON.stringify({
+          bundlers: 'incorrect-string', // Should be an array, not a string
+        }),
+      },
+      {
+        name: 'Services',
+        value: JSON.stringify({
+          bundlers: [
+            {
+              port: 443,
+              protocol: 'https',
+              path: '/bundler1', // Missing `fqdn`
+            },
+          ],
+        }),
+      },
+      {
+        name: 'Services',
+        value: JSON.stringify({
+          bundlers: [
+            {
+              fqdn: 'bundler1.example.com',
+              port: '443', // Incorrect data type for port
+              protocol: 'https',
+              path: '/bundler1',
+            },
+          ],
+        }),
+      },
+      {
+        name: 'Services',
+        value: JSON.stringify({
+          bundlers: [
+            {
+              fqdn: 'bundler1.example.com',
+              port: 443,
+              protocol: 'ftp', // Unsupported protocol
+              path: '/bundler1',
+            },
+          ],
+        }),
+      },
+      {
+        name: 'Services',
+        value: JSON.stringify({
+          bundlers: [
+            {
+              fqdn: 'bundler1.example.com',
+              port: 443,
+              protocol: 'https',
+              path: '/bundler1',
+              details: { active: true }, // Unexpected nested object
+            },
+          ],
+        }),
+      },
     ];
-    // for each bad input tag append it to the good tags and verify it fails
-    for (const tags of badInputTags) {
-      it(`should fail to join the network with bad input: ${JSON.stringify(tags)}`, async () => {
-        const overwriteTags = validGatewayTags.filter((tag) => {
-          return !tags.map((t) => t.name).includes(tag.name);
-        });
+    // Iterate over each set of bad input tags
+    badInputTags.forEach((tags) => {
+      const normalizedTags = normalizeTags(tags); // Ensure tags are always arrays
+
+      it(`should fail to join the network with bad input: ${JSON.stringify(normalizedTags)}`, async () => {
+        // Filter out tags from validGatewayTags that are overridden by normalizedTags
+        const overwriteTags = validGatewayTags.filter(
+          (vTag) => !normalizedTags.some((t) => t.name === vTag.name),
+        );
+
         const joinNetworkResult = await handle({
-          Tags: [...overwriteTags, ...tags],
+          Tags: [...overwriteTags, ...normalizedTags],
         });
 
-        // confirm there is an error tag
+        // Confirm there is an error tag
         const errorTag = joinNetworkResult.Messages[0].Tags.find(
           (tag) => tag.name === 'Error',
         );
-        //
         assert(errorTag, 'Error tag not found');
 
-        // confirm gateway did not join
+        // Confirm gateway did not join
         const gateway = await handle(
           {
             Tags: [
@@ -117,10 +274,11 @@ describe('GatewayRegistry', async () => {
           joinNetworkResult.Memory,
         );
         const gatewayData = JSON.parse(gateway.Messages[0].Data);
-        // assert it does not exist
+
+        // Assert gateway data does not exist
         assert.equal(gatewayData, null);
       });
-    }
+    });
   });
 
   describe('Update-Gateway-Settings', () => {
@@ -184,6 +342,124 @@ describe('GatewayRegistry', async () => {
           minDelegatedStake: 1_000_000_000,
           delegateRewardShareRatio: 10,
           properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
+        },
+        stats: {
+          passedConsecutiveEpochs: 0,
+          failedConsecutiveEpochs: 0,
+          totalEpochCount: 0,
+          failedEpochCount: 0,
+          passedEpochCount: 0,
+          prescribedEpochCount: 0,
+          observedEpochCount: 0,
+        },
+      });
+    });
+
+    it('should allow updating the gateway settings and services', async () => {
+      const validGatewayTagsWithServices = [
+        ...validGatewayTags,
+        {
+          name: 'Services',
+          value: JSON.stringify({
+            bundlers: [
+              {
+                fqdn: 'bundler1.example.com',
+                port: 443,
+                protocol: 'https',
+                path: '/bundler1',
+              },
+              {
+                fqdn: 'bundler2.example.com',
+                port: 443,
+                protocol: 'https',
+                path: '/',
+              },
+            ],
+          }),
+        },
+      ];
+      const joinNetworkResult = await handle({
+        Tags: validGatewayTagsWithServices,
+      });
+
+      const joinNetworkData = JSON.parse(joinNetworkResult.Messages[0].Data);
+
+      const updateGatewaySettingsResult = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Update-Gateway-Settings' },
+            { name: 'Label', value: 'new-label' },
+            { name: 'Note', value: 'new-note' },
+            { name: 'FQDN', value: 'new-fqdn' },
+            { name: 'Port', value: '80' },
+            { name: 'Protocol', value: 'https' },
+            { name: 'Allow-Delegated-Staking', value: 'false' },
+            { name: 'Min-Delegated-Stake', value: '1000000000' }, // 1K IO
+            { name: 'Delegate-Reward-Share-Ratio', value: '10' },
+            {
+              name: 'Properties',
+              value: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
+            },
+            { name: 'Auto-Stake', value: 'false' },
+            {
+              name: 'Services',
+              value: JSON.stringify({
+                bundlers: [
+                  {
+                    fqdn: 'updated-bundler.example.com',
+                    port: 443,
+                    protocol: 'https',
+                    path: '/newpath',
+                  },
+                ],
+              }),
+            },
+          ],
+        },
+        joinNetworkResult.Memory,
+      );
+
+      // check the gateway record from contract
+      const gateway = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Gateway' },
+            { name: 'Address', value: STUB_ADDRESS },
+          ],
+        },
+        updateGatewaySettingsResult.Memory,
+      );
+      const gatewayData = JSON.parse(gateway.Messages[0].Data);
+
+      assert.deepEqual(gatewayData, {
+        observerAddress: STUB_ADDRESS,
+        operatorStake: 50_000_000_000,
+        totalDelegatedStake: 0,
+        status: 'joined',
+        delegates: [],
+        vaults: [],
+        startTimestamp: joinNetworkData.startTimestamp,
+        settings: {
+          label: 'new-label',
+          note: 'new-note',
+          fqdn: 'new-fqdn',
+          port: 80,
+          protocol: 'https',
+          autoStake: false,
+          allowDelegatedStaking: false,
+          minDelegatedStake: 1_000_000_000,
+          delegateRewardShareRatio: 10,
+          properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
+        },
+        services: {
+          bundlers: [
+            {
+              fqdn: 'updated-bundler.example.com',
+              port: 443,
+              protocol: 'https',
+              path: '/newpath',
+            },
+          ],
         },
         stats: {
           passedConsecutiveEpochs: 0,
