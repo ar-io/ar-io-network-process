@@ -17,7 +17,7 @@ graph TD
     CheckFailedGateway -- Invalid --> Skip
     Skip --> UpdateObserverReportTxId[Update Observer Report Tx Id]
     ProcessFailedGateway -- Does not Exist --> CreateFailedGateway[Create Failed Gateway Object]
-    ProcessFailedGateway -- Exists --> UpdateFailedGateway[Update Failed Gateway Object]   
+    ProcessFailedGateway -- Exists --> UpdateFailedGateway[Update Failed Gateway Object]
     UpdateFailedGateway -- Updated --> UpdateObserverReportTxId[Update Observer Report Tx Id]
     CreateFailedGateway -- Created --> UpdateObserverReportTxId[Update Observer Report Tx Id]
     class Error redBorder

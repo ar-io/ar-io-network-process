@@ -65,7 +65,8 @@ describe('setup', () => {
       );
       assert.ok(
         handlersList.indexOf('_eval') === 2,
-        '_eval should be the third handler, got: ' + handlersList.indexOf('_eval'),
+        '_eval should be the third handler, got: ' +
+          handlersList.indexOf('_eval'),
       );
       assert.ok(
         handlersList.indexOf('_default') === 3,
@@ -74,7 +75,8 @@ describe('setup', () => {
       );
       assert.ok(
         handlersList.indexOf('prune') === 4,
-        'prune should be the fifth handler, got: ' + handlersList.indexOf('prune'),
+        'prune should be the fifth handler, got: ' +
+          handlersList.indexOf('prune'),
       );
       assert.ok(
         handlersList.length === expectedHandlerCount,
