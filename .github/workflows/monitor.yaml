@@ -3,7 +3,7 @@ name: IO Process Status
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */1 * * *' # Run every 1 hour
+    - cron: '0 0,2-23 * * *' # Run every hour except 1AM UTC
 
 jobs:
   monitor:
