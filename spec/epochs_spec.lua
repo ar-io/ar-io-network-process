@@ -494,6 +494,7 @@ describe("epochs", function()
 					},
 					prescribedNames = {},
 					distributions = {
+						totalEligibleGateways = 1,
 						totalEligibleRewards = expectedElibibleRewards,
 						totalEligibleGatewayReward = expectedTotalGatewayReward,
 						totalEligibleObserverReward = expectedTotalObserverReward,
@@ -551,6 +552,7 @@ describe("epochs", function()
 				startHeight = 0,
 				distributionTimestamp = 1704092400115,
 				distributions = {
+					totalEligibleGateways = 5,
 					totalEligibleGatewayReward = 225000000000,
 					totalEligibleObserverReward = 25000000000,
 					totalEligibleRewards = 1250000000000,
