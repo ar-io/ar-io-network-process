@@ -151,12 +151,13 @@ end, function(msg)
 	local msgId = msg.Id
 	local msgTimestamp = tonumber(msg.Timestamp)
 	print("Pruning state at timestamp: " .. msgTimestamp)
+	-- we may to be concious about deep copying here, as it could consume a large amount of memory. so long as we are pruning effectively, this should be fine
 	local previousState = {
 		Vaults = utils.deepCopy(Vaults),
 		GatewayRegistry = utils.deepCopy(GatewayRegistry),
 		NameRegistry = utils.deepCopy(NameRegistry),
 		Epochs = utils.deepCopy(Epochs),
-		-- TODO: add vaults and balances
+		Balances = utils.deepCopy(Balances),
 	}
 	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId)
 	if not status then

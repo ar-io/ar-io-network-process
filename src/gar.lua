@@ -88,22 +88,26 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 	local gatewayStakeWithdrawTimestamp = currentTimestamp + gar.getSettings().operators.withdrawLengthMs
 	local delegateEndTimestamp = currentTimestamp + gar.getSettings().delegates.withdrawLengthMs
 
-	-- Add minimum staked tokens to a vault that unlocks after the gateway completely leaves the network
-	gateway.vaults[from] = {
-		balance = math.min(gar.getSettings().operators.minStake, gateway.operatorStake),
-		startTimestamp = currentTimestamp,
-		endTimestamp = gatewayEndTimestamp,
-	}
+	local minimumStakedTokens = math.min(gar.getSettings().operators.minStake, gateway.operatorStake)
 
-	local remainingStake = gateway.operatorStake - gar.getSettings().operators.minStake
-
-	-- Add remainder to another vault
-	if remainingStake > 0 then
-		gateway.vaults[msgId] = {
-			balance = remainingStake,
+	-- if the slash happens to be 100% we do not need to vault anything
+	if minimumStakedTokens > 0 then
+		gateway.vaults[from] = {
+			balance = minimumStakedTokens,
 			startTimestamp = currentTimestamp,
-			endTimestamp = gatewayStakeWithdrawTimestamp,
+			endTimestamp = gatewayEndTimestamp,
 		}
+
+		-- if there is more than the minimum staked tokens, we need to vault the rest but on shorter term
+		local remainingStake = gateway.operatorStake - gar.getSettings().operators.minStake
+
+		if remainingStake > 0 then
+			gateway.vaults[msgId] = {
+				balance = remainingStake,
+				startTimestamp = currentTimestamp,
+				endTimestamp = gatewayStakeWithdrawTimestamp,
+			}
+		end
 	end
 
 	gateway.status = "leaving"
@@ -667,8 +671,9 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				and gateway.stats.failedConsecutiveEpochs >= garSettings.operators.failedEpochCountMax
 			then
 				-- slash 20% of the minimum operator stake and return the rest to the protocol balance, then mark the gateway as leaving
-				local slashedOperatorStake = math.min(gateway.operatorStake, garSettings.operators.minStake)
-				local slashAmount = math.floor(slashedOperatorStake * garSettings.operators.failedEpochSlashPercentage)
+				local slashableOperatorStake = math.min(gateway.operatorStake, garSettings.operators.minStake)
+				local slashAmount =
+					math.floor(slashableOperatorStake * garSettings.operators.failedEpochSlashPercentage)
 				gar.slashOperatorStake(address, slashAmount)
 				gar.leaveNetwork(address, currentTimestamp, msgId)
 				table.insert(result.slashedGateways, address)
