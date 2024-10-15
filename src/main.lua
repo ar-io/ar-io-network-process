@@ -148,6 +148,7 @@ end, function(msg)
 	local epochIndex = epochs.getEpochIndexForTimestamp(tonumber(msg.Tags.Timestamp or msg.Timestamp))
 	msg.ioEvent:addField("epochIndex", epochIndex)
 
+	local msgId = msg.Id
 	local msgTimestamp = tonumber(msg.Timestamp)
 	print("Pruning state at timestamp: " .. msgTimestamp)
 	local previousState = {
