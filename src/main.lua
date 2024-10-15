@@ -151,7 +151,7 @@ end, function(msg)
 	local msgId = msg.Id
 	local msgTimestamp = tonumber(msg.Timestamp)
 	print("Pruning state at timestamp: " .. msgTimestamp)
-	-- we may to be concious about deep copying here, as it could consume a large amount of memory. so long as we are pruning effectively, this should be fine
+	-- we need to be concious about deep copying here, as it could consume a large amount of memory. so long as we are pruning effectively, this should be fine
 	local previousState = {
 		Vaults = utils.deepCopy(Vaults),
 		GatewayRegistry = utils.deepCopy(GatewayRegistry),
@@ -171,6 +171,7 @@ end, function(msg)
 		GatewayRegistry = previousState.GatewayRegistry
 		NameRegistry = previousState.NameRegistry
 		Epochs = previousState.Epochs
+		Balances = previousState.Balances
 		msg.ioEvent:addField("TickError", tostring(resultOrError))
 		return true -- stop processing here and return
 	end
