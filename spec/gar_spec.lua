@@ -1056,6 +1056,253 @@ describe("gar", function()
 			assert.are.same(expectation, result)
 			assert.are.same(expectation, gar.getGateway(stubGatewayAddress))
 		end)
+
+		it("should decrease delegated stake with instant withdrawal and apply penalty and remove delegate", function()
+			Balances[ao.id] = 0
+			local penaltyAmount = 1000 * 0.80
+			local withdrawalAmount = 1000 - penaltyAmount
+			GatewayRegistry[stubGatewayAddress] = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = gar.getSettings().delegates.minStake + 1000,
+				vaults = {},
+				startTimestamp = startTimestamp,
+				stats = {
+					prescribedEpochCount = 0,
+					observedEpochCount = 0,
+					totalEpochCount = 0,
+					passedEpochCount = 0,
+					failedEpochCount = 0,
+					failedConsecutiveEpochs = 0,
+					passedConsecutiveEpochs = 0,
+				},
+				settings = testSettings,
+				status = "joined",
+				observerAddress = stubObserverAddress,
+				delegates = {
+					[stubRandomAddress] = {
+						delegatedStake = gar.getSettings().delegates.minStake + 1000,
+						startTimestamp = 0,
+						vaults = {},
+					},
+				},
+			}
+
+			local status, result = pcall(
+				gar.decreaseDelegateStake,
+				stubGatewayAddress,
+				stubRandomAddress,
+				1000,
+				startTimestamp,
+				stubMessageId,
+				true -- instant withdrawal
+			)
+
+			assert.is_true(status)
+			assert.are.same(result.delegates[stubRandomAddress].delegatedStake, gar.getSettings().delegates.minStake)
+			assert.are.equal(result.totalDelegatedStake, gar.getSettings().delegates.minStake)
+			assert.are.equal(withdrawalAmount, Balances[stubRandomAddress])
+			assert.are.equal(penaltyAmount, Balances[ao.id])
+			assert.are.equal(
+				gar.getSettings().delegates.minStake,
+				_G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake
+			)
+		end)
+
+		it(
+			"should successfully convert a standard delegate withdraw to instant with maximum penalty and remove delegate",
+			function()
+				-- Setup a valid gateway with a delegate vault
+				local vaultId = "vault_id_1"
+				local currentTimestamp = 1000000
+				local startTimestamp = 1000000
+				local vaultBalance = 1000
+				local expectedPenaltyRate = 0.80
+				local expectedPenaltyAmount = vaultBalance * expectedPenaltyRate
+				local expectedWithdrawalAmount = vaultBalance - expectedPenaltyAmount
+
+				Balances[ao.id] = 0
+
+				_G.GatewayRegistry[stubGatewayAddress] = {
+					operatorStake = gar.getSettings().operators.minStake + vaultBalance,
+					totalDelegatedStake = 0,
+					vaults = {},
+					delegates = {
+						[stubRandomAddress] = {
+							delegatedStake = 0,
+							startTimestamp = startTimestamp,
+							vaults = {
+								[vaultId] = {
+									balance = vaultBalance,
+									startTimestamp = startTimestamp,
+								},
+							},
+						},
+					},
+					startTimestamp = startTimestamp,
+					stats = {
+						prescribedEpochCount = 0,
+						observedEpochCount = 0,
+						totalEpochCount = 0,
+						passedEpochCount = 0,
+						failedEpochCount = 0,
+						failedConsecutiveEpochs = 0,
+						passedConsecutiveEpochs = 0,
+					},
+					settings = testSettings,
+					status = "joined",
+					observerAddress = stubObserverAddress,
+				}
+
+				local status, result = pcall(
+					gar.instantDelegateWithdrawal,
+					stubRandomAddress,
+					stubGatewayAddress,
+					vaultId,
+					currentTimestamp
+				)
+
+				assert.is_true(status)
+				assert.are.equal(nil, result.delegate) -- Delegate should be removed after full withdrawal
+				assert.are.equal(0, result.totalDelegatedStake)
+				assert.are.equal(expectedWithdrawalAmount, Balances[stubRandomAddress])
+				assert.are.equal(expectedPenaltyAmount, Balances[ao.id])
+				assert.are.equal(0, _G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
+			end
+		)
+
+		it(
+			"should withdraw delegate stake and apply reduced penalty based on elapsed time with remaining vault",
+			function()
+				-- Setup a valid gateway with a delegate vault
+				local vaultId = "vault_id_1"
+				local remainingDelegateStakeBalance = 1000
+				local startTimestamp = 500000
+				local elapsedTime = 15 * 24 * 60 * 60 * 1000 -- Half of 30 days in milliseconds
+				local currentTimestamp = startTimestamp + elapsedTime
+				local vaultBalance = 1000
+				local maxPenalty = 0.80
+				local minPenalty = 0.05
+				local penaltyRate = maxPenalty
+					- ((maxPenalty - minPenalty) * (elapsedTime / gar.getSettings().delegates.withdrawLengthMs))
+				local expectedPenaltyAmount = math.floor(vaultBalance * penaltyRate)
+				local expectedWithdrawalAmount = vaultBalance - expectedPenaltyAmount
+				Balances[ao.id] = 0
+
+				_G.GatewayRegistry[stubGatewayAddress] = {
+					operatorStake = gar.getSettings().operators.minStake,
+					totalDelegatedStake = remainingDelegateStakeBalance,
+					vaults = {},
+					delegates = {
+						[stubRandomAddress] = {
+							delegatedStake = remainingDelegateStakeBalance,
+							startTimestamp = startTimestamp,
+							vaults = {
+								[vaultId] = {
+									balance = vaultBalance,
+									startTimestamp = startTimestamp,
+								},
+							},
+						},
+					},
+					startTimestamp = startTimestamp,
+					stats = {
+						prescribedEpochCount = 0,
+						observedEpochCount = 0,
+						totalEpochCount = 0,
+						passedEpochCount = 0,
+						failedEpochCount = 0,
+						failedConsecutiveEpochs = 0,
+						passedConsecutiveEpochs = 0,
+					},
+					settings = testSettings,
+					status = "joined",
+					observerAddress = stubObserverAddress,
+				}
+
+				local status, result = pcall(
+					gar.instantDelegateWithdrawal,
+					stubRandomAddress,
+					stubGatewayAddress,
+					vaultId,
+					currentTimestamp
+				)
+
+				assert.is_true(status)
+				assert.are.equal(nil, next(result.delegate.vaults)) -- Delegate should have no vaults remaining
+				assert.are.equal(remainingDelegateStakeBalance, result.totalDelegatedStake)
+				assert.are.equal(expectedWithdrawalAmount, Balances[stubRandomAddress])
+				assert.are.equal(expectedPenaltyAmount, Balances[ao.id])
+				assert.are.equal(
+					remainingDelegateStakeBalance,
+					_G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake
+				)
+			end
+		)
+
+		it(
+			"should withdraw delegate stake and apply reduced penalty based on more elapsed time and remove delegate",
+			function()
+				-- Setup a valid gateway with a delegate vault
+				local vaultId = "vault_id_1"
+				local vaultBalance = 1000
+				local startTimestamp = 500000
+				local elapsedTime = 29 * 24 * 60 * 60 * 1000 -- Half of 30 days in milliseconds
+				local currentTimestamp = startTimestamp + elapsedTime
+				local maxPenalty = 0.80
+				local minPenalty = 0.05
+				local penaltyRate = maxPenalty
+					- ((maxPenalty - minPenalty) * (elapsedTime / gar.getSettings().delegates.withdrawLengthMs))
+				local expectedPenaltyAmount = math.floor(vaultBalance * penaltyRate)
+				local expectedWithdrawalAmount = vaultBalance - expectedPenaltyAmount
+				Balances[ao.id] = 0
+
+				_G.GatewayRegistry[stubGatewayAddress] = {
+					operatorStake = gar.getSettings().operators.minStake,
+					totalDelegatedStake = 0,
+					vaults = {},
+					delegates = {
+						[stubRandomAddress] = {
+							delegatedStake = 0,
+							startTimestamp = startTimestamp,
+							vaults = {
+								[vaultId] = {
+									balance = vaultBalance,
+									startTimestamp = startTimestamp,
+								},
+							},
+						},
+					},
+					startTimestamp = startTimestamp,
+					stats = {
+						prescribedEpochCount = 0,
+						observedEpochCount = 0,
+						totalEpochCount = 0,
+						passedEpochCount = 0,
+						failedEpochCount = 0,
+						failedConsecutiveEpochs = 0,
+						passedConsecutiveEpochs = 0,
+					},
+					settings = testSettings,
+					status = "joined",
+					observerAddress = stubObserverAddress,
+				}
+
+				local status, result = pcall(
+					gar.instantDelegateWithdrawal,
+					stubRandomAddress,
+					stubGatewayAddress,
+					vaultId,
+					currentTimestamp
+				)
+
+				assert.is_true(status)
+				assert.are.equal(nil, result.delegate) -- Delegate should be removed after full withdrawal
+				assert.are.equal(0, result.totalDelegatedStake)
+				assert.are.equal(expectedWithdrawalAmount, Balances[stubRandomAddress])
+				assert.are.equal(expectedPenaltyAmount, Balances[ao.id])
+				assert.are.equal(0, _G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
+			end
+		)
 	end)
 
 	describe("slashOperatorStake", function()

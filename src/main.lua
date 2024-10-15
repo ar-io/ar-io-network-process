@@ -82,6 +82,7 @@ local ActionMap = {
 	DelegateStake = "Delegate-Stake",
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
 	CancelDelegateWithdrawal = "Cancel-Delegate-Withdrawal",
+	InstantDelegateWithdrawal = "Instant-Delegate-Withdrawal",
 }
 
 -- Low fidelity trackers
@@ -1114,6 +1115,68 @@ addEventingHandler(
 )
 
 addEventingHandler(
+	ActionMap.InstantDelegateWithdrawal,
+	utils.hasMatchingTag("Action", ActionMap.InstantDelegateWithdrawal),
+	function(msg)
+		local checkAssertions = function()
+			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
+			assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
+		end
+
+		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-Instant-Delegate-Withdrawal-Notice", Error = "Bad-Input" },
+				Data = tostring(error),
+			})
+		end, checkAssertions)
+		if not shouldContinue then
+			return
+		end
+
+		local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
+		local fromAddress = utils.formatAddress(msg.From)
+		local vaultId = msg.Tags["Vault-Id"]
+		msg.ioEvent:addField("TargetFormatted", gatewayAddress)
+
+		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Invalid-Instant-Delegate-Withdrawal-Notice",
+					Error = "Invalid-Instant-Delegate-Withdrawal",
+				},
+				Data = tostring(error),
+			})
+		end, gar.instantDelegateWithdrawal, fromAddress, gatewayAddress, vaultId, msg.Timestamp)
+		if not shouldContinue2 then
+			return
+		end
+
+		local delegateResult = {}
+		if result ~= nil then
+			if result.delegate ~= nil then
+				delegateResult = result.delegate
+				local newStake = delegateResult.delegatedStake
+				msg.ioEvent:addField("PreviousStake", newStake - delegateResult.vaults[vaultId].balance)
+				msg.ioEvent:addField("NewStake", newStake)
+				msg.ioEvent:addField("GatewayTotalDelegatedStake", result.totalDelegatedStake)
+			end
+		end
+
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Instant-Delegate-Withdrawal-Notice",
+				Address = gatewayAddress,
+				["Vault-Id"] = msg.Tags["Vault-Id"],
+			},
+			Data = json.encode(delegateResult),
+		})
+	end
+)
+
+addEventingHandler(
 	ActionMap.DecreaseDelegateStake,
 	utils.hasMatchingTag("Action", ActionMap.DecreaseDelegateStake),
 	function(msg)
@@ -1123,6 +1186,9 @@ addEventingHandler(
 				tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
 				"Invalid quantity. Must be integer greater than 0"
 			)
+			if msg.Tags.Instant ~= nil then
+				assert(type(msg.Tags.Instant) == "boolean", "Instant must be a boolean value")
+			end
 		end
 
 		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -1139,6 +1205,7 @@ addEventingHandler(
 		local from = utils.formatAddress(msg.From)
 		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 		local quantity = tonumber(msg.Tags.Quantity)
+		local instantWithdraw = msg.Tags.Instant == true
 		msg.ioEvent:addField("TargetFormatted", target)
 
 		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
@@ -1147,7 +1214,7 @@ addEventingHandler(
 				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Invalid-Decrease-Delegate-Stake" },
 				Data = tostring(error),
 			})
-		end, gar.decreaseDelegateStake, target, from, quantity, msg.Timestamp, msg.Id)
+		end, gar.decreaseDelegateStake, target, from, quantity, msg.Timestamp, msg.Id, instantWithdraw)
 		if not shouldContinue2 then
 			return
 		end
@@ -1158,7 +1225,9 @@ addEventingHandler(
 			msg.ioEvent:addField("PreviousStake", newStake + quantity)
 			msg.ioEvent:addField("NewStake", newStake)
 			msg.ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
-
+			if msg.Tags.Instant == true then
+				msg.ioEvent:addField("InstantWithdrawal", true)
+			end
 			delegateResult = gateway.delegates[from]
 			local newDelegateVaults = delegateResult.vaults
 			if newDelegateVaults ~= nil then
