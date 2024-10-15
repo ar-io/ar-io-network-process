@@ -366,5 +366,13 @@ describe('ArNS', async () => {
     );
   });
 
+  it('should get the current demand factor', async () => {
+    const result = await handle({
+      Tags: [{ name: 'Action', value: 'Demand-Factor' }],
+    });
+    const demandFactor = JSON.parse(result.Messages[0].Data);
+    assert.equal(demandFactor, 1);
+  });
+
   // TODO: add several error scenarios
 });
