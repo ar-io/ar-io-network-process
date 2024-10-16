@@ -5,11 +5,12 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+export const PROCESS_ID = 'PROCESS_ID'.padEnd(43, '1');
 export const STUB_ADDRESS = ''.padEnd(43, '1');
 /* ao READ-ONLY Env Variables */
 export const AO_LOADER_HANDLER_ENV = {
   Process: {
-    Id: STUB_ADDRESS,
+    Id: PROCESS_ID,
     Owner: STUB_ADDRESS,
     Tags: [{ name: 'Authority', value: 'XXXXXX' }],
   },
