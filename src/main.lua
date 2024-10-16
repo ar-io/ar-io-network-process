@@ -9,10 +9,11 @@ Logo = Logo or "qUjrTmHdVjXX4D6rU6Fik02bUOzWkOR6oOqUg39g4-s"
 Denomination = 6
 DemandFactor = DemandFactor or {}
 Owner = Owner or ao.env.Process.Owner
+Protocol = Protocol or ao.env.Process.Id
 Balances = Balances or {}
-if not Balances[ao.id] then -- initialize the balance for the process id
+if not Balances[Protocol] then -- initialize the balance for the process id
 	Balances = {
-		[ao.id] = math.floor(50000000 * 1000000), -- 50M IO
+		[Protocol] = math.floor(50000000 * 1000000), -- 50M IO
 		[Owner] = math.floor(constants.totalTokenSupply - (50000000 * 1000000)), -- 950M IO
 	}
 end
@@ -1330,6 +1331,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 	local stakedSupply = 0
 	local delegatedSupply = 0
 	local withdrawSupply = 0
+	local protocolBalance = balances.getBalance(Protocol)
 	local balances = balances.getBalances()
 	for _, balance in pairs(balances) do
 		totalSupply = totalSupply + balance
@@ -1374,13 +1376,15 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 		["Staked-Supply"] = stakedSupply,
 		["Delegated-Supply"] = delegatedSupply,
 		["Withdraw-Supply"] = withdrawSupply,
+		["Protocol-Balance"] = protocolBalance,
 		Data = json.encode({
 			total = totalSupply,
 			circulating = circulatingSupply,
 			locked = lockedSupply,
 			staked = stakedSupply,
-			deleagted = delegatedSupply,
+			delegated = delegatedSupply,
 			withdrawn = withdrawSupply,
+			protocolBalance = protocolBalance,
 		}),
 	})
 end)
