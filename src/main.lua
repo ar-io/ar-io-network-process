@@ -1325,23 +1325,33 @@ addEventingHandler(
 addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Token-Supply"), function(msg)
 	-- add all the balances
 	local totalSupply = 0
+	local circulatingSupply = 0
+	local lockedSupply = 0
+	local stakedSupply = 0
+	local delegatedSupply = 0
+	local withdrawSupply = 0
 	local balances = balances.getBalances()
 	for _, balance in pairs(balances) do
 		totalSupply = totalSupply + balance
+		circulatingSupply = circulatingSupply + balance
 	end
 	-- gateways and delegates
 	local gateways = gar.getGateways()
 	for _, gateway in pairs(gateways) do
 		totalSupply = totalSupply + gateway.operatorStake + gateway.totalDelegatedStake
+		stakedSupply = stakedSupply + gateway.operatorStake
+		delegatedSupply = delegatedSupply + gateway.totalDelegatedStake
 		for _, delegate in pairs(gateway.delegates) do
 			-- check vaults
 			for _, vault in pairs(delegate.vaults) do
 				totalSupply = totalSupply + vault.balance
+				withdrawSupply = withdrawSupply + vault.balance
 			end
 		end
 		-- iterate through vaults
 		for _, vault in pairs(gateway.vaults) do
 			totalSupply = totalSupply + vault.balance
+			withdrawSupply = withdrawSupply + vault.balance
 		end
 	end
 
@@ -1351,6 +1361,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 		-- they may have several vaults iterate through them
 		for _, vault in pairs(vaultsForAddress) do
 			totalSupply = totalSupply + vault.balance
+			lockedSupply = lockedSupply + vault.balance
 		end
 	end
 
@@ -1358,7 +1369,19 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 		Target = msg.From,
 		Action = "Total-Token-Supply-Notice",
 		["Total-Token-Supply"] = totalSupply,
-		Data = json.encode(totalSupply),
+		["Circulating-Supply"] = circulatingSupply,
+		["Locked-Supply"] = lockedSupply,
+		["Staked-Supply"] = stakedSupply,
+		["Delegated-Supply"] = delegatedSupply,
+		["Withdraw-Supply"] = withdrawSupply,
+		Data = json.encode({
+			total = totalSupply,
+			circulating = circulatingSupply,
+			locked = lockedSupply,
+			staked = stakedSupply,
+			deleagted = delegatedSupply,
+			withdrawn = withdrawSupply,
+		}),
 	})
 end)
 
