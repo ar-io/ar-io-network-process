@@ -290,6 +290,7 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 		epochs.getEpochTimestampsForIndex(epochIndex)
 	local prescribedObservers, weightedGateways = epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	local prescribedNames = epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
+	local activeGateways = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
 	-- get the max rewards for each participant eligible for the epoch
 	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
 	-- create the epoch
@@ -306,6 +307,7 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 			reports = {},
 		},
 		distributions = {
+			totalEligibleGateways = utils.lengthOfTable(activeGateways),
 			totalEligibleRewards = eligibleEpochRewards.totalEligibleRewards,
 			totalEligibleGatewayReward = eligibleEpochRewards.perGatewayReward,
 			totalEligibleObserverReward = eligibleEpochRewards.perObserverReward,
