@@ -9,7 +9,7 @@ Epochs = Epochs or {}
 EpochSettings = EpochSettings
 	or {
 		pruneEpochsCount = 14, -- prune epochs older than 14 days
-		prescribedNameCount = 5,
+		prescribedNameCount = 2,
 		rewardPercentage = 0.0005, -- 0.05%
 		maxObservers = 50,
 		epochZeroStartTimestamp = 1719900000000, -- July 9th, 00:00:00 UTC
@@ -290,6 +290,7 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 		epochs.getEpochTimestampsForIndex(epochIndex)
 	local prescribedObservers, weightedGateways = epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	local prescribedNames = epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
+	local activeGateways = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
 	-- get the max rewards for each participant eligible for the epoch
 	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
 	-- create the epoch
@@ -306,6 +307,7 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 			reports = {},
 		},
 		distributions = {
+			totalEligibleGateways = utils.lengthOfTable(activeGateways),
 			totalEligibleRewards = eligibleEpochRewards.totalEligibleRewards,
 			totalEligibleGatewayReward = eligibleEpochRewards.perGatewayReward,
 			totalEligibleObserverReward = eligibleEpochRewards.perObserverReward,
@@ -627,6 +629,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 
 	-- update the epoch
 	Epochs[epochIndex] = epoch
+	return epochs.getEpoch(epochIndex)
 end
 
 -- prune epochs older than 14 days

@@ -151,12 +151,13 @@ end, function(msg)
 	local msgId = msg.Id
 	local msgTimestamp = tonumber(msg.Timestamp)
 	print("Pruning state at timestamp: " .. msgTimestamp)
+	-- we need to be concious about deep copying here, as it could consume a large amount of memory. so long as we are pruning effectively, this should be fine
 	local previousState = {
 		Vaults = utils.deepCopy(Vaults),
 		GatewayRegistry = utils.deepCopy(GatewayRegistry),
 		NameRegistry = utils.deepCopy(NameRegistry),
 		Epochs = utils.deepCopy(Epochs),
-		-- TODO: add vaults and balances
+		Balances = utils.deepCopy(Balances),
 	}
 	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId)
 	if not status then
@@ -170,6 +171,7 @@ end, function(msg)
 		GatewayRegistry = previousState.GatewayRegistry
 		NameRegistry = previousState.NameRegistry
 		Epochs = previousState.Epochs
+		Balances = previousState.Balances
 		msg.ioEvent:addField("TickError", tostring(resultOrError))
 		return true -- stop processing here and return
 	end
@@ -761,6 +763,8 @@ addEventingHandler(
 )
 
 addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.JoinNetwork), function(msg)
+	-- TODO: add assertions on all the provided input, although the joinNetwork function will throw an error if the input is invalid
+
 	local updatedSettings = {
 		label = msg.Tags.Label,
 		note = msg.Tags.Note,
@@ -773,31 +777,39 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 		properties = msg.Tags.Properties or "FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44",
 		autoStake = msg.Tags["Auto-Stake"] == "true",
 	}
-	local observerAddress = msg.Tags["Observer-Address"] or msg.Tags.From
-	msg.ioEvent:addField("Resolved-Observer-Address", observerAddress)
-	msg.ioEvent:addField("Sender-Previous-Balance", balances[msg.From])
 
-	local shouldContinue, gateway = eventingPcall(
-		msg.ioEvent,
-		function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Invalid-Join-Network-Notice", Error = "Invalid-Join-Network" },
-				Data = tostring(error),
-			})
-		end,
-		gar.joinNetwork,
-		msg.From,
-		tonumber(msg.Tags["Operator-Stake"]),
-		updatedSettings,
-		observerAddress,
-		msg.Timestamp
-	)
+	local updatedServices = utils.safeDecodeJson(msg.Tags.Services)
+
+	if msg.Tags.Services and not updatedServices then
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-Join-Network-Notice", Error = "Invalid-Join-Network-Input" },
+			Data = tostring("Failed to decode Services JSON: " .. msg.Tags.Services),
+		})
+		return
+	end
+	-- format join network and observer address
+	local fromAddress = utils.formatAddress(msg.From)
+	local observerAddress = msg.Tags["Observer-Address"] or fromAddress
+	local formattedObserverAddress = utils.formatAddress(observerAddress)
+	local stake = tonumber(msg.Tags["Operator-Stake"])
+	local timestamp = tonumber(msg.Timestamp)
+
+	msg.ioEvent:addField("Resolved-Observer-Address", formattedObserverAddress)
+	msg.ioEvent:addField("Sender-Previous-Balance", fromBalance)
+
+	local shouldContinue, gateway = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = fromAddress,
+			Tags = { Action = "Invalid-Join-Network-Notice", Error = "Invalid-Join-Network" },
+			Data = tostring(error),
+		})
+	end, gar.joinNetwork, fromAddress, stake, updatedSettings, updatedServices, formattedObserverAddress, timestamp)
 	if not shouldContinue then
 		return
 	end
 
-	msg.ioEvent:addField("Sender-New-Balance", balances[msg.From])
+	msg.ioEvent:addField("Sender-New-Balance", fromBalance)
 	if gateway ~= nil then
 		msg.ioEvent:addField("GW-Start-Timestamp", gateway.startTimestamp)
 	end
@@ -806,7 +818,7 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
 
 	ao.send({
-		Target = msg.From,
+		Target = fromAddress,
 		Tags = { Action = "Join-Network-Notice" },
 		Data = json.encode(gateway),
 	})
@@ -892,7 +904,7 @@ addEventingHandler(
 		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Invalid-Increase-Operator-Stake-Notice" },
+				Tags = { Action = "Invalid-Increase-Operator-Stake-Notice", Error = "Invalid-Increase-Operator-Stake" },
 				Data = tostring(error),
 			})
 		end, gar.increaseOperatorStake, msg.From, quantity)
@@ -1003,8 +1015,8 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 	local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = from,
-			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Invalid-Delegate-Stake", Message = error }, -- TODO: is this still right?
-			Data = json.encode(error),
+			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = tostring(error) },
+			Data = tostring(error),
 		})
 	end, gar.delegateStake, from, target, quantity, tonumber(msg.Timestamp))
 	if not shouldContinue2 then
@@ -1171,6 +1183,17 @@ addEventingHandler(
 			return
 		end
 
+		local updatedServices = utils.safeDecodeJson(msg.Tags.Services)
+
+		if msg.Tags.Services and not updatedServices then
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-Join-Network-Notice", Error = "Invalid-Join-Network-Input" },
+				Data = tostring("Failed to decode Services JSON: " .. msg.Tags.Services),
+			})
+			return
+		end
+
 		-- keep defaults, but update any new ones
 		local updatedSettings = {
 			label = msg.Tags.Label or gateway.settings.label,
@@ -1186,9 +1209,21 @@ addEventingHandler(
 			properties = msg.Tags.Properties or gateway.settings.properties,
 			autoStake = not msg.Tags["Auto-Stake"] and gateway.settings.autoStake or msg.Tags["Auto-Stake"] == "true",
 		}
+
+		-- TODO: we could standardize this on our prepended handler to inject and ensure formatted addresses and converted values
 		local observerAddress = msg.Tags["Observer-Address"] or gateway.observerAddress
-		local status, result =
-			pcall(gar.updateGatewaySettings, msg.From, updatedSettings, observerAddress, msg.Timestamp, msg.Id)
+		local formattedAddress = utils.formatAddress(msg.From)
+		local formattedObserverAddress = utils.formatAddress(observerAddress)
+		local timestamp = tonumber(msg.Timestamp)
+		local status, result = pcall(
+			gar.updateGatewaySettings,
+			formattedAddress,
+			updatedSettings,
+			updatedServices,
+			formattedObserverAddress,
+			timestamp,
+			msg.Id
+		)
 		if not status then
 			ao.send({
 				Target = msg.From,
@@ -1332,13 +1367,22 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
 	local msgTimestamp = tonumber(msg.Timestamp)
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
+	local tickedRewardDistributions = {}
+	local totalTickedRewardsDistributed = 0
 	local function tickEpoch(timestamp, blockHeight, hashchain)
 		-- update demand factor if necessary
 		local demandFactor = demand.updateDemandFactor(timestamp)
-		epochs.distributeRewardsForEpoch(timestamp)
-		local epoch = epochs.createEpoch(timestamp, tonumber(blockHeight), hashchain)
+		local distributedEpoch = epochs.distributeRewardsForEpoch(timestamp)
+		if distributedEpoch ~= nil and distributedEpoch.epochIndex ~= nil then
+			tickedRewardDistributions[tostring(distributedEpoch.epochIndex)] =
+				distributedEpoch.distributions.totalDistributedRewards
+			totalTickedRewardsDistributed = totalTickedRewardsDistributed
+				+ distributedEpoch.distributions.totalDistributedRewards
+		end
+
+		local newEpoch = epochs.createEpoch(timestamp, tonumber(blockHeight), hashchain)
 		return {
-			maybeEpoch = epoch,
+			maybeEpoch = newEpoch,
 			maybeDemandFactor = demandFactor,
 		}
 	end
@@ -1427,7 +1471,14 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	if #newDemandFactors > 0 then
 		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors, ";")
 	end
-	msg.ioEvent:printEvent()
+	if utils.lengthOfTable(tickedRewardDistributions) > 0 then
+		msg.ioEvent:addField("Ticked-Reward-Distributions", tickedRewardDistributions)
+		msg.ioEvent:addField("Total-Ticked-Rewards-Distributed", totalTickedRewardsDistributed)
+	end
+
+	local gwStats = gatewayStats()
+	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
+	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
 end)
 
 -- READ HANDLERS
