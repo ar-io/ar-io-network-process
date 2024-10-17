@@ -160,7 +160,7 @@ function gar.increaseOperatorStake(from, qty)
 	return gar.getGateway(from)
 end
 
-function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId)
+function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWithdraw)
 	assert(type(qty) == "number", "Quantity is required and must be a number")
 	assert(qty > 0, "Quantity must be greater than 0")
 
@@ -183,13 +183,27 @@ function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId)
 				.. " IO"
 		)
 	end
-
 	gateway.operatorStake = gar.getGateway(from).operatorStake - qty
-	gateway.vaults[msgId] = {
-		balance = qty,
-		startTimestamp = currentTimestamp,
-		endTimestamp = currentTimestamp + gar.getSettings().operators.withdrawLengthMs,
-	}
+
+	-- Instant withdrawal logic with penalty
+	if instantWithdraw then
+		-- Calculate the penalty amount
+		local maxPenalty = 0.80
+		local penaltyAmount = qty * maxPenalty
+		local amountToWithdraw = qty - penaltyAmount
+
+		-- Add penalty to AR.IO protocol balance
+		balances.increaseBalance(ao.id, penaltyAmount)
+
+		-- Withdraw the remaining tokens to the delegate
+		balances.increaseBalance(from, amountToWithdraw)
+	else
+		gateway.vaults[msgId] = {
+			balance = qty,
+			startTimestamp = currentTimestamp,
+			endTimestamp = currentTimestamp + gar.getSettings().operators.withdrawLengthMs,
+		}
+	end
 	-- update the gateway
 	GatewayRegistry[from] = gateway
 	return gar.getGateway(from)
@@ -832,6 +846,57 @@ function gar.instantDelegateWithdrawal(from, gatewayAddress, vaultId, currentTim
 	return {
 		delegate = gar.getGateway(gatewayAddress).delegates[from],
 		totalDelegatedStake = gateway.totalDelegatedStake,
+	}
+end
+
+function gar.instantGatewayWithdrawal(from, vaultId, currentTimestamp)
+	local gateway = gar.getGateway(from)
+	if gateway == nil then
+		error("Gateway does not exist")
+	end
+
+	local vault = gateway.vaults[vaultId]
+	if vault == nil then
+		error("Vault does not exist")
+	end
+
+	if vaultId == from then
+		error("This gateway is leaving and this vault cannot be instantly withdrawn.")
+	end
+
+	-- Calculate elapsed time since the withdrawal started
+	local elapsedTime = currentTimestamp - vault.startTimestamp
+	local totalWithdrawalTime = gar.getSettings().operators.withdrawLengthMs
+
+	-- Ensure the elapsed time is not negative
+	if elapsedTime < 0 then
+		error("Invalid elapsed time")
+	end
+
+	-- Calculate the penalty rate based on elapsed time
+	local maxPenalty = 0.80
+	local minPenalty = 0.05
+	local penaltyRate = maxPenalty - ((maxPenalty - minPenalty) * (elapsedTime / totalWithdrawalTime))
+	penaltyRate = math.max(minPenalty, math.min(maxPenalty, penaltyRate)) -- Ensure penalty is within bounds
+
+	-- Calculate the penalty amount and the amount to withdraw
+	local vaultBalance = vault.balance
+
+	local penaltyAmount = math.floor(vaultBalance * penaltyRate)
+	local amountToWithdraw = vaultBalance - penaltyAmount
+
+	-- Add penalty to AR.IO protocol balance
+	balances.increaseBalance(ao.id, penaltyAmount)
+	balances.increaseBalance(from, amountToWithdraw)
+
+	-- Remove the vault after withdrawal
+	gateway.vaults[vaultId] = nil
+
+	-- Update the gateway
+	GatewayRegistry[from] = gateway
+	return {
+		gateway = gar.getGateway(from),
+		operatorStake = gateway.operatorStake,
 	}
 end
 

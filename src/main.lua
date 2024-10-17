@@ -82,6 +82,7 @@ local ActionMap = {
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
 	CancelDelegateWithdrawal = "Cancel-Delegate-Withdrawal",
 	InstantDelegateWithdrawal = "Instant-Delegate-Withdrawal",
+	InstantOperatorWithdrawal = "Instant-Operator-Withdrawal",
 }
 
 local function eventingPcall(ioEvent, onError, fnToCall, ...)
@@ -936,6 +937,9 @@ addEventingHandler(
 				utils.isInteger(tonumber(msg.Tags.Quantity)) and tonumber(msg.Tags.Quantity) > 0,
 				"Invalid quantity. Must be integer greater than 0"
 			)
+			if msg.Tags.Instant ~= nil then
+				assert(type(msg.Tags.Instant) == "boolean", "Instant must be a boolean value")
+			end
 		end
 
 		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -950,6 +954,7 @@ addEventingHandler(
 		end
 
 		local quantity = tonumber(msg.Tags.Quantity)
+		local instantWithdraw = msg.Tags.Instant == true
 		msg.ioEvent:addField("Sender-Previous-Balance", balances[msg.From])
 
 		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
@@ -958,7 +963,7 @@ addEventingHandler(
 				Tags = { Action = "Invalid-Decrease-Operator-Stake-Notice", Error = "Invalid-Stake-Decrease" },
 				Data = tostring(error),
 			})
-		end, gar.decreaseOperatorStake, msg.From, quantity, msg.Timestamp, msg.Id)
+		end, gar.decreaseOperatorStake, msg.From, quantity, msg.Timestamp, msg.Id, instantWithdraw)
 		if not shouldContinue2 then
 			return
 		end
@@ -969,6 +974,9 @@ addEventingHandler(
 			msg.ioEvent:addField("New-Operator-Stake", gateway.operatorStake)
 			msg.ioEvent:addField("Previous-Operator-Stake", previousStake)
 			msg.ioEvent:addField("GW-Vaults-Count", utils.lengthOfTable(gateway.vaults or {}))
+			if msg.Tags.Instant == true then
+				msg.ioEvent:addField("InstantWithdrawal", true)
+			end
 			local decreaseStakeVault = gateway.vaults[msg.Id]
 			if decreaseStakeVault ~= nil then
 				previousStake = previousStake + decreaseStakeVault.balance
@@ -984,6 +992,61 @@ addEventingHandler(
 			Target = msg.From,
 			Tags = { Action = "Decrease-Operator-Stake-Notice" },
 			Data = json.encode(gateway),
+		})
+	end
+)
+
+addEventingHandler(
+	ActionMap.InstantOperatorWithdrawal,
+	utils.hasMatchingTag("Action", ActionMap.InstantOperatorWithdrawal),
+	function(msg)
+		local checkAssertions = function()
+			assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
+		end
+
+		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-Instant-Gateway-Withdrawal-Notice", Error = "Bad-Input" },
+				Data = tostring(error),
+			})
+		end, checkAssertions)
+		if not shouldContinue then
+			return
+		end
+
+		local fromAddress = utils.formatAddress(msg.From)
+		local vaultId = msg.Tags["Vault-Id"]
+		msg.ioEvent:addField("TargetFormatted", gatewayAddress)
+
+		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Invalid-Instant-Gateway-Withdrawal-Notice",
+					Error = "Invalid-Instant-Gateway-Withdrawal",
+				},
+				Data = tostring(error),
+			})
+		end, gar.instantOperataorWithdrawal, fromAddress, vaultId, msg.Timestamp)
+		if not shouldContinue2 then
+			return
+		end
+
+		local gatewayResult = {}
+		if result ~= nil then
+			if result.gateway ~= nil then
+				msg.ioEvent:addField("GatewayTotalOperatorStake", result.operatorStake)
+			end
+		end
+
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Instant-Operator-Withdrawal-Notice",
+				["Vault-Id"] = msg.Tags["Vault-Id"],
+			},
+			Data = json.encode(gatewayResult),
 		})
 	end
 )
