@@ -114,6 +114,44 @@ describe("vaults", function()
 		end)
 	end)
 
+	describe("vaultedTransfer", function()
+		it("should create a vault for the recipient", function()
+			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 100
+			_G.Balances["test-this-is-valid-arweave-wallet-address-2"] = 200
+			local from = "test-this-is-valid-arweave-wallet-address-1"
+			local recipient = "test-this-is-valid-arweave-wallet-address-2"
+			local quantity = 50
+			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
+			local timestamp = 1000000
+			local msgId = "msgId"
+			local result, vault =
+				pcall(vaults.vaultedTransfer, from, recipient, quantity, lockLengthMs, timestamp, msgId)
+			assert.is_true(result)
+			assert.is_not_nil(vault)
+			assert.are.equal(50, _G.Balances[from])
+			assert.are.same({
+				balance = 50,
+				startTimestamp = timestamp,
+				endTimestamp = timestamp + lockLengthMs,
+			}, vault)
+		end)
+
+		it("should throw an error if the sender does not have enough balance", function()
+			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 100
+			_G.Balances["test-this-is-valid-arweave-wallet-address-2"] = 200
+			local from = "test-this-is-valid-arweave-wallet-address-1"
+			local recipient = "test-this-is-valid-arweave-wallet-address-2"
+			local quantity = 150
+			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
+			local timestamp = 1000000
+			local msgId = "msgId"
+			local status, result =
+				pcall(vaults.vaultedTransfer, from, recipient, quantity, lockLengthMs, timestamp, msgId)
+			assert.is_false(status)
+			assert.match("Insufficient balance", result)
+		end)
+	end)
+
 	describe("pruneVaults", function()
 		it("should prune expired vaults and return balance to owners", function()
 			local currentTimestamp = 1000000

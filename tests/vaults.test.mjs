@@ -99,4 +99,140 @@ describe('Vaults', async () => {
       createVaultResult.startTimestamp + lockLengthMs,
     );
   });
+
+  it('should extend a vault', async () => {
+    const lockLengthMs = 1209600000;
+    const quantity = 1000000000;
+
+    const createVaultResult = await handle({
+      Tags: [
+        {
+          name: 'Action',
+          value: 'Create-Vault',
+        },
+        {
+          name: 'Quantity',
+          value: quantity.toString(),
+        },
+        {
+          name: 'Lock-Length',
+          value: lockLengthMs.toString(),
+        },
+      ],
+    });
+
+    // ensure no error
+    const errorTag = createVaultResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.deepEqual(errorTag, undefined);
+
+    const createVaultResultData = JSON.parse(
+      createVaultResult.Messages[0].Data,
+    );
+    const vaultId = createVaultResult.Messages[0].Tags.find(
+      (tag) => tag.name === 'Vault-Id',
+    ).value;
+
+    const extendVaultResult = await handle(
+      {
+        Tags: [
+          {
+            name: 'Action',
+            value: 'Extend-Vault',
+          },
+          {
+            name: 'Vault-Id',
+            value: vaultId,
+          },
+          {
+            name: 'Extend-Length',
+            value: lockLengthMs.toString(),
+          },
+        ],
+      },
+      createVaultResult.Memory
+    );
+
+    // ensure no error
+    const extendVaultErrorTag = extendVaultResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.deepEqual(extendVaultErrorTag, undefined);
+
+    const extendVaultResultData = JSON.parse(
+      extendVaultResult.Messages[0].Data,
+    );
+    assert.deepEqual(
+      extendVaultResultData.balance,
+      createVaultResultData.balance,
+      quantity,
+    );
+  });
+
+  it('should increase a vault balance', async () => {
+    const quantity = 1000000000;
+    const lockLengthMs = 1209600000;
+    const createVaultResult = await handle({
+      Tags: [
+        {
+          name: 'Action',
+          value: 'Create-Vault',
+        },
+        {
+          name: 'Quantity',
+          value: quantity.toString(),
+        },
+        {
+          name: 'Lock-Length',
+          value: lockLengthMs.toString(),
+        },
+      ],
+    });
+
+    // ensure no error
+    const errorTag = createVaultResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.deepEqual(errorTag, undefined);
+
+    const createVaultResultData = JSON.parse(
+      createVaultResult.Messages[0].Data,
+    );
+
+    const vaultId = createVaultResult.Messages[0].Tags.find(
+      (tag) => tag.name === 'Vault-Id',
+    ).value;
+
+    const increaseVaultBalanceResult = await handle({
+      Tags: [
+        {
+          name: 'Action',
+          value: 'Increase-Vault',
+        },
+        {
+          name: 'Vault-Id',
+          value: vaultId,
+        },
+        {
+          name: 'Quantity',
+          value: quantity.toString(),
+        },
+      ],
+    }, createVaultResult.Memory);
+
+    // ensure no error
+    const increaseVaultBalanceErrorTag = increaseVaultBalanceResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.deepEqual(increaseVaultBalanceErrorTag, undefined);
+
+    const increaseVaultBalanceResultData = JSON.parse(
+      increaseVaultBalanceResult.Messages[0].Data,
+    );
+    assert.deepEqual(
+      increaseVaultBalanceResultData.balance,
+      createVaultResultData.balance + quantity,
+    );
+  });
 });
