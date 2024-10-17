@@ -1225,9 +1225,7 @@ addEventingHandler(
 			msg.ioEvent:addField("PreviousStake", newStake + quantity)
 			msg.ioEvent:addField("NewStake", newStake)
 			msg.ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
-			if msg.Tags.Instant == true then
-				msg.ioEvent:addField("InstantWithdrawal", true)
-			end
+			msg.ioEvent:addField("InstantWithdrawal", insantWithdraw)
 			delegateResult = gateway.delegates[from]
 			local newDelegateVaults = delegateResult.vaults
 			if newDelegateVaults ~= nil then
