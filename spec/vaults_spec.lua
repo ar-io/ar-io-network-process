@@ -43,6 +43,48 @@ describe("vaults", function()
 		assert.match("Insufficient balance", result)
 	end)
 
+	describe("increaseVault", function()
+		it("should increase the vault", function()
+			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 200
+			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
+			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
+			local msgId = "msgId"
+			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, msgId)
+			local increaseAmount = 100
+			local currentTimestamp = vault.startTimestamp + 1000
+			local increasedVault = vaults.increaseVault(vaultOwner, increaseAmount, msgId, currentTimestamp)
+			assert.are.same(vault.balance + increaseAmount, increasedVault.balance)
+			assert.are.same(vault.startTimestamp, increasedVault.startTimestamp)
+			assert.are.same(vault.endTimestamp, increasedVault.endTimestamp)
+		end)
+
+		it("should throw an error if insufficient balance", function()
+			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 100
+			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
+			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
+			local msgId = "msgId"
+			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, msgId)
+			local increaseAmount = 101
+			local currentTimestamp = vault.startTimestamp + 1000
+			local status, result = pcall(vaults.increaseVault, vaultOwner, increaseAmount, msgId, currentTimestamp)
+			assert.is_false(status)
+			assert.match("Insufficient balance", result)
+		end)
+
+		it("should throw an error if the vault is expired", function()
+			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 200
+			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
+			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
+			local msgId = "msgId"
+			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, msgId)
+			local increaseAmount = 100
+			local currentTimestamp = vault.endTimestamp + 1
+			local status, result = pcall(vaults.increaseVault, vaultOwner, increaseAmount, msgId, currentTimestamp)
+			assert.is_false(status)
+			assert.match("This vault has ended.", result)
+		end)
+	end)
+
 	describe("extendVault", function()
 		it("should extend the vault", function()
 			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 100
