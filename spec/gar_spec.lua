@@ -529,6 +529,253 @@ describe("gar", function()
 				observerAddress = stubObserverAddress,
 			})
 		end)
+		it("should instantly withdraw operator stake with penalty", function()
+			Balances[ao.id] = 0 -- Initialize protocol balance to 0
+			Balances[stubGatewayAddress] = 0
+			local penaltyRate = 0.80
+			local penaltyAmount = 1000 * penaltyRate
+			local withdrawalAmount = 1000 - penaltyAmount
+
+			_G.GatewayRegistry[stubGatewayAddress] = {
+				operatorStake = gar.getSettings().operators.minStake + 1000,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+				startTimestamp = startTimestamp,
+				stats = {
+					prescribedEpochCount = 0,
+					observedEpochCount = 0,
+					totalEpochCount = 0,
+					passedEpochCount = 0,
+					failedEpochCount = 0,
+					failedConsecutiveEpochs = 0,
+					passedConsecutiveEpochs = 0,
+				},
+				settings = testSettings,
+				status = "joined",
+				observerAddress = stubObserverAddress,
+			}
+
+			local status, result = pcall(
+				gar.decreaseOperatorStake,
+				stubGatewayAddress,
+				1000,
+				startTimestamp,
+				stubMessageId,
+				true -- Instant withdrawal flag
+			)
+
+			assert.is_true(status)
+			assert.are.same(result.operatorStake, gar.getSettings().operators.minStake)
+			assert.are.equal(Balances[stubGatewayAddress], withdrawalAmount) -- The gateway's balance should increase with withdrawal amount
+			assert.are.equal(Balances[ao.id], penaltyAmount) -- Penalty amount should be added to protocol balance
+		end)
+
+		-- Unhappy path tests
+
+		it("should fail if attempting to withdraw more than max allowed operator stake", function()
+			_G.GatewayRegistry[stubGatewayAddress] = {
+				operatorStake = gar.getSettings().operators.minStake + 500,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+				startTimestamp = startTimestamp,
+				settings = testSettings,
+				status = "joined",
+				observerAddress = stubObserverAddress,
+			}
+
+			local status, result = pcall(
+				gar.decreaseOperatorStake,
+				stubGatewayAddress,
+				1000, -- Attempting to withdraw more than allowed
+				startTimestamp,
+				stubMessageId,
+				true
+			)
+
+			assert.is_false(status)
+			assert.matches("Resulting stake is not enough maintain the minimum operator stake", result)
+		end)
+
+		it("should fail if gateway does not exist", function()
+			local nonexistentGatewayAddress = "nonexistent_gateway"
+
+			local status, result =
+				pcall(gar.decreaseOperatorStake, nonexistentGatewayAddress, 1000, startTimestamp, stubMessageId, true)
+
+			assert.is_false(status)
+			assert.matches("Gateway does not exist", result)
+		end)
+
+		it("should fail if gateway is in 'leaving' status", function()
+			_G.GatewayRegistry[stubGatewayAddress] = {
+				operatorStake = gar.getSettings().operators.minStake + 1000,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+				startTimestamp = startTimestamp,
+				settings = testSettings,
+				status = "leaving",
+				observerAddress = stubObserverAddress,
+			}
+
+			local status, result =
+				pcall(gar.decreaseOperatorStake, stubGatewayAddress, 1000, startTimestamp, stubMessageId, true)
+
+			assert.is_false(status)
+			assert.matches("Gateway is leaving the network", result)
+		end)
+	end)
+
+	describe("instantGatewayWithdrawal", function()
+		-- Happy path test: Successful instant withdrawal with maximum penalty
+		it("should successfully withdraw instantly with maximum penalty", function()
+			-- Setup a valid gateway with a vault to withdraw from
+			local from = "gateway_address"
+			local vaultId = "vault_1"
+			local currentTimestamp = 1000000
+			local startTimestamp = 1000000
+			local vaultBalance = 1000
+			local expectedPenaltyRate = 0.80
+			local expectedPenaltyAmount = math.floor(vaultBalance * expectedPenaltyRate)
+			local expectedWithdrawalAmount = vaultBalance - expectedPenaltyAmount
+
+			-- Initialize balances
+			Balances[ao.id] = 0
+			Balances[from] = 0
+
+			_G.GatewayRegistry[from] = {
+				operatorStake = 2000,
+				vaults = {
+					[vaultId] = {
+						balance = vaultBalance,
+						startTimestamp = startTimestamp,
+					},
+				},
+			}
+
+			-- Attempt to withdraw instantly
+			local status, result = pcall(gar.instantGatewayWithdrawal, from, vaultId, currentTimestamp)
+
+			-- Assertions
+			assert.is_true(status)
+			assert.are.same(result.gateway.vaults[vaultId], nil) -- Vault should be removed after withdrawal
+			assert.are.equal(Balances[from], expectedWithdrawalAmount) -- Withdrawal amount should be added to gateway balance
+			assert.are.equal(Balances[ao.id], expectedPenaltyAmount) -- Penalty should be added to protocol balance
+		end)
+
+		-- Happy path test: Successful instant withdrawal with reduced penalty
+		it("should successfully withdraw instantly with reduced penalty after partial time elapsed", function()
+			-- Setup a valid gateway with a vault to withdraw from
+			local from = "gateway_address"
+			local vaultId = "vault_1"
+			local startTimestamp = 1000000
+			local currentTimestamp = startTimestamp + (gar.getSettings().operators.withdrawLengthMs / 2) -- Halfway through the withdrawal period
+			local vaultBalance = 1000
+			local maxPenalty = 0.80
+			local minPenalty = 0.05
+			local expectedPenaltyRate = maxPenalty - ((maxPenalty - minPenalty) * 0.5) -- 50% elapsed time
+			local expectedPenaltyAmount = math.floor(vaultBalance * expectedPenaltyRate)
+			local expectedWithdrawalAmount = vaultBalance - expectedPenaltyAmount
+
+			-- Initialize balances
+			Balances[ao.id] = 0
+			Balances[from] = 0
+
+			_G.GatewayRegistry[from] = {
+				operatorStake = 2000,
+				vaults = {
+					[vaultId] = {
+						balance = vaultBalance,
+						startTimestamp = startTimestamp,
+					},
+				},
+			}
+
+			-- Attempt to withdraw instantly
+			local status, result = pcall(gar.instantGatewayWithdrawal, from, vaultId, currentTimestamp)
+
+			-- Assertions
+			assert.is_true(status)
+			assert.are.same(result.gateway.vaults[vaultId], nil) -- Vault should be removed after withdrawal
+			assert.are.equal(Balances[from], expectedWithdrawalAmount) -- Withdrawal amount should be added to gateway balance
+			assert.are.equal(Balances[ao.id], expectedPenaltyAmount) -- Penalty should be added to protocol balance
+		end)
+
+		-- Unhappy path test: Gateway does not exist
+		it("should fail if the gateway does not exist", function()
+			local nonexistentGateway = "nonexistent_gateway"
+			local vaultId = "vault_1"
+			local currentTimestamp = 1000000
+
+			local status, result = pcall(gar.instantGatewayWithdrawal, nonexistentGateway, vaultId, currentTimestamp)
+
+			assert.is_false(status)
+			assert.matches("Gateway does not exist", result)
+		end)
+
+		-- Unhappy path test: Vault does not exist
+		it("should fail if the vault does not exist", function()
+			local from = "gateway_address"
+			local nonexistentVaultId = "nonexistent_vault"
+			local currentTimestamp = 1000000
+
+			_G.GatewayRegistry[from] = {
+				operatorStake = 2000,
+				vaults = {},
+			}
+
+			local status, result = pcall(gar.instantGatewayWithdrawal, from, nonexistentVaultId, currentTimestamp)
+
+			assert.is_false(status)
+			assert.matches("Vault does not exist", result)
+		end)
+
+		-- Unhappy path test: Withdrawal from leaving gateway
+		it("should fail if trying to withdraw from a vault while gateway is leaving", function()
+			local from = "gateway_address"
+			local vaultId = from -- Special vault ID representing the leaving status
+			local currentTimestamp = 1000000
+
+			_G.GatewayRegistry[from] = {
+				operatorStake = 2000,
+				vaults = {
+					[vaultId] = {
+						balance = 1000,
+						startTimestamp = 1000000,
+					},
+				},
+			}
+
+			local status, result = pcall(gar.instantGatewayWithdrawal, from, vaultId, currentTimestamp)
+
+			assert.is_false(status)
+			assert.matches("This gateway is leaving and this vault cannot be instantly withdrawn.", result)
+		end)
+
+		-- Unhappy path test: Invalid elapsed time
+		it("should fail if elapsed time is negative", function()
+			local from = "gateway_address"
+			local vaultId = "vault_1"
+			local startTimestamp = 1000000
+			local currentTimestamp = startTimestamp - 1 -- Negative elapsed time
+
+			_G.GatewayRegistry[from] = {
+				operatorStake = 2000,
+				vaults = {
+					[vaultId] = {
+						balance = 1000,
+						startTimestamp = startTimestamp,
+					},
+				},
+			}
+
+			local status, result = pcall(gar.instantGatewayWithdrawal, from, vaultId, currentTimestamp)
+
+			assert.is_false(status)
+			assert.matches("Invalid elapsed time", result)
+		end)
 	end)
 
 	describe("updateGatewaySettings", function()
