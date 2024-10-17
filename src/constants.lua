@@ -32,10 +32,11 @@ constants.demandSettings = {
 	criteria = "revenue",
 }
 
--- BALANCES
-constants.MAX_TOKEN_LOCK_TIME = 12 * 365 * 24 * 60 * 60 * 1000 -- The maximum amount of blocks tokens can be locked in a vault (12 years of blocks)
-constants.MIN_TOKEN_LOCK_TIME = 14 * 24 * 60 * 60 * 1000 -- The minimum amount of blocks tokens can be locked in a vault (14 days of blocks)
+-- VAULTS
+constants.MAX_TOKEN_LOCK_TIME_MS = 12 * 365 * 24 * 60 * 60 * 1000 -- The maximum amount of blocks tokens can be locked in a vault (12 years of blocks)
+constants.MIN_TOKEN_LOCK_TIME_MS = 14 * 24 * 60 * 60 * 1000 -- The minimum amount of blocks tokens can be locked in a vault (14 days of blocks)
 
+-- ARNS FEES
 constants.genesisFees = {
 	[1] = 2000000000000,
 	[2] = 200000000000,

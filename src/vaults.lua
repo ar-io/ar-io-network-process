@@ -5,19 +5,18 @@ local vaults = {}
 local balances = require("balances")
 local utils = require("utils")
 local constants = require("constants")
-local json = require("json")
 
-function vaults.createVault(from, qty, lockLength, currentTimestamp, msgId)
+function vaults.createVault(from, qty, lockLengthMs, currentTimestamp, msgId)
 	if vaults.getVault(from, msgId) then
 		error("Vault with id " .. msgId .. " already exists")
 	end
 
-	if lockLength < constants.MIN_TOKEN_LOCK_TIME or lockLength > constants.MAX_TOKEN_LOCK_TIME then
+	if lockLengthMs < constants.MIN_TOKEN_LOCK_TIME_MS or lockLengthMs > constants.MAX_TOKEN_LOCK_TIME_MS then
 		error(
 			"Invalid lock length. Must be between "
-				.. constants.MIN_TOKEN_LOCK_TIME
-				.. " and "
-				.. constants.MAX_TOKEN_LOCK_TIME
+				.. constants.MIN_TOKEN_LOCK_TIME_MS
+				.. " - "
+				.. constants.MAX_TOKEN_LOCK_TIME_MS
 				.. " ms"
 		)
 	end
@@ -26,12 +25,12 @@ function vaults.createVault(from, qty, lockLength, currentTimestamp, msgId)
 	vaults.setVault(from, msgId, {
 		balance = qty,
 		startTimestamp = currentTimestamp,
-		endTimestamp = currentTimestamp + lockLength,
+		endTimestamp = currentTimestamp + lockLengthMs,
 	})
 	return vaults.getVault(from, msgId)
 end
 
-function vaults.vaultedTransfer(from, recipient, qty, lockLength, currentTimestamp, msgId)
+function vaults.vaultedTransfer(from, recipient, qty, lockLengthMs, currentTimestamp, msgId)
 	if balances.getBalance(from) < qty then
 		error("Insufficient balance")
 	end
@@ -42,12 +41,13 @@ function vaults.vaultedTransfer(from, recipient, qty, lockLength, currentTimesta
 		error("Vault with id " .. msgId .. " already exists")
 	end
 
-	if lockLength < constants.MIN_TOKEN_LOCK_TIME or lockLength > constants.MAX_TOKEN_LOCK_TIME then
+	if lockLengthMs < constants.MIN_TOKEN_LOCK_TIME_MS or lockLengthMs > constants.MAX_TOKEN_LOCK_TIME_MS then
 		error(
 			"Invalid lock length. Must be between "
-				.. constants.MIN_TOKEN_LOCK_TIME
+				.. constants.MIN_TOKEN_LOCK_TIME_MS
 				.. " - "
-				.. constants.MAX_TOKEN_LOCK_TIME
+				.. constants.MAX_TOKEN_LOCK_TIME_MS
+				.. " ms"
 		)
 	end
 
@@ -55,38 +55,39 @@ function vaults.vaultedTransfer(from, recipient, qty, lockLength, currentTimesta
 	vaults.setVault(recipient, msgId, {
 		balance = qty,
 		startTimestamp = currentTimestamp,
-		endTimestamp = currentTimestamp + lockLength,
+		endTimestamp = currentTimestamp + lockLengthMs,
 	})
-
 	return vaults.getVault(recipient, msgId)
 end
 
-function vaults.extendVault(from, extendLength, currentTimestamp, vaultId)
+function vaults.extendVault(from, extendLengthMs, currentTimestamp, vaultId)
 	local vault = vaults.getVault(from, vaultId)
 
 	if not vault then
-		error("Invalid vault ID.")
+		error("Vault not found.")
 	end
 
 	if currentTimestamp >= vault.endTimestamp then
 		error("This vault has ended.")
 	end
 
+	if extendLengthMs <= 0 then
+		error("Invalid extend length. Must be a positive number.")
+	end
+
 	local totalTimeRemaining = vault.endTimestamp - currentTimestamp
-	if
-		extendLength < constants.MIN_TOKEN_LOCK_BLOCK_LENGTH
-		or extendLength > constants.MAX_TOKEN_LOCK_BLOCK_LENGTH
-		or totalTimeRemaining + extendLength > constants.MAX_TOKEN_LOCK_BLOCK_LENGTH
-	then
+	local totalTimeRemainingWithExtension = totalTimeRemaining + extendLengthMs
+	if totalTimeRemainingWithExtension > constants.MAX_TOKEN_LOCK_TIME_MS then
 		error(
-			"Invalid lock length. Must be between "
-				.. constants.MIN_TOKEN_LOCK_TIME
-				.. " - "
-				.. constants.MAX_TOKEN_LOCK_TIME
+			"Invalid vault extension. Total lock time cannot be greater than "
+				.. constants.MAX_TOKEN_LOCK_TIME_MS
+				.. " ms"
 		)
 	end
 
-	vault.endTimestamp = vault.endTimestamp + extendLength
+	vault.endTimestamp = vault.endTimestamp + extendLengthMs
+	-- update the vault
+	Vaults[from][vaultId] = vault
 	return vaults.getVault(from, vaultId)
 end
 
@@ -98,7 +99,7 @@ function vaults.increaseVault(from, qty, vaultId, currentTimestamp)
 	local vault = vaults.getVault(from, vaultId)
 
 	if not vault then
-		error("Invalid vault ID.")
+		error("Vault not found.")
 	end
 
 	if currentTimestamp >= vault.endTimestamp then
@@ -107,6 +108,8 @@ function vaults.increaseVault(from, qty, vaultId, currentTimestamp)
 
 	balances.reduceBalance(from, qty)
 	vault.balance = vault.balance + qty
+	-- update the vault
+	Vaults[from][vaultId] = vault
 	return vaults.getVault(from, vaultId)
 end
 
@@ -130,6 +133,7 @@ function vaults.setVault(target, id, vault)
 	end
 	-- set the vault
 	Vaults[target][id] = vault
+	return vault
 end
 
 -- return any vaults to owners that have expired

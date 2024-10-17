@@ -59,7 +59,8 @@ describe('Tick', async () => {
     });
 
     // mock the passage of time and tick with a future timestamp
-    const futureTimestamp = buyRecordData.endTimestamp + 1000 * 60 * 60 * 24 * 14 + 1;
+    const futureTimestamp =
+      buyRecordData.endTimestamp + 1000 * 60 * 60 * 24 * 14 + 1;
     const futureTickResult = await handle(
       {
         Tags: [
@@ -70,7 +71,11 @@ describe('Tick', async () => {
       buyRecordResult.Memory,
     );
 
-    const tickEvent = JSON.parse(futureTickResult.Output.data.split('\n').filter((line) => line.includes('_e'))[0]);
+    const tickEvent = JSON.parse(
+      futureTickResult.Output.data
+        .split('\n')
+        .filter((line) => line.includes('_e'))[0],
+    );
     assert.equal(tickEvent['Records-Count'], 0);
     assert.equal(tickEvent['Pruned-Records-Count'], 1);
     assert.deepEqual(tickEvent['Pruned-Records'], ['test-name']);
