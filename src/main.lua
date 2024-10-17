@@ -1205,7 +1205,7 @@ addEventingHandler(
 		local from = utils.formatAddress(msg.From)
 		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 		local quantity = tonumber(msg.Tags.Quantity)
-		local instantWithdraw = msg.Tags.Instant == true
+		local instantWithdraw = msg.Tags.Instant and msg.Tags.Instant == "true"
 		msg.ioEvent:addField("TargetFormatted", target)
 
 		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
