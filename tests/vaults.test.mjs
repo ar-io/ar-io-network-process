@@ -283,7 +283,7 @@ describe('Vaults', async () => {
 
       const senderMessage = createVaultedTransferResult.Messages.find((msg) =>
         msg.Tags.find(
-          (tag) => tag.name === 'Action' && tag.value === 'Credit-Notice',
+          (tag) => tag.name === 'Action' && tag.value === 'Debit-Notice',
         ),
       );
 
@@ -293,9 +293,10 @@ describe('Vaults', async () => {
       const recipientMessage = createVaultedTransferResult.Messages.find(
         (msg) =>
           msg.Tags.find(
-            (tag) => tag.name === 'Action' && tag.value === 'Create-Vault-Notice',
+            (tag) =>
+              tag.name === 'Action' && tag.value === 'Create-Vault-Notice',
           ),
-      );  
+      );
 
       assert.ok(recipientMessage);
 
@@ -304,7 +305,7 @@ describe('Vaults', async () => {
       ).value;
 
       // ensure vault id is defined
-      assert.ok(vaultId)
+      assert.ok(vaultId);
 
       const vault = await handle(
         {

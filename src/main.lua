@@ -399,12 +399,12 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 			Data = tostring(err),
 		})
 	else
-		-- sender gets an immediate credit notice
+		-- sender gets an immediate debit notice as the quantity is debited from their balance
 		ao.send({
 			Target = from,
 			Recipient = recipient,
 			Quantity = quantity,
-			Tags = { Action = "Credit-Notice", ["Vault-Id"] = msgId },
+			Tags = { Action = "Debit-Notice", ["Vault-Id"] = msgId },
 			Data = json.encode(result),
 		})
 		-- to the receiver, they get a vault notice
