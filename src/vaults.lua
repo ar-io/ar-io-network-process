@@ -71,7 +71,7 @@ function vaults.extendVault(from, extendLengthMs, currentTimestamp, vaultId)
 		error("This vault has ended.")
 	end
 
-	if extendLengthMs < 0 then
+	if extendLengthMs <= 0 then
 		error("Invalid extend length. Must be a positive number.")
 	end
 
@@ -99,7 +99,7 @@ function vaults.increaseVault(from, qty, vaultId, currentTimestamp)
 	local vault = vaults.getVault(from, vaultId)
 
 	if not vault then
-		error("Invalid vault ID.")
+		error("Vault not found.")
 	end
 
 	if currentTimestamp >= vault.endTimestamp then

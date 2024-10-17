@@ -67,6 +67,28 @@ describe("vaults", function()
 			)
 			assert.is_false(status)
 		end)
+
+		it("should throw an error if the vault already exists", function()
+			local status, result = pcall(
+				vaults.createVault,
+				"test-this-is-valid-arweave-wallet-address-1",
+				100,
+				constants.MIN_TOKEN_LOCK_TIME_MS,
+				startTimestamp,
+				"msgId"
+			)
+			assert.is_true(status)
+			local status, result = pcall(
+				vaults.createVault,
+				"test-this-is-valid-arweave-wallet-address-1",
+				100,
+				constants.MIN_TOKEN_LOCK_TIME_MS,
+				startTimestamp,
+				"msgId"
+			)
+			assert.is_false(status)
+			assert.match("Vault with id msgId already exists", result)
+		end)
 	end)
 
 	describe("increaseVault", function()
@@ -108,6 +130,14 @@ describe("vaults", function()
 			local status, result = pcall(vaults.increaseVault, vaultOwner, increaseAmount, msgId, currentTimestamp)
 			assert.is_false(status)
 			assert.match("This vault has ended.", result)
+		end)
+
+		it("should throw an error if the vault does not exist", function()
+			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
+			local vaultId = "msgId"
+			local status, result = pcall(vaults.increaseVault, vaultOwner, 100, vaultId, startTimestamp)
+			assert.is_false(status)
+			assert.match("Vault not found", result)
 		end)
 	end)
 
@@ -155,6 +185,27 @@ describe("vaults", function()
 					.. " ms",
 				result
 			)
+		end)
+
+		it("should throw an error if the vault does not exist", function()
+			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
+			local vaultId = "msgId"
+			local status, result = pcall(vaults.extendVault, vaultOwner, 100, startTimestamp, vaultId)
+			assert.is_false(status)
+			assert.match("Vault not found", result)
+		end)
+
+		it("should throw an error if the extend length is less than or equal to 0", function()
+			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 100
+			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
+			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
+			local msgId = "msgId"
+			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, msgId)
+			local extendLengthMs = 0
+			local currentTimestamp = vault.startTimestamp + 1000
+			local status, result = pcall(vaults.extendVault, vaultOwner, extendLengthMs, currentTimestamp, msgId)
+			assert.is_false(status)
+			assert.match("Invalid extend length. Must be a positive number.", result)
 		end)
 	end)
 
