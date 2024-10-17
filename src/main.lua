@@ -391,6 +391,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 	local msgId = msg.Id
 
 	local result, err = vaults.vaultedTransfer(from, recipient, quantity, lockLengthMs, timestamp, msgId)
+	print("Created vault" .. json.encode(Vaults[recipient]))
 	if err then
 		ao.send({
 			Target = msg.From,
@@ -398,16 +399,20 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 			Data = tostring(err),
 		})
 	else
+		-- sender gets an immediate credit notice
 		ao.send({
-			Target = msg.From,
-			Recipient = msg.Tags.Recipient,
-			Quantity = msg.Tags.Quantity,
-			Tags = { Action = "Vaulted-Debit-Notice" },
+			Target = from,
+			Recipient = recipient,
+			Quantity = quantity,
+			Tags = { Action = "Credit-Notice", ["Vault-Id"] = msgId },
 			Data = json.encode(result),
 		})
+		-- to the receiver, they get a vault notice
 		ao.send({
-			Target = msg.Tags.Recipient,
-			Tags = { Action = "Vaulted-Credit-Notice" },
+			Target = recipient,
+			Quantity = quantity,
+			Sender = from,
+			Tags = { Action = "Create-Vault-Notice", ["Vault-Id"] = msgId },
 			Data = json.encode(result),
 		})
 	end

@@ -1,8 +1,4 @@
-import {
-  AOProcess,
-  IO,
-  IO_TESTNET_PROCESS_ID,
-} from '@ar.io/sdk';
+import { AOProcess, IO, IO_TESTNET_PROCESS_ID } from '@ar.io/sdk';
 import { connect } from '@permaweb/aoconnect';
 import { strict as assert } from 'node:assert';
 import { describe, it, before, after } from 'node:test';
@@ -64,7 +60,8 @@ describe('setup', () => {
       );
       assert.ok(
         handlersList.indexOf('_eval') === 2,
-        '_eval should be the third handler, got: ' + handlersList.indexOf('_eval'),
+        '_eval should be the third handler, got: ' +
+          handlersList.indexOf('_eval'),
       );
       assert.ok(
         handlersList.indexOf('_default') === 3,
@@ -73,7 +70,8 @@ describe('setup', () => {
       );
       assert.ok(
         handlersList.indexOf('prune') === 4,
-        'prune should be the fifth handler, got: ' + handlersList.indexOf('prune'),
+        'prune should be the fifth handler, got: ' +
+          handlersList.indexOf('prune'),
       );
       assert.ok(
         handlersList.length === expectedHandlerCount,
@@ -248,19 +246,29 @@ describe('setup', () => {
             assert(gateway.operatorStake === 0);
             for (const [vaultId, vault] of Object.entries(gateway.vaults)) {
               if (vaultId === gateway.gatewayAddress) {
-                  assert(
+                assert(
                   vault.balance <= 50_000_000_000,
                   `Gateway ${gateway.gatewayAddress} is leaving with invalid amount of IO vaulted against the wallet address (${gateway.vaults?.[gateway.gatewayAddress]?.balance}). Any stake higher than the minimum staked amount of 50_000_000_000 IO should be vaulted against the message id.`,
                 );
                 assert(
-                  vault.endTimestamp === vault.startTimestamp + 1000 * 60 * 60 * 24 * 90,
+                  vault.endTimestamp ===
+                    vault.startTimestamp + 1000 * 60 * 60 * 24 * 90,
                   `Vault ${vaultId} has an invalid end timestamp (${vault.endTimestamp}).`,
                 );
               }
               // assert vault balance is greater than 0 and startTimestamp and endTimestamp are valid timestamps 30 days apart
-              assert(vault.balance >= 0, `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid balance (${vault.balance})`); 
-              assert(vault.startTimestamp > 0, `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid start timestamp (${vault.startTimestamp})`);
-              assert(vault.endTimestamp > 0, `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`);
+              assert(
+                vault.balance >= 0,
+                `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid balance (${vault.balance})`,
+              );
+              assert(
+                vault.startTimestamp > 0,
+                `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid start timestamp (${vault.startTimestamp})`,
+              );
+              assert(
+                vault.endTimestamp > 0,
+                `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`,
+              );
             }
           }
         }

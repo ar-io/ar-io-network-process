@@ -3,7 +3,7 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true,
     "editor.formatOnPaste": true,
-    "editor.formatOnSaveMode": "file",
+    "editor.formatOnSaveMode": "file"
   },
   "prettier.configPath": ".prettierrc",
   "prettier.prettierPath": "./node_modules/prettier/index.cjs",
@@ -32,5 +32,5 @@
     "editor.formatOnSave": true,
     "editor.formatOnPaste": true,
     "editor.formatOnSaveMode": "file"
-  },
+  }
 }
