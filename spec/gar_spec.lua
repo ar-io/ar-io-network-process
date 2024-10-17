@@ -1,3 +1,4 @@
+local constants = require("constants")
 local gar = require("gar")
 local utils = require("utils")
 
@@ -1059,8 +1060,8 @@ describe("gar", function()
 
 		it("should decrease delegated stake with instant withdrawal and apply penalty and remove delegate", function()
 			Balances[ao.id] = 0
-			local penaltyAmount = 1000 * 0.80
-			local withdrawalAmount = 1000 - penaltyAmount
+			local expenditedWithdrawalFee = 1000 * 0.80
+			local withdrawalAmount = 1000 - expenditedWithdrawalFee
 			GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = gar.getSettings().delegates.minStake + 1000,
@@ -1101,7 +1102,7 @@ describe("gar", function()
 			assert.are.same(result.delegates[stubRandomAddress].delegatedStake, gar.getSettings().delegates.minStake)
 			assert.are.equal(result.totalDelegatedStake, gar.getSettings().delegates.minStake)
 			assert.are.equal(withdrawalAmount, Balances[stubRandomAddress])
-			assert.are.equal(penaltyAmount, Balances[ao.id])
+			assert.are.equal(expenditedWithdrawalFee, Balances[ao.id])
 			assert.are.equal(
 				gar.getSettings().delegates.minStake,
 				_G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake
@@ -1116,9 +1117,9 @@ describe("gar", function()
 				local currentTimestamp = 1000000
 				local startTimestamp = 1000000
 				local vaultBalance = 1000
-				local expectedPenaltyRate = 0.80
-				local expectedPenaltyAmount = vaultBalance * expectedPenaltyRate
-				local expectedWithdrawalAmount = vaultBalance - expectedPenaltyAmount
+				local expectedPenaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+				local expectedexpenditedWithdrawalFee = vaultBalance * expectedPenaltyRate
+				local expectedWithdrawalAmount = vaultBalance - expectedexpenditedWithdrawalFee
 
 				Balances[ao.id] = 0
 
@@ -1165,7 +1166,7 @@ describe("gar", function()
 				assert.are.equal(nil, result.delegate) -- Delegate should be removed after full withdrawal
 				assert.are.equal(0, result.totalDelegatedStake)
 				assert.are.equal(expectedWithdrawalAmount, Balances[stubRandomAddress])
-				assert.are.equal(expectedPenaltyAmount, Balances[ao.id])
+				assert.are.equal(expectedexpenditedWithdrawalFee, Balances[ao.id])
 				assert.are.equal(0, _G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
 			end
 		)
@@ -1180,12 +1181,13 @@ describe("gar", function()
 				local elapsedTime = 15 * 24 * 60 * 60 * 1000 -- Half of 30 days in milliseconds
 				local currentTimestamp = startTimestamp + elapsedTime
 				local vaultBalance = 1000
-				local maxPenalty = 0.80
-				local minPenalty = 0.05
-				local penaltyRate = maxPenalty
-					- ((maxPenalty - minPenalty) * (elapsedTime / gar.getSettings().delegates.withdrawLengthMs))
-				local expectedPenaltyAmount = math.floor(vaultBalance * penaltyRate)
-				local expectedWithdrawalAmount = vaultBalance - expectedPenaltyAmount
+				local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+					- (
+						(constants.MAX_EXPEDITED_WITHDRAWAL_FEE - constants.MIN_EXPEDITED_WITHDRAWAL_FEE)
+						* (elapsedTime / gar.getSettings().delegates.withdrawLengthMs)
+					)
+				local expectedexpenditedWithdrawalFee = math.floor(vaultBalance * penaltyRate)
+				local expectedWithdrawalAmount = vaultBalance - expectedexpenditedWithdrawalFee
 				Balances[ao.id] = 0
 
 				_G.GatewayRegistry[stubGatewayAddress] = {
@@ -1231,7 +1233,7 @@ describe("gar", function()
 				assert.are.equal(nil, next(result.delegate.vaults)) -- Delegate should have no vaults remaining
 				assert.are.equal(remainingDelegateStakeBalance, result.totalDelegatedStake)
 				assert.are.equal(expectedWithdrawalAmount, Balances[stubRandomAddress])
-				assert.are.equal(expectedPenaltyAmount, Balances[ao.id])
+				assert.are.equal(expectedexpenditedWithdrawalFee, Balances[ao.id])
 				assert.are.equal(
 					remainingDelegateStakeBalance,
 					_G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake
@@ -1248,12 +1250,13 @@ describe("gar", function()
 				local startTimestamp = 500000
 				local elapsedTime = 29 * 24 * 60 * 60 * 1000 -- Half of 30 days in milliseconds
 				local currentTimestamp = startTimestamp + elapsedTime
-				local maxPenalty = 0.80
-				local minPenalty = 0.05
-				local penaltyRate = maxPenalty
-					- ((maxPenalty - minPenalty) * (elapsedTime / gar.getSettings().delegates.withdrawLengthMs))
-				local expectedPenaltyAmount = math.floor(vaultBalance * penaltyRate)
-				local expectedWithdrawalAmount = vaultBalance - expectedPenaltyAmount
+				local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+					- (
+						(constants.MAX_EXPEDITED_WITHDRAWAL_FEE - constants.MIN_EXPEDITED_WITHDRAWAL_FEE)
+						* (elapsedTime / gar.getSettings().delegates.withdrawLengthMs)
+					)
+				local expectedexpenditedWithdrawalFee = math.floor(vaultBalance * penaltyRate)
+				local expectedWithdrawalAmount = vaultBalance - expectedexpenditedWithdrawalFee
 				Balances[ao.id] = 0
 
 				_G.GatewayRegistry[stubGatewayAddress] = {
@@ -1299,7 +1302,7 @@ describe("gar", function()
 				assert.are.equal(nil, result.delegate) -- Delegate should be removed after full withdrawal
 				assert.are.equal(0, result.totalDelegatedStake)
 				assert.are.equal(expectedWithdrawalAmount, Balances[stubRandomAddress])
-				assert.are.equal(expectedPenaltyAmount, Balances[ao.id])
+				assert.are.equal(expectedexpenditedWithdrawalFee, Balances[ao.id])
 				assert.are.equal(0, _G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
 			end
 		)

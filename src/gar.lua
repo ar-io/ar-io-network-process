@@ -1,5 +1,6 @@
 -- gar.lua
 local balances = require("balances")
+local constants = require("constants")
 local utils = require("utils")
 local gar = {}
 
@@ -376,12 +377,11 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 		gateway.totalDelegatedStake = gateway.totalDelegatedStake - qty
 
 		-- Calculate the penalty amount
-		local maxPenalty = 0.80
-		local penaltyAmount = qty * maxPenalty
-		local amountToWithdraw = qty - penaltyAmount
+		local expenditedWithdrawalFee = qty * constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+		local amountToWithdraw = qty - expenditedWithdrawalFee
 
 		-- Add penalty to AR.IO protocol balance
-		balances.increaseBalance(ao.id, penaltyAmount)
+		balances.increaseBalance(ao.id, expenditedWithdrawalFee)
 
 		-- Withdraw the remaining tokens to the delegate
 		balances.increaseBalance(delegator, amountToWithdraw)
@@ -804,19 +804,22 @@ function gar.instantDelegateWithdrawal(from, gatewayAddress, vaultId, currentTim
 	end
 
 	-- Calculate the penalty rate based on elapsed time
-	local maxPenalty = 0.80
-	local minPenalty = 0.05
-	local penaltyRate = maxPenalty - ((maxPenalty - minPenalty) * (elapsedTime / totalWithdrawalTime))
-	penaltyRate = math.max(minPenalty, math.min(maxPenalty, penaltyRate)) -- Ensure penalty is within bounds
+	local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+		- (
+			(constants.MAX_EXPEDITED_WITHDRAWAL_FEE - constants.MIN_EXPEDITED_WITHDRAWAL_FEE)
+			* (elapsedTime / totalWithdrawalTime)
+		)
+	penaltyRate =
+		math.max(constants.MIN_EXPEDITED_WITHDRAWAL_FEE, math.min(constants.MAX_EXPEDITED_WITHDRAWAL_FEE, penaltyRate)) -- Ensure penalty is within bounds
 
 	-- Calculate the penalty amount and the amount to withdraw
 	local vaultBalance = vault.balance
 
-	local penaltyAmount = math.floor(vaultBalance * penaltyRate)
-	local amountToWithdraw = vaultBalance - penaltyAmount
+	local expenditedWithdrawalFee = math.floor(vaultBalance * penaltyRate)
+	local amountToWithdraw = vaultBalance - expenditedWithdrawalFee
 
 	-- Add penalty to AR.IO protocol balance
-	balances.increaseBalance(ao.id, penaltyAmount)
+	balances.increaseBalance(ao.id, expenditedWithdrawalFee)
 	balances.increaseBalance(from, amountToWithdraw)
 
 	-- Remove the vault after withdrawal
