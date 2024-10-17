@@ -15,7 +15,7 @@ function vaults.createVault(from, qty, lockLengthMs, currentTimestamp, msgId)
 		error(
 			"Invalid lock length. Must be between "
 				.. constants.MIN_TOKEN_LOCK_TIME_MS
-				.. " and "
+				.. " - "
 				.. constants.MAX_TOKEN_LOCK_TIME_MS
 				.. " ms"
 		)
@@ -47,6 +47,7 @@ function vaults.vaultedTransfer(from, recipient, qty, lockLengthMs, currentTimes
 				.. constants.MIN_TOKEN_LOCK_TIME_MS
 				.. " - "
 				.. constants.MAX_TOKEN_LOCK_TIME_MS
+				.. " ms"
 		)
 	end
 
