@@ -84,6 +84,14 @@ local ActionMap = {
 	CancelDelegateWithdrawal = "Cancel-Delegate-Withdrawal",
 }
 
+-- Low fidelity trackers
+local lastKnownTotalSupply = 0
+local lastKnownCirculatingSupply = 0
+local lastKnownLockedSupply = 0
+local lastKnownStakedSupply = 0
+local lastKnownDelegatedSupply = 0
+local lastKnownWithdrawSupply = 0
+
 local function eventingPcall(ioEvent, onError, fnToCall, ...)
 	local status, result = pcall(fnToCall, ...)
 	if not status then
@@ -1335,40 +1343,58 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 	local delegatedSupply = 0
 	local withdrawSupply = 0
 	local protocolBalance = balances.getBalance(Protocol)
-	local balances = balances.getBalances()
-	for _, balance in pairs(balances) do
-		totalSupply = totalSupply + balance
+	local userBalances = balances.getBalances()
+
+	-- tally circulating supply
+	for _, balance in pairs(userBalances) do
 		circulatingSupply = circulatingSupply + balance
 	end
-	-- gateways and delegates
+	totalSupply = totalSupply + circulatingSupply
+
+	-- tally supply stashed in gateways and delegates
 	local gateways = gar.getGateways()
 	for _, gateway in pairs(gateways) do
 		totalSupply = totalSupply + gateway.operatorStake + gateway.totalDelegatedStake
 		stakedSupply = stakedSupply + gateway.operatorStake
 		delegatedSupply = delegatedSupply + gateway.totalDelegatedStake
 		for _, delegate in pairs(gateway.delegates) do
-			-- check vaults
+			-- tally delegates' vaults
 			for _, vault in pairs(delegate.vaults) do
 				totalSupply = totalSupply + vault.balance
 				withdrawSupply = withdrawSupply + vault.balance
 			end
 		end
-		-- iterate through vaults
+		-- tally gateway's own vaults
 		for _, vault in pairs(gateway.vaults) do
 			totalSupply = totalSupply + vault.balance
 			withdrawSupply = withdrawSupply + vault.balance
 		end
 	end
 
-	-- vaults
-	local vaults = vaults.getVaults()
-	for _, vaultsForAddress in pairs(vaults) do
+	-- user vaults
+	local userVaults = vaults.getVaults()
+	for _, vaultsForAddress in pairs(userVaults) do
 		-- they may have several vaults iterate through them
 		for _, vault in pairs(vaultsForAddress) do
 			totalSupply = totalSupply + vault.balance
 			lockedSupply = lockedSupply + vault.balance
 		end
 	end
+
+	lastKnownTotalSupply = totalSupply
+	lastKnownCirculatingSupply = circulatingSupply
+	lastKnownLockedSupply = lockedSupply
+	lastKnownStakedSupply = stakedSupply
+	lastKnownDelegatedSupply = delegatedSupply
+	lastKnownWithdrawSupply = withdrawSupply
+
+	msg.ioEvent:addField("Total-Token-Supply", lastKnownTotalSupply)
+	msg.ioEvent:addField("Circulating-Supply", lastKnownCirculatingSupply)
+	msg.ioEvent:addField("Locked-Supply", lastKnownLockedSupply)
+	msg.ioEvent:addField("Staked-Supply", lastKnownStakedSupply)
+	msg.ioEvent:addField("Delegated-Supply", lastKnownDelegatedSupply)
+	msg.ioEvent:addField("Withdraw-Supply", lastKnownWithdrawSupply)
+	msg.ioEvent:addField("Protocol-Balance", protocolBalance)
 
 	ao.send({
 		Target = msg.From,
