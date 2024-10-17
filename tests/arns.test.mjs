@@ -64,13 +64,15 @@ describe('ArNS', async () => {
     );
 
     const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
-    const buyRecordEvent = JSON.parse(buyRecordResult.Output.data.split('\n')[1]);
-    
+    const buyRecordEvent = JSON.parse(
+      buyRecordResult.Output.data.split('\n')[1],
+    );
+
     // Fields based on timestamps will be unstable for testing, but verify their type
-    assert.equal("number", typeof buyRecordEvent.Timestamp);
-    assert.equal("number", typeof buyRecordEvent['Epoch-Index']);
-    assert.equal("number", typeof buyRecordEvent['Start-Timestamp']);
-    assert.equal("number", typeof buyRecordEvent['End-Timestamp']);
+    assert.equal('number', typeof buyRecordEvent.Timestamp);
+    assert.equal('number', typeof buyRecordEvent['Epoch-Index']);
+    assert.equal('number', typeof buyRecordEvent['Start-Timestamp']);
+    assert.equal('number', typeof buyRecordEvent['End-Timestamp']);
     delete buyRecordEvent.Timestamp;
     delete buyRecordEvent['Epoch-Index'];
     delete buyRecordEvent['Start-Timestamp'];

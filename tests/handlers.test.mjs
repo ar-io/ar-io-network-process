@@ -65,8 +65,7 @@ describe('handlers', async () => {
       // assert correct tag in message by finding the index of the tag in the message
       const notice = supplyResult.Messages?.[0]?.Tags?.find(
         (tag) =>
-          tag.name === 'Action' &&
-          tag.value === 'Total-Token-Supply-Notice',
+          tag.name === 'Action' && tag.value === 'Total-Token-Supply-Notice',
       );
       assert.ok(notice, 'should have a Total-Token-Supply-Notice tag');
 
@@ -100,7 +99,8 @@ describe('handlers', async () => {
 
       assert.ok(
         supplyData.protocolBalance === 50000000000000,
-        'protocol balance should be 50M IO but was ' + supplyData.protocolBalance,
+        'protocol balance should be 50M IO but was ' +
+          supplyData.protocolBalance,
       );
     });
   });

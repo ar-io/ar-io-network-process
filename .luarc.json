@@ -2,16 +2,10 @@
   "Lua": {
     "runtime": {
       "version": "5.3",
-      "path": [
-        "?.lua",
-        "?/init.lua"
-      ]
+      "path": ["?.lua", "?/init.lua"]
     },
     "workspace": {
-      "library": [
-        "src",
-        "spec"
-      ]
+      "library": ["src", "spec"]
     },
     "diagnostics": {
       "enable": true,

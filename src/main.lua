@@ -314,9 +314,15 @@ addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionM
 		)
 	end
 
+	local from = utils.formatAddress(msg.From)
+	local quantity = tonumber(msg.Tags.Quantity)
+	local lockLengthMs = tonumber(msg.Tags["Lock-Length"])
+	local timestamp = tonumber(msg.Timestamp)
+	local msgId = msg.Id
+
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
-			Target = msg.From,
+			Target = from,
 			Tags = { Action = "Invalid-Create-Vault-Notice", Error = "Bad-Input" },
 			Data = tostring(error),
 		})
@@ -325,38 +331,29 @@ addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionM
 		return
 	end
 
-	local shouldContinue2, vault = eventingPcall(
-		ioEvent,
-		function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Invalid-Create-Vault-Notice", Error = "Invalid-Create-Vault" },
-				Data = tostring(error),
-			})
-		end,
-		vaults.createVault,
-		msg.From,
-		tonumber(msg.Tags.Quantity),
-		tonumber(msg.Tags["Lock-Length"]),
-		tonumber(msg.Timestamp),
-		msg.Id
-	)
+	local shouldContinue2, vault = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = from,
+			Tags = { Action = "Invalid-Create-Vault-Notice", Error = "Invalid-Create-Vault" },
+			Data = tostring(error),
+		})
+	end, vaults.createVault, from, quantity, lockLengthMs, timestamp, msgId)
 	if not shouldContinue2 then
 		return
 	end
 
 	if vault ~= nil then
-		msg.ioEvent:addField("Vault-Id", msg.Id)
+		msg.ioEvent:addField("Vault-Id", msgId)
 		msg.ioEvent:addField("VaultBalance", vault.balance)
 		msg.ioEvent:addField("VaultStartTimestamp", vault.startTimestamp)
 		msg.ioEvent:addField("VaultEndTimestamp", vault.endTimestamp)
 	end
 
 	ao.send({
-		Target = msg.From,
+		Target = from,
 		Tags = {
 			Action = "Vault-Created-Notice",
-			["Vault-Id"] = msg.Id,
+			["Vault-Id"] = msgId,
 		},
 		Data = json.encode(vault),
 	})
@@ -364,7 +361,7 @@ end)
 
 addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap.VaultedTransfer), function(msg)
 	local function checkAssertions()
-		assert(utils.isValidArweaveAddress(msg.Tags.Recipient), "Invalid recipient")
+		assert(utils.isValidAOAddress(msg.Tags.Recipient), "Invalid recipient")
 		assert(
 			tonumber(msg.Tags["Lock-Length"]) > 0 and utils.isInteger(tonumber(msg.Tags["Lock-Length"])),
 			"Invalid lock length. Must be integer greater than 0"
@@ -386,14 +383,15 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 		return
 	end
 
-	local result, err = balances.vaultedTransfer(
-		msg.From,
-		msg.Tags.Recipient,
-		tonumber(msg.Tags.Quantity),
-		tonumber(msg.Tags["Lock-Length"]),
-		msg.Timestamp,
-		msg.Id
-	)
+	local from = utils.formatAddress(msg.From)
+	local recipient = utils.formatAddress(msg.Tags.Recipient)
+	local quantity = tonumber(msg.Tags.Quantity)
+	local lockLengthMs = tonumber(msg.Tags["Lock-Length"])
+	local timestamp = tonumber(msg.Timestamp)
+	local msgId = msg.Id
+
+	local result, err = vaults.vaultedTransfer(from, recipient, quantity, lockLengthMs, timestamp, msgId)
+	print("Created vault" .. json.encode(Vaults[recipient]))
 	if err then
 		ao.send({
 			Target = msg.From,
@@ -401,16 +399,20 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 			Data = tostring(err),
 		})
 	else
+		-- sender gets an immediate debit notice as the quantity is debited from their balance
 		ao.send({
-			Target = msg.From,
-			Recipient = msg.Tags.Recipient,
-			Quantity = msg.Tags.Quantity,
-			Tags = { Action = "Debit-Notice" },
+			Target = from,
+			Recipient = recipient,
+			Quantity = quantity,
+			Tags = { Action = "Debit-Notice", ["Vault-Id"] = msgId },
 			Data = json.encode(result),
 		})
+		-- to the receiver, they get a vault notice
 		ao.send({
-			Target = msg.Tags.Recipient,
-			Tags = { Action = "Vaulted-Credit-Notice" },
+			Target = recipient,
+			Quantity = quantity,
+			Sender = from,
+			Tags = { Action = "Create-Vault-Notice", ["Vault-Id"] = msgId },
 			Data = json.encode(result),
 		})
 	end
@@ -418,15 +420,16 @@ end)
 
 addEventingHandler(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.ExtendVault), function(msg)
 	local checkAssertions = function()
-		assert(utils.isValidArweaveAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
+		assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
 		assert(
 			tonumber(msg.Tags["Extend-Length"]) > 0 and utils.isInteger(tonumber(msg.Tags["Extend-Length"])),
 			"Invalid extension length. Must be integer greater than 0"
 		)
 	end
-
-	local vaultId = msg.Tags["Vault-Id"]
-	local extendLength = tonumber(msg.Tags["Extend-Length"])
+	local from = utils.formatAddress(msg.From)
+	local vaultId = utils.formatAddress(msg.Tags["Vault-Id"])
+	local timestamp = tonumber(msg.Timestamp)
+	local extendLengthMs = tonumber(msg.Tags["Extend-Length"])
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
@@ -444,17 +447,17 @@ addEventingHandler(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionM
 			Tags = { Action = "Invalid-Extend-Vault-Notice", Error = "Invalid-Extend-Vault" },
 			Data = tostring(error),
 		})
-	end, vaults.extendVault, msg.From, extendLength, msg.Timestamp, vaultId)
+	end, vaults.extendVault, from, extendLengthMs, timestamp, vaultId)
 	if not shouldContinue2 then
 		return
 	end
 
 	if vault ~= nil then
 		msg.ioEvent:addField("Vault-Id", vaultId)
-		msg.ioEvent:addField("VaultBalance", vault.balance)
-		msg.ioEvent:addField("VaultStartTimestamp", vault.startTimestamp)
-		msg.ioEvent:addField("VaultEndTimestamp", vault.endTimestamp)
-		msg.ioEvent:addField("VaultPrevEndTimestamp", vault.endTimestamp - extendLength)
+		msg.ioEvent:addField("Vault-Balance", vault.balance)
+		msg.ioEvent:addField("Vault-Start-Timestamp", vault.startTimestamp)
+		msg.ioEvent:addField("Vault-End-Timestamp", vault.endTimestamp)
+		msg.ioEvent:addField("Vault-Prev-End-Timestamp", vault.endTimestamp - extendLengthMs)
 	end
 
 	ao.send({
