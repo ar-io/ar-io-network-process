@@ -246,11 +246,22 @@ describe('setup', () => {
           if (gateway.status === 'leaving') {
             assert(gateway.totalDelegatedStake === 0);
             assert(gateway.operatorStake === 0);
-            assert(
-              gateway.vaults[gateway.gatewayAddress].balance >= 0 &&
-                gateway.vaults[gateway.gatewayAddress].balance <= 50_000_000_000,
-              `Gateway ${gateway.gatewayAddress} is leaving with invalid amount of IO vaulted against the wallet address. Any stake higher than the minimum staked amount of 50_000_000_000 IO should be vaulted against the message id.`,
-            );
+            for (const [vaultId, vault] of Object.entries(gateway.vaults)) {
+              if (vaultId === gateway.gatewayAddress) {
+                  assert(
+                  vault.balance <= 50_000_000_000,
+                  `Gateway ${gateway.gatewayAddress} is leaving with invalid amount of IO vaulted against the wallet address (${gateway.vaults?.[gateway.gatewayAddress]?.balance}). Any stake higher than the minimum staked amount of 50_000_000_000 IO should be vaulted against the message id.`,
+                );
+                assert(
+                  vault.endTimestamp === vault.startTimestamp + 1000 * 60 * 60 * 24 * 90,
+                  `Vault ${vaultId} has an invalid end timestamp (${vault.endTimestamp}).`,
+                );
+              }
+              // assert vault balance is greater than 0 and startTimestamp and endTimestamp are valid timestamps 30 days apart
+              assert(vault.balance >= 0, `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid balance (${vault.balance})`); 
+              assert(vault.startTimestamp > 0, `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid start timestamp (${vault.startTimestamp})`);
+              assert(vault.endTimestamp > 0, `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`);
+            }
           }
         }
         cursor = nextCursor;
