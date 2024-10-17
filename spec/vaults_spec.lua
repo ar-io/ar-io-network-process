@@ -15,14 +15,14 @@ describe("vaults", function()
 			vaults.createVault,
 			"test-this-is-valid-arweave-wallet-address-1",
 			100,
-			constants.MIN_TOKEN_LOCK_TIME,
+			constants.MIN_TOKEN_LOCK_TIME_MS,
 			startTimestamp,
 			"msgId"
 		)
 		local expectation = {
 			balance = 100,
 			startTimestamp = startTimestamp,
-			endTimestamp = startTimestamp + constants.MIN_TOKEN_LOCK_TIME,
+			endTimestamp = startTimestamp + constants.MIN_TOKEN_LOCK_TIME_MS,
 		}
 		assert.is_true(status)
 		assert.are.same(expectation, result)
@@ -35,12 +35,41 @@ describe("vaults", function()
 			vaults.createVault,
 			"test-this-is-valid-arweave-wallet-address-1",
 			100,
-			constants.MIN_TOKEN_LOCK_TIME,
+			constants.MIN_TOKEN_LOCK_TIME_MS,
 			startTimestamp,
 			"msgId"
 		)
 		assert.is_false(status)
 		assert.match("Insufficient balance", result)
+	end)
+
+	describe("extendVault", function()
+		it("should extend the vault", function()
+			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 100
+			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
+			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
+			local msgId = "msgId"
+			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, msgId)
+			local extendLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
+			local currentTimestamp = vault.startTimestamp + 1000
+			local extendedVault = vaults.extendVault(vaultOwner, extendLengthMs, currentTimestamp, msgId)
+			assert.are.same(vault.balance, extendedVault.balance)
+			assert.are.same(vault.startTimestamp, extendedVault.startTimestamp)
+			assert.are.same(vault.endTimestamp + extendLengthMs, extendedVault.endTimestamp)
+		end)
+
+		it("should throw an error if the vault is expired", function()
+			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 100
+			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
+			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
+			local msgId = "msgId"
+			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, msgId)
+			local extendLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
+			local currentTimestamp = vault.endTimestamp + 1000
+			local status, result = pcall(vaults.extendVault, vaultOwner, extendLengthMs, currentTimestamp, msgId)
+			assert.is_false(status)
+			assert.match("This vault has ended.", result)
+		end)
 	end)
 
 	describe("pruneVaults", function()
