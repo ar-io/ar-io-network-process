@@ -1208,13 +1208,7 @@ addEventingHandler(
 		local from = utils.formatAddress(msg.From)
 		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 		local quantity = tonumber(msg.Tags.Quantity)
-		-- Convert the string value of Instant to a boolean value
-		local instantWithdraw = false
-		if msg.Tags.Instant and msg.Tags.Instant == "true" then
-			instantWithdraw = true
-		else
-			instantWithdraw = false
-		end
+		local instantWithdraw = msg.Tags.Instant and msg.Tags.Instant == "true" or false
 
 		msg.ioEvent:addField("TargetFormatted", target)
 
