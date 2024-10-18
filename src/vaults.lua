@@ -148,9 +148,6 @@ function vaults.pruneVaults(currentTimestamp)
 				prunedVaults[id] = nestedVault
 			end
 		end
-		-- update the owner vault
-		-- TODO: I THINK THIS LINE IS UNNECESSARY. CHECK TESTS
-		allVaults[owner] = ownersVaults
 	end
 	-- set the vaults to the updated vaults
 	Vaults = allVaults
