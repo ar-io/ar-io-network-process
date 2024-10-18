@@ -275,7 +275,7 @@ describe('GatewayRegistry', async () => {
         );
         const gatewayData = JSON.parse(gateway.Messages[0].Data);
 
-        // Assert gateway data does not exist
+        // Assert gateway data not found
         assert.equal(gatewayData, null);
       });
     });

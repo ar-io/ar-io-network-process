@@ -1109,6 +1109,52 @@ describe("gar", function()
 			)
 		end)
 
+		it("should error if the remaining delegate stake is less than the minimum stake", function()
+			local delegatedStake = gar.getSettings().delegates.minStake
+			GatewayRegistry[stubGatewayAddress] = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = gar.getSettings().delegates.minStake - 1,
+				vaults = {},
+				delegates = {
+					[stubRandomAddress] = {
+						delegatedStake = delegatedStake,
+						startTimestamp = startTimestamp,
+						vaults = {},
+					},
+				},
+				startTimestamp = startTimestamp,
+				stats = {
+					prescribedEpochCount = 0,
+					observedEpochCount = 0,
+					totalEpochCount = 0,
+					passedEpochCount = 0,
+					failedEpochCount = 0,
+					failedConsecutiveEpochs = 0,
+					passedConsecutiveEpochs = 0,
+				},
+				settings = testSettings,
+				status = "joined",
+				observerAddress = stubObserverAddress,
+			}
+
+			local status, err = pcall(
+				gar.decreaseDelegateStake,
+				stubGatewayAddress,
+				stubRandomAddress,
+				1,
+				startTimestamp,
+				stubMessageId
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches(
+				"Remaining delegated stake must be greater than the minimum delegated stake. Adjust the amount or withdraw all stake.",
+				err
+			)
+		end)
+	end)
+
+	describe("instantDelegateWithdrawal", function()
 		it(
 			"should successfully convert a standard delegate withdraw to instant with maximum penalty and remove delegate",
 			function()
@@ -1306,6 +1352,72 @@ describe("gar", function()
 				assert.are.equal(0, _G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
 			end
 		)
+
+		it("should error if the vault is not found", function()
+			local vaultId = "vault_id_1"
+			local vaultBalance = 1000
+			local startTimestamp = 500000
+			local currentTimestamp = startTimestamp + 1000
+
+			_G.GatewayRegistry[stubGatewayAddress] = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {
+					[stubRandomAddress] = {
+						delegatedStake = 0,
+						startTimestamp = startTimestamp,
+						vaults = {
+							[vaultId] = {
+								balance = vaultBalance,
+								startTimestamp = startTimestamp,
+							},
+						},
+					},
+				},
+				startTimestamp = startTimestamp,
+				stats = {
+					prescribedEpochCount = 0,
+					observedEpochCount = 0,
+					totalEpochCount = 0,
+					passedEpochCount = 0,
+					failedEpochCount = 0,
+					failedConsecutiveEpochs = 0,
+					passedConsecutiveEpochs = 0,
+				},
+				settings = testSettings,
+				status = "joined",
+				observerAddress = stubObserverAddress,
+			}
+
+			local status, err = pcall(
+				gar.instantDelegateWithdrawal,
+				stubRandomAddress,
+				stubGatewayAddress,
+				"non-existent-vault-id",
+				currentTimestamp
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Vault not found", err)
+		end)
+
+		it("should error if the gateway is not found", function()
+			local vaultId = "vault_id_1"
+			local startTimestamp = 500000
+			local currentTimestamp = startTimestamp + 1000
+
+			local status, err = pcall(
+				gar.instantDelegateWithdrawal,
+				stubRandomAddress,
+				"non-existent-gateway-address",
+				vaultId,
+				currentTimestamp
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Gateway not found", err)
+		end)
 	end)
 
 	describe("slashOperatorStake", function()
@@ -1538,7 +1650,7 @@ describe("gar", function()
 				},
 			}, _G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress])
 		end)
-		it("should not cancel a withdrawal if the delegate does not exist", function()
+		it("should not cancel a withdrawal if the delegate not found", function()
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
 			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = nil
 			_G.GatewayRegistry[stubGatewayAddress].settings.allowDelegatedStaking = true
@@ -1550,9 +1662,9 @@ describe("gar", function()
 			)
 			assert.is_false(status)
 			assert.is_not_nil(err)
-			assert.matches("Delegate does not exist", err)
+			assert.matches("Delegate not found", err)
 		end)
-		it("should not cancel a withdrawal if the withdrawal does not exist", function()
+		it("should not cancel a withdrawal if the withdrawal not found", function()
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
 			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = {
 				delegatedStake = 0,
@@ -1568,7 +1680,7 @@ describe("gar", function()
 			)
 			assert.is_false(status)
 			assert.is_not_nil(err)
-			assert.matches("Vault does not exist", err)
+			assert.matches("Vault not found", err)
 		end)
 		it("should not cancel a withdrawal if the gateway is leaving", function()
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
