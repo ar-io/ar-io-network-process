@@ -249,8 +249,7 @@ function arns.calculateLeaseFee(baseFee, years, demandFactor)
 end
 
 function arns.calculateAnnualRenewalFee(baseFee, years)
-	local nameAnnualRegistrationFee = baseFee * constants.ANNUAL_PERCENTAGE_FEE
-	local totalAnnualRenewalCost = nameAnnualRegistrationFee * years
+	local totalAnnualRenewalCost = baseFee * constants.ANNUAL_PERCENTAGE_FEE * years
 	return math.floor(totalAnnualRenewalCost)
 end
 
@@ -369,9 +368,11 @@ function arns.getTokenCost(intendedAction)
 		local purchaseType = intendedAction.purchaseType
 		local years = intendedAction.years
 		local name = intendedAction.name
-		assert(purchaseType == "lease" or purchaseType == "permabuy", "PurchaseType is invalid.")
-		assert(years >= 1 and years <= 5, "Years is invalid. Must be an integer between 1 and 5")
 		assert(type(name) == "string", "Name is required and must be a string.")
+		assert(purchaseType == "lease" or purchaseType == "permabuy", "PurchaseType is invalid.")
+		if purchaseType == "lease" then
+			assert(years >= 1 and years <= 5, "Years is invalid. Must be an integer between 1 and 5")
+		end
 		local baseFee = demand.getFees()[#name]
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
 	elseif intendedAction.intent == "Extend-Lease" then
