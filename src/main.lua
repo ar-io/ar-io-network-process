@@ -245,6 +245,16 @@ end, function(msg)
 		if slashedGatewaysCount > 0 then
 			msg.ioEvent:addField("Slashed-Gateways", slashedGateways)
 			msg.ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
+			local invariantSlashedGateways = {}
+			for _, gwAddress in pairs(slashedGateways) do
+				local gw = gar.getGateway(gwAddress) or {}
+				if gw.totalDelegatedStake > 0 then
+					invariantSlashedGateways[gwAddress] = gw.totalDelegatedStake
+				end
+			end
+			if utils.lengthOfTable(invariantSlashedGateways) > 0 then
+				msg.ioEvent:addField("Invariant-Slashed-Gateways", invariantSlashedGateways)
+			end
 		end
 	end
 
