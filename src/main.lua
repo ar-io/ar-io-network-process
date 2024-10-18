@@ -1187,7 +1187,10 @@ addEventingHandler(
 				"Invalid quantity. Must be integer greater than 0"
 			)
 			if msg.Tags.Instant ~= nil then
-				assert(type(msg.Tags.Instant) == "boolean", "Instant must be a boolean value")
+				assert(
+					msg.Tags.Instant == "true" or msg.Tags.Instant == "false",
+					"Instant must be a string with value 'true' or 'false'"
+				)
 			end
 		end
 
@@ -1205,7 +1208,8 @@ addEventingHandler(
 		local from = utils.formatAddress(msg.From)
 		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 		local quantity = tonumber(msg.Tags.Quantity)
-		local instantWithdraw = msg.Tags.Instant and msg.Tags.Instant == "true"
+		-- Convert the string value of Instant to a boolean value
+		local instantWithdraw = msg.Tags.Instant == "true"
 		msg.ioEvent:addField("TargetFormatted", target)
 
 		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)

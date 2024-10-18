@@ -371,7 +371,7 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 	end
 
 	-- Instant withdrawal logic with penalty
-	if instantWithdraw then
+	if instantWithdraw == true then
 		-- Unlock the tokens from the gateway and delegate
 		gateway.delegates[delegator].delegatedStake = gateway.delegates[delegator].delegatedStake - qty
 		gateway.totalDelegatedStake = gateway.totalDelegatedStake - qty
