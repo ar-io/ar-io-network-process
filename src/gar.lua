@@ -125,6 +125,7 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 		}
 
 		-- Reduce gateway stake and set this delegate stake to 0
+		-- TODO: It's an invariant if totalDelegatedStake isn't 0 at the end of this loop
 		gateway.totalDelegatedStake = gateway.totalDelegatedStake - delegate.delegatedStake
 		gateway.delegates[address].delegatedStake = 0
 	end
@@ -654,6 +655,9 @@ function gar.pruneGateways(currentTimestamp, msgId)
 	local result = {
 		prunedGateways = {},
 		slashedGateways = {},
+		gatewayStakeReturned = 0,
+		delegateStakeReturned = 0,
+		stakeSlashed = 0,
 	}
 
 	if next(gateways) == nil then
@@ -667,6 +671,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 			for vaultId, vault in pairs(gateway.vaults) do
 				if vault.endTimestamp <= currentTimestamp then
 					balances.increaseBalance(address, vault.balance)
+					result.gatewayStakeReturned = result.gatewayStakeReturned + vault.balance
 					gateway.vaults[vaultId] = nil
 				end
 			end
@@ -675,6 +680,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				for vaultId, vault in pairs(delegate.vaults) do
 					if vault.endTimestamp <= currentTimestamp then
 						balances.increaseBalance(delegateAddress, vault.balance)
+						result.delegateStakeReturned = result.delegateStakeReturned + vault.balance
 						delegate.vaults[vaultId] = nil
 					end
 				end
@@ -701,6 +707,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				gar.slashOperatorStake(address, slashAmount)
 				gar.leaveNetwork(address, currentTimestamp, msgId)
 				table.insert(result.slashedGateways, address)
+				result.stakeSlashed = result.stakeSlashed + slashAmount
 			else
 				if gateway.status == "leaving" and gateway.endTimestamp <= currentTimestamp then
 					-- if the timestamp is after gateway end timestamp, mark the gateway as nil
