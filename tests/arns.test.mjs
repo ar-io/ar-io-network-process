@@ -109,6 +109,7 @@ describe('ArNS', async () => {
       'Protocol-Balance': expectedRemainingBalance[PROCESS_ID],
       'Reserved-Records-Count': 0,
       'Remaining-Balance': expectedRemainingBalance[sender],
+      'Circulating-Supply': -600000000, // Artifact of starting out without initializing this properly
     });
 
     // fetch the record

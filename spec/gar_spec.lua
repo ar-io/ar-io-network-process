@@ -1557,12 +1557,15 @@ describe("gar", function()
 				local protocolBalanceBefore = _G.Balances[ao.id] or 0
 				local status, result = pcall(gar.pruneGateways, currentTimestamp, msgId)
 				assert.is_true(status)
+				local expectedSlashedStake = math.floor(gar.getSettings().operators.minStake * 0.2)
 				assert.are.same({
 					prunedGateways = { "address1" },
 					slashedGateways = { "address3" },
+					stakeSlashed = expectedSlashedStake,
+					delegateStakeReturned = 0,
+					gatewayStakeReturned = 0,
 				}, result)
 
-				local expectedSlashedStake = math.floor(gar.getSettings().operators.minStake * 0.2)
 				local expectedRemainingStake = math.floor(gar.getSettings().operators.minStake * 0.8) + 10000
 				assert.is_nil(GatewayRegistry["address1"]) -- removed
 				assert.is_not_nil(GatewayRegistry["address2"]) -- not removed
