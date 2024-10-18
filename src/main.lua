@@ -86,12 +86,18 @@ local ActionMap = {
 }
 
 -- Low fidelity trackers
-local lastKnownTotalSupply = 0
 local lastKnownCirculatingSupply = 0
 local lastKnownLockedSupply = 0
 local lastKnownStakedSupply = 0
 local lastKnownDelegatedSupply = 0
 local lastKnownWithdrawSupply = 0
+local function lastKnownTotalTokenSupply()
+	return lastKnownCirculatingSupply
+		+ lastKnownLockedSupply
+		+ lastKnownStakedSupply
+		+ lastKnownDelegatedSupply
+		+ Balances[Protocol]
+end
 
 local function eventingPcall(ioEvent, onError, fnToCall, ...)
 	local status, result = pcall(fnToCall, ...)
@@ -168,6 +174,12 @@ end, function(msg)
 		NameRegistry = utils.deepCopy(NameRegistry),
 		Epochs = utils.deepCopy(Epochs),
 		Balances = utils.deepCopy(Balances),
+		lastKnownCirculatingSupply = lastKnownCirculatingSupply,
+		lastKnownLockedSupply = lastKnownLockedSupply,
+		lastKnownStakedSupply = lastKnownStakedSupply,
+		lastKnownDelegatedSupply = lastKnownDelegatedSupply,
+		lastKnownWithdrawSupply = lastKnownWithdrawSupply,
+		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
 	}
 	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId)
 	if not status then
@@ -236,20 +248,27 @@ end, function(msg)
 		end
 	end
 
-	msg.ioEvent:addField(
-		"Total-Supply",
-		lastKnownCirculatingSupply
-			+ lastKnownLockedSupply
-			+ lastKnownStakedSupply
-			+ lastKnownDelegatedSupply
-			+ lastKnownWithdrawSupply
-	)
-	msg.ioEvent:addField("Circulating-Supply", lastKnownCirculatingSupply)
-	msg.ioEvent:addField("Locked-Supply", lastKnownLockedSupply)
-	msg.ioEvent:addField("Staked-Supply", lastKnownStakedSupply)
-	msg.ioEvent:addField("Delegated-Supply", lastKnownDelegatedSupply)
-	msg.ioEvent:addField("Withdraw-Supply", lastKnownWithdrawSupply)
-	msg.ioEvent:addField("Protocol-Balance", Balances[Protocol])
+	if lastKnownCirculatingSupply ~= previousState.lastKnownCirculatingSupply then
+		msg.ioEvent:addField("Circulating-Supply", lastKnownCirculatingSupply)
+	end
+	if lastKnownLockedSupply ~= previousState.lastKnownLockedSupply then
+		msg.ioEvent:addField("Locked-Supply", lastKnownLockedSupply)
+	end
+	if lastKnownStakedSupply ~= previousState.lastKnownStakedSupply then
+		msg.ioEvent:addField("Staked-Supply", lastKnownStakedSupply)
+	end
+	if lastKnownDelegatedSupply ~= previousState.lastKnownDelegatedSupply then
+		msg.ioEvent:addField("Delegated-Supply", lastKnownDelegatedSupply)
+	end
+	if lastKnownWithdrawSupply ~= previousState.lastKnownWithdrawSupply then
+		msg.ioEvent:addField("Withdraw-Supply", lastKnownWithdrawSupply)
+	end
+	if Balances[Protocol] ~= previousState.Balances[Protocol] then
+		msg.ioEvent:addField("Protocol-Balance", Balances[Protocol])
+	end
+	if lastKnownTotalTokenSupply() ~= previousState.lastKnownTotalSupply then
+		msg.ioEvent:addField("Total-Token-Supply", lastKnownTotalTokenSupply())
+	end
 
 	return status
 end)
@@ -1560,14 +1579,14 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 		end
 	end
 
-	lastKnownTotalSupply = totalSupply
 	lastKnownCirculatingSupply = circulatingSupply
 	lastKnownLockedSupply = lockedSupply
 	lastKnownStakedSupply = stakedSupply
 	lastKnownDelegatedSupply = delegatedSupply
 	lastKnownWithdrawSupply = withdrawSupply
 
-	msg.ioEvent:addField("Total-Token-Supply", lastKnownTotalSupply)
+	msg.ioEvent:addField("Total-Token-Supply", totalSupply)
+	msg.ioEvent:addField("Last-Known-Total-Token-Supply", lastKnownTotalTokenSupply())
 	msg.ioEvent:addField("Circulating-Supply", lastKnownCirculatingSupply)
 	msg.ioEvent:addField("Locked-Supply", lastKnownLockedSupply)
 	msg.ioEvent:addField("Staked-Supply", lastKnownStakedSupply)
