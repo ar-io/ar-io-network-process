@@ -854,7 +854,7 @@ describe('GatewayRegistry', async () => {
             { name: 'Action', value: 'Decrease-Delegate-Stake' },
             { name: 'Address', value: STUB_ADDRESS },
             { name: 'Quantity', value: '1000000000' }, // 1K IO
-            { name: 'Instant', value: 'false' }, // FOR SOME REASON THIS WORKS IF YOU PUT 'false' :O
+            { name: 'Instant', value: 'RANDOM' },
           ],
         },
         sharedMemory,
