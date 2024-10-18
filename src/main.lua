@@ -1419,9 +1419,13 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 	local protocolBalance = balances.getBalance(Protocol)
 	local userBalances = balances.getBalances()
 
-	-- tally circulating supply
-	for _, balance in pairs(userBalances) do
-		circulatingSupply = circulatingSupply + balance
+	totalSupply = totalSupply + protocolBalance
+
+	-- tally circulating supply, exclude protocol balance
+	for address, balance in pairs(userBalances) do
+		if address ~= Protocol then
+			circulatingSupply = circulatingSupply + balance
+		end
 	end
 	totalSupply = totalSupply + circulatingSupply
 
