@@ -1209,8 +1209,11 @@ addEventingHandler(
 		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 		local quantity = tonumber(msg.Tags.Quantity)
 		local instantWithdraw = msg.Tags.Instant and msg.Tags.Instant == "true" or false
+		local timestamp = tonumber(msg.Timestamp)
+		local messageId = msg.Id
 
-		msg.ioEvent:addField("TargetFormatted", target)
+		msg.ioEvent:addField("Target-Formatted", target)
+		msg.ioEvent:addField("Quantity", quantity)
 
 		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
@@ -1218,7 +1221,7 @@ addEventingHandler(
 				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Invalid-Decrease-Delegate-Stake" },
 				Data = tostring(error),
 			})
-		end, gar.decreaseDelegateStake, target, from, quantity, msg.Timestamp, msg.Id, instantWithdraw)
+		end, gar.decreaseDelegateStake, target, from, quantity, timestamp, messageId, instantWithdraw)
 		if not shouldContinue2 then
 			return
 		end
@@ -1226,10 +1229,10 @@ addEventingHandler(
 		local delegateResult = {}
 		if gateway ~= nil then
 			local newStake = gateway.delegates[from].delegatedStake
-			msg.ioEvent:addField("PreviousStake", newStake + quantity)
-			msg.ioEvent:addField("NewStake", newStake)
-			msg.ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
-			msg.ioEvent:addField("InstantWithdrawal", instantWithdraw)
+			msg.ioEvent:addField("Previous-Stake", newStake + quantity)
+			msg.ioEvent:addField("New-Stake", newStake)
+			msg.ioEvent:addField("Gateway-Total-Delegated-Stake", gateway.totalDelegatedStake)
+			msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
 			delegateResult = gateway.delegates[from]
 			local newDelegateVaults = delegateResult.vaults
 			if newDelegateVaults ~= nil then
@@ -1237,16 +1240,16 @@ addEventingHandler(
 				local newDelegateVault = newDelegateVaults[msg.Id]
 				if newDelegateVault ~= nil then
 					msg.ioEvent:addField("Vault-Id", msg.Id)
-					msg.ioEvent:addField("VaultBalance", newDelegateVault.balance)
-					msg.ioEvent:addField("VaultStartTimestamp", newDelegateVault.startTimestamp)
-					msg.ioEvent:addField("VaultEndTimestamp", newDelegateVault.endTimestamp)
+					msg.ioEvent:addField("Vault-Balance", newDelegateVault.balance)
+					msg.ioEvent:addField("Vault-Start-Timestamp", newDelegateVault.startTimestamp)
+					msg.ioEvent:addField("Vault-End-Timestamp", newDelegateVault.endTimestamp)
 				end
 			end
 		end
 
 		ao.send({
 			Target = from,
-			Tags = { Action = "Decrease-Delegate-Stake-Notice", Adddress = target, Quantity = msg.Tags.Quantity },
+			Tags = { Action = "Decrease-Delegate-Stake-Notice", Address = target, Quantity = quantity },
 			Data = json.encode(delegateResult),
 		})
 	end
