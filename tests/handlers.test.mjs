@@ -76,9 +76,14 @@ describe('handlers', async () => {
         'total supply should be 1 billion IO but was ' + supplyData.total,
       );
       assert.ok(
-        supplyData.circulating === 1000000000 * 1000000,
+        supplyData.circulating === 950000000 * 1000000,
         'circulating supply should be 1 billion IO but was ' +
           supplyData.circulating,
+      );
+      assert.ok(
+        supplyData.protocolBalance === 50000000000000,
+        'protocol balance should be 50M IO but was ' +
+          supplyData.protocolBalance,
       );
       assert.ok(
         supplyData.locked === 0,
