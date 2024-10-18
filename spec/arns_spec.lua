@@ -21,6 +21,7 @@ describe("arns", function()
 			[testAddressArweave] = startBalance,
 			[testAddressEth] = startBalance,
 		}
+		_G.DemandFactor.currentDemandFactor = 1.0
 	end)
 
 	for addressType, testAddress in pairs(testAddresses) do
@@ -423,6 +424,60 @@ describe("arns", function()
 			end)
 		end)
 	end
+
+	describe("getTokenCost", function()
+		it("should return the correct token cost for a lease", function()
+			local baseFee = 500000000
+			local years = 2
+			local demandFactor = 0.974
+			local expectedCost = math.floor((years * baseFee * 0.20) + baseFee) * demandFactor
+			local intendedAction = {
+				intent = "Buy-Record",
+				purchaseType = "lease",
+				years = 2,
+				name = "test-name",
+			}
+			_G.DemandFactor.currentDemandFactor = demandFactor
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+		end)
+		it("should return the correct token cost for a permabuy", function()
+			local baseFee = 500000000
+			local demandFactor = 1.052
+			local expectedCost = math.floor((baseFee * 0.2 * 20) + baseFee) * demandFactor
+			local intendedAction = {
+				intent = "Buy-Record",
+				purchaseType = "permabuy",
+				name = "test-name",
+			}
+			_G.DemandFactor.currentDemandFactor = demandFactor
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+		end)
+		it("should return the correct token cost for an undername", function()
+			_G.NameRegistry.records["test-name"] = {
+				endTimestamp = constants.oneYearMs,
+				processId = testProcessId,
+				purchasePrice = 600000000,
+				startTimestamp = 0,
+				type = "lease",
+				undernameLimit = 10,
+			}
+			local baseFee = 500000000
+			local undernamePercentageFee = 0.001
+			local increaseQty = 5
+			local demandFactor = 0.60137
+			local yearsRemaining = 0.5
+			local expectedCost =
+				math.floor(baseFee * increaseQty * undernamePercentageFee * yearsRemaining * demandFactor)
+			local intendedAction = {
+				intent = "Increase-Undername-Limit",
+				quantity = 5,
+				name = "test-name",
+				currentTimestamp = constants.oneYearMs / 2,
+			}
+			_G.DemandFactor.currentDemandFactor = demandFactor
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+		end)
+	end)
 
 	describe("pruneRecords", function()
 		it("should prune records", function()

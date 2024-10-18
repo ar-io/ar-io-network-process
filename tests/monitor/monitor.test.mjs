@@ -33,7 +33,7 @@ describe('setup', () => {
 
   describe('handlers', () => {
     it('should always have correct number of handlers', async () => {
-      const expectedHandlerCount = 52; // TODO: update this if more handlers are added
+      const expectedHandlerCount = 53; // TODO: update this if more handlers are added
       const { Handlers: handlersList } = await io.getInfo();
       /**
        * There are two security handlers before _eval and _default, so count is 52
