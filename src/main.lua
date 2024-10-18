@@ -1209,7 +1209,13 @@ addEventingHandler(
 		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 		local quantity = tonumber(msg.Tags.Quantity)
 		-- Convert the string value of Instant to a boolean value
-		local instantWithdraw = msg.Tags.Instant == "true"
+		local instantWithdraw = false
+		if msg.Tags.Instant and msg.Tags.Instant == "true" then
+			instantWithdraw = true
+		else
+			instantWithdraw = false
+		end
+
 		msg.ioEvent:addField("TargetFormatted", target)
 
 		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
@@ -1229,7 +1235,7 @@ addEventingHandler(
 			msg.ioEvent:addField("PreviousStake", newStake + quantity)
 			msg.ioEvent:addField("NewStake", newStake)
 			msg.ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
-			msg.ioEvent:addField("InstantWithdrawal", insantWithdraw)
+			msg.ioEvent:addField("InstantWithdrawal", instantWithdraw)
 			delegateResult = gateway.delegates[from]
 			local newDelegateVaults = delegateResult.vaults
 			if newDelegateVaults ~= nil then

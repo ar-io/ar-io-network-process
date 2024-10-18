@@ -830,7 +830,6 @@ describe('GatewayRegistry', async () => {
       );
 
       const gatewayData = JSON.parse(gateway.Messages[0].Data);
-      console.log ("1: Gateway Data Is: ", gatewayData)
       
       assert.deepEqual(gatewayData.delegates, {
         [newStubAddress]: {
@@ -841,6 +840,39 @@ describe('GatewayRegistry', async () => {
       });
       assert.deepEqual(gatewayData.totalDelegatedStake, 2_000_000_000);
       sharedMemory = cancelWithdrawalResult.Memory;
+    });
+
+    it('should not decrease delegate stake with invalid instant withdrawal tag', async () => {
+      const instantWithdrawalTimestamp = stubbedTimestamp + 1000 * 60 * 15; // 15 minutes after stubbedTimestamp
+      const decreaseStakeResult = await handle(
+        {
+          From: newStubAddress,
+          Owner: newStubAddress,
+          Timestamp: instantWithdrawalTimestamp,
+          Id: ''.padEnd(43, 'x'),
+          Tags: [
+            { name: 'Action', value: 'Decrease-Delegate-Stake' },
+            { name: 'Address', value: STUB_ADDRESS },
+            { name: 'Quantity', value: '1000000000' }, // 1K IO
+            { name: 'Instant', value: 'false' }, // FOR SOME REASON THIS WORKS IF YOU PUT 'false' :O
+          ],
+        },
+        sharedMemory,
+      );
+    
+      // get the updated gateway record
+      const gateway = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Gateway' },
+            { name: 'Address', value: STUB_ADDRESS },
+          ],
+          Timestamp: instantWithdrawalTimestamp + 1,
+        },
+        decreaseStakeResult.Memory,
+      );
+      const gatewayData = JSON.parse(gateway.Messages[0].Data);
+      assert.deepEqual(gatewayData.totalDelegatedStake, 2_000_000_000);
     });
 
     it('should decrease delegate stake with instant withdrawal', async () => {
@@ -860,8 +892,6 @@ describe('GatewayRegistry', async () => {
         },
         sharedMemory,
       );
-
-      console.log ("2: decrease stake result: ", decreaseStakeResult.Messages[0].Data)
     
       // get the updated gateway record
       const gateway = await handle(
@@ -875,7 +905,6 @@ describe('GatewayRegistry', async () => {
         decreaseStakeResult.Memory,
       );
       const gatewayData = JSON.parse(gateway.Messages[0].Data);
-      console.log ("3: gateway result: ", gatewayData)
       // Assertions
       assert.deepEqual(gatewayData.delegates, {
         [newStubAddress]: {
@@ -948,9 +977,12 @@ describe('GatewayRegistry', async () => {
       );
 
       gatewayData = JSON.parse(gateway.Messages[0].Data);
+      console.log ("1: ", gatewayData)
       assert.deepEqual(gatewayData.delegates, []);
       assert.deepEqual(gatewayData.totalDelegatedStake, 0);
       sharedMemory = instantDecreaseStakeResult.Memory;
     });
+
+
   });
 });
