@@ -830,7 +830,7 @@ describe('GatewayRegistry', async () => {
       );
 
       const gatewayData = JSON.parse(gateway.Messages[0].Data);
-      
+
       assert.deepEqual(gatewayData.delegates, {
         [newStubAddress]: {
           delegatedStake: 2_000_000_000,
@@ -859,7 +859,7 @@ describe('GatewayRegistry', async () => {
         },
         sharedMemory,
       );
-    
+
       // get the updated gateway record
       const gateway = await handle(
         {
@@ -887,12 +887,12 @@ describe('GatewayRegistry', async () => {
             { name: 'Action', value: 'Decrease-Delegate-Stake' },
             { name: 'Address', value: STUB_ADDRESS },
             { name: 'Quantity', value: '1000000000' }, // 1K IO
-            { name: 'Instant', value: "true" },
+            { name: 'Instant', value: 'true' },
           ],
         },
         sharedMemory,
       );
-    
+
       // get the updated gateway record
       const gateway = await handle(
         {
@@ -915,7 +915,6 @@ describe('GatewayRegistry', async () => {
       });
       assert.deepEqual(gatewayData.totalDelegatedStake, 1_000_000_000);
       sharedMemory = decreaseStakeResult.Memory;
-
     });
 
     it('should allow decrease delegate stake from a gateway followed up with instant withdrawal', async () => {
@@ -946,9 +945,10 @@ describe('GatewayRegistry', async () => {
         },
         decreaseStakeResult.Memory,
       );
-      let gatewayData = JSON.parse(gateway.Messages[0].Data);  
+      let gatewayData = JSON.parse(gateway.Messages[0].Data);
 
-      const instantDecreaseStakeTimestamp = decreaseStakeTimestamp + 1000 * 60 * 60; // 60 minutes after stubbedTimestamp
+      const instantDecreaseStakeTimestamp =
+        decreaseStakeTimestamp + 1000 * 60 * 60; // 60 minutes after stubbedTimestamp
       const instantDecreaseStakeResult = await handle(
         {
           From: newStubAddress,
@@ -977,12 +977,10 @@ describe('GatewayRegistry', async () => {
       );
 
       gatewayData = JSON.parse(gateway.Messages[0].Data);
-      console.log ("1: ", gatewayData)
+      console.log('1: ', gatewayData);
       assert.deepEqual(gatewayData.delegates, []);
       assert.deepEqual(gatewayData.totalDelegatedStake, 0);
       sharedMemory = instantDecreaseStakeResult.Memory;
     });
-
-
   });
 });

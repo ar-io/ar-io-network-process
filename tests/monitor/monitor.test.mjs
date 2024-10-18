@@ -244,6 +244,7 @@ describe('setup', () => {
           if (gateway.status === 'leaving') {
             assert(gateway.totalDelegatedStake === 0);
             assert(gateway.operatorStake === 0);
+<<<<<<< HEAD
             for (const [vaultId, vault] of Object.entries(gateway.vaults)) {
               if (vaultId === gateway.gatewayAddress) {
                 assert(
@@ -270,6 +271,14 @@ describe('setup', () => {
                 `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`,
               );
             }
+=======
+            assert(
+              gateway.vaults[gateway.gatewayAddress].balance >= 0 &&
+                gateway.vaults[gateway.gatewayAddress].balance <=
+                  50_000_000_000,
+              `Gateway ${gateway.gatewayAddress} is leaving with invalid amount of IO vaulted against the wallet address. Any stake higher than the minimum staked amount of 50_000_000_000 IO should be vaulted against the message id.`,
+            );
+>>>>>>> bdce999 (chore: run prettier)
           }
         }
         cursor = nextCursor;
