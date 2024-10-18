@@ -82,6 +82,7 @@ local ActionMap = {
 	DelegateStake = "Delegate-Stake",
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
 	CancelDelegateWithdrawal = "Cancel-Delegate-Withdrawal",
+	InstantDelegateWithdrawal = "Instant-Delegate-Withdrawal",
 }
 
 -- Low fidelity trackers
@@ -1114,6 +1115,68 @@ addEventingHandler(
 )
 
 addEventingHandler(
+	ActionMap.InstantDelegateWithdrawal,
+	utils.hasMatchingTag("Action", ActionMap.InstantDelegateWithdrawal),
+	function(msg)
+		local checkAssertions = function()
+			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
+			assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
+		end
+
+		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-Instant-Delegate-Withdrawal-Notice", Error = "Bad-Input" },
+				Data = tostring(error),
+			})
+		end, checkAssertions)
+		if not shouldContinue then
+			return
+		end
+
+		local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
+		local fromAddress = utils.formatAddress(msg.From)
+		local vaultId = msg.Tags["Vault-Id"]
+		msg.ioEvent:addField("TargetFormatted", gatewayAddress)
+
+		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Invalid-Instant-Delegate-Withdrawal-Notice",
+					Error = "Invalid-Instant-Delegate-Withdrawal",
+				},
+				Data = tostring(error),
+			})
+		end, gar.instantDelegateWithdrawal, fromAddress, gatewayAddress, vaultId, msg.Timestamp)
+		if not shouldContinue2 then
+			return
+		end
+
+		local delegateResult = {}
+		if result ~= nil then
+			if result.delegate ~= nil then
+				delegateResult = result.delegate
+				local newStake = delegateResult.delegatedStake
+				msg.ioEvent:addField("PreviousStake", newStake - delegateResult.vaults[vaultId].balance)
+				msg.ioEvent:addField("NewStake", newStake)
+				msg.ioEvent:addField("GatewayTotalDelegatedStake", result.totalDelegatedStake)
+			end
+		end
+
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Instant-Delegate-Withdrawal-Notice",
+				Address = gatewayAddress,
+				["Vault-Id"] = msg.Tags["Vault-Id"],
+			},
+			Data = json.encode(delegateResult),
+		})
+	end
+)
+
+addEventingHandler(
 	ActionMap.DecreaseDelegateStake,
 	utils.hasMatchingTag("Action", ActionMap.DecreaseDelegateStake),
 	function(msg)
@@ -1123,6 +1186,12 @@ addEventingHandler(
 				tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
 				"Invalid quantity. Must be integer greater than 0"
 			)
+			if msg.Tags.Instant ~= nil then
+				assert(
+					msg.Tags.Instant == "true" or msg.Tags.Instant == "false",
+					"Instant must be a string with value 'true' or 'false'"
+				)
+			end
 		end
 
 		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -1139,7 +1208,12 @@ addEventingHandler(
 		local from = utils.formatAddress(msg.From)
 		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 		local quantity = tonumber(msg.Tags.Quantity)
-		msg.ioEvent:addField("TargetFormatted", target)
+		local instantWithdraw = msg.Tags.Instant and msg.Tags.Instant == "true" or false
+		local timestamp = tonumber(msg.Timestamp)
+		local messageId = msg.Id
+
+		msg.ioEvent:addField("Target-Formatted", target)
+		msg.ioEvent:addField("Quantity", quantity)
 
 		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
@@ -1147,7 +1221,7 @@ addEventingHandler(
 				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Invalid-Decrease-Delegate-Stake" },
 				Data = tostring(error),
 			})
-		end, gar.decreaseDelegateStake, target, from, quantity, msg.Timestamp, msg.Id)
+		end, gar.decreaseDelegateStake, target, from, quantity, timestamp, messageId, instantWithdraw)
 		if not shouldContinue2 then
 			return
 		end
@@ -1155,10 +1229,10 @@ addEventingHandler(
 		local delegateResult = {}
 		if gateway ~= nil then
 			local newStake = gateway.delegates[from].delegatedStake
-			msg.ioEvent:addField("PreviousStake", newStake + quantity)
-			msg.ioEvent:addField("NewStake", newStake)
-			msg.ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
-
+			msg.ioEvent:addField("Previous-Stake", newStake + quantity)
+			msg.ioEvent:addField("New-Stake", newStake)
+			msg.ioEvent:addField("Gateway-Total-Delegated-Stake", gateway.totalDelegatedStake)
+			msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
 			delegateResult = gateway.delegates[from]
 			local newDelegateVaults = delegateResult.vaults
 			if newDelegateVaults ~= nil then
@@ -1166,16 +1240,16 @@ addEventingHandler(
 				local newDelegateVault = newDelegateVaults[msg.Id]
 				if newDelegateVault ~= nil then
 					msg.ioEvent:addField("Vault-Id", msg.Id)
-					msg.ioEvent:addField("VaultBalance", newDelegateVault.balance)
-					msg.ioEvent:addField("VaultStartTimestamp", newDelegateVault.startTimestamp)
-					msg.ioEvent:addField("VaultEndTimestamp", newDelegateVault.endTimestamp)
+					msg.ioEvent:addField("Vault-Balance", newDelegateVault.balance)
+					msg.ioEvent:addField("Vault-Start-Timestamp", newDelegateVault.startTimestamp)
+					msg.ioEvent:addField("Vault-End-Timestamp", newDelegateVault.endTimestamp)
 				end
 			end
 		end
 
 		ao.send({
 			Target = from,
-			Tags = { Action = "Decrease-Delegate-Stake-Notice", Adddress = target, Quantity = msg.Tags.Quantity },
+			Tags = { Action = "Decrease-Delegate-Stake-Notice", Address = target, Quantity = quantity },
 			Data = json.encode(delegateResult),
 		})
 	end
