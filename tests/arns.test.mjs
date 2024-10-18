@@ -110,11 +110,6 @@ describe('ArNS', async () => {
       'Reserved-Records-Count': 0,
       'Remaining-Balance': expectedRemainingBalance[sender],
       'Circulating-Supply': -600000000, // Artifact of starting out without initializing this properly
-      'Total-Supply': 0, // Artifact of starting out without initializing this properly
-      'Staked-Supply': 0,
-      'Delegated-Supply': 0,
-      'Locked-Supply': 0,
-      'Withdraw-Supply': 0,
     });
 
     // fetch the record
