@@ -1798,4 +1798,31 @@ describe("gar", function()
 			})
 		end)
 	end)
+
+	describe("getPaginatedGateways", function()
+		it("should return paginated gateways sorted by startTimestamp in ascending order (oldest first)", function()
+			local gateway1 = utils.deepCopy(testGateway)
+			local gateway2 = utils.deepCopy(testGateway)
+			gateway1.startTimestamp = 1000
+			gateway2.startTimestamp = 0
+			_G.GatewayRegistry = {
+				[stubGatewayAddress] = gateway1,
+				[stubRandomAddress] = gateway2,
+			}
+			local gateways = gar.getPaginatedGateways(nil, 10, "startTimestamp", "asc")
+			gateway1.gatewayAddress = stubGatewayAddress
+			gateway2.gatewayAddress = stubRandomAddress
+			assert.are.same({
+				limit = 10,
+				sortBy = "startTimestamp",
+				sortOrder = "asc",
+				hasMore = false,
+				totalItems = 2,
+				items = {
+					gateway2, -- should be first because it has a lower startTimestamp
+					gateway1,
+				},
+			}, gateways)
+		end)
+	end)
 end)
