@@ -228,8 +228,10 @@ end
 
 function utils.lengthOfTable(table)
 	local count = 0
-	for _ in pairs(table) do
-		count = count + 1
+	for _, val in pairs(table) do
+		if val then
+			count = count + 1
+		end
 	end
 	return count
 end
