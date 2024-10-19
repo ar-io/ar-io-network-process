@@ -72,16 +72,22 @@ function utils.sortTableByField(prevTable, field, order)
 	end
 
 	table.sort(tableCopy, function(a, b)
-		-- If the field is not present in the table, return false
-		if not a[field] or not b[field] then
-			print("Field not found in table, skipping:" .. field .. " " .. json.encode(a) .. " " .. json.encode(b))
+		local aField = a[field]
+		local bField = b[field]
+		-- If one field is nil, ensure it goes to the end
+		if aField == nil and bField ~= nil then
+			return false
+		elseif aField ~= nil and bField == nil then
+			return true
+		elseif aField == nil and bField == nil then
+			-- If both fields are nil, consider them equal
 			return false
 		end
 
 		if order == "asc" then
-			return a[field] < b[field]
+			return aField < bField
 		else
-			return a[field] > b[field]
+			return aField > bField
 		end
 	end)
 	return tableCopy
@@ -131,7 +137,7 @@ function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, s
 		totalItems = #sortedArray,
 		sortBy = sortBy,
 		sortOrder = sortOrder,
-		nextCursor = nextCursor,
+		nextCursor = nextCursor, -- the last item in the current page
 		hasMore = nextCursor ~= nil,
 	}
 end

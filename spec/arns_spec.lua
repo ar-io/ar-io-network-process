@@ -584,4 +584,128 @@ describe("arns", function()
 			assert.are.equal(registrationFees["51"].lease["1"], 480000000)
 		end)
 	end)
+
+	describe("getPaginatedRecords", function()
+		before_each(function()
+			_G.NameRegistry = {
+				records = {
+					["active-record"] = {
+						endTimestamp = 100, -- far in the future
+						processId = "oldest-process-id",
+						purchasePrice = 600000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 10,
+					},
+					["active-record-1"] = {
+						endTimestamp = 10000,
+						processId = "middle-process-id",
+						purchasePrice = 400000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 5,
+					},
+					["active-record-2"] = {
+						endTimestamp = 10000000,
+						processId = "newest-process-id",
+						purchasePrice = 500000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 8,
+					},
+					["permabuy-record"] = {
+						endTimestamp = nil,
+						processId = "permabuy-process-id",
+						purchasePrice = 600000000,
+						startTimestamp = 0,
+						type = "permabuy",
+						undernameLimit = 10,
+					},
+				},
+			}
+		end)
+
+		it("should return the correct paginated records with ascending putting permabuy at the end", function()
+			local paginatedRecords = arns.getPaginatedRecords(nil, 1, "endTimestamp", "asc")
+			assert.are.same({
+				limit = 1,
+				sortBy = "endTimestamp",
+				sortOrder = "asc",
+				hasMore = true,
+				totalItems = 4,
+				nextCursor = "active-record",
+				items = {
+					{
+						name = "active-record",
+						endTimestamp = 100,
+						processId = "oldest-process-id",
+						purchasePrice = 600000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 10,
+					},
+				},
+			}, paginatedRecords)
+			local paginatedRecords2 = arns.getPaginatedRecords(paginatedRecords.nextCursor, 1, "endTimestamp", "asc")
+			assert.are.same({
+				limit = 1,
+				sortBy = "endTimestamp",
+				sortOrder = "asc",
+				hasMore = true,
+				totalItems = 4,
+				nextCursor = "active-record-1",
+				items = {
+					{
+						name = "active-record-1",
+						endTimestamp = 10000,
+						processId = "middle-process-id",
+						purchasePrice = 400000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 5,
+					},
+				},
+			}, paginatedRecords2)
+			local paginatedRecords3 = arns.getPaginatedRecords(paginatedRecords2.nextCursor, 1, "endTimestamp", "asc")
+			assert.are.same({
+				limit = 1,
+				sortBy = "endTimestamp",
+				sortOrder = "asc",
+				hasMore = true,
+				totalItems = 4,
+				nextCursor = "active-record-2",
+				items = {
+					{
+						name = "active-record-2",
+						endTimestamp = 10000000,
+						processId = "newest-process-id",
+						purchasePrice = 500000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 8,
+					},
+				},
+			}, paginatedRecords3)
+			local paginatedRecords4 = arns.getPaginatedRecords(paginatedRecords3.nextCursor, 1, "endTimestamp", "asc")
+			assert.are.same({
+				limit = 1,
+				sortBy = "endTimestamp",
+				sortOrder = "asc",
+				hasMore = false,
+				totalItems = 4,
+				nextCursor = nil,
+				items = {
+					{
+						name = "permabuy-record",
+						endTimestamp = nil,
+						processId = "permabuy-process-id",
+						purchasePrice = 600000000,
+						startTimestamp = 0,
+						type = "permabuy",
+						undernameLimit = 10,
+					},
+				},
+			}, paginatedRecords4)
+		end)
+	end)
 end)
