@@ -1769,7 +1769,7 @@ describe("gar", function()
 					startTimestamp = timestamp + 10, -- joined after the timestamp
 					status = "joined",
 				},
-				["test-this-is-valid-arweave-wallet-address-3"] = {
+				["test-this-is-valid-arweave-wallet-address-4"] = {
 					startTimestamp = timestamp - 10, -- joined before the timestamp, but leaving
 					endTimestamp = timestamp + 100,
 					status = "leaving",
@@ -1809,20 +1809,33 @@ describe("gar", function()
 				[stubGatewayAddress] = gateway1,
 				[stubRandomAddress] = gateway2,
 			}
-			local gateways = gar.getPaginatedGateways(nil, 10, "startTimestamp", "asc")
+			local gateways = gar.getPaginatedGateways(nil, 1, "startTimestamp", "asc")
 			gateway1.gatewayAddress = stubGatewayAddress
 			gateway2.gatewayAddress = stubRandomAddress
 			assert.are.same({
-				limit = 10,
+				limit = 1,
 				sortBy = "startTimestamp",
 				sortOrder = "asc",
-				hasMore = false,
+				hasMore = true,
+				nextCursor = stubRandomAddress,
 				totalItems = 2,
 				items = {
 					gateway2, -- should be first because it has a lower startTimestamp
-					gateway1,
 				},
 			}, gateways)
+			-- get the next page
+			local nextGateways = gar.getPaginatedGateways(gateways.nextCursor, 1, "startTimestamp", "asc")
+			assert.are.same({
+				limit = 1,
+				sortBy = "startTimestamp",
+				sortOrder = "asc",
+				hasMore = false,
+				nextCursor = nil,
+				totalItems = 2,
+				items = {
+					gateway1,
+				},
+			}, nextGateways)
 		end)
 	end)
 end)
