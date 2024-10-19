@@ -88,9 +88,9 @@ function utils.sortTableByField(prevTable, field, order)
 end
 
 function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, sortBy, sortOrder)
-	local sortedTable = utils.sortTableByField(tableArray, sortBy, sortOrder)
+	local sortedArray = utils.sortTableByField(tableArray, sortBy, sortOrder)
 
-	if not sortedTable or utils.lengthOfTable(sortedTable) == 0 then
+	if not sortedArray or #sortedArray == 0 then
 		return {
 			items = {},
 			limit = limit,
@@ -105,7 +105,7 @@ function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, s
 	local startIndex = 1
 
 	if cursor then
-		for i, obj in ipairs(sortedTable) do
+		for i, obj in ipairs(sortedArray) do
 			if obj[cursorField] == cursor then
 				startIndex = i + 1
 				break
@@ -114,21 +114,21 @@ function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, s
 	end
 
 	local items = {}
-	local endIndex = math.min(startIndex + limit - 1, utils.lengthOfTable(sortedTable))
+	local endIndex = math.min(startIndex + limit - 1, #sortedArray)
 
 	for i = startIndex, endIndex do
-		table.insert(items, sortedTable[i])
+		table.insert(items, sortedArray[i])
 	end
 
 	local nextCursor = nil
-	if endIndex < utils.lengthOfTable(sortedTable) then
-		nextCursor = sortedTable[endIndex][cursorField]
+	if endIndex < #sortedArray then
+		nextCursor = sortedArray[endIndex][cursorField]
 	end
 
 	return {
 		items = items,
 		limit = limit,
-		totalItems = utils.lengthOfTable(sortedTable),
+		totalItems = #sortedArray,
 		sortBy = sortBy,
 		sortOrder = sortOrder,
 		nextCursor = nextCursor,
