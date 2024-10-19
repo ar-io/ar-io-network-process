@@ -72,39 +72,46 @@ function utils.sortTableByField(prevTable, field, order)
 	end
 
 	table.sort(tableCopy, function(a, b)
-		-- If the field is not present in the table, return false
-		if not a[field] or not b[field] then
-			print("Field not found in table, skipping:" .. field .. " " .. json.encode(a) .. " " .. json.encode(b))
+		local aField = a[field]
+		local bField = b[field]
+		-- If one field is nil, ensure it goes to the end
+		if aField == nil and bField ~= nil then
+			return false
+		elseif aField ~= nil and bField == nil then
+			return true
+		elseif aField == nil and bField == nil then
+			-- If both fields are nil, consider them equal
 			return false
 		end
 
 		if order == "asc" then
-			return a[field] < b[field]
+			return aField < bField
 		else
-			return a[field] > b[field]
+			return aField > bField
 		end
 	end)
 	return tableCopy
 end
 
 function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, sortBy, sortOrder)
-	local sortedTable = utils.sortTableByField(tableArray, sortBy, sortOrder)
-	if not sortedTable or #sortedTable == 0 then
+	local sortedArray = utils.sortTableByField(tableArray, sortBy, sortOrder)
+
+	if not sortedArray or #sortedArray == 0 then
 		return {
 			items = {},
 			limit = limit,
 			totalItems = 0,
-			totalPages = 0,
 			sortBy = sortBy,
 			sortOrder = sortOrder,
 			nextCursor = nil,
+			hasMore = false,
 		}
 	end
 
 	local startIndex = 1
 
 	if cursor then
-		for i, obj in ipairs(sortedTable) do
+		for i, obj in ipairs(sortedArray) do
 			if obj[cursorField] == cursor then
 				startIndex = i + 1
 				break
@@ -113,24 +120,24 @@ function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, s
 	end
 
 	local items = {}
-	local endIndex = math.min(startIndex + limit - 1, #sortedTable)
+	local endIndex = math.min(startIndex + limit - 1, #sortedArray)
 
 	for i = startIndex, endIndex do
-		table.insert(items, sortedTable[i])
+		table.insert(items, sortedArray[i])
 	end
 
 	local nextCursor = nil
-	if endIndex < #sortedTable then
-		nextCursor = sortedTable[endIndex][cursorField]
+	if endIndex < #sortedArray then
+		nextCursor = sortedArray[endIndex][cursorField]
 	end
 
 	return {
 		items = items,
 		limit = limit,
-		totalItems = #sortedTable,
+		totalItems = #sortedArray,
 		sortBy = sortBy,
 		sortOrder = sortOrder,
-		nextCursor = nextCursor,
+		nextCursor = nextCursor, -- the last item in the current page
 		hasMore = nextCursor ~= nil,
 	}
 end
