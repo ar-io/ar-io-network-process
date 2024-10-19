@@ -4,9 +4,10 @@ import { strict as assert } from 'node:assert';
 import { describe, it, before, after } from 'node:test';
 import { DockerComposeEnvironment, Wait } from 'testcontainers';
 
+const processId = process.env.IO_PROCESS_ID || IO_TESTNET_PROCESS_ID;
 const io = IO.init({
   process: new AOProcess({
-    processId: process.env.IO_PROCESS_ID || IO_TESTNET_PROCESS_ID,
+    processId,
     ao: connect({
       CU_URL: 'http://localhost:6363',
     }),
@@ -33,7 +34,8 @@ describe('setup', () => {
 
   describe('handlers', () => {
     it('should always have correct number of handlers', async () => {
-      const expectedHandlerCount = 53; // TODO: update this if more handlers are added
+      const expectedHandlerCount =
+        processId === IO_TESTNET_PROCESS_ID ? 52 : 53; // TODO: update this if more handlers are added
       const { Handlers: handlersList } = await io.getInfo();
       /**
        * There are two security handlers before _eval and _default, so count is 52
