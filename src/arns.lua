@@ -165,8 +165,7 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
 end
 
 function arns.getRecord(name)
-	local records = arns.getRecords()
-	return records[name]
+	return utils.deepCopy(NameRegistry.records[name])
 end
 
 function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
@@ -200,8 +199,7 @@ function arns.getReservedNames()
 end
 
 function arns.getReservedName(name)
-	local reserved = arns.getReservedNames()
-	return reserved[name]
+	return utils.deepCopy(NameRegistry.reserved[name])
 end
 
 function arns.modifyRecordundernameLimit(name, qty)
@@ -226,19 +224,6 @@ function arns.modifyRecordEndTimestamp(name, newEndTimestamp)
 	end
 
 	NameRegistry.records[name].endTimestamp = newEndTimestamp
-end
-
-function arns.addReservedName(name, details)
-	if arns.getReservedName(name) then
-		error("Name is already reserved")
-	end
-
-	if arns.getRecord(name) then
-		error("Name is already registered")
-	end
-
-	NameRegistry.reserved[name] = details
-	return arns.getReservedName(name)
 end
 
 -- internal functions

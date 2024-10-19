@@ -477,6 +477,27 @@ describe("arns", function()
 			_G.DemandFactor.currentDemandFactor = demandFactor
 			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
 		end)
+		it("should return the token cost for extending a name", function()
+			_G.NameRegistry.records["test-name"] = {
+				endTimestamp = timestamp + constants.oneYearMs,
+				processId = testProcessId,
+				purchasePrice = 600000000,
+				startTimestamp = 0,
+				type = "lease",
+				undernameLimit = 10,
+			}
+			local baseFee = 500000000
+			local years = 2
+			local demandFactor = 1.2405
+			local expectedCost = math.floor((years * baseFee * 0.20) * demandFactor)
+			local intendedAction = {
+				intent = "Extend-Lease",
+				years = 2,
+				name = "test-name",
+			}
+			_G.DemandFactor.currentDemandFactor = demandFactor
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+		end)
 	end)
 
 	describe("pruneRecords", function()
