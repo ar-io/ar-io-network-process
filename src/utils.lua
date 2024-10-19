@@ -132,7 +132,7 @@ function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, s
 		sortBy = sortBy,
 		sortOrder = sortOrder,
 		nextCursor = nextCursor,
-		hasMore = nextCursor ~= nil and true or false,
+		hasMore = nextCursor ~= nil,
 	}
 end
 
