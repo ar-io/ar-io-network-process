@@ -118,9 +118,13 @@ describe('ArNS', async () => {
       'Protocol-Balance': expectedRemainingBalance[PROCESS_ID],
       'Reserved-Records-Count': 0,
       'Remaining-Balance': expectedRemainingBalance[sender],
-      'Epoch-Index': -183,
-    };
-    assert.deepEqual(buyRecordEvent, expectedEvent);
+      'Circulating-Supply': -600000000, // Artifact of starting out without initializing this properly
+      'Total-Token-Supply': 50000000000000, // Artifact of starting out without initializing this properly
+      'Staked-Supply': 0, // Artifact of starting out without initializing this properly
+      'Delegated-Supply': 0, // Artifact of starting out without initializing this properly
+      'Withdraw-Supply': 0, // Artifact of starting out without initializing this properly
+      'Locked-Supply': 0, // Artifact of starting out without initializing this properly
+    });
 
     // fetch the record
     const realRecord = await handle(
