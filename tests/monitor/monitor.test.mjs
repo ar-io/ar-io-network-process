@@ -189,8 +189,13 @@ describe('setup', () => {
       );
     });
     it('should contain the startTimestamp, endTimestamp and distributions and observations for the current epoch', async () => {
-      const { epochIndex, startTimestamp, endTimestamp, distributions, observations } =
-        await io.getCurrentEpoch();
+      const {
+        epochIndex,
+        startTimestamp,
+        endTimestamp,
+        distributions,
+        observations,
+      } = await io.getCurrentEpoch();
       assert(epochIndex > 0, 'Epoch index is not valid');
       assert(distributions, 'Distributions are not valid');
       assert(observations, 'Observations are not valid');
@@ -202,10 +207,7 @@ describe('setup', () => {
         endTimestamp > startTimestamp,
         `End timestamp is not greater than start timestamp: ${endTimestamp} > ${startTimestamp}`,
       );
-      assert(
-        distributions.rewards.eligible,
-        'Eligible rewards are not valid',
-      );
+      assert(distributions.rewards.eligible, 'Eligible rewards are not valid');
 
       // compare the current gateway count to the current epoch totalEligibleRewards
       const { items: gateways } = await io.getGateways({
@@ -264,7 +266,11 @@ describe('setup', () => {
       let countedTotalGateways = 0;
       let totalGateways = 0;
       do {
-        const { items: gateways, nextCursor, totalItems } = await io.getGateways({
+        const {
+          items: gateways,
+          nextCursor,
+          totalItems,
+        } = await io.getGateways({
           cursor,
         });
         totalGateways = totalItems;
@@ -353,7 +359,11 @@ describe('setup', () => {
       let countedTotalArns = 0;
       let totalArns = 0;
       do {
-        const { items: arns, nextCursor, totalItems } = await io.getArNSRecords({
+        const {
+          items: arns,
+          nextCursor,
+          totalItems,
+        } = await io.getArNSRecords({
           cursor,
         });
         totalArns = totalItems;
