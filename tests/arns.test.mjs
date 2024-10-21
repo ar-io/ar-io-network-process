@@ -438,7 +438,7 @@ describe('ArNS', async () => {
     );
 
     // assert no error tag
-    const releaseNameErrorTag = releaseNameResult.Messages[0].Tags.find(
+    const releaseNameErrorTag = releaseNameResult.Messages?.[0]?.Tags?.find(
       (tag) => tag.name === 'Error',
     );
     assert.equal(releaseNameErrorTag, undefined);
@@ -469,7 +469,7 @@ describe('ArNS', async () => {
       endTimestamp: expectedStartTimestamp + 60 * 60 * 1000 * 24 * 14,
       currentPrice: expectedStartPrice,
       settings: {
-        decayRate: (0.020379 / (1000 * 60 * 60 * 24 * 14)).toFixed(24),
+        decayRate: (0.02037911 / (1000 * 60 * 60 * 24 * 14)).toFixed(24),
         scalingExponent: 190,
         baseFee: 500000000,
         demandFactor: 1,
@@ -584,6 +584,118 @@ describe('ArNS', async () => {
     assert.equal(balances['test-owner-of-ant'], expectedRewardForInitiator);
     assert.equal(balances[PROCESS_ID], expectedProtocolBalance);
     assert.equal(balances[bidderAddress], 0);
+  });
+
+  it('should compute the prices of an auction at a specific interval', async () => {
+    // buy the name first
+    const processId = ''.padEnd(43, 'a');
+    const { mem } = await runBuyRecord({
+      sender: STUB_ADDRESS,
+      processId,
+      type: 'permabuy',
+    });
+
+    const releaseNameResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Release-Name' },
+          { name: 'Name', value: 'test-name' },
+          { name: 'Initiator', value: 'test-owner-of-ant' }, // simulate who the owner is of the ANT process when sending the message
+        ],
+        From: processId,
+        Owner: processId,
+      },
+      mem,
+    );
+
+    // assert no error tag
+    const releaseNameErrorTag = releaseNameResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.equal(releaseNameErrorTag, undefined);
+
+    // fetch the auction
+    const auctionResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Auction-Info' },
+          { name: 'Name', value: 'test-name' },
+        ],
+      },
+      releaseNameResult.Memory,
+    );
+    // assert no error tag
+    const auctionErrorTag = auctionResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+
+    assert.equal(auctionErrorTag, undefined);
+    const auctionPrices = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Auction-Prices' },
+          { name: 'Name', value: 'test-name' },
+        ],
+      },
+      releaseNameResult.Memory,
+    );
+
+    // assert no error tag for auction prices
+    const auctionPricesErrorTag = auctionPrices.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.equal(auctionPricesErrorTag, undefined);
+
+    // parse the auction prices data
+    const auctionPricesData = JSON.parse(auctionPrices.Messages?.[0]?.Data);
+
+    // expectations
+    const expectedStartPrice = 125000000000;
+    const expectedFloorPrice = Math.floor(expectedStartPrice / 50);
+
+    // validate the response structure
+    assert.ok(auctionPricesData.name, 'Auction prices should include a name');
+    assert.ok(auctionPricesData.type, 'Auction prices should include a type');
+    assert.ok(auctionPricesData.prices, 'Auction prices should include prices');
+    assert.ok(
+      auctionPricesData.currentPrice,
+      'Auction prices should include a current price',
+    );
+
+    // validate the prices
+    assert.ok(
+      Object.keys(auctionPricesData.prices).length > 0,
+      'Prices should not be empty',
+    );
+    Object.entries(auctionPricesData.prices).forEach(([timestamp, price]) => {
+      assert.ok(
+        Number.isInteger(Number(timestamp)),
+        'Timestamp should be a number',
+      );
+      assert.ok(Number.isInteger(price), 'Price should be an integer');
+      assert.ok(price > 0, 'Price should be positive');
+    });
+    // assert the first price is the start price
+    assert.equal(auctionPricesData.prices[STUB_TIMESTAMP], expectedStartPrice);
+
+    // assert the last price is the floor price
+    const lastPriceTimestamp = Math.max(
+      ...Object.keys(auctionPricesData.prices).map(Number),
+    );
+    assert.equal(
+      auctionPricesData.prices[lastPriceTimestamp],
+      expectedFloorPrice,
+    );
+
+    // validate the current price
+    assert.ok(
+      Number.isInteger(auctionPricesData.currentPrice),
+      'Current price should be an integer',
+    );
+    assert.ok(
+      auctionPricesData.currentPrice > 0,
+      'Current price should be positive',
+    );
   });
 
   // TODO: add several error scenarios

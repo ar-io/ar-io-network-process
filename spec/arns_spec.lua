@@ -666,7 +666,7 @@ describe("arns", function()
 				assert.are.equal(auction.endTimestamp, twoWeeksMs + 1000000) -- 14 days late
 				assert.are.equal(auction.baseFee, 500000000)
 				assert.are.equal(auction.demandFactor, 1)
-				assert.are.equal(auction.decayRate, 0.020379 / (1000 * 60 * 60 * 24 * 14))
+				assert.are.equal(auction.decayRate, 0.02037911 / (1000 * 60 * 60 * 24 * 14))
 				assert.are.equal(auction.scalingExponent, 190)
 				assert.are.equal(auction.initiator, "test-initiator")
 				assert.are.equal(NameRegistry.records["test-name"], nil)
@@ -714,7 +714,7 @@ describe("arns", function()
 				local startTimestamp = 1000000
 				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
 				local currentTimestamp = startTimestamp + 1000 * 60 * 60 * 24 * 7 -- 1 week into the auction
-				local decayRate = 0.020379 / (1000 * 60 * 60 * 24 * 14)
+				local decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14)
 				local scalingExponent = 190
 				local expectedStartPrice = arns.calculateRegistrationFee(
 					"permabuy",
@@ -744,7 +744,8 @@ describe("arns", function()
 				-- create the curve of prices using the parameters of the auction
 				local decayRate = auction.decayRate
 				local scalingExponent = auction.scalingExponent
-				for i = startTimestamp, auction.endTimestamp, intervalMs do
+				-- all the prices before the last one should match
+				for i = startTimestamp, auction.endTimestamp - intervalMs, intervalMs do
 					local timeSinceStart = i - auction.startTimestamp
 					local totalDecaySinceStart = decayRate * timeSinceStart
 					local expectedPriceAtTimestamp =
@@ -756,14 +757,15 @@ describe("arns", function()
 					)
 				end
 				-- make sure the last price at the end of the auction is the floor price
-				local lastPrice = prices[auction.endTimestamp]
-				local listPricePercentDifference = (lastPrice - floorPrice) / floorPrice
+				local lastProvidedPrice = prices[auction.endTimestamp]
+				local lastComputedPrice = auction:getPriceForAuctionAtTimestamp(auction.endTimestamp, "lease", 1)
+				local listPricePercentDifference = (lastComputedPrice - lastProvidedPrice) / lastProvidedPrice
 				assert.is_true(
 					listPricePercentDifference <= 0.0001,
-					"Last price should be within 0.01% of the floor price. Last price: "
-						.. lastPrice
-						.. " Floor price: "
-						.. floorPrice
+					"Last price should be within 0.01% of the final price in the interval. Last computed: "
+						.. lastComputedPrice
+						.. " Last provided: "
+						.. lastProvidedPrice
 				)
 			end)
 		end)

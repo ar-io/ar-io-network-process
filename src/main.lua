@@ -85,9 +85,10 @@ local ActionMap = {
 	InstantDelegateWithdrawal = "Instant-Delegate-Withdrawal",
 
 	-- auctions
-	AuctionInfo = "Auction-Info",
 	ReleaseName = "Release-Name",
+	AuctionInfo = "Auction-Info",
 	AuctionBid = "Auction-Bid",
+	AuctionPrices = "Auction-Prices",
 }
 
 -- Low fidelity trackers
@@ -2249,6 +2250,44 @@ addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.Aucti
 		Target = msg.From,
 		Action = ActionMap.AuctionInfo .. "-Notice",
 		Data = json.encode(auctionObj),
+	})
+end)
+
+-- Handler to get auction prices for a name
+addEventingHandler("auctionPrices", utils.hasMatchingTag("Action", ActionMap.AuctionPrices), function(msg)
+	local name = string.lower(msg.Tags.Name)
+	local auction = arns.getAuction(name)
+	local timestamp = tonumber(msg.Tags.Timestamp or msg.Timestamp)
+	local type = msg.Tags.Type or "permabuy"
+	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
+	local intervalMs = msg.Tags["Price-Interval"] and tonumber(msg.Tags["Price-Interval"]) or 15 * 60 * 1000 -- 15 minute intervals
+
+	if not auction then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionPrices .. "-Notice",
+			Error = "Auction-Not-Found",
+		})
+		return
+	end
+
+	local prices = auction:computePricesForAuction(type, years, intervalMs)
+	local currentPrice = auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
+	local jsonPrices = {}
+	for k, v in pairs(prices) do
+		jsonPrices[tostring(k)] = v
+	end
+
+	ao.send({
+		Target = msg.From,
+		Action = ActionMap.AuctionPrices .. "-Notice",
+		Data = json.encode({
+			name = auction.name,
+			type = type,
+			years = years,
+			prices = jsonPrices,
+			currentPrice = currentPrice,
+		}),
 	})
 end)
 

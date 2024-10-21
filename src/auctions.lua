@@ -76,12 +76,24 @@ end
 --- @param years number The number of years for the auction
 --- @return number The current price for the auction at the given timestamp
 function Auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
-	local startPrice = self.registrationFeeCalculator(type, self.baseFee, years, self.demandFactor)
-		* self.startPriceMultiplier
+	local startPrice = self:startPrice(type, years)
+	local floorPrice = self:floorPrice(type, years)
 	local timeSinceStart = timestamp - self.startTimestamp
 	local totalDecaySinceStart = self.decayRate * timeSinceStart
 	local currentPrice = math.floor(startPrice * ((1 - totalDecaySinceStart) ^ self.scalingExponent))
-	return currentPrice
+	return math.max(currentPrice, floorPrice)
+end
+
+--- Returns the start price for the auction
+--- @return number The start price for the auction
+function Auction:startPrice(type, years)
+	return self:floorPrice(type, years) * self.startPriceMultiplier
+end
+
+--- Returns the floor price for the auction
+--- @return number The floor price for the auction
+function Auction:floorPrice(type, years)
+	return self.registrationFeeCalculator(type, self.baseFee, years, self.demandFactor)
 end
 
 return Auction

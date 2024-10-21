@@ -439,7 +439,7 @@ function arns.createAuction(name, timestamp, initiator)
 		error("Auction already exists for name")
 	end
 	local durationMs = 60 * 1000 * 60 * 24 * 14 -- 14 days in milliseconds
-	local decayRate = 0.020379 / durationMs
+	local decayRate = 0.02037911 / durationMs
 	local scalingExponent = 190
 	local baseFee = demand.getFees()[#name]
 	local demandFactor = demand.getDemandFactor()
