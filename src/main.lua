@@ -86,11 +86,11 @@ local ActionMap = {
 }
 
 -- Low fidelity trackers
-local lastKnownCirculatingSupply = 0
-local lastKnownLockedSupply = 0
-local lastKnownStakedSupply = 0
-local lastKnownDelegatedSupply = 0
-local lastKnownWithdrawSupply = 0
+local lastKnownCirculatingSupply = lastKnownCirculatingSupply or 0
+local lastKnownLockedSupply = lastKnownLockedSupply or 0
+local lastKnownStakedSupply = lastKnownStakedSupply or 0
+local lastKnownDelegatedSupply = lastKnownDelegatedSupply or 0
+local lastKnownWithdrawSupply = lastKnownWithdrawSupply or 0
 local function lastKnownTotalTokenSupply()
 	return lastKnownCirculatingSupply
 		+ lastKnownLockedSupply
