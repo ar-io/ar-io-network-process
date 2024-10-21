@@ -600,23 +600,21 @@ describe("arns", function()
 			local existingAuction = Auction:new(
 				"active-auction",
 				currentTimestamp,
-				1000 * 60 * 60 * 24 * 14,
-				0.020379 / (1000 * 60 * 60 * 24 * 14),
-				190,
 				1,
-				1000000000,
-				"test-initiator"
+				500000000,
+				"test-initiator",
+				arns.calculateRegistrationFee
 			)
 			local expiredAuction = Auction:new(
 				"expired-auction",
-				currentTimestamp - 1,
-				0, -- ended after 0 ms
-				0.020379 / (1000 * 60 * 60 * 24 * 14),
-				190,
+				currentTimestamp,
 				1,
-				1000000000,
-				"test-initiator"
+				500000000,
+				"test-initiator",
+				arns.calculateRegistrationFee
 			)
+			-- manually set the end timestamp to the current timestamp
+			expiredAuction.endTimestamp = currentTimestamp
 			_G.NameRegistry.auctions = {
 				["active-auction"] = existingAuction,
 				["expired-auction"] = expiredAuction,
@@ -664,27 +662,19 @@ describe("arns", function()
 				assert.are.equal(auction.name, "test-name")
 				assert.are.equal(auction.startTimestamp, 1000000)
 				assert.are.equal(auction.endTimestamp, twoWeeksMs + 1000000) -- 14 days late
+				assert.are.equal(auction.initiator, "test-initiator")
 				assert.are.equal(auction.baseFee, 500000000)
 				assert.are.equal(auction.demandFactor, 1)
-				assert.are.equal(auction.decayRate, 0.02037911 / (1000 * 60 * 60 * 24 * 14))
-				assert.are.equal(auction.scalingExponent, 190)
-				assert.are.equal(auction.initiator, "test-initiator")
+				assert.are.equal(auction.settings.decayRate, 0.02037911 / (1000 * 60 * 60 * 24 * 14))
+				assert.are.equal(auction.settings.scalingExponent, 190)
+				assert.are.equal(auction.settings.startPriceMultiplier, 50)
+				assert.are.equal(auction.settings.durationMs, twoWeeksMs)
 				assert.are.equal(NameRegistry.records["test-name"], nil)
 			end)
 
 			it("should throw an error if the name is already in the auction map", function()
-				local existingAuction = Auction:new(
-					"test-name",
-					1000000,
-					1000 * 60 * 60 * 24 * 14,
-					0.020379 / (1000 * 60 * 60 * 24 * 14),
-					190,
-					1,
-					500000000,
-					"test-initiator",
-					50,
-					arns.calculateRegistrationFee
-				)
+				local existingAuction =
+					Auction:new("test-name", 1000000, 1, 500000000, "test-initiator", arns.calculateRegistrationFee)
 				_G.NameRegistry.auctions = {
 					["test-name"] = existingAuction,
 				}
@@ -716,7 +706,7 @@ describe("arns", function()
 				local currentTimestamp = startTimestamp + 1000 * 60 * 60 * 24 * 7 -- 1 week into the auction
 				local decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14)
 				local scalingExponent = 190
-				local expectedStartPrice = arns.calculateRegistrationFee(
+				local expectedStartPrice = auction.registrationFeeCalculator(
 					"permabuy",
 					auction.baseFee,
 					nil,
@@ -742,8 +732,8 @@ describe("arns", function()
 				local floorPrice = baseFee + oneYearLeaseFee
 				local startPriceForLease = floorPrice * 50
 				-- create the curve of prices using the parameters of the auction
-				local decayRate = auction.decayRate
-				local scalingExponent = auction.scalingExponent
+				local decayRate = auction.settings.decayRate
+				local scalingExponent = auction.settings.scalingExponent
 				-- all the prices before the last one should match
 				for i = startTimestamp, auction.endTimestamp - intervalMs, intervalMs do
 					local timeSinceStart = i - auction.startTimestamp
@@ -795,7 +785,10 @@ describe("arns", function()
 					local balances = balances.getBalances()
 					local expectedPrice = math.floor(
 						startPrice
-							* ((1 - (auction.decayRate * (bidTimestamp - startTimestamp))) ^ auction.scalingExponent)
+							* (
+								(1 - (auction.settings.decayRate * (bidTimestamp - startTimestamp)))
+								^ auction.settings.scalingExponent
+							)
 					)
 					local expectedRecord = {
 						endTimestamp = nil,

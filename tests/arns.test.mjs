@@ -454,12 +454,14 @@ describe('ArNS', async () => {
       releaseNameResult.Memory,
     );
     // assert no error tag
-    const auctionErrorTag = auctionResult.Messages[0].Tags.find(
+    const auctionErrorTag = auctionResult.Messages?.[0]?.Tags?.find(
       (tag) => tag.name === 'Error',
     );
 
+    console.log(auctionResult);
+
     assert.equal(auctionErrorTag, undefined);
-    const auction = JSON.parse(auctionResult.Messages[0].Data);
+    const auction = JSON.parse(auctionResult.Messages?.[0]?.Data);
     const expectedStartPrice = 125000000000;
     const expectedStartTimestamp = STUB_TIMESTAMP;
     assert.deepEqual(auction, {
@@ -468,11 +470,11 @@ describe('ArNS', async () => {
       startTimestamp: auction.startTimestamp,
       endTimestamp: expectedStartTimestamp + 60 * 60 * 1000 * 24 * 14,
       currentPrice: expectedStartPrice,
+      baseFee: 500000000,
+      demandFactor: 1,
       settings: {
         decayRate: (0.02037911 / (1000 * 60 * 60 * 24 * 14)).toFixed(24),
         scalingExponent: 190,
-        baseFee: 500000000,
-        demandFactor: 1,
         durationMs: 1209600000,
         startPriceMultiplier: 50,
       },
@@ -645,6 +647,8 @@ describe('ArNS', async () => {
       (tag) => tag.name === 'Error',
     );
     assert.equal(auctionPricesErrorTag, undefined);
+
+    console.log(auctionPrices);
 
     // parse the auction prices data
     const auctionPricesData = JSON.parse(auctionPrices.Messages?.[0]?.Data);

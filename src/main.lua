@@ -2231,25 +2231,19 @@ addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.Aucti
 		return
 	end
 
-	local auctionObj = {
-		name = auction.name,
-		startTimestamp = auction.startTimestamp,
-		endTimestamp = auction.endTimestamp,
-		initiator = auction.initiator,
-		currentPrice = auction:getPriceForAuctionAtTimestamp(timestamp, type, years),
-		settings = {
-			decayRate = auction.decayRate,
-			scalingExponent = auction.scalingExponent,
-			baseFee = auction.baseFee,
-			demandFactor = auction.demandFactor,
-			durationMs = auction.durationMs,
-			startPriceMultiplier = auction.startPriceMultiplier,
-		},
-	}
 	ao.send({
 		Target = msg.From,
 		Action = ActionMap.AuctionInfo .. "-Notice",
-		Data = json.encode(auctionObj),
+		Data = json.encode({
+			name = auction.name,
+			startTimestamp = auction.startTimestamp,
+			endTimestamp = auction.endTimestamp,
+			initiator = auction.initiator,
+			currentPrice = auction:getPriceForAuctionAtTimestamp(timestamp, type, years),
+			baseFee = auction.baseFee,
+			demandFactor = auction.demandFactor,
+			settings = auction.settings,
+		}),
 	})
 end)
 
@@ -2360,22 +2354,6 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 		return
 	end
 
-	local auctionObj = {
-		name = auction.name,
-		startTimestamp = auction.startTimestamp,
-		endTimestamp = auction.endTimestamp,
-		initiator = auction.initiator,
-		currentPrice = auction:getPriceForAuctionAtTimestamp(timestamp, type, years),
-		settings = {
-			decayRate = auction.decayRate,
-			scalingExponent = auction.scalingExponent,
-			baseFee = auction.baseFee,
-			demandFactor = auction.demandFactor,
-			durationMs = auction.durationMs,
-			startPriceMultiplier = auction.startPriceMultiplier,
-		},
-	}
-
 	-- send buy record notice and auction close notice?
 	ao.send({
 		Target = bidder,
@@ -2388,7 +2366,9 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 		Action = "Debit-Notice",
 		Quantity = tostring(result.rewardForInitiator),
 		Data = json.encode({
-			auction = auctionObj,
+			type = type,
+			years = years,
+			name = auction.name,
 			bidder = result.bidder,
 			bidAmount = result.bidAmount,
 			rewardForInitiator = result.rewardForInitiator,

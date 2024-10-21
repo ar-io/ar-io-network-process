@@ -1,55 +1,47 @@
 local Auction = {}
 
+-- Default Auction Settings
+AuctionSettings = {
+	durationMs = 60 * 1000 * 60 * 24 * 14, -- 14 days in milliseconds
+	decayRate = 0.000000000016847809193121693, -- 0.02037911 / durationMs
+	scalingExponent = 190, -- steepness of the curve
+	startPriceMultiplier = 50, -- multiplier for the starting price
+}
+
 --- Represents an Auction.
 --- @class Auction
 --- @field name string The name of the auction
---- @field decayRate number The decay rate for price calculation
---- @field scalingExponent number The scaling exponent for price calculation
 --- @field demandFactor number The demand factor for pricing
---- @field durationMs number The duration of the auction in milliseconds
---- @field initiator string The address of the initiator of the auction
 --- @field baseFee number The base fee for the auction
+--- @field initiator string The address of the initiator of the auction
+--- @field settings table The settings for the auction
 --- @field startTimestamp number The starting timestamp for the auction
 --- @field endTimestamp number The ending timestamp for the auction
---- @field startPriceMultiplier number The multiplier for the starting price
 --- @field registrationFeeCalculator function Function to calculate registration fee
 
 --- Creates a new Auction instance
 --- @param name string The name of the auction
 --- @param startTimestamp number The starting timestamp for the auction
---- @param durationMs number The duration of the auction in milliseconds
---- @param decayRate number The decay rate for price calculation
---- @param scalingExponent number The scaling exponent for price calculation
 --- @param demandFactor number The demand factor for pricing
 --- @param baseFee number The base fee for the auction
 --- @param initiator string The address of the initiator of the auction
---- @param startPriceMultiplier number The multiplier for the starting price
 --- @param registrationFeeCalculator function Function to calculate registration fee that supports type, baseFee, years, demandFactor
 --- @return Auction The new Auction instance
-function Auction:new(
-	name,
-	startTimestamp,
-	durationMs,
-	decayRate,
-	scalingExponent,
-	demandFactor,
-	baseFee,
-	initiator,
-	startPriceMultiplier,
-	registrationFeeCalculator
-)
+function Auction:new(name, startTimestamp, demandFactor, baseFee, initiator, registrationFeeCalculator)
 	local auction = {
 		name = name,
-		decayRate = decayRate,
-		scalingExponent = scalingExponent,
-		demandFactor = demandFactor,
-		durationMs = durationMs,
 		initiator = initiator,
-		baseFee = baseFee,
 		startTimestamp = startTimestamp,
-		endTimestamp = startTimestamp + (durationMs or 14 * 24 * 60 * 60 * 1000),
-		startPriceMultiplier = startPriceMultiplier or 50,
+		endTimestamp = startTimestamp + AuctionSettings.durationMs,
 		registrationFeeCalculator = registrationFeeCalculator,
+		baseFee = baseFee,
+		demandFactor = demandFactor,
+		settings = {
+			durationMs = AuctionSettings.durationMs,
+			decayRate = AuctionSettings.decayRate,
+			scalingExponent = AuctionSettings.scalingExponent,
+			startPriceMultiplier = AuctionSettings.startPriceMultiplier,
+		},
 	}
 	setmetatable(auction, self)
 	self.__index = self
@@ -79,15 +71,15 @@ function Auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
 	local startPrice = self:startPrice(type, years)
 	local floorPrice = self:floorPrice(type, years)
 	local timeSinceStart = timestamp - self.startTimestamp
-	local totalDecaySinceStart = self.decayRate * timeSinceStart
-	local currentPrice = math.floor(startPrice * ((1 - totalDecaySinceStart) ^ self.scalingExponent))
+	local totalDecaySinceStart = self.settings.decayRate * timeSinceStart
+	local currentPrice = math.floor(startPrice * ((1 - totalDecaySinceStart) ^ self.settings.scalingExponent))
 	return math.max(currentPrice, floorPrice)
 end
 
 --- Returns the start price for the auction
 --- @return number The start price for the auction
 function Auction:startPrice(type, years)
-	return self:floorPrice(type, years) * self.startPriceMultiplier
+	return self:floorPrice(type, years) * self.settings.startPriceMultiplier
 end
 
 --- Returns the floor price for the auction

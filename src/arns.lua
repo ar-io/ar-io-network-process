@@ -438,24 +438,10 @@ function arns.createAuction(name, timestamp, initiator)
 	if arns.getAuction(name) then
 		error("Auction already exists for name")
 	end
-	local durationMs = 60 * 1000 * 60 * 24 * 14 -- 14 days in milliseconds
-	local decayRate = 0.02037911 / durationMs
-	local scalingExponent = 190
+
 	local baseFee = demand.getFees()[#name]
 	local demandFactor = demand.getDemandFactor()
-	local startPriceMultiplier = 50
-	local auction = Auction:new(
-		name,
-		timestamp,
-		durationMs,
-		decayRate,
-		scalingExponent,
-		demandFactor,
-		baseFee,
-		initiator,
-		startPriceMultiplier,
-		arns.calculateRegistrationFee
-	)
+	local auction = Auction:new(name, timestamp, demandFactor, baseFee, initiator, arns.calculateRegistrationFee)
 	NameRegistry.auctions[name] = auction
 	-- ensure the name is removed from the registry
 	arns.removeRecord(name)
