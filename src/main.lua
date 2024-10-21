@@ -128,6 +128,17 @@ local function addRecordResultFields(ioEvent, result)
 	end
 end
 
+local function addSupplyData(ioEvent, supplyData)
+	supplyData = supplyData or {}
+	ioEvent:addField("Circulating-Supply", supplyData.circulatingSupply or lastKnownCirculatingSupply)
+	ioEvent:addField("Locked-Supply", supplyData.lockedSupply or lastKnownLockedSupply)
+	ioEvent:addField("Staked-Supply", supplyData.stakedSupply or lastKnownStakedSupply)
+	ioEvent:addField("Delegated-Supply", supplyData.delegatedSupply or lastKnownDelegatedSupply)
+	ioEvent:addField("Withdraw-Supply", supplyData.withdrawSupply or lastKnownWithdrawSupply)
+	ioEvent:addField("Total-Token-Supply", supplyData.totalTokenSupply or lastKnownTotalTokenSupply())
+	ioEvent:addField("Protocol-Balance", Balances[Protocol])
+end
+
 local function gatewayStats()
 	local numJoinedGateways = 0
 	local numLeavingGateways = 0
@@ -258,26 +269,16 @@ end, function(msg)
 		end
 	end
 
-	if lastKnownCirculatingSupply ~= previousState.lastKnownCirculatingSupply then
-		msg.ioEvent:addField("Circulating-Supply", lastKnownCirculatingSupply)
-	end
-	if lastKnownLockedSupply ~= previousState.lastKnownLockedSupply then
-		msg.ioEvent:addField("Locked-Supply", lastKnownLockedSupply)
-	end
-	if lastKnownStakedSupply ~= previousState.lastKnownStakedSupply then
-		msg.ioEvent:addField("Staked-Supply", lastKnownStakedSupply)
-	end
-	if lastKnownDelegatedSupply ~= previousState.lastKnownDelegatedSupply then
-		msg.ioEvent:addField("Delegated-Supply", lastKnownDelegatedSupply)
-	end
-	if lastKnownWithdrawSupply ~= previousState.lastKnownWithdrawSupply then
-		msg.ioEvent:addField("Withdraw-Supply", lastKnownWithdrawSupply)
-	end
-	if Balances[Protocol] ~= previousState.Balances[Protocol] then
-		msg.ioEvent:addField("Protocol-Balance", Balances[Protocol])
-	end
-	if lastKnownTotalTokenSupply() ~= previousState.lastKnownTotalSupply then
-		msg.ioEvent:addField("Total-Token-Supply", lastKnownTotalTokenSupply())
+	if
+		lastKnownCirculatingSupply ~= previousState.lastKnownCirculatingSupply
+		or lastKnownLockedSupply ~= previousState.lastKnownLockedSupply
+		or lastKnownStakedSupply ~= previousState.lastKnownStakedSupply
+		or lastKnownDelegatedSupply ~= previousState.lastKnownDelegatedSupply
+		or lastKnownWithdrawSupply ~= previousState.lastKnownWithdrawSupply
+		or Balances[Protocol] ~= previousState.Balances[Protocol]
+		or lastKnownTotalTokenSupply() ~= previousState.lastKnownTotalSupply
+	then
+		addSupplyData(msg.ioEvent)
 	end
 
 	return status
@@ -421,8 +422,7 @@ addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionM
 
 	lastKnownLockedSupply = lastKnownLockedSupply + quantity
 	lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
-	msg.ioEvent:addField("Locked-Supply", lastKnownLockedSupply)
-	msg.ioEvent:addField("Circulating-Supply", lastKnownCirculatingSupply)
+	addSupplyData(msg.ioEvent)
 
 	ao.send({
 		Target = from,
@@ -485,8 +485,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 
 	lastKnownLockedSupply = lastKnownLockedSupply + quantity
 	lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
-	msg.ioEvent:addField("Locked-Supply", lastKnownLockedSupply)
-	msg.ioEvent:addField("Circulating-Supply", lastKnownCirculatingSupply)
+	addSupplyData(msg.ioEvent)
 
 	-- sender gets an immediate debit notice as the quantity is debited from their balance
 	ao.send({
@@ -599,8 +598,7 @@ addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", Actio
 
 	lastKnownLockedSupply = lastKnownLockedSupply + quantity
 	lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
-	msg.ioEvent:addField("Locked-Supply", lastKnownLockedSupply)
-	msg.ioEvent:addField("Circulating-Supply", lastKnownCirculatingSupply)
+	addSupplyData(msg.ioEvent)
 
 	ao.send({
 		Target = msg.From,
@@ -666,7 +664,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 		record = result.record
 		addRecordResultFields(msg.ioEvent, result)
 		lastKnownCirculatingSupply = lastKnownCirculatingSupply - record.purchasePrice
-		msg.ioEvent:addField("Circulating-Supply", lastKnownCirculatingSupply)
+		addSupplyData(msg.ioEvent)
 	end
 
 	msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
@@ -715,7 +713,7 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 		addRecordResultFields(msg.ioEvent, result)
 		msg.ioEvent:addField("totalExtensionFee", recordResult.totalExtensionFee)
 		lastKnownCirculatingSupply = lastKnownCirculatingSupply - recordResult.totalExtensionFee
-		msg.ioEvent:addField("Circulating-Supply", lastKnownCirculatingSupply)
+		addSupplyData(msg.ioEvent)
 	end
 
 	ao.send({
@@ -776,7 +774,7 @@ addEventingHandler(
 			msg.ioEvent:addField("previousUndernameLimit", recordResult.undernameLimit - tonumber(msg.Tags.Quantity))
 			msg.ioEvent:addField("additionalUndernameCost", recordResult.additionalUndernameCost)
 			lastKnownCirculatingSupply = lastKnownCirculatingSupply - recordResult.additionalUndernameCost
-			msg.ioEvent:addField("Circulating-Supply", lastKnownCirculatingSupply)
+			addSupplyData(msg.ioEvent)
 		end
 
 		ao.send({
@@ -922,8 +920,7 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 
 	lastKnownCirculatingSupply = lastKnownCirculatingSupply - stake
 	lastKnownStakedSupply = lastKnownStakedSupply + stake
-	msg.ioEvent:addField("Circulating-Supply", lastKnownCirculatingSupply)
-	msg.ioEvent:addField("Staked-Supply", lastKnownStakedSupply)
+	addSupplyData(msg.ioEvent)
 
 	ao.send({
 		Target = fromAddress,
@@ -986,8 +983,7 @@ addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", Action
 
 	lastKnownStakedSupply = lastKnownStakedSupply - gwPrevStake - gwPrevTotalDelegatedStake
 	lastKnownWithdrawSupply = lastKnownWithdrawSupply + gwPrevStake + gwPrevTotalDelegatedStake
-	msg.ioEvent:addField("Staked-Supply", lastKnownStakedSupply)
-	msg.ioEvent:addField("Withdraw-Supply", lastKnownWithdrawSupply)
+	addSupplyData(msg.ioEvent)
 
 	ao.send({
 		Target = msg.From,
@@ -1040,8 +1036,7 @@ addEventingHandler(
 
 		lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
 		lastKnownStakedSupply = lastKnownStakedSupply + quantity
-		msg.ioEvent:addField("Circulating-Supply", lastKnownCirculatingSupply)
-		msg.ioEvent:addField("Staked-Supply", lastKnownStakedSupply)
+		addSupplyData(msg.ioEvent)
 
 		ao.send({
 			Target = msg.From,
@@ -1106,8 +1101,7 @@ addEventingHandler(
 
 		lastKnownStakedSupply = lastKnownStakedSupply - quantity
 		lastKnownWithdrawSupply = lastKnownWithdrawSupply + quantity
-		msg.ioEvent:addField("Staked-Supply", lastKnownStakedSupply)
-		msg.ioEvent:addField("Withdraw-Supply", lastKnownWithdrawSupply)
+		addSupplyData(msg.ioEvent)
 
 		ao.send({
 			Target = msg.From,
@@ -1164,8 +1158,7 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 
 	lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
 	lastKnownStakedSupply = lastKnownStakedSupply + quantity
-	msg.ioEvent:addField("Circulating-Supply", lastKnownCirculatingSupply)
-	msg.ioEvent:addField("Staked-Supply", lastKnownStakedSupply)
+	addSupplyData(msg.ioEvent)
 
 	ao.send({
 		Target = msg.From,
@@ -1225,8 +1218,7 @@ addEventingHandler(
 
 				lastKnownStakedSupply = lastKnownStakedSupply + vaultBalance
 				lastKnownWithdrawSupply = lastKnownWithdrawSupply - vaultBalance
-				msg.ioEvent:addField("Staked-Supply", lastKnownStakedSupply)
-				msg.ioEvent:addField("Withdraw-Supply", lastKnownWithdrawSupply)
+				addSupplyData(msg.ioEvent)
 			end
 		end
 
@@ -1377,8 +1369,7 @@ addEventingHandler(
 
 		lastKnownStakedSupply = lastKnownStakedSupply - quantity
 		lastKnownWithdrawSupply = lastKnownWithdrawSupply + quantity
-		msg.ioEvent:addField("Staked-Supply", lastKnownStakedSupply)
-		msg.ioEvent:addField("Withdraw-Supply", lastKnownWithdrawSupply)
+		addSupplyData(msg.ioEvent)
 
 		ao.send({
 			Target = from,
@@ -1595,14 +1586,10 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 	lastKnownDelegatedSupply = delegatedSupply
 	lastKnownWithdrawSupply = withdrawSupply
 
-	msg.ioEvent:addField("Total-Token-Supply", totalSupply)
+	addSupplyData(msg.ioEvent, {
+		totalSupply = totalSupply,
+	})
 	msg.ioEvent:addField("Last-Known-Total-Token-Supply", lastKnownTotalTokenSupply())
-	msg.ioEvent:addField("Circulating-Supply", lastKnownCirculatingSupply)
-	msg.ioEvent:addField("Locked-Supply", lastKnownLockedSupply)
-	msg.ioEvent:addField("Staked-Supply", lastKnownStakedSupply)
-	msg.ioEvent:addField("Delegated-Supply", lastKnownDelegatedSupply)
-	msg.ioEvent:addField("Withdraw-Supply", lastKnownWithdrawSupply)
-	msg.ioEvent:addField("Protocol-Balance", protocolBalance)
 
 	ao.send({
 		Target = msg.From,
