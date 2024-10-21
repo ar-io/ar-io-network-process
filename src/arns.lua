@@ -447,7 +447,7 @@ function arns.createAuction(name, timestamp, initiator)
 	end
 	local record = arns.getRecord(name)
 	local auctionDurationMs = 60 * 1000 * 60 * 24 * 14 -- 14 days in milliseconds
-	local decayRate = 0.00000002
+	local decayRate = 0.020379 / auctionDurationMs
 	local scalingExponent = 190
 	local endTimestamp = timestamp + auctionDurationMs
 	local baseFee = demand.getFees()[#name]
@@ -486,9 +486,10 @@ function arns.getAuctions()
 	return auctions or {}
 end
 
-function arns.computePricesForAuction(auction)
+function arns.computePricesForAuction(auction, intervalMs)
 	local prices = {}
-	for timestampAtInterval = auction.startTimestamp, auction.endTimestamp - auction.settings.durationMs do
+	intervalMs = intervalMs or 1000 * 60 * 5 -- default to 5 minute price intervals
+	for timestampAtInterval = auction.startTimestamp, auction.endTimestamp, intervalMs do
 		local priceAtTimestamp = arns.getCurrentBidPriceForAuction(auction, timestampAtInterval)
 		prices[timestampAtInterval] = priceAtTimestamp
 	end
@@ -502,8 +503,8 @@ function arns.getCurrentBidPriceForAuction(auction, timestamp)
 		error("Timestamp is outside of auction start and end timestamps")
 	end
 	local timeSinceStart = timestamp - auction.startTimestamp
-	local currentAuctionPrice = auction.startPrice * ((1 - (decayRate * timeSinceStart)) ^ scalingExponent)
-	-- TODO: the initial price is based on the default number of years (1) - we may want to use the actual requested years
+	local decayFactor = math.max(1 - timeSinceStart * decayRate, 0) ^ scalingExponent
+	local currentAuctionPrice = auction.startPrice * decayFactor
 	return math.floor(math.max(currentAuctionPrice, auction.floorPrice))
 end
 
