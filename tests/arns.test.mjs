@@ -105,7 +105,6 @@ describe('ArNS', async () => {
       'DF-Current-Period': 1,
       'DF-Trailing-Period-Revenues': [0, 0, 0, 0, 0, 0],
       'DF-Trailing-Period-Purchases': [0, 0, 0, 0, 0, 0, 0],
-      'Circulating-Supply': -buyRecordData.purchasePrice, // This is a bug - as circulating supply should not be negative
       Cron: false,
       Cast: false,
       Name: name,
@@ -118,13 +117,13 @@ describe('ArNS', async () => {
       'Protocol-Balance': expectedRemainingBalance[PROCESS_ID],
       'Reserved-Records-Count': 0,
       'Remaining-Balance': expectedRemainingBalance[sender],
-      'Circulating-Supply': -600000000, // Artifact of starting out without initializing this properly
+      'Circulating-Supply': -buyRecordData.purchasePrice, // Artifact of starting out without initializing this properly
       'Total-Token-Supply': 50000000000000, // Artifact of starting out without initializing this properly
       'Staked-Supply': 0, // Artifact of starting out without initializing this properly
       'Delegated-Supply': 0, // Artifact of starting out without initializing this properly
       'Withdraw-Supply': 0, // Artifact of starting out without initializing this properly
       'Locked-Supply': 0, // Artifact of starting out without initializing this properly
-    });
+    };
 
     // fetch the record
     const realRecord = await handle(
@@ -462,8 +461,6 @@ describe('ArNS', async () => {
       (tag) => tag.name === 'Error',
     );
 
-    console.log(auctionResult);
-
     assert.equal(auctionErrorTag, undefined);
     const auction = JSON.parse(auctionResult.Messages?.[0]?.Data);
     const expectedStartPrice = 125000000000;
@@ -651,9 +648,6 @@ describe('ArNS', async () => {
       (tag) => tag.name === 'Error',
     );
     assert.equal(auctionPricesErrorTag, undefined);
-
-    console.log(auctionPrices);
-
     // parse the auction prices data
     const auctionPricesData = JSON.parse(auctionPrices.Messages?.[0]?.Data);
 
