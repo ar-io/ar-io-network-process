@@ -275,7 +275,7 @@ describe('GatewayRegistry', async () => {
         );
         const gatewayData = JSON.parse(gateway.Messages[0].Data);
 
-        // Assert gateway data does not exist
+        // Assert gateway data not found
         assert.equal(gatewayData, null);
       });
     });
@@ -708,7 +708,7 @@ describe('GatewayRegistry', async () => {
           Tags: [
             { name: 'Action', value: 'Transfer' },
             { name: 'Recipient', value: newStubAddress },
-            { name: 'Quantity', value: '1000000000' }, // 1K IO
+            { name: 'Quantity', value: '2000000000' }, // 2K IO
           ],
         },
         joinNetworkResult.Memory,
@@ -724,7 +724,7 @@ describe('GatewayRegistry', async () => {
           Timestamp: stubbedTimestamp,
           Tags: [
             { name: 'Action', value: 'Delegate-Stake' },
-            { name: 'Quantity', value: '1000000000' }, // 1K IO
+            { name: 'Quantity', value: '2000000000' }, // 2K IO
             { name: 'Address', value: STUB_ADDRESS },
           ],
         },
@@ -745,14 +745,14 @@ describe('GatewayRegistry', async () => {
       assert.deepEqual(
         {
           [newStubAddress]: {
-            delegatedStake: 1_000_000_000,
+            delegatedStake: 2_000_000_000,
             startTimestamp: stubbedTimestamp,
             vaults: [],
           },
         },
         gatewayData.delegates,
       );
-      assert.deepEqual(gatewayData.totalDelegatedStake, 1_000_000_000);
+      assert.deepEqual(gatewayData.totalDelegatedStake, 2_000_000_000);
       sharedMemory = delegateStakeResult.Memory;
     });
 
@@ -786,7 +786,7 @@ describe('GatewayRegistry', async () => {
       const gatewayData = JSON.parse(gateway.Messages[0].Data);
       assert.deepEqual(gatewayData.delegates, {
         [newStubAddress]: {
-          delegatedStake: 0,
+          delegatedStake: 1_000_000_000,
           startTimestamp: stubbedTimestamp,
           vaults: {
             [''.padEnd(43, 'x')]: {
@@ -797,7 +797,7 @@ describe('GatewayRegistry', async () => {
           },
         },
       });
-      assert.deepEqual(gatewayData.totalDelegatedStake, 0);
+      assert.deepEqual(gatewayData.totalDelegatedStake, 1_000_000_000);
       sharedMemory = decreaseStakeResult.Memory;
     });
 
@@ -830,6 +830,82 @@ describe('GatewayRegistry', async () => {
       );
 
       const gatewayData = JSON.parse(gateway.Messages[0].Data);
+
+      assert.deepEqual(gatewayData.delegates, {
+        [newStubAddress]: {
+          delegatedStake: 2_000_000_000,
+          startTimestamp: stubbedTimestamp,
+          vaults: [],
+        },
+      });
+      assert.deepEqual(gatewayData.totalDelegatedStake, 2_000_000_000);
+      sharedMemory = cancelWithdrawalResult.Memory;
+    });
+
+    it('should not decrease delegate stake with invalid instant withdrawal tag', async () => {
+      const instantWithdrawalTimestamp = stubbedTimestamp + 1000 * 60 * 15; // 15 minutes after stubbedTimestamp
+      const decreaseStakeResult = await handle(
+        {
+          From: newStubAddress,
+          Owner: newStubAddress,
+          Timestamp: instantWithdrawalTimestamp,
+          Id: ''.padEnd(43, 'x'),
+          Tags: [
+            { name: 'Action', value: 'Decrease-Delegate-Stake' },
+            { name: 'Address', value: STUB_ADDRESS },
+            { name: 'Quantity', value: '1000000000' }, // 1K IO
+            { name: 'Instant', value: 'RANDOM' },
+          ],
+        },
+        sharedMemory,
+      );
+
+      // get the updated gateway record
+      const gateway = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Gateway' },
+            { name: 'Address', value: STUB_ADDRESS },
+          ],
+          Timestamp: instantWithdrawalTimestamp + 1,
+        },
+        decreaseStakeResult.Memory,
+      );
+      const gatewayData = JSON.parse(gateway.Messages[0].Data);
+      assert.deepEqual(gatewayData.totalDelegatedStake, 2_000_000_000);
+    });
+
+    it('should decrease delegate stake with instant withdrawal', async () => {
+      const instantWithdrawalTimestamp = stubbedTimestamp + 1000 * 60 * 15; // 15 minutes after stubbedTimestamp
+      const decreaseStakeResult = await handle(
+        {
+          From: newStubAddress,
+          Owner: newStubAddress,
+          Timestamp: instantWithdrawalTimestamp,
+          Id: ''.padEnd(43, 'x'),
+          Tags: [
+            { name: 'Action', value: 'Decrease-Delegate-Stake' },
+            { name: 'Address', value: STUB_ADDRESS },
+            { name: 'Quantity', value: '1000000000' }, // 1K IO
+            { name: 'Instant', value: 'true' },
+          ],
+        },
+        sharedMemory,
+      );
+
+      // get the updated gateway record
+      const gateway = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Gateway' },
+            { name: 'Address', value: STUB_ADDRESS },
+          ],
+          Timestamp: instantWithdrawalTimestamp + 1,
+        },
+        decreaseStakeResult.Memory,
+      );
+      const gatewayData = JSON.parse(gateway.Messages[0].Data);
+      // Assertions
       assert.deepEqual(gatewayData.delegates, {
         [newStubAddress]: {
           delegatedStake: 1_000_000_000,
@@ -838,7 +914,73 @@ describe('GatewayRegistry', async () => {
         },
       });
       assert.deepEqual(gatewayData.totalDelegatedStake, 1_000_000_000);
-      sharedMemory = cancelWithdrawalResult.Memory;
+      sharedMemory = decreaseStakeResult.Memory;
+    });
+
+    it('should allow decrease delegate stake from a gateway followed up with instant withdrawal', async () => {
+      const decreaseStakeTimestamp = stubbedTimestamp + 1000 * 60 * 15; // 15 minutes after stubbedTimestamp
+      const decreaseStakeResult = await handle(
+        {
+          From: newStubAddress,
+          Owner: newStubAddress,
+          Timestamp: decreaseStakeTimestamp,
+          Id: ''.padEnd(43, 'x'),
+          Tags: [
+            { name: 'Action', value: 'Decrease-Delegate-Stake' },
+            { name: 'Address', value: STUB_ADDRESS },
+            { name: 'Quantity', value: '1000000000' }, // 1K IO
+          ],
+        },
+        sharedMemory,
+      );
+
+      // get the updated gateway record
+      let gateway = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Gateway' },
+            { name: 'Address', value: STUB_ADDRESS },
+          ],
+          Timestamp: decreaseStakeTimestamp + 1,
+        },
+        decreaseStakeResult.Memory,
+      );
+      let gatewayData = JSON.parse(gateway.Messages[0].Data);
+
+      const instantDecreaseStakeTimestamp =
+        decreaseStakeTimestamp + 1000 * 60 * 60; // 60 minutes after stubbedTimestamp
+      const instantDecreaseStakeResult = await handle(
+        {
+          From: newStubAddress,
+          Owner: newStubAddress,
+          Timestamp: instantDecreaseStakeTimestamp,
+          Id: ''.padEnd(43, 'x'),
+          Tags: [
+            { name: 'Action', value: 'Instant-Delegate-Withdrawal' }, // TO DO - MAKE THIS HANDLER!
+            { name: 'Address', value: STUB_ADDRESS },
+            { name: 'Vault-Id', value: ''.padEnd(43, 'x') },
+          ],
+        },
+        decreaseStakeResult.Memory,
+      );
+
+      // get the gateway record
+      gateway = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Gateway' },
+            { name: 'Address', value: STUB_ADDRESS },
+          ],
+          Timestamp: instantDecreaseStakeTimestamp + 1,
+        },
+        instantDecreaseStakeResult.Memory,
+      );
+
+      gatewayData = JSON.parse(gateway.Messages[0].Data);
+      console.log('1: ', gatewayData);
+      assert.deepEqual(gatewayData.delegates, []);
+      assert.deepEqual(gatewayData.totalDelegatedStake, 0);
+      sharedMemory = instantDecreaseStakeResult.Memory;
     });
   });
 });

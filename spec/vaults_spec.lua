@@ -132,7 +132,7 @@ describe("vaults", function()
 			assert.match("This vault has ended.", result)
 		end)
 
-		it("should throw an error if the vault does not exist", function()
+		it("should throw an error if the vault not found", function()
 			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
 			local vaultId = "msgId"
 			local status, result = pcall(vaults.increaseVault, vaultOwner, 100, vaultId, startTimestamp)
@@ -187,7 +187,7 @@ describe("vaults", function()
 			)
 		end)
 
-		it("should throw an error if the vault does not exist", function()
+		it("should throw an error if the vault not found", function()
 			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
 			local vaultId = "msgId"
 			local status, result = pcall(vaults.extendVault, vaultOwner, 100, startTimestamp, vaultId)

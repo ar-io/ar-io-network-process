@@ -38,7 +38,7 @@ describe('handlers', async () => {
     const evalIndex = handlersList.indexOf('_eval');
     const defaultIndex = handlersList.indexOf('_default');
     const pruneIndex = handlersList.indexOf('prune');
-    const expectedHandlerCount = 50; // TODO: update this if more handlers are added
+    const expectedHandlerCount = 51; // TODO: update this if more handlers are added
     assert.ok(evalIndex === 0);
     assert.ok(defaultIndex === 1);
     assert.ok(pruneIndex === 2);
@@ -76,8 +76,8 @@ describe('handlers', async () => {
         'total supply should be 1 billion IO but was ' + supplyData.total,
       );
       assert.ok(
-        supplyData.circulating === 1000000000 * 1000000,
-        'circulating supply should be 1 billion IO but was ' +
+        supplyData.circulating === 1000000000 * 1000000 - 50000000000000,
+        'circulating supply should be 0.95 billion IO but was ' +
           supplyData.circulating,
       );
       assert.ok(

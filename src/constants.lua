@@ -7,13 +7,15 @@ constants.oneYearSeconds = 60 * 60 * 24 * 365
 constants.thirtyDaysSeconds = 60 * 60 * 24 * 30
 constants.defaultundernameLimit = 10
 constants.totalTokenSupply = 1000000000 * 1000000 -- 1 billion tokens
+constants.MIN_EXPEDITED_WITHDRAWAL_FEE = 0.05
+constants.MAX_EXPEDITED_WITHDRAWAL_FEE = 0.80
 
 -- ARNS
 constants.DEFAULT_UNDERNAME_COUNT = 10
 constants.DEADLINE_DURATION_MS = 60 * 60 * 1000 -- One hour of miliseconds
 constants.PERMABUY_LEASE_FEE_LENGTH = 20 -- 20 years
 constants.ANNUAL_PERCENTAGE_FEE = 0.2 -- 20%
-constants.ARNS_NAME_DOES_NOT_EXIST_MESSAGE = "Name does not exist in the ArNS Registry!"
+constants.ARNS_NAME_DOES_NOT_EXIST_MESSAGE = "Name not found in the ArNS Registry!"
 constants.UNDERNAME_LEASE_FEE_PERCENTAGE = 0.001
 constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE = 0.005
 constants.oneYearMs = 31536000 * 1000

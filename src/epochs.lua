@@ -364,7 +364,7 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 
 	local observingGateway = gar.getGateway(observer.gatewayAddress)
 	if observingGateway == nil then
-		error("The associated gateway does not exist in the registry.")
+		error("The associated gateway not found in the registry.")
 	end
 
 	local epoch = epochs.getEpoch(epochIndex)
