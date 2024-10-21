@@ -4,6 +4,7 @@ local constants = require("constants")
 local balances = require("balances")
 local demand = require("demand")
 local arns = {}
+local Auction = require("auctions")
 
 NameRegistry = NameRegistry or {
 	reserved = {},
@@ -424,6 +425,12 @@ function arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
 end
 
 -- AUCTIONS
+
+--- Creates an auction for a given name
+--- @param name string The name of the auction
+--- @param timestamp number The timestamp to start the auction
+--- @param initiator string The address of the initiator of the auction
+--- @return Auction|nil The auction instance
 function arns.createAuction(name, timestamp, initiator)
 	if not arns.getRecord(name) then
 		error("Name is not registered. Auctions must be created for registered names.")
@@ -431,74 +438,39 @@ function arns.createAuction(name, timestamp, initiator)
 	if arns.getAuction(name) then
 		error("Auction already exists for name")
 	end
-	local record = arns.getRecord(name)
-	local auctionDurationMs = 60 * 1000 * 60 * 24 * 14 -- 14 days in milliseconds
-	local decayRate = 0.020379 / auctionDurationMs
+	local durationMs = 60 * 1000 * 60 * 24 * 14 -- 14 days in milliseconds
+	local decayRate = 0.020379 / durationMs
 	local scalingExponent = 190
-	local endTimestamp = timestamp + auctionDurationMs
 	local baseFee = demand.getFees()[#name]
 	local demandFactor = demand.getDemandFactor()
-	local floorPrice = arns.calculateRegistrationFee(record.type, baseFee, 1, demandFactor)
 	local startPriceMultiplier = 50
-	local startPrice = floorPrice * startPriceMultiplier
-	local auction = {
-		name = name,
-		type = record.type, -- prices are dynamically based on the requested bid time (e.g. years - 5)
-		startTimestamp = timestamp,
-		endTimestamp = endTimestamp,
-		startPrice = startPrice,
-		floorPrice = floorPrice,
-		initiator = initiator,
-		settings = {
-			durationMs = auctionDurationMs,
-			demandFactor = demand.getDemandFactor(),
-			baseFee = baseFee,
-			decayRate = decayRate,
-			scalingExponent = scalingExponent,
-		},
-	}
+	local auction = Auction:new(
+		name,
+		timestamp,
+		durationMs,
+		decayRate,
+		scalingExponent,
+		demandFactor,
+		baseFee,
+		initiator,
+		startPriceMultiplier
+	)
 	NameRegistry.auctions[name] = auction
 	-- ensure the name is removed from the registry
 	arns.removeRecord(name)
 	return auction
 end
 
-function arns.getAuction(name)
-	return utils.deepCopy(NameRegistry.auctions[name])
-end
-
 function arns.getAuctions()
-	local auctions = utils.deepCopy(NameRegistry.auctions)
-	return auctions or {}
+	return NameRegistry.auctions or {}
 end
 
-function arns.computePricesForAuction(auction, intervalMs)
-	local prices = {}
-	intervalMs = intervalMs or 1000 * 60 * 5 -- default to 5 minute price intervals
-	for timestampAtInterval = auction.startTimestamp, auction.endTimestamp, intervalMs do
-		local priceAtTimestamp = arns.getCurrentBidPriceForAuction(auction, timestampAtInterval)
-		prices[timestampAtInterval] = priceAtTimestamp
-	end
-	return prices
-end
-
-function arns.getCurrentBidPriceForAuction(auction, timestamp)
-	local decayRate = auction.settings.decayRate
-	local scalingExponent = auction.settings.scalingExponent
-	if timestamp < auction.startTimestamp or timestamp > auction.endTimestamp then
-		error("Timestamp is outside of auction start and end timestamps")
-	end
-	local timeSinceStart = timestamp - auction.startTimestamp
-	local decayFactor = math.max(1 - timeSinceStart * decayRate, 0) ^ scalingExponent
-	local currentAuctionPrice = auction.startPrice * decayFactor
-	return math.floor(math.max(currentAuctionPrice, auction.floorPrice))
-end
-
-function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, years)
-	local auction = arns.getAuction(name)
-	if not auction then
+function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, type, years)
+	local maybeAuction = arns.getAuction(name)
+	if not maybeAuction then
 		error("Auction does not exist")
 	end
+	local auction = maybeAuction:decode()
 
 	-- assert the bid is between auction start and end timestamps
 	if timestamp < auction.startTimestamp or timestamp > auction.endTimestamp then
@@ -506,7 +478,7 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ye
 		error("Bid timestamp is outside of auction start and end timestamps")
 	end
 
-	local requiredBid = arns.getCurrentBidPriceForAuction(auction, timestamp)
+	local requiredBid = arns.getCurrentBidPriceForAuction(auction, timestamp, type, years)
 	local requiredOrBidAmount = bidAmount or requiredBid
 	if requiredOrBidAmount < requiredBid then
 		error("Bid amount is less than the required bid of " .. requiredBid)
