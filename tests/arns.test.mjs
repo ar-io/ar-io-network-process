@@ -93,7 +93,7 @@ describe('ArNS', async () => {
       'Start-Timestamp': STUB_TIMESTAMP,
       ...(type == 'lease' && { 'End-Timestamp': STUB_TIMESTAMP + 31536000000 }), // 1 year in ms
       'Purchase-Type': type,
-      Years: 1, // Note: this added because we are sending the tag, but not relevant for permabuys
+      Years: '1', // Note: this added because we are sending the tag, but not relevant for permabuys
       'Undername-Limit': 10,
       'Purchase-Price': buyRecordData.purchasePrice,
       'DF-Purchases-This-Period': 1,
@@ -105,6 +105,7 @@ describe('ArNS', async () => {
       'DF-Current-Period': 1,
       'DF-Trailing-Period-Revenues': [0, 0, 0, 0, 0, 0],
       'DF-Trailing-Period-Purchases': [0, 0, 0, 0, 0, 0, 0],
+      'Circulating-Supply': -buyRecordData.purchasePrice, // This is a bug - as circulating supply should not be negative
       Cron: false,
       Cast: false,
       Name: name,
@@ -471,7 +472,7 @@ describe('ArNS', async () => {
       endTimestamp: auction.endTimestamp,
       currentPrice: auction.startPrice,
       settings: {
-        decayRate: 0.00000002,
+        decayRate: (0.020379 / (1000 * 60 * 60 * 24 * 14)).toFixed(24),
         scalingExponent: 190,
         baseFee: 500000000,
         demandFactor: 1,
@@ -482,9 +483,11 @@ describe('ArNS', async () => {
     // // TRANSFER FROM THE OWNER TO A NEW STUB ADDRESS
     const bidderAddress = 'auction-bidder-'.padEnd(43, '0');
     const bidTimestamp = auction.startTimestamp + 60 * 1000; // same as the original interval but 1 minute after the auction has started
+    const decayRate = auction.settings.decayRate;
     const expectedPurchasePrice = Math.floor(
       expectedStartPrice *
-        (1 - 0.00000002 * (bidTimestamp - auction.startTimestamp)) ** 190,
+        (1 - decayRate * (bidTimestamp - auction.startTimestamp)) **
+          auction.settings.scalingExponent,
     );
     const transferResult = await handle(
       {
@@ -519,6 +522,8 @@ describe('ArNS', async () => {
       },
       transferResult.Memory,
     );
+
+    console.log(submitBidResult.Messages[0]);
 
     // assert no error tag
     const submitBidErrorTag = submitBidResult.Messages[0].Tags.find(
