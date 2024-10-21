@@ -21,8 +21,7 @@ function balances.transfer(recipient, from, qty)
 end
 
 function balances.getBalance(target)
-	local balance = balances.getBalances()[target]
-	return balance or 0
+	return utils.deepCopy(Balances[target] or 0)
 end
 
 function balances.getBalances()
@@ -31,7 +30,7 @@ function balances.getBalances()
 end
 
 function balances.reduceBalance(target, qty)
-	local prevBalance = balances.getBalance(target) or 0
+	local prevBalance = balances.getBalance(target)
 	if prevBalance < qty then
 		error("Insufficient balance")
 	end

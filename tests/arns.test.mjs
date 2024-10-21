@@ -70,7 +70,7 @@ describe('ArNS', async () => {
           { name: 'Name', value: name },
           { name: 'Purchase-Type', value: type },
           { name: 'Process-Id', value: processId },
-          { name: 'Years', value: '1' }
+          { name: 'Years', value: '1' },
         ],
       },
       mem,
@@ -117,10 +117,9 @@ describe('ArNS', async () => {
       'Protocol-Balance': expectedRemainingBalance[PROCESS_ID],
       'Reserved-Records-Count': 0,
       'Remaining-Balance': expectedRemainingBalance[sender],
-      'Epoch-Index': -183
+      'Epoch-Index': -183,
     };
     assert.deepEqual(buyRecordEvent, expectedEvent);
-
 
     // fetch the record
     const realRecord = await handle(
@@ -142,7 +141,7 @@ describe('ArNS', async () => {
       startTimestamp: buyRecordData.startTimestamp,
       type: type,
       undernameLimit: 10,
-      ...(type == "lease" && { endTimestamp: buyRecordData.endTimestamp }),
+      ...(type == 'lease' && { endTimestamp: buyRecordData.endTimestamp }),
     });
 
     return {
@@ -485,8 +484,7 @@ describe('ArNS', async () => {
     const bidTimestamp = auction.startTimestamp + 60 * 1000; // same as the original interval but 1 minute after the auction has started
     const expectedPurchasePrice = Math.floor(
       expectedStartPrice *
-        (1 - 0.00000002 * (bidTimestamp - auction.startTimestamp)) **
-          190,
+        (1 - 0.00000002 * (bidTimestamp - auction.startTimestamp)) ** 190,
     );
     const transferResult = await handle(
       {

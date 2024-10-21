@@ -44,4 +44,23 @@ describe("balances", function()
 		assert.are.equal(0, balances.getBalance(testAddress2))
 		assert.are.equal(100, balances.getBalance(testAddress1))
 	end)
+
+	describe("getPaginatedBalances", function()
+		it("should return paginated balances", function()
+			local balances = balances.getPaginatedBalances(nil, 10, "balance", "desc")
+			assert.are.same(balances, {
+				limit = 10,
+				sortBy = "balance",
+				sortOrder = "desc",
+				hasMore = false,
+				totalItems = 1,
+				items = {
+					{
+						address = testAddress1,
+						balance = 100,
+					},
+				},
+			})
+		end)
+	end)
 end)

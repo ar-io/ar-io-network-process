@@ -38,7 +38,7 @@ describe('handlers', async () => {
     const evalIndex = handlersList.indexOf('_eval');
     const defaultIndex = handlersList.indexOf('_default');
     const pruneIndex = handlersList.indexOf('prune');
-    const expectedHandlerCount = 53; // TODO: update this if more handlers are added
+    const expectedHandlerCount = 54; // TODO: update this if more handlers are added
     assert.ok(evalIndex === 0);
     assert.ok(defaultIndex === 1);
     assert.ok(pruneIndex === 2);
@@ -49,5 +49,62 @@ describe('handlers', async () => {
         ' handlers; got ' +
         handlersList.length,
     ); // forces us to think critically about the order of handlers so intended to be sensitive to changes
+  });
+
+  describe('token supply', () => {
+    it('should always be 1 billion IO', async () => {
+      const supplyResult = await handle({
+        Tags: [
+          {
+            name: 'Action',
+            value: 'Total-Token-Supply',
+          },
+        ],
+      });
+
+      // assert no errors
+      assert.deepEqual(supplyResult.Messages[0].Error, undefined);
+
+      // assert correct tag in message by finding the index of the tag in the message
+      const notice = supplyResult.Messages?.[0]?.Tags?.find(
+        (tag) =>
+          tag.name === 'Action' && tag.value === 'Total-Token-Supply-Notice',
+      );
+      assert.ok(notice, 'should have a Total-Token-Supply-Notice tag');
+
+      const supplyData = JSON.parse(supplyResult.Messages[0].Data);
+
+      assert.ok(
+        supplyData.total === 1000000000 * 1000000,
+        'total supply should be 1 billion IO but was ' + supplyData.total,
+      );
+      assert.ok(
+        supplyData.circulating === 1000000000 * 1000000 - 50000000000000,
+        'circulating supply should be 0.95 billion IO but was ' +
+          supplyData.circulating,
+      );
+      assert.ok(
+        supplyData.locked === 0,
+        'locked supply should be 0 but was ' + supplyData.locked,
+      );
+      assert.ok(
+        supplyData.staked === 0,
+        'staked supply should be 0 but was ' + supplyData.staked,
+      );
+      assert.ok(
+        supplyData.delegated === 0,
+        'delegated supply should be 0 but was ' + supplyData.delegated,
+      );
+      assert.ok(
+        supplyData.withdrawn === 0,
+        'withdrawn supply should be 0 but was ' + supplyData.withdrawn,
+      );
+
+      assert.ok(
+        supplyData.protocolBalance === 50000000000000,
+        'protocol balance should be 50M IO but was ' +
+          supplyData.protocolBalance,
+      );
+    });
   });
 });

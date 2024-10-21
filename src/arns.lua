@@ -165,8 +165,7 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
 end
 
 function arns.getRecord(name)
-	local records = arns.getRecords()
-	return records[name]
+	return utils.deepCopy(NameRegistry.records[name])
 end
 
 function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
@@ -200,8 +199,7 @@ function arns.getReservedNames()
 end
 
 function arns.getReservedName(name)
-	local reserved = arns.getReservedNames()
-	return reserved[name]
+	return utils.deepCopy(NameRegistry.reserved[name])
 end
 
 function arns.modifyRecordundernameLimit(name, qty)
@@ -228,19 +226,6 @@ function arns.modifyRecordEndTimestamp(name, newEndTimestamp)
 	NameRegistry.records[name].endTimestamp = newEndTimestamp
 end
 
-function arns.addReservedName(name, details)
-	if arns.getReservedName(name) then
-		error("Name is already reserved")
-	end
-
-	if arns.getRecord(name) then
-		error("Name is already registered")
-	end
-
-	NameRegistry.reserved[name] = details
-	return arns.getReservedName(name)
-end
-
 -- internal functions
 function arns.calculateLeaseFee(baseFee, years, demandFactor)
 	local annualRegistrationFee = arns.calculateAnnualRenewalFee(baseFee, years)
@@ -249,8 +234,7 @@ function arns.calculateLeaseFee(baseFee, years, demandFactor)
 end
 
 function arns.calculateAnnualRenewalFee(baseFee, years)
-	local nameAnnualRegistrationFee = baseFee * constants.ANNUAL_PERCENTAGE_FEE
-	local totalAnnualRenewalCost = nameAnnualRegistrationFee * years
+	local totalAnnualRenewalCost = baseFee * constants.ANNUAL_PERCENTAGE_FEE * years
 	return math.floor(totalAnnualRenewalCost)
 end
 
@@ -369,9 +353,11 @@ function arns.getTokenCost(intendedAction)
 		local purchaseType = intendedAction.purchaseType
 		local years = intendedAction.years
 		local name = intendedAction.name
-		assert(purchaseType == "lease" or purchaseType == "permabuy", "PurchaseType is invalid.")
-		assert(years >= 1 and years <= 5, "Years is invalid. Must be an integer between 1 and 5")
 		assert(type(name) == "string", "Name is required and must be a string.")
+		assert(purchaseType == "lease" or purchaseType == "permabuy", "PurchaseType is invalid.")
+		if purchaseType == "lease" then
+			assert(years >= 1 and years <= 5, "Years is invalid. Must be an integer between 1 and 5")
+		end
 		local baseFee = demand.getFees()[#name]
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
 	elseif intendedAction.intent == "Extend-Lease" then

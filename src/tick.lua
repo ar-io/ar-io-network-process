@@ -5,18 +5,14 @@ local vaults = require("vaults")
 local epochs = require("epochs")
 function tick.pruneState(timestamp, msgId)
 	local prunedRecords = arns.pruneRecords(timestamp)
-	local prunedAuctions = arns.pruneAuctions(timestamp)
-	local prunedReserved = arns.pruneReservedNames(timestamp)
-	-- TODO: return vaults and updated balances from vault pruning
-	vaults.pruneVaults(timestamp)
+	arns.pruneReservedNames(timestamp)
+	local prunedVaults = vaults.pruneVaults(timestamp)
 	local gatewayResults = gar.pruneGateways(timestamp, msgId)
 	local prunedEpochs = epochs.pruneEpochs(timestamp)
 	return {
 		prunedRecords = prunedRecords,
-		prunedAuctions = prunedAuctions,
-		prunedReserved = prunedReserved,
-		prunedGateways = gatewayResults.prunedGateways,
-		slashedGateways = gatewayResults.slashedGateways,
+		prunedVaults = prunedVaults,
+		pruneGatewayResults = gatewayResults,
 		prunedEpochs = prunedEpochs,
 	}
 end
