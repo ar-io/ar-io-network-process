@@ -447,8 +447,7 @@ function arns.createAuction(name, timestamp, initiator)
 	end
 	local record = arns.getRecord(name)
 	local auctionDurationMs = 60 * 1000 * 60 * 24 * 14 -- 14 days in milliseconds
-	local auctionPriceIntervalMs = 1000 * 60 * 2 -- ~2 min per price interval
-	local exponentialDecayRate = 0.000002
+	local decayRate = 0.00000002
 	local scalingExponent = 190
 	local endTimestamp = timestamp + auctionDurationMs
 	local baseFee = demand.getFees()[#name]
@@ -458,21 +457,20 @@ function arns.createAuction(name, timestamp, initiator)
 	local startPrice = floorPrice * startPriceMultiplier
 	local auction = {
 		name = name,
-		type = record.type,
+		type = record.type, -- prices are dynamically based on the requested bid time (e.g. years - 5)
 		startTimestamp = timestamp,
 		endTimestamp = endTimestamp,
 		startPrice = startPrice,
 		floorPrice = floorPrice,
 		initiator = initiator,
-		years = record.type == "lease" and 1 or nil,
-		-- TODO: this requires storing 10080 prices, which is a lot of memory - we may want to just store the settings below and compute on the fly (or have clients use the settings to compute the price at any given timestamp)
-		prices = arns.computePricesForAuction(startPrice, timestamp, endTimestamp, {
-			auctionPriceIntervalMs = auctionPriceIntervalMs, -- ~2 min per price interval
-			exponentialDecayRate = exponentialDecayRate,
+		settings = {
+			durationMs = auctionDurationMs,
+			demandFactor = demand.getDemandFactor(),
+			baseFee = baseFee,
+			decayRate = decayRate,
 			scalingExponent = scalingExponent,
-		}),
+		},
 	}
-	-- auction.prices = arns.computePricesForAuction(startPrice, timestamp, endTimestamp, auction.settings)
 	NameRegistry.auctions[name] = auction
 	-- ensure the name is removed from the registry
 	arns.removeRecord(name)
@@ -480,7 +478,7 @@ function arns.createAuction(name, timestamp, initiator)
 end
 
 function arns.getAuction(name)
-	return NameRegistry.auctions[name]
+	return utils.deepCopy(NameRegistry.auctions[name])
 end
 
 function arns.getAuctions()
@@ -488,33 +486,39 @@ function arns.getAuctions()
 	return auctions or {}
 end
 
-function arns.computePricesForAuction(startPrice, startTimestamp, endTimestamp, settings)
+function arns.computePricesForAuction(auction)
 	local prices = {}
-	local auctionPriceIntervalMs = settings.auctionPriceIntervalMs
-	local exponentialDecayRate = settings.exponentialDecayRate
-	local scalingExponent = settings.scalingExponent
-	for timestampAtInterval = startTimestamp, endTimestamp - auctionPriceIntervalMs, auctionPriceIntervalMs do
-		local intervalsSinceStart = math.floor((timestampAtInterval - startTimestamp) / auctionPriceIntervalMs)
-		local totalDecaySinceStart = math.min(1, exponentialDecayRate * intervalsSinceStart)
-		local priceAtInterval = math.floor(startPrice * ((1 - totalDecaySinceStart) ^ scalingExponent))
-		prices[timestampAtInterval] = priceAtInterval
+	for timestampAtInterval = auction.startTimestamp, auction.endTimestamp - auction.settings.durationMs do
+		local priceAtTimestamp = arns.getCurrentBidPriceForAuction(auction, timestampAtInterval)
+		prices[timestampAtInterval] = priceAtTimestamp
 	end
 	return prices
 end
 
 function arns.getCurrentBidPriceForAuction(auction, timestamp)
-	-- find the timestamp nearest to the interval based on auction timestamp
-	local auctionIntervalMs = 1000 * 60 * 2 -- ~2 min per price interval
-	local auctionIntervalCount = math.floor((timestamp - auction.startTimestamp) / auctionIntervalMs)
-	local nearestPriceTimestamp = auction.startTimestamp + (auctionIntervalCount * auctionIntervalMs)
-	return auction.prices[nearestPriceTimestamp]
+	local decayRate = auction.settings.decayRate
+	local scalingExponent = auction.settings.scalingExponent
+	if timestamp < auction.startTimestamp or timestamp > auction.endTimestamp then
+		error("Timestamp is outside of auction start and end timestamps")
+	end
+	local timeSinceStart = timestamp - auction.startTimestamp
+	local currentAuctionPrice = auction.startPrice * ((1 - (decayRate * timeSinceStart)) ^ scalingExponent)
+	-- TODO: the initial price is based on the default number of years (1) - we may want to use the actual requested years
+	return math.floor(math.max(currentAuctionPrice, auction.floorPrice))
 end
 
-function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId)
+function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, years)
 	local auction = arns.getAuction(name)
 	if not auction then
 		error("Auction does not exist")
 	end
+
+	-- assert the bid is between auction start and end timestamps
+	if timestamp < auction.startTimestamp or timestamp > auction.endTimestamp then
+		-- TODO: we should likely clean up the auction if it is outside of the time range
+		error("Bid timestamp is outside of auction start and end timestamps")
+	end
+
 	local requiredBid = arns.getCurrentBidPriceForAuction(auction, timestamp)
 	local requiredOrBidAmount = bidAmount or requiredBid
 	if requiredOrBidAmount < requiredBid then
@@ -524,8 +528,7 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId)
 	local finalBidAmount = math.min(requiredOrBidAmount, requiredBid)
 
 	-- check the balance of the bidder
-	local bidderBalance = balances.getBalance(bidder)
-	if bidderBalance < finalBidAmount then
+	if not utils.walletHasSufficientBalance(bidder, finalBidAmount) then
 		error("Insufficient balance")
 	end
 

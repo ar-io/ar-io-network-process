@@ -1902,6 +1902,7 @@ end)
 addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.AuctionInfo), function(msg)
 	local name = string.lower(msg.Tags.Name)
 	local auction = arns.getAuction(name)
+	local timestamp = tonumber(msg.Timestamp or msg.Tags.Timestamp)
 	if not auction then
 		ao.send({
 			Target = msg.From,
@@ -1921,9 +1922,8 @@ addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.Aucti
 			floorPrice = auction.floorPrice,
 			initiator = auction.initiator,
 			type = auction.type,
-			years = auction.years,
-			currentPrice = arns.getCurrentBidPriceForAuction(auction, msg.Timestamp),
-			-- TODO: prices may take up too much memory, we may need to paginate the response or slice the array
+			settings = auction.settings,
+			currentPrice = arns.getCurrentBidPriceForAuction(auction, timestamp),
 		}),
 	})
 end)
