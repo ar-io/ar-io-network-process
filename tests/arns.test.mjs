@@ -421,7 +421,7 @@ describe('ArNS', async () => {
     const { mem, record: initialRecord } = await runBuyRecord({
       sender: STUB_ADDRESS,
       processId,
-      type: "permabuy"
+      type: 'permabuy',
     });
 
     const releaseNameResult = await handle(
@@ -471,17 +471,31 @@ describe('ArNS', async () => {
       startTimestamp: auction.startTimestamp,
       endTimestamp: auction.endTimestamp,
       currentPrice: auction.startPrice,
+      settings: {
+        decayRate: 0.00000002,
+        scalingExponent: 190,
+        baseFee: 500000000,
+        demandFactor: 1,
+        durationMs: 1209600000,
+      },
     });
 
-    // TRANSFER FROM THE OWNER TO THE STUB ADDRESS
+    // // TRANSFER FROM THE OWNER TO A NEW STUB ADDRESS
+    const bidderAddress = 'auction-bidder-'.padEnd(43, '0');
+    const bidTimestamp = auction.startTimestamp + 60 * 1000; // same as the original interval but 1 minute after the auction has started
+    const expectedPurchasePrice = Math.floor(
+      expectedStartPrice *
+        (1 - 0.00000002 * (bidTimestamp - auction.startTimestamp)) **
+          190,
+    );
     const transferResult = await handle(
       {
         From: PROCESS_OWNER,
         Owner: PROCESS_OWNER,
         Tags: [
           { name: 'Action', value: 'Transfer' },
-          { name: 'Recipient', value: STUB_ADDRESS },
-          { name: 'Quantity', value: expectedStartPrice },
+          { name: 'Recipient', value: bidderAddress },
+          { name: 'Quantity', value: expectedPurchasePrice },
           { name: 'Cast', value: true },
         ],
       },
@@ -494,11 +508,10 @@ describe('ArNS', async () => {
     );
 
     assert.equal(transferErrorTag, undefined);
-    const bidTimestamp = auction.startTimestamp + 60 * 1000; // same as the original interval but 1 minute after the auction has started
     const submitBidResult = await handle(
       {
-        From: STUB_ADDRESS,
-        Owner: STUB_ADDRESS,
+        From: bidderAddress,
+        Owner: bidderAddress,
         Tags: [
           { name: 'Action', value: 'Auction-Bid' },
           { name: 'Name', value: 'test-name' },
@@ -543,13 +556,14 @@ describe('ArNS', async () => {
       submitBidResult.Memory,
     );
 
-    const expectedRewardForInitiator = expectedStartPrice * 0.5;
-    const expectedRewardForProtocol = expectedStartPrice - expectedRewardForInitiator;
+    const expectedRewardForInitiator = Math.floor(expectedPurchasePrice * 0.5);
+    const expectedRewardForProtocol =
+      expectedPurchasePrice - expectedRewardForInitiator;
 
     const record = JSON.parse(recordResult.Messages[0].Data);
     assert.deepEqual(record, {
       processId,
-      purchasePrice: expectedStartPrice,
+      purchasePrice: expectedPurchasePrice,
       startTimestamp: bidTimestamp,
       type: 'permabuy',
       undernameLimit: 10,
@@ -570,6 +584,7 @@ describe('ArNS', async () => {
     const balances = JSON.parse(balancesResult.Messages[0].Data);
     assert.equal(balances['test-owner-of-ant'], expectedRewardForInitiator);
     assert.equal(balances[PROCESS_ID], expectedProtocolBalance);
+    assert.equal(balances[bidderAddress], 0);
   });
 
   // TODO: add several error scenarios
