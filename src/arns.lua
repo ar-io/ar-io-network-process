@@ -453,7 +453,8 @@ function arns.createAuction(name, timestamp, initiator)
 		demandFactor,
 		baseFee,
 		initiator,
-		startPriceMultiplier
+		startPriceMultiplier,
+		arns.calculateRegistrationFee
 	)
 	NameRegistry.auctions[name] = auction
 	-- ensure the name is removed from the registry
@@ -461,24 +462,26 @@ function arns.createAuction(name, timestamp, initiator)
 	return auction
 end
 
+function arns.getAuction(name)
+	return NameRegistry.auctions[name]
+end
+
 function arns.getAuctions()
 	return NameRegistry.auctions or {}
 end
 
 function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, type, years)
-	local maybeAuction = arns.getAuction(name)
-	if not maybeAuction then
+	local auction = arns.getAuction(name)
+	if not auction then
 		error("Auction does not exist")
 	end
-	local auction = maybeAuction:decode()
 
 	-- assert the bid is between auction start and end timestamps
 	if timestamp < auction.startTimestamp or timestamp > auction.endTimestamp then
 		-- TODO: we should likely clean up the auction if it is outside of the time range
 		error("Bid timestamp is outside of auction start and end timestamps")
 	end
-
-	local requiredBid = arns.getCurrentBidPriceForAuction(auction, timestamp, type, years)
+	local requiredBid = auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
 	local requiredOrBidAmount = bidAmount or requiredBid
 	if requiredOrBidAmount < requiredBid then
 		error("Bid amount is less than the required bid of " .. requiredBid)
@@ -494,8 +497,8 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 	local record = {
 		processId = processId,
 		startTimestamp = timestamp,
-		endTimestamp = auction.type == "lease" and timestamp + constants.oneYearMs * auction.years or nil,
-		type = auction.type,
+		endTimestamp = type == "lease" and timestamp + constants.oneYearMs * years or nil,
+		type = type,
 		undernameLimit = constants.DEFAULT_UNDERNAME_COUNT,
 		purchasePrice = finalBidAmount,
 	}

@@ -1,5 +1,4 @@
 local Auction = {}
-local arns = require("arns")
 
 --- Represents an Auction.
 --- @class Auction
@@ -7,11 +6,13 @@ local arns = require("arns")
 --- @field decayRate number The decay rate for price calculation
 --- @field scalingExponent number The scaling exponent for price calculation
 --- @field demandFactor number The demand factor for pricing
+--- @field durationMs number The duration of the auction in milliseconds
 --- @field initiator string The address of the initiator of the auction
 --- @field baseFee number The base fee for the auction
 --- @field startTimestamp number The starting timestamp for the auction
 --- @field endTimestamp number The ending timestamp for the auction
 --- @field startPriceMultiplier number The multiplier for the starting price
+--- @field registrationFeeCalculator function Function to calculate registration fee
 
 --- Creates a new Auction instance
 --- @param name string The name of the auction
@@ -23,6 +24,7 @@ local arns = require("arns")
 --- @param baseFee number The base fee for the auction
 --- @param initiator string The address of the initiator of the auction
 --- @param startPriceMultiplier number The multiplier for the starting price
+--- @param registrationFeeCalculator function Function to calculate registration fee that supports type, baseFee, years, demandFactor
 --- @return Auction The new Auction instance
 function Auction:new(
 	name,
@@ -33,18 +35,21 @@ function Auction:new(
 	demandFactor,
 	baseFee,
 	initiator,
-	startPriceMultiplier
+	startPriceMultiplier,
+	registrationFeeCalculator
 )
 	local auction = {
 		name = name,
 		decayRate = decayRate,
 		scalingExponent = scalingExponent,
 		demandFactor = demandFactor,
+		durationMs = durationMs,
 		initiator = initiator,
 		baseFee = baseFee,
 		startTimestamp = startTimestamp,
 		endTimestamp = startTimestamp + (durationMs or 14 * 24 * 60 * 60 * 1000),
 		startPriceMultiplier = startPriceMultiplier or 50,
+		registrationFeeCalculator = registrationFeeCalculator,
 	}
 	setmetatable(auction, self)
 	self.__index = self
@@ -57,18 +62,9 @@ end
 --- @param intervalMs number The interval in milliseconds, must be at least 15 minutes
 --- @return table A table of prices indexed by timestamp
 function Auction:computePricesForAuction(type, years, intervalMs)
-	if intervalMs < 1000 * 60 * 15 then -- Ensure the interval is at least 15 minutes
-		error("Interval must be at least 15 minutes to avoid excessive computation.")
-	end
-
 	local prices = {}
-	local startPrice = arns.calculateRegistrationFee(type, self.baseFee, years, self.demandFactor)
-		* self.startPriceMultiplier
-
 	for i = self.startTimestamp, self.endTimestamp, intervalMs do
-		local timeSinceStart = i - self.startTimestamp
-		local totalDecaySinceStart = self.decayRate * timeSinceStart
-		local priceAtTimestamp = math.floor(startPrice * ((1 - totalDecaySinceStart) ^ self.scalingExponent))
+		local priceAtTimestamp = self:getPriceForAuctionAtTimestamp(i, type, years)
 		prices[i] = priceAtTimestamp
 	end
 	return prices
@@ -80,28 +76,12 @@ end
 --- @param years number The number of years for the auction
 --- @return number The current price for the auction at the given timestamp
 function Auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
-	local startPrice = arns.calculateRegistrationFee(type, self.baseFee, years, self.demandFactor)
+	local startPrice = self.registrationFeeCalculator(type, self.baseFee, years, self.demandFactor)
 		* self.startPriceMultiplier
 	local timeSinceStart = timestamp - self.startTimestamp
 	local totalDecaySinceStart = self.decayRate * timeSinceStart
 	local currentPrice = math.floor(startPrice * ((1 - totalDecaySinceStart) ^ self.scalingExponent))
 	return currentPrice
-end
-
---- Decodes the auction into a table
---- @return table The decoded auction table with all the fields
-function Auction:decode()
-	return {
-		name = self.name,
-		startTimestamp = self.startTimestamp,
-		endTimestamp = self.endTimestamp,
-		decayRate = self.decayRate,
-		scalingExponent = self.scalingExponent,
-		demandFactor = self.demandFactor,
-		baseFee = self.baseFee,
-		initiator = self.initiator,
-		startPriceMultiplier = self.startPriceMultiplier,
-	}
 end
 
 return Auction

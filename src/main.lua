@@ -2219,6 +2219,8 @@ addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.Aucti
 	local name = string.lower(msg.Tags.Name)
 	local auction = arns.getAuction(name)
 	local timestamp = tonumber(msg.Timestamp or msg.Tags.Timestamp)
+	local type = msg.Tags.Type or "permabuy"
+	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
 	if not auction then
 		ao.send({
 			Target = msg.From,
@@ -2227,20 +2229,26 @@ addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.Aucti
 		})
 		return
 	end
+
+	local auctionObj = {
+		name = auction.name,
+		startTimestamp = auction.startTimestamp,
+		endTimestamp = auction.endTimestamp,
+		initiator = auction.initiator,
+		currentPrice = auction:getPriceForAuctionAtTimestamp(timestamp, type, years),
+		settings = {
+			decayRate = auction.decayRate,
+			scalingExponent = auction.scalingExponent,
+			baseFee = auction.baseFee,
+			demandFactor = auction.demandFactor,
+			durationMs = auction.durationMs,
+			startPriceMultiplier = auction.startPriceMultiplier,
+		},
+	}
 	ao.send({
 		Target = msg.From,
 		Action = ActionMap.AuctionInfo .. "-Notice",
-		Data = json.encode({
-			name = name,
-			startTimestamp = auction.startTimestamp,
-			endTimestamp = auction.endTimestamp,
-			startPrice = auction.startPrice,
-			floorPrice = auction.floorPrice,
-			initiator = auction.initiator,
-			type = auction.type,
-			settings = auction.settings,
-			currentPrice = arns.getCurrentBidPriceForAuction(auction, timestamp),
-		}),
+		Data = json.encode(auctionObj),
 	})
 end)
 
@@ -2250,6 +2258,8 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 	local bidder = utils.formatAddress(msg.From)
 	local processId = utils.formatAddress(msg.Tags["Process-Id"])
 	local timestamp = tonumber(msg.Timestamp)
+	local type = msg.Tags.Type or "permabuy"
+	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
 
 	-- assert name, bidder, processId are provided
 	local checkAssertions = function()
@@ -2263,6 +2273,19 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 				type(bidAmount) == "number" and bidAmount > 0 and utils.isInteger(bidAmount),
 				"Bid amount must be a positive integer"
 			)
+		end
+		if type then
+			assert(type == "permabuy" or type == "lease", "Invalid auction type. Must be either 'permabuy' or 'lease'")
+		end
+		if type == "lease" then
+			if years then
+				assert(
+					years and utils.isInteger(years) and years > 0 and years <= constants.maxLeaseLengthYears,
+					"Years must be an integer between 1 and 5"
+				)
+			else
+				years = 1
+			end
 		end
 	end
 
@@ -2287,7 +2310,7 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 		return
 	end
 
-	local status, result = pcall(arns.submitAuctionBid, name, bidAmount, bidder, timestamp, processId)
+	local status, result = pcall(arns.submitAuctionBid, name, bidAmount, bidder, timestamp, processId, type, years)
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -2297,6 +2320,22 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 		})
 		return
 	end
+
+	local auctionObj = {
+		name = auction.name,
+		startTimestamp = auction.startTimestamp,
+		endTimestamp = auction.endTimestamp,
+		initiator = auction.initiator,
+		currentPrice = auction:getPriceForAuctionAtTimestamp(timestamp, type, years),
+		settings = {
+			decayRate = auction.decayRate,
+			scalingExponent = auction.scalingExponent,
+			baseFee = auction.baseFee,
+			demandFactor = auction.demandFactor,
+			durationMs = auction.durationMs,
+			startPriceMultiplier = auction.startPriceMultiplier,
+		},
+	}
 
 	-- send buy record notice and auction close notice?
 	ao.send({
@@ -2310,16 +2349,7 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 		Action = "Debit-Notice",
 		Quantity = tostring(result.rewardForInitiator),
 		Data = json.encode({
-			auction = {
-				name = name,
-				startTimestamp = auction.startTimestamp,
-				endTimestamp = auction.endTimestamp,
-				startPrice = auction.startPrice,
-				floorPrice = auction.floorPrice,
-				initiator = auction.initiator,
-				type = auction.type,
-				years = auction.years,
-			},
+			auction = auctionObj,
 			bidder = result.bidder,
 			bidAmount = result.bidAmount,
 			rewardForInitiator = result.rewardForInitiator,

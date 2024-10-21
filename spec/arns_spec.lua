@@ -659,7 +659,7 @@ describe("arns", function()
 
 		describe("createAuction", function()
 			it("should create an auction and remove any existing record", function()
-				local auction = arns.createAuction("test-name", 1000000, "test-initiator"):decode()
+				local auction = arns.createAuction("test-name", 1000000, "test-initiator")
 				local twoWeeksMs = 1000 * 60 * 60 * 24 * 14
 				assert.are.equal(auction.name, "test-name")
 				assert.are.equal(auction.startTimestamp, 1000000)
@@ -681,7 +681,9 @@ describe("arns", function()
 					190,
 					1,
 					500000000,
-					"test-initiator"
+					"test-initiator",
+					50,
+					arns.calculateRegistrationFee
 				)
 				_G.NameRegistry.auctions = {
 					["test-name"] = existingAuction,
@@ -707,7 +709,7 @@ describe("arns", function()
 			end)
 		end)
 
-		describe("getCurrentBidPriceForAuction", function()
+		describe("getPriceForAuctionAtTimestamp", function()
 			it("should return the correct price for an auction at a given timestamp for a permabuy", function()
 				local startTimestamp = 1000000
 				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
@@ -720,7 +722,7 @@ describe("arns", function()
 					nil,
 					auction.demandFactor
 				) * 50
-				local timeSinceStart = currentTimestamp - auctionDecoded.startTimestamp
+				local timeSinceStart = currentTimestamp - auction.startTimestamp
 				local totalDecaySinceStart = decayRate * timeSinceStart
 				local expectedPriceAtTimestamp =
 					math.floor(expectedStartPrice * ((1 - totalDecaySinceStart) ^ scalingExponent))
@@ -730,41 +732,38 @@ describe("arns", function()
 		end)
 
 		describe("computePricesForAuction", function()
-			it("should return the correct prices for an auction", function()
+			it("should return the correct prices for an auction with for a lease", function()
 				local startTimestamp = 1729524023521
 				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
-				local auctionDecoded = auction:decode()
-				local startPriceForLease = arns.calculateRegistrationFee(
-					"lease",
-					auctionDecoded.baseFee,
-					1,
-					auctionDecoded.demandFactor
-				) * 50
 				local intervalMs = 1000 * 60 * 15 -- 15 min (how granular we want to compute the prices)
-				local prices = auction:computePricesForAuction(1, "lease", intervalMs)
-				-- create the curve of prices
-				local decayRate = auctionDecoded.decayRate
-				local scalingExponent = auctionDecoded.scalingExponent
-				for i = startTimestamp, auctionDecoded.endTimestamp, intervalMs do
-					local timeSinceStart = i - auctionDecoded.startTimestamp
+				local prices = auction:computePricesForAuction("lease", 1, intervalMs)
+				local baseFee = 500000000
+				local oneYearLeaseFee = baseFee * constants.ANNUAL_PERCENTAGE_FEE * 1
+				local floorPrice = baseFee + oneYearLeaseFee
+				local startPriceForLease = floorPrice * 50
+				-- create the curve of prices using the parameters of the auction
+				local decayRate = auction.decayRate
+				local scalingExponent = auction.scalingExponent
+				for i = startTimestamp, auction.endTimestamp, intervalMs do
+					local timeSinceStart = i - auction.startTimestamp
 					local totalDecaySinceStart = decayRate * timeSinceStart
 					local expectedPriceAtTimestamp =
 						math.floor(startPriceForLease * ((1 - totalDecaySinceStart) ^ scalingExponent))
 					assert.are.equal(
-						prices[i],
 						expectedPriceAtTimestamp,
+						prices[i],
 						"Price at timestamp" .. i .. " should be " .. expectedPriceAtTimestamp
 					)
 				end
 				-- make sure the last price at the end of the auction is the floor price
-				local lastPrice = prices[auctionDecoded.endTimestamp]
-				local listPricePercentDifference = (lastPrice - auctionDecoded.floorPrice) / auctionDecoded.floorPrice
+				local lastPrice = prices[auction.endTimestamp]
+				local listPricePercentDifference = (lastPrice - floorPrice) / floorPrice
 				assert.is_true(
 					listPricePercentDifference <= 0.0001,
 					"Last price should be within 0.01% of the floor price. Last price: "
 						.. lastPrice
 						.. " Floor price: "
-						.. auctionDecoded.floorPrice
+						.. floorPrice
 				)
 			end)
 		end)
@@ -777,22 +776,24 @@ describe("arns", function()
 					local bidTimestamp = startTimestamp + 1000 * 60 * 2 -- 2 min into the auction
 					local demandBefore = demand.getCurrentPeriodPurchases()
 					local revenueBefore = demand.getCurrentPeriodRevenue()
+					local baseFee = 500000000
+					local permabuyAnnualFee = baseFee * constants.ANNUAL_PERCENTAGE_FEE * 20
+					local floorPrice = baseFee + permabuyAnnualFee
+					local startPrice = floorPrice * 50
 					local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
-					local auctionDecoded = auction and auction:decode()
 					local result = arns.submitAuctionBid(
 						"test-name",
-						auctionDecoded.startPrice,
+						startPrice,
 						testAddressArweave,
 						bidTimestamp,
-						"test-process-id"
+						"test-process-id",
+						"permabuy",
+						nil
 					)
 					local balances = balances.getBalances()
 					local expectedPrice = math.floor(
-						auctionDecoded.startPrice
-							* (
-								(1 - (auctionDecoded.decayRate * (bidTimestamp - startTimestamp)))
-								^ auctionDecoded.scalingExponent
-							)
+						startPrice
+							* ((1 - (auction.decayRate * (bidTimestamp - startTimestamp))) ^ auction.scalingExponent)
 					)
 					local expectedRecord = {
 						endTimestamp = nil,
@@ -831,23 +832,26 @@ describe("arns", function()
 
 			it("should throw an error if the bid is not high enough", function()
 				local startTimestamp = 1000000
-				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator"):decode()
+				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
+				local startPrice = auction:getPriceForAuctionAtTimestamp(startTimestamp, "permabuy", nil)
 				local status, error = pcall(
 					arns.submitAuctionBid,
 					"test-name",
-					auction.startPrice - 1,
+					startPrice - 1,
 					testAddressArweave,
 					startTimestamp,
-					"test-process-id"
+					"test-process-id",
+					"permabuy",
+					nil
 				)
 				assert.is_false(status)
-				assert.match("Bid amount is less than the required bid of " .. auction.startPrice, error)
+				assert.match("Bid amount is less than the required bid of " .. startPrice, error)
 			end)
 
 			it("should throw an error if the bidder does not have enough balance", function()
 				local startTimestamp = 1000000
 				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
-				local requiredBid = arns.getCurrentBidPriceForAuction(auction, startTimestamp)
+				local requiredBid = auction:getPriceForAuctionAtTimestamp(startTimestamp, "permabuy", nil)
 				_G.Balances[testAddressArweave] = requiredBid - 1
 				local status, error = pcall(
 					arns.submitAuctionBid,
@@ -855,7 +859,9 @@ describe("arns", function()
 					requiredBid,
 					testAddressArweave,
 					startTimestamp,
-					"test-process-id"
+					"test-process-id",
+					"permabuy",
+					nil
 				)
 				assert.is_false(status)
 				assert.match("Insufficient balance", error)

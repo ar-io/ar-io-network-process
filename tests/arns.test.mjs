@@ -461,22 +461,20 @@ describe('ArNS', async () => {
     assert.equal(auctionErrorTag, undefined);
     const auction = JSON.parse(auctionResult.Messages[0].Data);
     const expectedStartPrice = 125000000000;
-    const expectedFloorPrice = 2500000000;
+    const expectedStartTimestamp = STUB_TIMESTAMP;
     assert.deepEqual(auction, {
       name: 'test-name',
-      type: 'permabuy',
-      startPrice: expectedStartPrice,
-      floorPrice: expectedFloorPrice,
       initiator: 'test-owner-of-ant',
       startTimestamp: auction.startTimestamp,
-      endTimestamp: auction.endTimestamp,
-      currentPrice: auction.startPrice,
+      endTimestamp: expectedStartTimestamp + 60 * 60 * 1000 * 24 * 14,
+      currentPrice: expectedStartPrice,
       settings: {
         decayRate: (0.020379 / (1000 * 60 * 60 * 24 * 14)).toFixed(24),
         scalingExponent: 190,
         baseFee: 500000000,
         demandFactor: 1,
         durationMs: 1209600000,
+        startPriceMultiplier: 50,
       },
     });
 
@@ -522,8 +520,6 @@ describe('ArNS', async () => {
       },
       transferResult.Memory,
     );
-
-    console.log(submitBidResult.Messages[0]);
 
     // assert no error tag
     const submitBidErrorTag = submitBidResult.Messages[0].Tags.find(
