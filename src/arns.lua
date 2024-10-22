@@ -486,6 +486,7 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 		endTimestamp = type == "lease" and timestamp + constants.oneYearMs * years or nil,
 		undernameLimit = constants.DEFAULT_UNDERNAME_COUNT,
 		purchasePrice = finalBidAmount,
+		type = type,
 	}
 	local rewardForInitiator = math.floor(finalBidAmount * 0.5)
 	local rewardForProtocol = finalBidAmount - rewardForInitiator

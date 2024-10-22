@@ -540,8 +540,6 @@ describe('ArNS', async () => {
 
     assert.ok(buyRecordNoticeTag);
 
-    console.log(submitBidResult.Messages[0]);
-
     // expect the target tag to be the bidder
     assert.equal(submitBidResult.Messages?.[0]?.Target, bidderAddress);
 
@@ -550,6 +548,7 @@ describe('ArNS', async () => {
       purchasePrice: expectedPurchasePrice,
       startTimestamp: bidTimestamp,
       undernameLimit: 10,
+      type: 'permabuy',
     };
     const expectedRewardForInitiator = Math.floor(expectedPurchasePrice * 0.5);
     const expectedRewardForProtocol =
@@ -580,7 +579,6 @@ describe('ArNS', async () => {
       rewardForInitiator: expectedRewardForInitiator,
       rewardForProtocol: expectedRewardForProtocol,
       name: 'test-name',
-      type: 'permabuy',
     });
 
     // should add the record to the registry
@@ -601,6 +599,7 @@ describe('ArNS', async () => {
       purchasePrice: expectedPurchasePrice,
       startTimestamp: bidTimestamp,
       undernameLimit: 10,
+      type: 'permabuy',
     });
 
     // assert the balance of the initiator and the protocol where updated correctly

@@ -2366,6 +2366,7 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 			undernameLimit = record.undernameLimit,
 			purchasePrice = record.purchasePrice,
 			processId = record.processId,
+			type = record.type,
 		}),
 	})
 
@@ -2374,8 +2375,6 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 		Action = "Debit-Notice",
 		Quantity = tostring(auctionBidOrError.rewardForInitiator),
 		Data = json.encode({
-			type = type,
-			years = years,
 			name = name,
 			bidder = auctionBidOrError.bidder,
 			bidAmount = auctionBidOrError.bidAmount,
