@@ -39,8 +39,7 @@ describe('setup', () => {
 
   describe('handlers', () => {
     it('should always have correct number of handlers', async () => {
-      const expectedHandlerCount =
-        processId === IO_TESTNET_PROCESS_ID ? 52 : 53; // TODO: update this if more handlers are added
+      const expectedHandlerCount = 53; // TODO: update this if more handlers are added
       const { Handlers: handlersList } = await io.getInfo();
       /**
        * There are two security handlers before _eval and _default, so count is 52
@@ -86,6 +85,21 @@ describe('setup', () => {
       ); // forces us to think critically about the order of handlers so intended to be sensitive to changes
     });
   });
+
+    describe('balances', () => {
+      it('should always be up to date', async () => {
+        const { items: balances } = await io.getBalances({
+          limit: 10_000,
+        });
+        // assert they are all integers
+        for (const balance of balances) {
+          assert(
+            Number.isInteger(balance.balance),
+            `Balance for ${balance.address} is not an integer: ${balance.balance}`,
+          );
+        }
+      });
+    });
 
   describe('distribution totals', () => {
     it('should always have correct eligible rewards for the current epoch (within 10 mIO)', async () => {
@@ -157,6 +171,52 @@ describe('setup', () => {
       assert(
         supplyData.delegated >= 0,
         `Delegated supply is undefined: ${supplyData.delegated}`,
+      );
+
+      const { items: balances } = await io.getBalances({
+        limit: 5000,
+      });
+
+      const protocolBalance = await io.getBalance({
+        address: processId,
+      });
+
+      assert(
+        protocolBalance === supplyData.protocolBalance,
+        `Protocol balance is not equal to the balance provided by the contract: ${protocolBalance} !== ${supplyData.protocolBalance}`,
+      );
+
+      const circulating = balances.reduce((acc, curr) => acc + curr.balance, 0) -
+        protocolBalance;
+
+      assert(
+        circulating === supplyData.circulating,
+        `Circulating supply is not equal to the sum of the balances minus the protocol balance: ${circulating} !== ${supplyData.circulating}`,
+      );
+
+      // get the supply staked
+      const { items: gateways } = await io.getGateways({
+        limit: 1000,
+      });
+
+      const staked = gateways.reduce(
+        (acc, curr) => acc + curr.operatorStake,
+        0,
+      );
+
+      assert(
+        staked === supplyData.staked,
+        `Staked supply is not equal to the sum of the operator stakes: ${staked} !== ${supplyData.staked}`,
+      );
+
+      const delegated = gateways.reduce(
+        (acc, curr) => acc + curr.totalDelegatedStake,
+        0,
+      );
+
+      assert(
+        delegated === supplyData.delegated,
+        `Delegated supply is not equal to the sum of the total delegated stakes: ${delegated} !== ${supplyData.delegated}`,
       );
 
       const computedTotal =
@@ -236,10 +296,11 @@ describe('setup', () => {
 
     it('the previous epoch should have a been distributed', async () => {
       const { epochIndex: currentEpochIndex } = await io.getCurrentEpoch();
+      const previousEpochIndex = currentEpochIndex - 1;
       const { epochIndex, distributions, endTimestamp, startTimestamp } =
-        await io.getEpoch({ epochIndex: currentEpochIndex - 1 });
+        await io.getEpoch({ epochIndex: previousEpochIndex });
       assert(
-        epochIndex === currentEpochIndex - 1,
+        epochIndex === previousEpochIndex,
         'Previous epoch index is not valid',
       );
       assert(distributions, 'Distributions are not valid');
@@ -255,14 +316,40 @@ describe('setup', () => {
         distributions.rewards.eligible !== undefined,
         'Eligible rewards are not valid',
       );
+      // assert all eligible rewards are integers
+      assert(
+        Object.values(distributions.rewards.eligible).every(
+          (reward) =>
+            Number.isInteger(reward.operatorReward) &&
+            Object.values(reward.delegateRewards).every(
+              (delegateReward) => Number.isInteger(delegateReward),
+            ),
+        ),
+        `Eligible rewards for the previous epoch (${previousEpochIndex}) are not integers`,
+      );
       assert(
         distributions.rewards.distributed !== undefined,
         'Distributed rewards are not valid',
       );
+      // assert distributed rewards are integers
+      assert(
+        Object.values(distributions.rewards.distributed).every(
+          (reward) => Number.isInteger(reward),
+        ),
+        `Distributed rewards for the previous epoch (${previousEpochIndex}) are not integers`,
+      );
     });
   });
 
-  // TODO: add demand factor tests
+  describe('demand factor', () => {
+    it('should always be greater than 0.5', async () => {
+      const demandFactor = await io.getDemandFactor();
+      assert(
+        demandFactor >= 0.5,
+        `Demand factor is less than 0.5: ${demandFactor}`,
+      );
+    });
+  });
 
   // gateway registry - ensure no invalid gateways
   describe('gateway registry', () => {
@@ -289,7 +376,18 @@ describe('setup', () => {
         countedTotalGateways += gateways.length;
         for (const gateway of gateways) {
           if (gateway.status === 'joined') {
-            assert(gateway.operatorStake >= 50_000_000_000);
+            assert(
+              Number.isInteger(gateway.operatorStake),
+              `Gateway ${gateway.gatewayAddress} has an invalid operator stake: ${gateway.operatorStake}`,
+            );
+            assert(
+              Number.isInteger(gateway.totalDelegatedStake),
+              `Gateway ${gateway.gatewayAddress} has an invalid total delegated stake: ${gateway.totalDelegatedStake}`,
+            );
+            assert(
+              gateway.operatorStake >= 50_000_000_000,
+              `Gateway ${gateway.gatewayAddress} has less than 50_000_000_000 IO staked`,
+            );
             assert(
               gateway.stats.failedConsecutiveEpochs >= 0,
               `Gateway ${gateway.gatewayAddress} has less than 0 failed consecutive epochs`,
@@ -323,6 +421,17 @@ describe('setup', () => {
               `Gateway ${gateway.gatewayAddress} has less than 0 prescribed epochs`,
             );
           }
+          if (gateway.delegates.length > 0) {
+            assert(
+              gateway.delegates?.every(
+              (delegate) =>
+                Number.isInteger(delegate.balance) &&
+                delegate.startTimestamp > 0 &&
+                delegate.endTimestamp > delegate.startTimestamp,
+            ),
+              `Gateway ${gateway.gatewayAddress} has invalid delegate balances`,
+            );
+          }
           if (gateway.status === 'leaving') {
             assert(gateway.totalDelegatedStake === 0);
             assert(gateway.operatorStake === 0);
@@ -339,6 +448,10 @@ describe('setup', () => {
                 );
               }
               // assert vault balance is greater than 0 and startTimestamp and endTimestamp are valid timestamps 30 days apart
+              assert(
+                Number.isInteger(vault.balance),
+                `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid balance (${vault.balance})`,
+              );
               assert(
                 vault.balance >= 0,
                 `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid balance (${vault.balance})`,
@@ -388,12 +501,12 @@ describe('setup', () => {
             `ARNs name '${arn.name}' has no start timestamp`,
           );
           assert(
-            arn.purchasePrice >= 0,
-            `ARNs name '${arn.name}' has no purchase price`,
+            Number.isInteger(arn.purchasePrice) && arn.purchasePrice >= 0,
+            `ARNs name '${arn.name}' has invalid purchase price: ${arn.purchasePrice}`,
           );
           assert(
-            arn.undernameLimit >= 10,
-            `ARNs name '${arn.name}' has no undername limit`,
+            Number.isInteger(arn.undernameLimit) && arn.undernameLimit >= 10,
+            `ARNs name '${arn.name}' has invalid undername limit: ${arn.undernameLimit}`,
           );
           if (arns.type === 'lease') {
             assert(

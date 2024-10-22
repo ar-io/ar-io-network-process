@@ -1606,7 +1606,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 			total = totalSupply,
 			circulating = circulatingSupply,
 			locked = lockedSupply,
-			staked = stakedSupply,
+			staked = -,
 			delegated = delegatedSupply,
 			withdrawn = withdrawSupply,
 			protocolBalance = protocolBalance,
