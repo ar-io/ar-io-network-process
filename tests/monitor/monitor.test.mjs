@@ -169,7 +169,7 @@ describe('setup', () => {
       assert(
         supplyData.total === computedTotal &&
           computedTotal === 1000000000 * 1000000,
-        `Computed total supply (${computedTotal}) is not equal to the sum of protocol balance, circulating, locked, staked, and delegated and withdrawn provided by the contract (${supplyData.total})`,
+        `Computed total supply (${computedTotal}) is not equal to the sum of protocol balance, circulating, locked, staked, and delegated and withdrawn provided by the contract (${supplyData.total}) and does not match the expected total of 1 billion IO`,
       );
 
       const computedCirculating =
