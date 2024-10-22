@@ -11,9 +11,9 @@ DemandFactor = DemandFactor or {}
 Owner = Owner or ao.env.Process.Owner
 Protocol = Protocol or ao.env.Process.Id
 Balances = Balances or {}
-if not Balances[ao.env.Process.Id] then -- initialize the balance for the process id
+if not Balances[Protocol] then -- initialize the balance for the process id
 	Balances = {
-		[ao.env.Process.Id] = math.floor(50000000 * 1000000), -- 50M IO
+		[Protocol] = math.floor(50000000 * 1000000), -- 50M IO
 		[Owner] = math.floor(constants.totalTokenSupply - (50000000 * 1000000)), -- 950M IO
 	}
 end
@@ -1150,7 +1150,7 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 	local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = from,
-			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = "Invalid-Delegate-Stake" }, -- TODO: is this still right?
+			Tags = { Action = "Invalid-Delegate-Stake-Notice", Error = tostring(error) },
 			Data = tostring(error),
 		})
 	end, gar.delegateStake, from, target, quantity, tonumber(msg.Timestamp))
@@ -2175,30 +2175,40 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	end
 
 	-- we should be able to create the auction here
-	local status, result = pcall(arns.createAuction, name, tonumber(msg.Timestamp), initiator)
+	local status, auctionOrError = pcall(arns.createAuction, name, tonumber(msg.Timestamp), initiator)
 	if not status then
 		ao.send({
 			Target = msg.From,
 			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
 			Error = "Auction-Creation-Error",
-			Data = tostring(result),
+			Data = tostring(auctionOrError),
 		})
 		return
 	end
+
+	if not auctionOrError or not auctionOrError.name then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Auction-Creation-Error",
+			Data = tostring(auctionOrError),
+		})
+		return
+	end
+
+	local auction = {
+		name = auctionOrError.name,
+		startTimestamp = auctionOrError.startTimestamp,
+		endTimestamp = auctionOrError.endTimestamp,
+		initiator = auctionOrError.initiator,
+		baseFee = auctionOrError.baseFee,
+		demandFactor = auctionOrError.demandFactor,
+		settings = auctionOrError.settings,
+	}
 	ao.send({
-		Target = initiator,
 		Action = "Auction-Notice",
 		Name = name,
-		Data = json.encode({
-			startTimestamp = result.startTimestamp,
-			endTimestamp = result.endTimestamp,
-			startPrice = result.startPrice,
-			floorPrice = result.floorPrice,
-			currentPrice = result.startPrice,
-			initiator = result.initiator,
-			type = result.type,
-			years = result.years,
-		}),
+		Data = json.encode(auction),
 	})
 	return
 end)
@@ -2242,7 +2252,7 @@ addEventingHandler("auctionPrices", utils.hasMatchingTag("Action", ActionMap.Auc
 	local timestamp = tonumber(msg.Tags.Timestamp or msg.Timestamp)
 	local type = msg.Tags.Type or "permabuy"
 	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
-	local intervalMs = msg.Tags["Price-Interval"] and tonumber(msg.Tags["Price-Interval"]) or 15 * 60 * 1000 -- 15 minute intervals
+	local intervalMs = msg.Tags["Price-Interval-Ms"] and tonumber(msg.Tags["Price-Interval-Ms"]) or 15 * 60 * 1000 -- 15 minute intervals by default
 
 	if not auction then
 		ao.send({
@@ -2331,37 +2341,47 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 		return
 	end
 
-	local status, result = pcall(arns.submitAuctionBid, name, bidAmount, bidder, timestamp, processId, type, years)
+	local status, auctionBidOrError =
+		pcall(arns.submitAuctionBid, name, bidAmount, bidder, timestamp, processId, type, years)
 	if not status then
 		ao.send({
 			Target = msg.From,
 			Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice",
 			Error = "Auction-Bid-Error",
-			Data = tostring(result),
+			Data = tostring(auctionBidOrError),
 		})
 		return
 	end
 
-	-- send buy record notice and auction close notice?
+	local record = auctionBidOrError.record
+
+	-- send buy record notice and auction close notice
 	ao.send({
 		Target = bidder,
 		Action = ActionMap.BuyRecord .. "-Notice",
-		Data = json.encode(result.record),
+		Data = json.encode({
+			name = name,
+			startTimestamp = record.startTimestamp,
+			endTimestamp = record.endTimestamp,
+			undernameLimit = record.undernameLimit,
+			purchasePrice = record.purchasePrice,
+			processId = record.processId,
+		}),
 	})
 
 	ao.send({
 		Target = auction.initiator,
 		Action = "Debit-Notice",
-		Quantity = tostring(result.rewardForInitiator),
+		Quantity = tostring(auctionBidOrError.rewardForInitiator),
 		Data = json.encode({
 			type = type,
 			years = years,
-			name = auction.name,
-			bidder = result.bidder,
-			bidAmount = result.bidAmount,
-			rewardForInitiator = result.rewardForInitiator,
-			rewardForProtocol = result.rewardForProtocol,
-			record = result.record,
+			name = name,
+			bidder = auctionBidOrError.bidder,
+			bidAmount = auctionBidOrError.bidAmount,
+			rewardForInitiator = auctionBidOrError.rewardForInitiator,
+			rewardForProtocol = auctionBidOrError.rewardForProtocol,
+			record = record,
 		}),
 	})
 end)

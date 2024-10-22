@@ -534,17 +534,54 @@ describe('ArNS', async () => {
     assert.equal(submitBidResult.Messages.length, 2);
 
     // should send a buy record notice
-    const buyRecordNoticeTag = submitBidResult.Messages[0].Tags.find(
+    const buyRecordNoticeTag = submitBidResult.Messages?.[0]?.Tags?.find(
       (tag) => tag.name === 'Action' && tag.value === 'Buy-Record-Notice',
     );
 
     assert.ok(buyRecordNoticeTag);
 
+    console.log(submitBidResult.Messages[0]);
+
+    // expect the target tag to be the bidder
+    assert.equal(submitBidResult.Messages?.[0]?.Target, bidderAddress);
+
+    const expectedRecord = {
+      processId,
+      purchasePrice: expectedPurchasePrice,
+      startTimestamp: bidTimestamp,
+      undernameLimit: 10,
+    };
+    const expectedRewardForInitiator = Math.floor(expectedPurchasePrice * 0.5);
+    const expectedRewardForProtocol =
+      expectedPurchasePrice - expectedRewardForInitiator;
+
+    // assert the data response contains the record
+    const buyRecordNoticeData = JSON.parse(submitBidResult.Messages?.[0]?.Data);
+    assert.deepEqual(buyRecordNoticeData, {
+      name: 'test-name',
+      ...expectedRecord,
+    });
+
     // should send a debit notice
-    const debitNoticeTag = submitBidResult.Messages[1].Tags.find(
+    const debitNoticeTag = submitBidResult.Messages?.[1]?.Tags?.find(
       (tag) => tag.name === 'Action' && tag.value === 'Debit-Notice',
     );
     assert.ok(debitNoticeTag);
+
+    // expect the target to be to the initiator
+    assert.equal(submitBidResult.Messages?.[1]?.Target, 'test-owner-of-ant');
+
+    // assert the data response contains the record
+    const debitNoticeData = JSON.parse(submitBidResult.Messages?.[1]?.Data);
+    assert.deepEqual(debitNoticeData, {
+      record: expectedRecord,
+      bidder: bidderAddress,
+      bidAmount: expectedPurchasePrice,
+      rewardForInitiator: expectedRewardForInitiator,
+      rewardForProtocol: expectedRewardForProtocol,
+      name: 'test-name',
+      type: 'permabuy',
+    });
 
     // should add the record to the registry
     const recordResult = await handle(
@@ -558,16 +595,11 @@ describe('ArNS', async () => {
       submitBidResult.Memory,
     );
 
-    const expectedRewardForInitiator = Math.floor(expectedPurchasePrice * 0.5);
-    const expectedRewardForProtocol =
-      expectedPurchasePrice - expectedRewardForInitiator;
-
-    const record = JSON.parse(recordResult.Messages[0].Data);
+    const record = JSON.parse(recordResult.Messages?.[0]?.Data);
     assert.deepEqual(record, {
       processId,
       purchasePrice: expectedPurchasePrice,
       startTimestamp: bidTimestamp,
-      type: 'permabuy',
       undernameLimit: 10,
     });
 

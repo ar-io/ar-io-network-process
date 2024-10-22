@@ -484,7 +484,6 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 		processId = processId,
 		startTimestamp = timestamp,
 		endTimestamp = type == "lease" and timestamp + constants.oneYearMs * years or nil,
-		type = type,
 		undernameLimit = constants.DEFAULT_UNDERNAME_COUNT,
 		purchasePrice = finalBidAmount,
 	}
