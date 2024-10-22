@@ -1587,7 +1587,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 	lastKnownWithdrawSupply = withdrawSupply
 
 	addSupplyData(msg.ioEvent, {
-		totalSupply = totalSupply,
+		totalTokenSupply = totalSupply,
 	})
 	msg.ioEvent:addField("Last-Known-Total-Token-Supply", lastKnownTotalTokenSupply())
 
