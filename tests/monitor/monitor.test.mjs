@@ -1,4 +1,4 @@
-import { AOProcess, IO, IO_TESTNET_PROCESS_ID } from '@ar.io/sdk';
+import { AOProcess, IO, IO_DEVNET_PROCESS_ID, IO_TESTNET_PROCESS_ID } from '@ar.io/sdk';
 import { connect } from '@permaweb/aoconnect';
 import { strict as assert } from 'node:assert';
 import { describe, it, before, after } from 'node:test';
@@ -154,23 +154,29 @@ describe('setup', () => {
         `Delegated supply is undefined: ${supplyData.delegated}`,
       );
 
-      // const computedCirculating =
-      //   supplyData.total - supplyData.locked - supplyData.staked - supplyData.delegated- supplyData.withdrawn;
-      // assert(
-      //   supplyData.circulating === computedCirculating,
-      //   `Circulating supply (${supplyData.circulating}) is not equal to the sum of total, locked, staked, delegated, and withdrawn (${computedCirculating})`,
-      // );
+      const computedCirculating =
+        supplyData.total -
+        supplyData.locked -
+        supplyData.staked -
+        supplyData.delegated -
+        supplyData.withdrawn -
+        supplyData.protocolBalance;
+      assert(
+        supplyData.circulating === computedCirculating,
+        `Circulating supply (${supplyData.circulating}) is not equal to the sum of total, locked, staked, delegated, and withdrawn (${computedCirculating})`,
+      );
 
-      // const computedTotal =
-      //   supplyData.circulating +
-      //   supplyData.locked +
-      //   supplyData.withdrawn +
-      //   supplyData.staked +
-      //   supplyData.delegated;
-      // assert(
-      //   supplyData.total === computedTotal,
-      //   `Total supply (${supplyData.total}) is not equal to the sum of protocol balance, circulating, locked, staked, and delegated (${computedTotal})`,
-      // );
+      const computedTotal =
+        supplyData.circulating +
+        supplyData.locked +
+        supplyData.withdrawn +
+        supplyData.staked +
+        supplyData.delegated +
+        supplyData.protocolBalance;
+      assert(
+        supplyData.total === computedTotal,
+        `Computed total supply (${computedTotal}) is not equal to the sum of protocol balance, circulating, locked, staked, and delegated (${supplyData.total})`,
+      );
     });
   });
 
