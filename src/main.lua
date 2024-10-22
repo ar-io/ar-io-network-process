@@ -96,6 +96,7 @@ local function lastKnownTotalTokenSupply()
 		+ lastKnownLockedSupply
 		+ lastKnownStakedSupply
 		+ lastKnownDelegatedSupply
+		+ lastKnownWithdrawSupply
 		+ Balances[Protocol]
 end
 
