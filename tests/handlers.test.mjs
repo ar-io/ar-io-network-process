@@ -63,7 +63,7 @@ describe('handlers', async () => {
       });
 
       // assert no errors
-      assert.deepEqual(supplyResult.Messages[0].Error, undefined);
+      assert.deepEqual(supplyResult.Messages?.[0]?.Error, undefined);
 
       // assert correct tag in message by finding the index of the tag in the message
       const notice = supplyResult.Messages?.[0]?.Tags?.find(
@@ -72,7 +72,7 @@ describe('handlers', async () => {
       );
       assert.ok(notice, 'should have a Total-Token-Supply-Notice tag');
 
-      const supplyData = JSON.parse(supplyResult.Messages[0].Data);
+      const supplyData = JSON.parse(supplyResult.Messages?.[0]?.Data);
 
       assert.ok(
         supplyData.total === 1000000000 * 1000000,
