@@ -21,6 +21,7 @@ describe("arns", function()
 			[testAddressArweave] = startBalance,
 			[testAddressEth] = startBalance,
 		}
+		_G.DemandFactor.currentDemandFactor = 1.0
 	end)
 
 	for addressType, testAddress in pairs(testAddresses) do
@@ -424,6 +425,81 @@ describe("arns", function()
 		end)
 	end
 
+	describe("getTokenCost", function()
+		it("should return the correct token cost for a lease", function()
+			local baseFee = 500000000
+			local years = 2
+			local demandFactor = 0.974
+			local expectedCost = math.floor((years * baseFee * 0.20) + baseFee) * demandFactor
+			local intendedAction = {
+				intent = "Buy-Record",
+				purchaseType = "lease",
+				years = 2,
+				name = "test-name",
+			}
+			_G.DemandFactor.currentDemandFactor = demandFactor
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+		end)
+		it("should return the correct token cost for a permabuy", function()
+			local baseFee = 500000000
+			local demandFactor = 1.052
+			local expectedCost = math.floor((baseFee * 0.2 * 20) + baseFee) * demandFactor
+			local intendedAction = {
+				intent = "Buy-Record",
+				purchaseType = "permabuy",
+				name = "test-name",
+			}
+			_G.DemandFactor.currentDemandFactor = demandFactor
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+		end)
+		it("should return the correct token cost for an undername", function()
+			_G.NameRegistry.records["test-name"] = {
+				endTimestamp = constants.oneYearMs,
+				processId = testProcessId,
+				purchasePrice = 600000000,
+				startTimestamp = 0,
+				type = "lease",
+				undernameLimit = 10,
+			}
+			local baseFee = 500000000
+			local undernamePercentageFee = 0.001
+			local increaseQty = 5
+			local demandFactor = 0.60137
+			local yearsRemaining = 0.5
+			local expectedCost =
+				math.floor(baseFee * increaseQty * undernamePercentageFee * yearsRemaining * demandFactor)
+			local intendedAction = {
+				intent = "Increase-Undername-Limit",
+				quantity = 5,
+				name = "test-name",
+				currentTimestamp = constants.oneYearMs / 2,
+			}
+			_G.DemandFactor.currentDemandFactor = demandFactor
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+		end)
+		it("should return the token cost for extending a name", function()
+			_G.NameRegistry.records["test-name"] = {
+				endTimestamp = timestamp + constants.oneYearMs,
+				processId = testProcessId,
+				purchasePrice = 600000000,
+				startTimestamp = 0,
+				type = "lease",
+				undernameLimit = 10,
+			}
+			local baseFee = 500000000
+			local years = 2
+			local demandFactor = 1.2405
+			local expectedCost = math.floor((years * baseFee * 0.20) * demandFactor)
+			local intendedAction = {
+				intent = "Extend-Lease",
+				years = 2,
+				name = "test-name",
+			}
+			_G.DemandFactor.currentDemandFactor = demandFactor
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+		end)
+	end)
+
 	describe("pruneRecords", function()
 		it("should prune records", function()
 			local currentTimestamp = 1000000000
@@ -527,6 +603,130 @@ describe("arns", function()
 			assert.are.equal(registrationFees["10"].permabuy, 2500000000)
 			assert.are.equal(registrationFees["10"].lease["5"], 1000000000)
 			assert.are.equal(registrationFees["51"].lease["1"], 480000000)
+		end)
+	end)
+
+	describe("getPaginatedRecords", function()
+		before_each(function()
+			_G.NameRegistry = {
+				records = {
+					["active-record"] = {
+						endTimestamp = 100, -- far in the future
+						processId = "oldest-process-id",
+						purchasePrice = 600000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 10,
+					},
+					["active-record-1"] = {
+						endTimestamp = 10000,
+						processId = "middle-process-id",
+						purchasePrice = 400000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 5,
+					},
+					["active-record-2"] = {
+						endTimestamp = 10000000,
+						processId = "newest-process-id",
+						purchasePrice = 500000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 8,
+					},
+					["permabuy-record"] = {
+						endTimestamp = nil,
+						processId = "permabuy-process-id",
+						purchasePrice = 600000000,
+						startTimestamp = 0,
+						type = "permabuy",
+						undernameLimit = 10,
+					},
+				},
+			}
+		end)
+
+		it("should return the correct paginated records with ascending putting permabuy at the end", function()
+			local paginatedRecords = arns.getPaginatedRecords(nil, 1, "endTimestamp", "asc")
+			assert.are.same({
+				limit = 1,
+				sortBy = "endTimestamp",
+				sortOrder = "asc",
+				hasMore = true,
+				totalItems = 4,
+				nextCursor = "active-record",
+				items = {
+					{
+						name = "active-record",
+						endTimestamp = 100,
+						processId = "oldest-process-id",
+						purchasePrice = 600000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 10,
+					},
+				},
+			}, paginatedRecords)
+			local paginatedRecords2 = arns.getPaginatedRecords(paginatedRecords.nextCursor, 1, "endTimestamp", "asc")
+			assert.are.same({
+				limit = 1,
+				sortBy = "endTimestamp",
+				sortOrder = "asc",
+				hasMore = true,
+				totalItems = 4,
+				nextCursor = "active-record-1",
+				items = {
+					{
+						name = "active-record-1",
+						endTimestamp = 10000,
+						processId = "middle-process-id",
+						purchasePrice = 400000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 5,
+					},
+				},
+			}, paginatedRecords2)
+			local paginatedRecords3 = arns.getPaginatedRecords(paginatedRecords2.nextCursor, 1, "endTimestamp", "asc")
+			assert.are.same({
+				limit = 1,
+				sortBy = "endTimestamp",
+				sortOrder = "asc",
+				hasMore = true,
+				totalItems = 4,
+				nextCursor = "active-record-2",
+				items = {
+					{
+						name = "active-record-2",
+						endTimestamp = 10000000,
+						processId = "newest-process-id",
+						purchasePrice = 500000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 8,
+					},
+				},
+			}, paginatedRecords3)
+			local paginatedRecords4 = arns.getPaginatedRecords(paginatedRecords3.nextCursor, 1, "endTimestamp", "asc")
+			assert.are.same({
+				limit = 1,
+				sortBy = "endTimestamp",
+				sortOrder = "asc",
+				hasMore = false,
+				totalItems = 4,
+				nextCursor = nil,
+				items = {
+					{
+						name = "permabuy-record",
+						endTimestamp = nil,
+						processId = "permabuy-process-id",
+						purchasePrice = 600000000,
+						startTimestamp = 0,
+						type = "permabuy",
+						undernameLimit = 10,
+					},
+				},
+			}, paginatedRecords4)
 		end)
 	end)
 end)

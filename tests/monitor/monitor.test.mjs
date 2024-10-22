@@ -4,9 +4,10 @@ import { strict as assert } from 'node:assert';
 import { describe, it, before, after } from 'node:test';
 import { DockerComposeEnvironment, Wait } from 'testcontainers';
 
+const processId = process.env.IO_PROCESS_ID || IO_TESTNET_PROCESS_ID;
 const io = IO.init({
   process: new AOProcess({
-    processId: process.env.IO_PROCESS_ID || IO_TESTNET_PROCESS_ID,
+    processId,
     ao: connect({
       CU_URL: 'http://localhost:6363',
     }),
@@ -33,7 +34,8 @@ describe('setup', () => {
 
   describe('handlers', () => {
     it('should always have correct number of handlers', async () => {
-      const expectedHandlerCount = 52; // TODO: update this if more handlers are added
+      const expectedHandlerCount =
+        processId === IO_TESTNET_PROCESS_ID ? 52 : 53; // TODO: update this if more handlers are added
       const { Handlers: handlersList } = await io.getInfo();
       /**
        * There are two security handlers before _eval and _default, so count is 52
@@ -186,6 +188,64 @@ describe('setup', () => {
         `Epoch index is not up to date: ${epochIndex}`,
       );
     });
+    it('should contain the startTimestamp, endTimestamp and distributions and observations for the current epoch', async () => {
+      const { epochIndex, startTimestamp, endTimestamp, distributions, observations } =
+        await io.getCurrentEpoch();
+      assert(epochIndex > 0, 'Epoch index is not valid');
+      assert(distributions, 'Distributions are not valid');
+      assert(observations, 'Observations are not valid');
+      assert(
+        startTimestamp > 0,
+        `Start timestamp is not valid: ${startTimestamp}`,
+      );
+      assert(
+        endTimestamp > startTimestamp,
+        `End timestamp is not greater than start timestamp: ${endTimestamp} > ${startTimestamp}`,
+      );
+      assert(
+        distributions.rewards.eligible,
+        'Eligible rewards are not valid',
+      );
+
+      // compare the current gateway count to the current epoch totalEligibleRewards
+      const { items: gateways } = await io.getGateways({
+        limit: 1000, // we will need to update this if the number of gateways grows
+      });
+      const activeGatewayCount = gateways.filter(
+        (gateway) => gateway.status === 'joined',
+      ).length;
+      assert(
+        activeGatewayCount === distributions.totalEligibleGateways,
+        `Active gateway count (${activeGatewayCount}) does not match total eligible gateways (${distributions.totalEligibleGateways}) for the current epoch`,
+      );
+    });
+
+    it('the previous epoch should have a been distributed', async () => {
+      const { epochIndex: currentEpochIndex } = await io.getCurrentEpoch();
+      const { epochIndex, distributions, endTimestamp, startTimestamp } =
+        await io.getEpoch({ epochIndex: currentEpochIndex - 1 });
+      assert(
+        epochIndex === currentEpochIndex - 1,
+        'Previous epoch index is not valid',
+      );
+      assert(distributions, 'Distributions are not valid');
+      assert(
+        endTimestamp > startTimestamp,
+        'End timestamp is not greater than start timestamp',
+      );
+      assert(
+        distributions.distributedTimestamp >= endTimestamp,
+        'Distributed timestamp is not greater than epoch end timestamp',
+      );
+      assert(
+        distributions.rewards.eligible !== undefined,
+        'Eligible rewards are not valid',
+      );
+      assert(
+        distributions.rewards.distributed !== undefined,
+        'Distributed rewards are not valid',
+      );
+    });
   });
 
   // TODO: add demand factor tests
@@ -201,10 +261,14 @@ describe('setup', () => {
       );
 
       let cursor = '';
+      let countedTotalGateways = 0;
+      let totalGateways = 0;
       do {
-        const { items: gateways, nextCursor } = await io.getGateways({
+        const { items: gateways, nextCursor, totalItems } = await io.getGateways({
           cursor,
         });
+        totalGateways = totalItems;
+        countedTotalGateways += gateways.length;
         for (const gateway of gateways) {
           if (gateway.status === 'joined') {
             assert(gateway.operatorStake >= 50_000_000_000);
@@ -274,6 +338,10 @@ describe('setup', () => {
         }
         cursor = nextCursor;
       } while (cursor !== undefined);
+      assert(
+        countedTotalGateways === totalGateways,
+        `Counted total gateways (${countedTotalGateways}) does not match total gateways (${totalGateways})`,
+      );
     });
   });
 
@@ -282,10 +350,14 @@ describe('setup', () => {
     const twoWeeks = 2 * 7 * 24 * 60 * 60 * 1000;
     it('should not have any arns records older than two weeks', async () => {
       let cursor = '';
+      let countedTotalArns = 0;
+      let totalArns = 0;
       do {
-        const { items: arns, nextCursor } = await io.getArNSRecords({
+        const { items: arns, nextCursor, totalItems } = await io.getArNSRecords({
           cursor,
         });
+        totalArns = totalItems;
+        countedTotalArns += arns.length;
         for (const arn of arns) {
           assert(arn.processId, `ARNs name '${arn.name}' has no processId`);
           assert(arn.type, `ARNs name '${arn.name}' has no type`);
@@ -321,6 +393,10 @@ describe('setup', () => {
         }
         cursor = nextCursor;
       } while (cursor !== undefined);
+      assert(
+        countedTotalArns === totalArns,
+        `Counted total ARNs (${countedTotalArns}) does not match total ARNs (${totalArns})`,
+      );
     });
   });
 });

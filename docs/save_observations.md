@@ -10,13 +10,13 @@ graph TD
     CheckGateway -- Doesn't Exist --> Error[Throw Error]
     CheckPrescribedObserver -- Prescribed --> CheckEpoch{Check Epoch Object}
     CheckPrescribedObserver -- Not Prescribed --> Error
-    CheckEpoch -- Does not Exist --> CreateEpoch[Create Epoch Object]
+    CheckEpoch -- not found --> CreateEpoch[Create Epoch Object]
     CheckEpoch -- Exists --> CheckFailedGateway{Check Failed Gateway}
     CreateEpoch -- Created --> CheckFailedGateway{Check Failed Gateway}
     CheckFailedGateway -- Valid --> ProcessFailedGateway{Check existing gateway failures}
     CheckFailedGateway -- Invalid --> Skip
     Skip --> UpdateObserverReportTxId[Update Observer Report Tx Id]
-    ProcessFailedGateway -- Does not Exist --> CreateFailedGateway[Create Failed Gateway Object]
+    ProcessFailedGateway -- not found --> CreateFailedGateway[Create Failed Gateway Object]
     ProcessFailedGateway -- Exists --> UpdateFailedGateway[Update Failed Gateway Object]
     UpdateFailedGateway -- Updated --> UpdateObserverReportTxId[Update Observer Report Tx Id]
     CreateFailedGateway -- Created --> UpdateObserverReportTxId[Update Observer Report Tx Id]

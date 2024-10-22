@@ -139,18 +139,19 @@ end
 -- return any vaults to owners that have expired
 function vaults.pruneVaults(currentTimestamp)
 	local allVaults = vaults.getVaults()
-	for owner, vaults in pairs(allVaults) do
-		for id, nestedVault in pairs(vaults) do
+	local prunedVaults = {}
+	for owner, ownersVaults in pairs(allVaults) do
+		for id, nestedVault in pairs(ownersVaults) do
 			if currentTimestamp >= nestedVault.endTimestamp then
 				balances.increaseBalance(owner, nestedVault.balance)
-				vaults[id] = nil
+				ownersVaults[id] = nil
+				prunedVaults[id] = nestedVault
 			end
 		end
-		-- update the owner vault
-		allVaults[owner] = vaults
 	end
 	-- set the vaults to the updated vaults
 	Vaults = allVaults
+	return prunedVaults
 end
 
 return vaults
