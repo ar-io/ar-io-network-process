@@ -1546,10 +1546,9 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 
 	-- tally circulating supply
 	for _, balance in pairs(userBalances) do
-		circulatingSupply = circulatingSupply + balance
+		totalSupply = totalSupply + balance
 	end
-	circulatingSupply = circulatingSupply - protocolBalance
-	totalSupply = protocolBalance + circulatingSupply
+	circulatingSupply = totalSupply - protocolBalance
 
 	-- tally supply stashed in gateways and delegates
 	local gateways = gar.getGateways()
@@ -1595,21 +1594,21 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 	ao.send({
 		Target = msg.From,
 		Action = "Total-Token-Supply-Notice",
-		["Total-Token-Supply"] = totalSupply,
-		["Circulating-Supply"] = circulatingSupply,
-		["Locked-Supply"] = lockedSupply,
-		["Staked-Supply"] = stakedSupply,
-		["Delegated-Supply"] = delegatedSupply,
-		["Withdraw-Supply"] = withdrawSupply,
-		["Protocol-Balance"] = protocolBalance,
+		["Total-Token-Supply"] = tostring(totalSupply),
+		["Circulating-Supply"] = tostring(circulatingSupply),
+		["Locked-Supply"] = tostring(lockedSupply),
+		["Staked-Supply"] = tostring(stakedSupply),
+		["Delegated-Supply"] = tostring(delegatedSupply),
+		["Withdraw-Supply"] = tostring(withdrawSupply),
+		["Protocol-Balance"] = tostring(protocolBalance),
 		Data = json.encode({
-			total = totalSupply,
-			circulating = circulatingSupply,
-			locked = lockedSupply,
-			staked = -,
-			delegated = delegatedSupply,
-			withdrawn = withdrawSupply,
-			protocolBalance = protocolBalance,
+			total = tostring(totalSupply),
+			circulating = tostring(circulatingSupply),
+			locked = tostring(lockedSupply),
+			staked = tostring(stakedSupply),
+			delegated = tostring(delegatedSupply),
+			withdrawn = tostring(withdrawSupply),
+			protocolBalance = tostring(protocolBalance),
 		}),
 	})
 end)
