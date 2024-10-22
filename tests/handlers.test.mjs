@@ -72,33 +72,33 @@ describe('handlers', async () => {
       const supplyData = JSON.parse(supplyResult.Messages?.[0]?.Data);
 
       assert.ok(
-        +supplyData.total === 1000000000 * 1000000,
+        supplyData.total === 1000000000 * 1000000,
         'total supply should be 1 billion IO but was ' + supplyData.total,
       );
       assert.ok(
-        +supplyData.circulating === 1000000000 * 1000000 - 50000000000000,
+        supplyData.circulating === 1000000000 * 1000000 - 50000000000000,
         'circulating supply should be 0.95 billion IO but was ' +
           supplyData.circulating,
       );
       assert.ok(
-        +supplyData.locked === 0,
+        supplyData.locked === 0,
         'locked supply should be 0 but was ' + supplyData.locked,
       );
       assert.ok(
-        +supplyData.staked === 0,
+        supplyData.staked === 0,
         'staked supply should be 0 but was ' + supplyData.staked,
       );
       assert.ok(
-        +supplyData.delegated === 0,
+        supplyData.delegated === 0,
         'delegated supply should be 0 but was ' + supplyData.delegated,
       );
       assert.ok(
-        +supplyData.withdrawn === 0,
+        supplyData.withdrawn === 0,
         'withdrawn supply should be 0 but was ' + supplyData.withdrawn,
       );
 
       assert.ok(
-        +supplyData.protocolBalance === 50000000000000,
+        supplyData.protocolBalance === 50000000000000,
         'protocol balance should be 50M IO but was ' +
           supplyData.protocolBalance,
       );

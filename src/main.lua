@@ -1546,9 +1546,10 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 
 	-- tally circulating supply
 	for _, balance in pairs(userBalances) do
-		totalSupply = totalSupply + balance
+		circulatingSupply = circulatingSupply + balance
 	end
-	circulatingSupply = totalSupply - protocolBalance
+	circulatingSupply = circulatingSupply - protocolBalance
+	totalSupply = protocolBalance + circulatingSupply
 
 	-- tally supply stashed in gateways and delegates
 	local gateways = gar.getGateways()
@@ -1594,21 +1595,25 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 	ao.send({
 		Target = msg.From,
 		Action = "Total-Token-Supply-Notice",
-		["Total-Token-Supply"] = tostring(totalSupply),
-		["Circulating-Supply"] = tostring(circulatingSupply),
-		["Locked-Supply"] = tostring(lockedSupply),
-		["Staked-Supply"] = tostring(stakedSupply),
-		["Delegated-Supply"] = tostring(delegatedSupply),
-		["Withdraw-Supply"] = tostring(withdrawSupply),
-		["Protocol-Balance"] = tostring(protocolBalance),
+		["Total-Token-Supply"] = totalSupply,
+		["Circulating-Supply"] = circulatingSupply,
+		["Locked-Supply"] = lockedSupply,
+		["Staked-Supply"] = stakedSupply,
+		["Delegated-Supply"] = delegatedSupply,
+		["Withdraw-Supply"] = withdrawSupply,
+		["Protocol-Balance"] = protocolBalance,
 		Data = json.encode({
-			total = tostring(totalSupply),
-			circulating = tostring(circulatingSupply),
-			locked = tostring(lockedSupply),
-			staked = tostring(stakedSupply),
-			delegated = tostring(delegatedSupply),
-			withdrawn = tostring(withdrawSupply),
-			protocolBalance = tostring(protocolBalance),
+<<<<<<< Updated upstream
+=======
+			-- TODO: we are losing precision on these values unexpectedly. This has been brought to the AO team - for now the tags should be correct as they are stringified
+>>>>>>> Stashed changes
+			total = totalSupply,
+			circulating = circulatingSupply,
+			locked = lockedSupply,
+			staked = stakedSupply,
+			delegated = delegatedSupply,
+			withdrawn = withdrawSupply,
+			protocolBalance = protocolBalance,
 		}),
 	})
 end)
