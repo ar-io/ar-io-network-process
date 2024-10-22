@@ -9,7 +9,7 @@ import { strict as assert } from 'node:assert';
 import { describe, it, before, after } from 'node:test';
 import { DockerComposeEnvironment, Wait } from 'testcontainers';
 
-const processId = process.env.IO_PROCESS_ID || IO_DEVNET_PROCESS_ID;
+const processId = process.env.IO_PROCESS_ID || IO_TESTNET_PROCESS_ID;
 const io = IO.init({
   process: new AOProcess({
     processId,
