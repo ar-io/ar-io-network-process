@@ -1603,6 +1603,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 		["Withdraw-Supply"] = withdrawSupply,
 		["Protocol-Balance"] = protocolBalance,
 		Data = json.encode({
+			-- TODO: we are losing precision on these values unexpectedly. This has been brought to the AO team - for now the tags should be correct as they are stringified
 			total = totalSupply,
 			circulating = circulatingSupply,
 			locked = lockedSupply,
