@@ -174,78 +174,78 @@ describe('setup', () => {
       );
 
       // TODO: there is an unknown precision loss on these values, we are discussing why with Forward. Once fixed, uncomment these tests
-      // const { items: balances } = await io.getBalances({
-      //   limit: 10_000,
-      // });
+      const { items: balances } = await io.getBalances({
+        limit: 10_000,
+      });
 
-      // const protocolBalance = await io.getBalance({
-      //   address: processId,
-      // });
+      const protocolBalance = await io.getBalance({
+        address: processId,
+      });
 
-      // assert(
-      //   protocolBalance === supplyData.protocolBalance,
-      //   `Protocol balance is not equal to the balance provided by the contract: ${protocolBalance} !== ${supplyData.protocolBalance}`,
-      // );
+      assert(
+        protocolBalance === supplyData.protocolBalance,
+        `Protocol balance is not equal to the balance provided by the contract: ${protocolBalance} !== ${supplyData.protocolBalance}`,
+      );
 
-      // const totalBalances = balances.reduce(
-      //   (acc, curr) => acc + curr.balance,
-      //   0,
-      // );
-      // const circulating = totalBalances - protocolBalance;
-      // assert(
-      //   circulating === supplyData.circulating,
-      //   `Circulating supply is not equal to the sum of the balances minus the protocol balance: ${circulating} !== ${supplyData.circulating}`,
-      // );
+      const totalBalances = balances.reduce(
+        (acc, curr) => acc + curr.balance,
+        0,
+      );
+      const circulating = totalBalances - protocolBalance;
+      assert(
+        circulating === supplyData.circulating,
+        `Circulating supply is not equal to the sum of the balances minus the protocol balance: ${circulating} !== ${supplyData.circulating}`,
+      );
 
-      // // get the supply staked
-      // const { items: gateways } = await io.getGateways({
-      //   limit: 1000,
-      // });
+      // get the supply staked
+      const { items: gateways } = await io.getGateways({
+        limit: 1000,
+      });
 
-      // const staked = gateways.reduce(
-      //   (acc, curr) => acc + curr.operatorStake,
-      //   0,
-      // );
+      const staked = gateways.reduce(
+        (acc, curr) => acc + curr.operatorStake,
+        0,
+      );
 
-      // assert(
-      //   staked === supplyData.staked,
-      //   `Staked supply is not equal to the sum of the operator stakes: ${staked} !== ${supplyData.staked}`,
-      // );
+      assert(
+        staked === supplyData.staked,
+        `Staked supply is not equal to the sum of the operator stakes: ${staked} !== ${supplyData.staked}`,
+      );
 
-      // const delegated = gateways.reduce(
-      //   (acc, curr) => acc + curr.totalDelegatedStake,
-      //   0,
-      // );
+      const delegated = gateways.reduce(
+        (acc, curr) => acc + curr.totalDelegatedStake,
+        0,
+      );
 
-      // assert(
-      //   delegated === supplyData.delegated,
-      //   `Delegated supply is not equal to the sum of the total delegated stakes: ${delegated} !== ${supplyData.delegated}`,
-      // );
+      assert(
+        delegated === supplyData.delegated,
+        `Delegated supply is not equal to the sum of the total delegated stakes: ${delegated} !== ${supplyData.delegated}`,
+      );
 
-      // const computedTotal =
-      //   supplyData.circulating +
-      //   supplyData.locked +
-      //   supplyData.withdrawn +
-      //   supplyData.staked +
-      //   supplyData.delegated +
-      //   supplyData.protocolBalance;
-      // assert(
-      //   supplyData.total === computedTotal &&
-      //     computedTotal === 1000000000 * 1000000,
-      //   `Computed total supply (${computedTotal}) is not equal to the sum of protocol balance, circulating, locked, staked, and delegated and withdrawn provided by the contract (${supplyData.total}) and does not match the expected total of 1 billion IO`,
-      // );
+      const computedTotal =
+        supplyData.circulating +
+        supplyData.locked +
+        supplyData.withdrawn +
+        supplyData.staked +
+        supplyData.delegated +
+        supplyData.protocolBalance;
+      assert(
+        supplyData.total === computedTotal &&
+          computedTotal === 1000000000 * 1000000,
+        `Computed total supply (${computedTotal}) is not equal to the sum of protocol balance, circulating, locked, staked, and delegated and withdrawn provided by the contract (${supplyData.total}) and does not match the expected total of 1 billion IO`,
+      );
 
-      // const computedCirculating =
-      //   supplyData.total -
-      //   supplyData.locked -
-      //   supplyData.staked -
-      //   supplyData.delegated -
-      //   supplyData.withdrawn -
-      //   supplyData.protocolBalance;
-      // assert(
-      //   supplyData.circulating === computedCirculating,
-      //   `Computed circulating supply (${computedCirculating}) is not equal to the total supply minus protocol balance, locked, staked, delegated, and withdrawn provided by the contract (${supplyData.circulating})`,
-      // );
+      const computedCirculating =
+        supplyData.total -
+        supplyData.locked -
+        supplyData.staked -
+        supplyData.delegated -
+        supplyData.withdrawn -
+        supplyData.protocolBalance;
+      assert(
+        supplyData.circulating === computedCirculating,
+        `Computed circulating supply (${computedCirculating}) is not equal to the total supply minus protocol balance, locked, staked, delegated, and withdrawn provided by the contract (${supplyData.circulating})`,
+      );
     });
   });
 
