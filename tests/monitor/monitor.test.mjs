@@ -86,20 +86,20 @@ describe('setup', () => {
     });
   });
 
-    describe('balances', () => {
-      it('should always be up to date', async () => {
-        const { items: balances } = await io.getBalances({
-          limit: 10_000,
-        });
-        // assert they are all integers
-        for (const balance of balances) {
-          assert(
-            Number.isInteger(balance.balance),
-            `Balance for ${balance.address} is not an integer: ${balance.balance}`,
-          );
-        }
+  describe('balances', () => {
+    it('should always be up to date', async () => {
+      const { items: balances } = await io.getBalances({
+        limit: 10_000,
       });
+      // assert they are all integers
+      for (const balance of balances) {
+        assert(
+          Number.isInteger(balance.balance),
+          `Balance for ${balance.address} is not an integer: ${balance.balance}`,
+        );
+      }
     });
+  });
 
   describe('distribution totals', () => {
     it('should always have correct eligible rewards for the current epoch (within 10 mIO)', async () => {
@@ -186,7 +186,10 @@ describe('setup', () => {
         `Protocol balance is not equal to the balance provided by the contract: ${protocolBalance} !== ${supplyData.protocolBalance}`,
       );
 
-      const totalBalances = balances.reduce((acc, curr) => acc + curr.balance, 0);
+      const totalBalances = balances.reduce(
+        (acc, curr) => acc + curr.balance,
+        0,
+      );
       const circulating = totalBalances - protocolBalance;
       assert(
         circulating === +supplyData.circulating,
@@ -320,8 +323,8 @@ describe('setup', () => {
         Object.values(distributions.rewards.eligible).every(
           (reward) =>
             Number.isInteger(reward.operatorReward) &&
-            Object.values(reward.delegateRewards).every(
-              (delegateReward) => Number.isInteger(delegateReward),
+            Object.values(reward.delegateRewards).every((delegateReward) =>
+              Number.isInteger(delegateReward),
             ),
         ),
         `Eligible rewards for the previous epoch (${previousEpochIndex}) are not integers`,
@@ -332,8 +335,8 @@ describe('setup', () => {
       );
       // assert distributed rewards are integers
       assert(
-        Object.values(distributions.rewards.distributed).every(
-          (reward) => Number.isInteger(reward),
+        Object.values(distributions.rewards.distributed).every((reward) =>
+          Number.isInteger(reward),
         ),
         `Distributed rewards for the previous epoch (${previousEpochIndex}) are not integers`,
       );
@@ -423,11 +426,11 @@ describe('setup', () => {
           if (gateway.delegates.length > 0) {
             assert(
               gateway.delegates?.every(
-              (delegate) =>
-                Number.isInteger(delegate.balance) &&
-                delegate.startTimestamp > 0 &&
-                delegate.endTimestamp > delegate.startTimestamp,
-            ),
+                (delegate) =>
+                  Number.isInteger(delegate.balance) &&
+                  delegate.startTimestamp > 0 &&
+                  delegate.endTimestamp > delegate.startTimestamp,
+              ),
               `Gateway ${gateway.gatewayAddress} has invalid delegate balances`,
             );
           }
