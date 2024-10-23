@@ -1740,11 +1740,13 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	if utils.lengthOfTable(tickedRewardDistributions) > 0 then
 		msg.ioEvent:addField("Ticked-Reward-Distributions", tickedRewardDistributions)
 		msg.ioEvent:addField("Total-Ticked-Rewards-Distributed", totalTickedRewardsDistributed)
+		lastKnownCirculatingSupply = lastKnownCirculatingSupply + totalTickedRewardsDistributed
 	end
 
 	local gwStats = gatewayStats()
 	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
 	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
+	addSupplyData(msg.ioEvent)
 end)
 
 -- READ HANDLERS
