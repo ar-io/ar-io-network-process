@@ -474,7 +474,7 @@ describe('ArNS', async () => {
       baseFee: 500000000,
       demandFactor: 1,
       settings: {
-        decayRate: (0.02037911 / (1000 * 60 * 60 * 24 * 14)).toFixed(24),
+        decayRate: 0.02037911 / (1000 * 60 * 60 * 24 * 14),
         scalingExponent: 190,
         durationMs: 1209600000,
         startPriceMultiplier: 50,
