@@ -240,6 +240,9 @@ end, function(msg)
 		lastKnownCirculatingSupply = lastKnownCirculatingSupply
 			+ (pruneGatewayResults.delegateStakeReturned or 0)
 			+ (pruneGatewayResults.gatewayStakeReturned or 0)
+		lastKnownWithdrawSupply = lastKnownWithdrawSupply
+			- (pruneGatewayResults.delegateStakeReturned or 0)
+			- (pruneGatewayResults.gatewayStakeReturned or 0)
 		lastKnownStakedSupply = lastKnownStakedSupply - (pruneGatewayResults.stakeSlashed or 0)
 
 		local prunedGateways = pruneGatewayResults.prunedGateways or {}
