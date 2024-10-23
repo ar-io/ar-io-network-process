@@ -862,6 +862,7 @@ describe('ArNS', async () => {
         Tags: [
           { name: 'Action', value: 'Auction-Prices' },
           { name: 'Name', value: 'test-name' },
+          { name: 'Purchase-Type', value: 'lease' },
         ],
       },
       releaseNameResult.Memory,
@@ -876,7 +877,7 @@ describe('ArNS', async () => {
     const auctionPricesData = JSON.parse(auctionPrices.Messages?.[0]?.Data);
 
     // expectations
-    const expectedStartPrice = 125000000000;
+    const expectedStartPrice = 30000000000; // price for a 1 year lease
     const expectedFloorPrice = Math.floor(expectedStartPrice / 50);
 
     // validate the response structure
@@ -923,6 +924,7 @@ describe('ArNS', async () => {
       'Current price should be positive',
     );
   });
+  
 
   // TODO: add several error scenarios
 });
