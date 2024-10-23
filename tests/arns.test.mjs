@@ -470,7 +470,6 @@ describe('ArNS', async () => {
       initiator: 'test-owner-of-ant',
       startTimestamp: auction.startTimestamp,
       endTimestamp: expectedStartTimestamp + 60 * 60 * 1000 * 24 * 14,
-      currentPrice: expectedStartPrice,
       baseFee: 500000000,
       demandFactor: 1,
       settings: {

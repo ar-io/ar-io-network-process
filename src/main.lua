@@ -85,6 +85,7 @@ local ActionMap = {
 	InstantDelegateWithdrawal = "Instant-Delegate-Withdrawal",
 
 	-- auctions
+	Auctions = "Auctions",
 	ReleaseName = "Release-Name",
 	AuctionInfo = "Auction-Info",
 	AuctionBid = "Auction-Bid",
@@ -2219,13 +2220,42 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	return
 end)
 
+-- AUCTIONS
+addEventingHandler("auctions", utils.hasMatchingTag("Action", ActionMap.Auctions), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local auctions = arns.getAuctions()
+	local auctionsWithoutFunctions = {}
+	for k, v in pairs(auctions) do
+		table.insert(auctionsWithoutFunctions, {
+			name = v.name,
+			startTimestamp = v.startTimestamp,
+			endTimestamp = v.endTimestamp,
+			initiator = v.initiator,
+			baseFee = v.baseFee,
+			demandFactor = v.demandFactor,
+			settings = v.settings,
+		})
+	end
+	-- paginate the auctions by name, showing auctions nearest to the endTimestamp first
+	local paginatedAuctions = utils.paginateTableWithCursor(
+		auctionsWithoutFunctions,
+		page.cursor,
+		"name",
+		page.limit,
+		page.sortBy or "endTimestamp",
+		page.sortOrder or "asc"
+	)
+	ao.send({
+		Target = msg.From,
+		Action = ActionMap.Auctions .. "-Notice",
+		Data = json.encode(paginatedAuctions),
+	})
+end)
+
 -- hadnler to get auction for a name
 addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.AuctionInfo), function(msg)
 	local name = string.lower(msg.Tags.Name)
 	local auction = arns.getAuction(name)
-	local timestamp = tonumber(msg.Timestamp or msg.Tags.Timestamp)
-	local type = msg.Tags.Type or "permabuy"
-	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
 	if not auction then
 		ao.send({
 			Target = msg.From,
@@ -2243,7 +2273,6 @@ addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.Aucti
 			startTimestamp = auction.startTimestamp,
 			endTimestamp = auction.endTimestamp,
 			initiator = auction.initiator,
-			currentPrice = auction:getPriceForAuctionAtTimestamp(timestamp, type, years),
 			baseFee = auction.baseFee,
 			demandFactor = auction.demandFactor,
 			settings = auction.settings,
@@ -2256,7 +2285,7 @@ addEventingHandler("auctionPrices", utils.hasMatchingTag("Action", ActionMap.Auc
 	local name = string.lower(msg.Tags.Name)
 	local auction = arns.getAuction(name)
 	local timestamp = tonumber(msg.Tags.Timestamp or msg.Timestamp)
-	local type = msg.Tags.Type or "permabuy"
+	local type = msg.Tags["Purchase-Type"] or "permabuy"
 	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
 	local intervalMs = msg.Tags["Price-Interval-Ms"] and tonumber(msg.Tags["Price-Interval-Ms"]) or 15 * 60 * 1000 -- 15 minute intervals by default
 
@@ -2269,8 +2298,18 @@ addEventingHandler("auctionPrices", utils.hasMatchingTag("Action", ActionMap.Auc
 		return
 	end
 
-	local prices = auction:computePricesForAuction(type, years, intervalMs)
+	if not type then
+		type = "permabuy"
+	end
+
+	if type == "lease" then
+		years = years or 1
+	else
+		years = 20
+	end
+
 	local currentPrice = auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
+	local prices = auction:computePricesForAuction(type, years, intervalMs)
 	local jsonPrices = {}
 	for k, v in pairs(prices) do
 		jsonPrices[tostring(k)] = v
