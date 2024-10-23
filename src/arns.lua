@@ -533,6 +533,7 @@ function arns.pruneRecords(currentTimestamp)
 	for name, record in pairs(arns.getRecords()) do
 		if record.type == "lease" and record.endTimestamp + constants.gracePeriodMs <= currentTimestamp then
 			-- psych! create an auction for the name instantiated by protocol - it will get pruned out if the auction expires with no bids
+			prunedRecords[name] = record
 			arns.createAuction(name, currentTimestamp, ao.id)
 		end
 	end

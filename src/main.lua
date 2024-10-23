@@ -213,7 +213,7 @@ end, function(msg)
 		NameRegistry = previousState.NameRegistry
 		Epochs = previousState.Epochs
 		Balances = previousState.Balances
-		msg.ioEvent:addField("TickError", tostring(resultOrError))
+		msg.ioEvent:addField("Tick-Error", tostring(resultOrError))
 		return true -- stop processing here and return
 	end
 
@@ -227,6 +227,18 @@ end, function(msg)
 			msg.ioEvent:addField("Pruned-Records", prunedRecordNames)
 			msg.ioEvent:addField("Pruned-Records-Count", prunedRecordsCount)
 			msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
+		end
+		local prunedAuctions = resultOrError.prunedAuctions or {}
+		local prunedAuctionsCount = utils.lengthOfTable(prunedAuctions)
+		if prunedAuctionsCount > 0 then
+			msg.ioEvent:addField("Pruned-Auctions", prunedAuctions)
+			msg.ioEvent:addField("Pruned-Auctions-Count", prunedAuctionsCount)
+		end
+		local prunedReserved = resultOrError.prunedReserved or {}
+		local prunedReservedCount = utils.lengthOfTable(prunedReserved)
+		if prunedReservedCount > 0 then
+			msg.ioEvent:addField("Pruned-Reserved", prunedReserved)
+			msg.ioEvent:addField("Pruned-Reserved-Count", prunedReservedCount)
 		end
 		local prunedVaultsCount = utils.lengthOfTable(resultOrError.prunedVaults or {})
 		if prunedVaultsCount > 0 then

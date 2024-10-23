@@ -10,8 +10,9 @@ export const PROCESS_OWNER = ''.padEnd(43, '1');
 export const STUB_ADDRESS = ''.padEnd(43, '2');
 export const INITIAL_PROTOCOL_BALANCE = 50_000_000_000_000; // 50M IO
 export const INITIAL_OWNER_BALANCE = 950_000_000_000_000; // 950M IO
-export const STUB_TIMESTAMP = 1704088800000; // 01-01-2024 00:00:00
+export const STUB_TIMESTAMP = 21600000; // 01-01-1970 00:00:00
 export const STUB_MESSAGE_ID = ''.padEnd(43, 'm');
+export const STUB_HASH_CHAIN = 'NGU1fq_ssL9m6kRbRU1bqiIDBht79ckvAwRMGElkSOg';
 /* ao READ-ONLY Env Variables */
 export const AO_LOADER_HANDLER_ENV = {
   Process: {
@@ -55,6 +56,7 @@ export const DEFAULT_HANDLE_OPTIONS = {
   Owner: PROCESS_OWNER,
   From: PROCESS_OWNER,
   Timestamp: STUB_TIMESTAMP,
+  'Hash-Chain': STUB_HASH_CHAIN,
 };
 
 export const validGatewayTags = [
