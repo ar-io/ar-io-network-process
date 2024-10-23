@@ -377,8 +377,8 @@ describe('setup', () => {
         });
         totalGateways = totalItems;
         for (const gateway of gateways) {
+          uniqueGateways.add(gateway.gatewayAddress);
           if (gateway.status === 'joined') {
-            uniqueGateways.add(gateway.gatewayAddress);
             assert(
               Number.isInteger(gateway.operatorStake),
               `Gateway ${gateway.gatewayAddress} has an invalid operator stake: ${gateway.operatorStake}`,
