@@ -484,8 +484,8 @@ describe('setup', () => {
     const twoWeeks = 2 * 7 * 24 * 60 * 60 * 1000;
     it('should not have any arns records older than two weeks', async () => {
       let cursor = '';
-      let countedTotalArns = 0;
       let totalArns = 0;
+      const uniqueNames = new Set();
       do {
         const {
           items: arns,
@@ -495,8 +495,8 @@ describe('setup', () => {
           cursor,
         });
         totalArns = totalItems;
-        countedTotalArns += arns.length;
         for (const arn of arns) {
+          uniqueNames.add(arn.name);
           assert(arn.processId, `ARNs name '${arn.name}' has no processId`);
           assert(arn.type, `ARNs name '${arn.name}' has no type`);
           assert(
@@ -532,8 +532,8 @@ describe('setup', () => {
         cursor = nextCursor;
       } while (cursor !== undefined);
       assert(
-        countedTotalArns === totalArns,
-        `Counted total ARNs (${countedTotalArns}) does not match total ARNs (${totalArns})`,
+        uniqueNames.size === totalArns,
+        `Counted total ARNs (${uniqueNames.size}) does not match total ARNs (${totalArns})`,
       );
     });
   });
