@@ -4,12 +4,14 @@ local constants = require("constants")
 local balances = require("balances")
 local demand = require("demand")
 local arns = {}
+local Auction = require("auctions")
 
 NameRegistry = NameRegistry or {
 	reserved = {},
 	records = {},
-	-- TODO: auctions
+	auctions = {},
 }
+
 function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 	-- don't catch, let the caller handle the error
 	arns.assertValidBuyRecord(name, years, purchaseType, processId)
@@ -17,7 +19,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		purchaseType = "lease" -- set to lease by default
 	end
 
-	if years == nil then
+	if years == nil and purchaseType == "lease" then
 		years = 1 -- set to 1 year by default
 	end
 
@@ -30,14 +32,14 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		error("Insufficient balance")
 	end
 
-	if
-		arns.getRecord(name) ~= nil and arns.getRecord(name).endTimestamp == nil
-		or arns.getRecord(name) ~= nil and arns.getRecord(name).endTimestamp + constants.gracePeriodMs > timestamp
-	then
+	local record = arns.getRecord(name)
+	local isPermabuy = record ~= nil and record.type == "permabuy"
+	local isActiveLease = record ~= nil and (record.endTimestamp or 0) + constants.gracePeriodMs > timestamp
+
+	if isPermabuy or isActiveLease then
 		error("Name is already registered")
 	end
 
-	-- TODO: handle reserved name timestamps (they should be pruned, so not immediately necessary)
 	if arns.getReservedName(name) and arns.getReservedName(name).target ~= from then
 		error("Name is reserved")
 	end
@@ -48,18 +50,17 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		type = purchaseType,
 		undernameLimit = constants.DEFAULT_UNDERNAME_COUNT,
 		purchasePrice = totalRegistrationFee,
+		endTimestamp = purchaseType == "lease" and timestamp + constants.oneYearMs * years or nil,
 	}
 
 	-- Register the leased or permabought name
-	if purchaseType == "lease" then
-		newRecord.endTimestamp = timestamp + constants.oneYearMs * years
-	end
 	-- Transfer tokens to the protocol balance
 	balances.transfer(ao.id, from, totalRegistrationFee)
 	arns.addRecord(name, newRecord)
 	demand.tallyNamePurchase(totalRegistrationFee)
 	return {
 		record = arns.getRecord(name),
+		totalRegistrationFee = totalRegistrationFee,
 		baseRegistrationFee = baseRegistrationFee,
 		remainingBalance = balances.getBalance(from),
 		protocolBalance = balances.getBalance(ao.id),
@@ -278,7 +279,7 @@ function arns.assertValidBuyRecord(name, years, purchaseType, processId)
 	assert(name:match("^%w") and name:match("%w$") and name:match("^[%w-]+$"), "Name pattern is invalid.")
 
 	-- assert purchase type if present is lease or permabuy
-	assert(purchaseType == nil or purchaseType == "lease" or purchaseType == "permabuy", "PurchaseType is invalid.")
+	assert(purchaseType == nil or purchaseType == "lease" or purchaseType == "permabuy", "Purchase-Type is invalid.")
 
 	if purchaseType == "lease" or purchaseType == nil then
 		-- only check on leases (nil is set to lease)
@@ -423,6 +424,96 @@ function arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
 	return true
 end
 
+-- AUCTIONS
+
+--- Creates an auction for a given name
+--- @param name string The name of the auction
+--- @param timestamp number The timestamp to start the auction
+--- @param initiator string The address of the initiator of the auction
+--- @return Auction|nil The auction instance
+function arns.createAuction(name, timestamp, initiator)
+	if not arns.getRecord(name) then
+		error("Name is not registered. Auctions must be created for registered names.")
+	end
+	if arns.getAuction(name) then
+		error("Auction already exists for name")
+	end
+
+	local baseFee = demand.getFees()[#name]
+	local demandFactor = demand.getDemandFactor()
+	local auction = Auction:new(name, timestamp, demandFactor, baseFee, initiator, arns.calculateRegistrationFee)
+	NameRegistry.auctions[name] = auction
+	-- ensure the name is removed from the registry
+	arns.removeRecord(name)
+	return auction
+end
+
+function arns.getAuction(name)
+	return NameRegistry.auctions[name]
+end
+
+function arns.getAuctions()
+	return NameRegistry.auctions or {}
+end
+
+function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, type, years)
+	local auction = arns.getAuction(name)
+	if not auction then
+		error("Auction does not exist")
+	end
+
+	-- assert the bid is between auction start and end timestamps
+	if timestamp < auction.startTimestamp or timestamp > auction.endTimestamp then
+		-- TODO: we should likely clean up the auction if it is outside of the time range
+		error("Bid timestamp is outside of auction start and end timestamps")
+	end
+	local requiredBid = auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
+	local requiredOrBidAmount = bidAmount or requiredBid
+	if requiredOrBidAmount < requiredBid then
+		error("Bid amount is less than the required bid of " .. requiredBid)
+	end
+
+	local finalBidAmount = math.min(requiredOrBidAmount, requiredBid)
+
+	-- check the balance of the bidder
+	if not utils.walletHasSufficientBalance(bidder, finalBidAmount) then
+		error("Insufficient balance")
+	end
+
+	local record = {
+		processId = processId,
+		startTimestamp = timestamp,
+		endTimestamp = type == "lease" and timestamp + constants.oneYearMs * years or nil,
+		undernameLimit = constants.DEFAULT_UNDERNAME_COUNT,
+		purchasePrice = finalBidAmount,
+		type = type,
+	}
+	local rewardForInitiator = math.floor(finalBidAmount * 0.5)
+	local rewardForProtocol = finalBidAmount - rewardForInitiator
+	-- reduce bidder balance by the final bid amount
+	balances.transfer(auction.initiator, bidder, rewardForInitiator)
+	balances.transfer(ao.id, bidder, rewardForProtocol)
+	arns.removeAuction(name)
+	arns.addRecord(name, record)
+	-- make sure we tally name purchase given, even though only half goes to protocol
+	-- TODO: DO WE WANT TO TALLY THE ENTIRE AMOUNT OR JUST THE REWARD FOR THE PROTOCOL?
+	demand.tallyNamePurchase(finalBidAmount)
+	return {
+		auction = auction,
+		bidder = bidder,
+		bidAmount = finalBidAmount,
+		rewardForInitiator = rewardForInitiator,
+		rewardForProtocol = rewardForProtocol,
+		record = record,
+	}
+end
+
+function arns.removeAuction(name)
+	local auction = arns.getAuction(name)
+	NameRegistry.auctions[name] = nil
+	return auction
+end
+
 function arns.removeRecord(name)
 	local record = NameRegistry.records[name]
 	NameRegistry.records[name] = nil
@@ -430,7 +521,9 @@ function arns.removeRecord(name)
 end
 
 function arns.removeReservedName(name)
+	local reserved = NameRegistry.reserved[name]
 	NameRegistry.reserved[name] = nil
+	return reserved
 end
 
 -- prune records that have expired
@@ -445,14 +538,26 @@ function arns.pruneRecords(currentTimestamp)
 	return prunedRecords
 end
 
--- identify any reserved names that have expired, account for a one week grace period in seconds
-function arns.pruneReservedNames(currentTimestamp)
-	local reserved = arns.getReservedNames()
-	for name, details in pairs(reserved) do
-		if details.endTimestamp and details.endTimestamp <= currentTimestamp then
-			arns.removeReservedName(name)
+-- prune auctions that have expired
+function arns.pruneAuctions(currentTimestamp)
+	local prunedAuctions = {}
+	for name, auction in pairs(arns.getAuctions()) do
+		if auction.endTimestamp <= currentTimestamp then
+			prunedAuctions[name] = arns.removeAuction(name)
 		end
 	end
+	return prunedAuctions
+end
+
+-- identify any reserved names that have expired, account for a one week grace period in seconds
+function arns.pruneReservedNames(currentTimestamp)
+	local prunedReserved = {}
+	for name, details in pairs(arns.getReservedNames()) do
+		if details.endTimestamp and details.endTimestamp <= currentTimestamp then
+			prunedReserved[name] = arns.removeReservedName(name)
+		end
+	end
+	return prunedReserved
 end
 
 return arns

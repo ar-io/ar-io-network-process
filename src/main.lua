@@ -83,6 +83,12 @@ local ActionMap = {
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
 	CancelDelegateWithdrawal = "Cancel-Delegate-Withdrawal",
 	InstantDelegateWithdrawal = "Instant-Delegate-Withdrawal",
+
+	-- auctions
+	ReleaseName = "Release-Name",
+	AuctionInfo = "Auction-Info",
+	AuctionBid = "Auction-Bid",
+	AuctionPrices = "Auction-Prices",
 }
 
 -- Low fidelity trackers
@@ -639,26 +645,23 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 
 	msg.ioEvent:addField("nameLength", #msg.Tags.Name)
 
-	local shouldContinue2, result = eventingPcall(
-		msg.ioEvent,
-		function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Invalid-Buy-Record-Notice",
-					Error = "Invalid-Buy-Record",
-				},
-				Data = tostring(error),
-			})
-		end,
-		arns.buyRecord,
-		string.lower(msg.Tags.Name),
-		msg.Tags["Purchase-Type"],
-		tonumber(msg.Tags.Years),
-		msg.From,
-		msg.Timestamp,
-		msg.Tags["Process-Id"]
-	)
+	local name = string.lower(msg.Tags.Name)
+	local purchaseType = string.lower(msg.Tags["Purchase-Type"])
+	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
+	local from = utils.formatAddress(msg.From)
+	local processId = msg.Tags["Process-Id"]
+	local timestamp = tonumber(msg.Timestamp)
+
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Invalid-Buy-Record-Notice",
+				Error = "Invalid-Buy-Record",
+			},
+			Data = tostring(error),
+		})
+	end, arns.buyRecord, name, purchaseType, years, from, timestamp, processId)
 	if not shouldContinue2 then
 		return
 	end
@@ -676,7 +679,14 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = "Buy-Record-Notice", Name = msg.Tags.Name },
-		Data = json.encode(record),
+		Data = json.encode({
+			name = name,
+			startTimestamp = record.startTimestamp,
+			endTimestamp = record.endTimestamp,
+			undernameLimit = record.undernameLimit,
+			purchasePrice = record.purchasePrice,
+			processId = record.processId,
+		}),
 	})
 end)
 
@@ -1817,8 +1827,6 @@ end)
 
 addEventingHandler(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMap.Balance), function(msg)
 	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From)
-
-	-- TODO: arconnect et. all expect to accept Target
 	local balance = balances.getBalance(target)
 	-- must adhere to token.lua spec for arconnect compatibility
 	ao.send({
@@ -2132,5 +2140,253 @@ addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginate
 end)
 
 -- END READ HANDLERS
+
+-- AUCTION HANDLER
+addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.ReleaseName), function(msg)
+	-- validate the name and process id exist, then create the auction using the auction function
+	local name = msg.Tags.Name
+	local processId = msg.From
+	local record = arns.getRecord(name)
+	local initiator = msg.Tags.Initiator
+
+	-- TODO: validate processId and initiator are valid addresses
+	if not record then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Record-Not-Found",
+		})
+		return
+	end
+
+	if record.processId ~= processId then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Process-Id-Mismatch",
+		})
+		return
+	end
+
+	if record.type ~= "permabuy" then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Invalid-Record-Type",
+			-- only permabought names can be released by the process that owns the name
+		})
+		return
+	end
+
+	-- we should be able to create the auction here
+	local status, auctionOrError = pcall(arns.createAuction, name, tonumber(msg.Timestamp), initiator)
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Auction-Creation-Error",
+			Data = tostring(auctionOrError),
+		})
+		return
+	end
+
+	if not auctionOrError or not auctionOrError.name then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Auction-Creation-Error",
+			Data = tostring(auctionOrError),
+		})
+		return
+	end
+
+	local auction = {
+		name = auctionOrError.name,
+		startTimestamp = auctionOrError.startTimestamp,
+		endTimestamp = auctionOrError.endTimestamp,
+		initiator = auctionOrError.initiator,
+		baseFee = auctionOrError.baseFee,
+		demandFactor = auctionOrError.demandFactor,
+		settings = auctionOrError.settings,
+	}
+	ao.send({
+		Action = "Auction-Notice",
+		Name = name,
+		Data = json.encode(auction),
+	})
+	return
+end)
+
+-- hadnler to get auction for a name
+addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.AuctionInfo), function(msg)
+	local name = string.lower(msg.Tags.Name)
+	local auction = arns.getAuction(name)
+	local timestamp = tonumber(msg.Timestamp or msg.Tags.Timestamp)
+	local type = msg.Tags.Type or "permabuy"
+	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
+	if not auction then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionInfo .. "-Notice",
+			Error = "Auction-Not-Found",
+		})
+		return
+	end
+
+	ao.send({
+		Target = msg.From,
+		Action = ActionMap.AuctionInfo .. "-Notice",
+		Data = json.encode({
+			name = auction.name,
+			startTimestamp = auction.startTimestamp,
+			endTimestamp = auction.endTimestamp,
+			initiator = auction.initiator,
+			currentPrice = auction:getPriceForAuctionAtTimestamp(timestamp, type, years),
+			baseFee = auction.baseFee,
+			demandFactor = auction.demandFactor,
+			settings = auction.settings,
+		}),
+	})
+end)
+
+-- Handler to get auction prices for a name
+addEventingHandler("auctionPrices", utils.hasMatchingTag("Action", ActionMap.AuctionPrices), function(msg)
+	local name = string.lower(msg.Tags.Name)
+	local auction = arns.getAuction(name)
+	local timestamp = tonumber(msg.Tags.Timestamp or msg.Timestamp)
+	local type = msg.Tags.Type or "permabuy"
+	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
+	local intervalMs = msg.Tags["Price-Interval-Ms"] and tonumber(msg.Tags["Price-Interval-Ms"]) or 15 * 60 * 1000 -- 15 minute intervals by default
+
+	if not auction then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionPrices .. "-Notice",
+			Error = "Auction-Not-Found",
+		})
+		return
+	end
+
+	local prices = auction:computePricesForAuction(type, years, intervalMs)
+	local currentPrice = auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
+	local jsonPrices = {}
+	for k, v in pairs(prices) do
+		jsonPrices[tostring(k)] = v
+	end
+
+	ao.send({
+		Target = msg.From,
+		Action = ActionMap.AuctionPrices .. "-Notice",
+		Data = json.encode({
+			name = auction.name,
+			type = type,
+			years = years,
+			prices = jsonPrices,
+			currentPrice = currentPrice,
+		}),
+	})
+end)
+
+addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.AuctionBid), function(msg)
+	local name = string.lower(msg.Tags.Name)
+	local bidAmount = msg.Tags.Quantity and tonumber(msg.Tags.Quantity) or nil -- if nil, we use the current bid price
+	local bidder = utils.formatAddress(msg.From)
+	local processId = utils.formatAddress(msg.Tags["Process-Id"])
+	local timestamp = tonumber(msg.Timestamp)
+	local type = msg.Tags.Type or "permabuy"
+	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
+
+	-- assert name, bidder, processId are provided
+	local checkAssertions = function()
+		assert(name and #name > 0, "Name is required")
+		assert(bidder and utils.isValidAOAddress(bidder), "Bidder is required")
+		assert(processId and utils.isValidAOAddress(processId), "Process-Id is required")
+		assert(timestamp and timestamp > 0, "Timestamp is required")
+		-- if bidAmount is not nil assert that it is a number
+		if bidAmount then
+			assert(
+				type(bidAmount) == "number" and bidAmount > 0 and utils.isInteger(bidAmount),
+				"Bid amount must be a positive integer"
+			)
+		end
+		if type then
+			assert(type == "permabuy" or type == "lease", "Invalid auction type. Must be either 'permabuy' or 'lease'")
+		end
+		if type == "lease" then
+			if years then
+				assert(
+					years and utils.isInteger(years) and years > 0 and years <= constants.maxLeaseLengthYears,
+					"Years must be an integer between 1 and 5"
+				)
+			else
+				years = 1
+			end
+		end
+	end
+
+	local validateStatus, errorMessage = pcall(checkAssertions)
+	if not validateStatus then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice",
+			Error = "Bad-Input",
+			Data = tostring(errorMessage),
+		})
+		return
+	end
+
+	local auction = arns.getAuction(name)
+	if not auction then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice",
+			Error = "Auction-Not-Found",
+		})
+		return
+	end
+
+	local status, auctionBidOrError =
+		pcall(arns.submitAuctionBid, name, bidAmount, bidder, timestamp, processId, type, years)
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice",
+			Error = "Auction-Bid-Error",
+			Data = tostring(auctionBidOrError),
+		})
+		return
+	end
+
+	local record = auctionBidOrError.record
+
+	-- send buy record notice and auction close notice
+	ao.send({
+		Target = bidder,
+		Action = ActionMap.BuyRecord .. "-Notice",
+		Data = json.encode({
+			name = name,
+			startTimestamp = record.startTimestamp,
+			endTimestamp = record.endTimestamp,
+			undernameLimit = record.undernameLimit,
+			purchasePrice = record.purchasePrice,
+			processId = record.processId,
+			type = record.type,
+		}),
+	})
+
+	ao.send({
+		Target = auction.initiator,
+		Action = "Debit-Notice",
+		Quantity = tostring(auctionBidOrError.rewardForInitiator),
+		Data = json.encode({
+			name = name,
+			bidder = auctionBidOrError.bidder,
+			bidAmount = auctionBidOrError.bidAmount,
+			rewardForInitiator = auctionBidOrError.rewardForInitiator,
+			rewardForProtocol = auctionBidOrError.rewardForProtocol,
+			record = record,
+		}),
+	})
+end)
 
 return process

@@ -5,6 +5,7 @@ import {
   AO_LOADER_HANDLER_ENV,
   DEFAULT_HANDLE_OPTIONS,
   STUB_ADDRESS,
+  PROCESS_OWNER,
 } from '../tools/constants.mjs';
 
 describe('Transfers', async () => {
@@ -77,8 +78,8 @@ describe('Transfers', async () => {
       assert.equal(balances[sender], senderBalanceData - quantity);
     };
 
-    const arweave1 = ''.padEnd(43, 'a');
-    const arweave2 = ''.padEnd(43, '1');
+    const arweave1 = STUB_ADDRESS;
+    const arweave2 = ''.padEnd(43, 'a');
     // EIP55 checksummed addresses
     const eth1 = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa';
     const eth2 = '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB';
@@ -89,8 +90,8 @@ describe('Transfers', async () => {
   });
 
   it('should not transfer tokens to another wallet if the sender does not have enough tokens', async () => {
-    const recipient = ''.padEnd(43, 'a');
-    const sender = ''.padEnd(43, '1');
+    const recipient = STUB_ADDRESS;
+    const sender = PROCESS_OWNER;
     const senderBalance = await handle({
       Tags: [
         { name: 'Action', value: 'Balance' },
@@ -120,8 +121,8 @@ describe('Transfers', async () => {
   });
 
   it('should not transfer when an invalid recipient is provided', async () => {
-    const recipient = ''.padEnd(44, 'z');
-    const sender = ''.padEnd(43, '1');
+    const recipient = STUB_ADDRESS;
+    const sender = PROCESS_OWNER;
     const senderBalance = await handle({
       Tags: [
         { name: 'Action', value: 'Balance' },
@@ -132,11 +133,18 @@ describe('Transfers', async () => {
     const transferResult = await handle({
       Tags: [
         { name: 'Action', value: 'Transfer' },
-        { name: 'Recipient', value: recipient },
+        { name: 'Recipient', value: recipient.slice(0, -1) },
         { name: 'Quantity', value: 100000000 }, // 100 IO
         { name: 'Cast', value: true },
       ],
     });
+
+    // assert the error tag
+    const errorTag = transferResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.ok(errorTag, 'Error tag should be present');
+
     // get balances
     const result = await handle(
       {
@@ -150,8 +158,8 @@ describe('Transfers', async () => {
   });
 
   it('should not transfer when an invalid quantity is provided', async () => {
-    const recipient = ''.padEnd(43, 'a');
-    const sender = ''.padEnd(43, '1');
+    const recipient = STUB_ADDRESS;
+    const sender = PROCESS_OWNER;
     const senderBalance = await handle({
       Tags: [
         { name: 'Action', value: 'Balance' },
