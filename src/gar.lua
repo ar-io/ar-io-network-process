@@ -706,7 +706,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 					math.floor(slashableOperatorStake * garSettings.operators.failedEpochSlashPercentage)
 				gar.slashOperatorStake(address, slashAmount)
 				gar.leaveNetwork(address, currentTimestamp, msgId)
-				table.insert(result.slashedGateways, address)
+				result.slashedGateways[address] = slashAmount
 				result.stakeSlashed = result.stakeSlashed + slashAmount
 			else
 				if gateway.status == "leaving" and gateway.endTimestamp <= currentTimestamp then

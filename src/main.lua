@@ -250,7 +250,11 @@ end, function(msg)
 		lastKnownWithdrawSupply = lastKnownWithdrawSupply
 			- (pruneGatewayResults.delegateStakeReturned or 0)
 			- (pruneGatewayResults.gatewayStakeReturned or 0)
-		lastKnownStakedSupply = lastKnownStakedSupply - (pruneGatewayResults.stakeSlashed or 0)
+		local totalGwStakesSlashed = (pruneGatewayResults.stakeSlashed or 0)
+		lastKnownStakedSupply = lastKnownStakedSupply - totalGwStakesSlashed
+		if totalGwStakesSlashed > 0 then
+			msg.ioEvent:addField("Total-Gateways-Stake-Slashed", totalGwStakesSlashed)
+		end
 
 		local prunedGateways = pruneGatewayResults.prunedGateways or {}
 		local prunedGatewaysCount = utils.lengthOfTable(prunedGateways)
@@ -265,7 +269,7 @@ end, function(msg)
 		local slashedGateways = pruneGatewayResults.slashedGateways or {}
 		local slashedGatewaysCount = utils.lengthOfTable(slashedGateways or {})
 		if slashedGatewaysCount > 0 then
-			msg.ioEvent:addField("Slashed-Gateways", slashedGateways)
+			msg.ioEvent:addField("Slashed-Gateway-Amounts", slashedGateways)
 			msg.ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
 			local invariantSlashedGateways = {}
 			for _, gwAddress in pairs(slashedGateways) do

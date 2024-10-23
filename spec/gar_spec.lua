@@ -1560,7 +1560,9 @@ describe("gar", function()
 				local expectedSlashedStake = math.floor(gar.getSettings().operators.minStake * 0.2)
 				assert.are.same({
 					prunedGateways = { "address1" },
-					slashedGateways = { "address3" },
+					slashedGateways = {
+						address3 = expectedSlashedStake,
+					},
 					stakeSlashed = expectedSlashedStake,
 					delegateStakeReturned = 0,
 					gatewayStakeReturned = 0,
