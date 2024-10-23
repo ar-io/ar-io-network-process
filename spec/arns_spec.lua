@@ -503,10 +503,12 @@ describe("arns", function()
 	end)
 
 	describe("pruneRecords", function()
-		it("should prune records", function()
+		it("should prune records and create auctions for expired leased records", function()
 			local currentTimestamp = 1000000000
 
 			_G.NameRegistry = {
+				auctions = {},
+				reserved = {},
 				records = {
 					["active-record"] = {
 						endTimestamp = currentTimestamp + 1000000, -- far in the future
@@ -569,6 +571,23 @@ describe("arns", function()
 					undernameLimit = 10,
 				},
 			}, _G.NameRegistry.records)
+			assert.are.same({
+				["expired-record"] = {
+					startTimestamp = currentTimestamp,
+					endTimestamp = currentTimestamp + (60 * 1000 * 60 * 24 * 14), -- 14 days
+					initiator = _G.ao.id,
+					baseFee = 400000000,
+					demandFactor = 1,
+					registrationFeeCalculator = arns.calculateRegistrationFee,
+					name = "expired-record",
+					settings = {
+						decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14),
+						scalingExponent = 190,
+						startPriceMultiplier = 50,
+						durationMs = 60 * 1000 * 60 * 24 * 14,
+					},
+				},
+			}, _G.NameRegistry.auctions)
 		end)
 	end)
 	describe("pruneReservedNames", function()

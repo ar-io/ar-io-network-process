@@ -619,6 +619,8 @@ describe('ArNS', async () => {
     assert.equal(balances[bidderAddress], 0);
   });
 
+  // TODO: add a test to create a lease initiated dutch auction that accepts a bid with explicit parameters
+
   it('should compute the prices of an auction at a specific interval', async () => {
     // buy the name first
     const processId = ''.padEnd(43, 'a');
