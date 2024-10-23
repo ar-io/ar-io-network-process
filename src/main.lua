@@ -246,6 +246,9 @@ end, function(msg)
 		lastKnownCirculatingSupply = lastKnownCirculatingSupply
 			+ (pruneGatewayResults.delegateStakeReturned or 0)
 			+ (pruneGatewayResults.gatewayStakeReturned or 0)
+		lastKnownWithdrawSupply = lastKnownWithdrawSupply
+			- (pruneGatewayResults.delegateStakeReturned or 0)
+			- (pruneGatewayResults.gatewayStakeReturned or 0)
 		lastKnownStakedSupply = lastKnownStakedSupply - (pruneGatewayResults.stakeSlashed or 0)
 
 		local prunedGateways = pruneGatewayResults.prunedGateways or {}
@@ -1605,13 +1608,13 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 	ao.send({
 		Target = msg.From,
 		Action = "Total-Token-Supply-Notice",
-		["Total-Token-Supply"] = totalSupply,
-		["Circulating-Supply"] = circulatingSupply,
-		["Locked-Supply"] = lockedSupply,
-		["Staked-Supply"] = stakedSupply,
-		["Delegated-Supply"] = delegatedSupply,
-		["Withdraw-Supply"] = withdrawSupply,
-		["Protocol-Balance"] = protocolBalance,
+		["Total-Token-Supply"] = tostring(totalSupply),
+		["Circulating-Supply"] = tostring(circulatingSupply),
+		["Locked-Supply"] = tostring(lockedSupply),
+		["Staked-Supply"] = tostring(stakedSupply),
+		["Delegated-Supply"] = tostring(delegatedSupply),
+		["Withdraw-Supply"] = tostring(withdrawSupply),
+		["Protocol-Balance"] = tostring(protocolBalance),
 		Data = json.encode({
 			-- TODO: we are losing precision on these values unexpectedly. This has been brought to the AO team - for now the tags should be correct as they are stringified
 			total = totalSupply,

@@ -1,13 +1,9 @@
-<<<<<<< HEAD
-import { AOProcess, IO, IO_DEVNET_PROCESS_ID, IO_TESTNET_PROCESS_ID } from '@ar.io/sdk';
-=======
 import {
   AOProcess,
   IO,
   IO_DEVNET_PROCESS_ID,
   IO_TESTNET_PROCESS_ID,
 } from '@ar.io/sdk';
->>>>>>> origin/develop
 import { connect } from '@permaweb/aoconnect';
 import { strict as assert } from 'node:assert';
 import { describe, it, before, after } from 'node:test';
@@ -178,78 +174,78 @@ describe('setup', () => {
       );
 
       // TODO: there is an unknown precision loss on these values, we are discussing why with Forward. Once fixed, uncomment these tests
-      // const { items: balances } = await io.getBalances({
-      //   limit: 10_000,
-      // });
+      const { items: balances } = await io.getBalances({
+        limit: 10_000,
+      });
 
-      // const protocolBalance = await io.getBalance({
-      //   address: processId,
-      // });
+      const protocolBalance = await io.getBalance({
+        address: processId,
+      });
 
-      // assert(
-      //   protocolBalance === supplyData.protocolBalance,
-      //   `Protocol balance is not equal to the balance provided by the contract: ${protocolBalance} !== ${supplyData.protocolBalance}`,
-      // );
+      assert(
+        protocolBalance === supplyData.protocolBalance,
+        `Protocol balance is not equal to the balance provided by the contract: ${protocolBalance} !== ${supplyData.protocolBalance}`,
+      );
 
-      // const totalBalances = balances.reduce(
-      //   (acc, curr) => acc + curr.balance,
-      //   0,
-      // );
-      // const circulating = totalBalances - protocolBalance;
-      // assert(
-      //   circulating === supplyData.circulating,
-      //   `Circulating supply is not equal to the sum of the balances minus the protocol balance: ${circulating} !== ${supplyData.circulating}`,
-      // );
+      const totalBalances = balances.reduce(
+        (acc, curr) => acc + curr.balance,
+        0,
+      );
+      const circulating = totalBalances - protocolBalance;
+      assert(
+        circulating === supplyData.circulating,
+        `Circulating supply is not equal to the sum of the balances minus the protocol balance: ${circulating} !== ${supplyData.circulating}`,
+      );
 
-      // // get the supply staked
-      // const { items: gateways } = await io.getGateways({
-      //   limit: 1000,
-      // });
+      // get the supply staked
+      const { items: gateways } = await io.getGateways({
+        limit: 1000,
+      });
 
-      // const staked = gateways.reduce(
-      //   (acc, curr) => acc + curr.operatorStake,
-      //   0,
-      // );
+      const staked = gateways.reduce(
+        (acc, curr) => acc + curr.operatorStake,
+        0,
+      );
 
-      // assert(
-      //   staked === supplyData.staked,
-      //   `Staked supply is not equal to the sum of the operator stakes: ${staked} !== ${supplyData.staked}`,
-      // );
+      assert(
+        staked === supplyData.staked,
+        `Staked supply is not equal to the sum of the operator stakes: ${staked} !== ${supplyData.staked}`,
+      );
 
-      // const delegated = gateways.reduce(
-      //   (acc, curr) => acc + curr.totalDelegatedStake,
-      //   0,
-      // );
+      const delegated = gateways.reduce(
+        (acc, curr) => acc + curr.totalDelegatedStake,
+        0,
+      );
 
-      // assert(
-      //   delegated === supplyData.delegated,
-      //   `Delegated supply is not equal to the sum of the total delegated stakes: ${delegated} !== ${supplyData.delegated}`,
-      // );
+      assert(
+        delegated === supplyData.delegated,
+        `Delegated supply is not equal to the sum of the total delegated stakes: ${delegated} !== ${supplyData.delegated}`,
+      );
 
-      // const computedTotal =
-      //   supplyData.circulating +
-      //   supplyData.locked +
-      //   supplyData.withdrawn +
-      //   supplyData.staked +
-      //   supplyData.delegated +
-      //   supplyData.protocolBalance;
-      // assert(
-      //   supplyData.total === computedTotal &&
-      //     computedTotal === 1000000000 * 1000000,
-      //   `Computed total supply (${computedTotal}) is not equal to the sum of protocol balance, circulating, locked, staked, and delegated and withdrawn provided by the contract (${supplyData.total}) and does not match the expected total of 1 billion IO`,
-      // );
+      const computedTotal =
+        supplyData.circulating +
+        supplyData.locked +
+        supplyData.withdrawn +
+        supplyData.staked +
+        supplyData.delegated +
+        supplyData.protocolBalance;
+      assert(
+        supplyData.total === computedTotal &&
+          computedTotal === 1000000000 * 1000000,
+        `Computed total supply (${computedTotal}) is not equal to the sum of protocol balance, circulating, locked, staked, and delegated and withdrawn provided by the contract (${supplyData.total}) and does not match the expected total of 1 billion IO`,
+      );
 
-      // const computedCirculating =
-      //   supplyData.total -
-      //   supplyData.locked -
-      //   supplyData.staked -
-      //   supplyData.delegated -
-      //   supplyData.withdrawn -
-      //   supplyData.protocolBalance;
-      // assert(
-      //   supplyData.circulating === computedCirculating,
-      //   `Computed circulating supply (${computedCirculating}) is not equal to the total supply minus protocol balance, locked, staked, delegated, and withdrawn provided by the contract (${supplyData.circulating})`,
-      // );
+      const computedCirculating =
+        supplyData.total -
+        supplyData.locked -
+        supplyData.staked -
+        supplyData.delegated -
+        supplyData.withdrawn -
+        supplyData.protocolBalance;
+      assert(
+        supplyData.circulating === computedCirculating,
+        `Computed circulating supply (${computedCirculating}) is not equal to the total supply minus protocol balance, locked, staked, delegated, and withdrawn provided by the contract (${supplyData.circulating})`,
+      );
     });
   });
 
@@ -369,8 +365,8 @@ describe('setup', () => {
       );
 
       let cursor = '';
-      let countedTotalGateways = 0;
       let totalGateways = 0;
+      const uniqueGateways = new Set();
       do {
         const {
           items: gateways,
@@ -380,9 +376,9 @@ describe('setup', () => {
           cursor,
         });
         totalGateways = totalItems;
-        countedTotalGateways += gateways.length;
         for (const gateway of gateways) {
           if (gateway.status === 'joined') {
+            uniqueGateways.add(gateway.gatewayAddress);
             assert(
               Number.isInteger(gateway.operatorStake),
               `Gateway ${gateway.gatewayAddress} has an invalid operator stake: ${gateway.operatorStake}`,
@@ -477,8 +473,8 @@ describe('setup', () => {
         cursor = nextCursor;
       } while (cursor !== undefined);
       assert(
-        countedTotalGateways === totalGateways,
-        `Counted total gateways (${countedTotalGateways}) does not match total gateways (${totalGateways})`,
+        uniqueGateways.size === totalGateways,
+        `Counted total gateways (${uniqueGateways.size}) does not match total gateways (${totalGateways})`,
       );
     });
   });
@@ -488,8 +484,8 @@ describe('setup', () => {
     const twoWeeks = 2 * 7 * 24 * 60 * 60 * 1000;
     it('should not have any arns records older than two weeks', async () => {
       let cursor = '';
-      let countedTotalArns = 0;
       let totalArns = 0;
+      const uniqueNames = new Set();
       do {
         const {
           items: arns,
@@ -499,8 +495,8 @@ describe('setup', () => {
           cursor,
         });
         totalArns = totalItems;
-        countedTotalArns += arns.length;
         for (const arn of arns) {
+          uniqueNames.add(arn.name);
           assert(arn.processId, `ARNs name '${arn.name}' has no processId`);
           assert(arn.type, `ARNs name '${arn.name}' has no type`);
           assert(
@@ -536,8 +532,8 @@ describe('setup', () => {
         cursor = nextCursor;
       } while (cursor !== undefined);
       assert(
-        countedTotalArns === totalArns,
-        `Counted total ARNs (${countedTotalArns}) does not match total ARNs (${totalArns})`,
+        uniqueNames.size === totalArns,
+        `Counted total ARNs (${uniqueNames.size}) does not match total ARNs (${totalArns})`,
       );
     });
   });
