@@ -365,8 +365,8 @@ describe('setup', () => {
       );
 
       let cursor = '';
-      let countedTotalGateways = 0;
       let totalGateways = 0;
+      const uniqueGateways = new Set();
       do {
         const {
           items: gateways,
@@ -376,9 +376,9 @@ describe('setup', () => {
           cursor,
         });
         totalGateways = totalItems;
-        countedTotalGateways += gateways.length;
         for (const gateway of gateways) {
           if (gateway.status === 'joined') {
+            uniqueGateways.add(gateway.gatewayAddress);
             assert(
               Number.isInteger(gateway.operatorStake),
               `Gateway ${gateway.gatewayAddress} has an invalid operator stake: ${gateway.operatorStake}`,
@@ -473,8 +473,8 @@ describe('setup', () => {
         cursor = nextCursor;
       } while (cursor !== undefined);
       assert(
-        countedTotalGateways === totalGateways,
-        `Counted total gateways (${countedTotalGateways}) does not match total gateways (${totalGateways})`,
+        uniqueGateways.size === totalGateways,
+        `Counted total gateways (${uniqueGateways.size}) does not match total gateways (${totalGateways})`,
       );
     });
   });
