@@ -619,7 +619,199 @@ describe('ArNS', async () => {
     assert.equal(balances[bidderAddress], 0);
   });
 
-  // TODO: add a test to create a lease initiated dutch auction that accepts a bid with explicit parameters
+  // TODO: add a test to create a lease expiration intiaited auction and accept a bid
+  it('should create a lease expiration intiaited auction and accept a bid', async () => {
+    const { record: initialRecord, mem } = await runBuyRecord({
+      sender: STUB_ADDRESS,
+      processId: ''.padEnd(43, 'a'),
+      type: 'lease',
+      years: 1,
+    });
+
+    // tick the contract after the lease leaves its grace period
+    const futureTimestamp =
+      initialRecord.endTimestamp + 60 * 1000 * 60 * 24 * 14 + 1;
+    const tickResult = await handle(
+      {
+        Tags: [{ name: 'Action', value: 'Tick' }],
+        Timestamp: futureTimestamp,
+      },
+      mem,
+    );
+
+    // fetch the auction
+    const auctionResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Auction-Info' },
+          { name: 'Name', value: 'test-name' },
+        ],
+      },
+      tickResult.Memory,
+    );
+    // assert no error tag
+    const auctionErrorTag = auctionResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+
+    assert.equal(auctionErrorTag, undefined);
+    const auction = JSON.parse(auctionResult.Messages?.[0]?.Data);
+    assert.deepEqual(auction, {
+      name: 'test-name',
+      initiator: PROCESS_ID,
+      startTimestamp: futureTimestamp,
+      endTimestamp: futureTimestamp + 60 * 60 * 1000 * 24 * 14,
+      baseFee: 500000000,
+      demandFactor: 1,
+      settings: {
+        decayRate: 0.02037911 / (1000 * 60 * 60 * 24 * 14),
+        scalingExponent: 190,
+        durationMs: 1209600000,
+        startPriceMultiplier: 50,
+      },
+    });
+
+    // // TRANSFER FROM THE OWNER TO A NEW STUB ADDRESS
+    const bidYears = 3;
+    const expectedFloorPrice = Math.floor(
+      auction.baseFee + auction.baseFee * bidYears * 0.2,
+    );
+    const expectedStartPrice = Math.floor(
+      expectedFloorPrice * auction.settings.startPriceMultiplier,
+    );
+    const bidderAddress = 'auction-bidder-'.padEnd(43, '0');
+    const bidTimestamp = futureTimestamp + 60 * 60 * 1000 * 24 * 7; // 7 days into the auction
+    const expectedPurchasePrice = Math.floor(
+      expectedStartPrice *
+        (1 - auction.settings.decayRate * (bidTimestamp - futureTimestamp)) **
+          auction.settings.scalingExponent,
+    );
+    const transferResult = await handle(
+      {
+        From: PROCESS_OWNER,
+        Owner: PROCESS_OWNER,
+        Tags: [
+          { name: 'Action', value: 'Transfer' },
+          { name: 'Recipient', value: bidderAddress },
+          { name: 'Quantity', value: `${expectedPurchasePrice}` },
+          { name: 'Cast', value: true },
+        ],
+        Timestamp: bidTimestamp - 1,
+      },
+      tickResult.Memory,
+    );
+
+    // assert no error in the transfer
+    const transferErrorTag = transferResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+
+    assert.equal(transferErrorTag, undefined);
+    const processId = 'new-name-owner-'.padEnd(43, '1');
+    const submitBidResult = await handle(
+      {
+        From: bidderAddress,
+        Owner: bidderAddress,
+        Tags: [
+          { name: 'Action', value: 'Auction-Bid' },
+          { name: 'Name', value: 'test-name' },
+          { name: 'Process-Id', value: processId },
+          { name: 'Purchase-Type', value: 'lease' },
+          { name: 'Years', value: bidYears },
+        ],
+        Timestamp: bidTimestamp,
+      },
+      transferResult.Memory,
+    );
+
+    // assert no error tag
+    const submitBidErrorTag = submitBidResult.Messages[0].Tags.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.equal(submitBidErrorTag, undefined);
+
+    // should send three messages including a Buy-Record-Notice and a Debit-Notice
+    assert.equal(submitBidResult.Messages.length, 2);
+
+    // should send a buy record notice
+    const buyRecordNoticeTag = submitBidResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Action' && tag.value === 'Buy-Record-Notice',
+    );
+
+    assert.ok(buyRecordNoticeTag);
+
+    // expect the target tag to be the bidder
+    assert.equal(submitBidResult.Messages?.[0]?.Target, bidderAddress);
+
+    const expectedRecord = {
+      processId,
+      purchasePrice: expectedPurchasePrice,
+      startTimestamp: bidTimestamp,
+      endTimestamp: bidTimestamp + 60 * 60 * 1000 * 24 * 365 * 3,
+      undernameLimit: 10,
+      type: 'lease',
+    };
+    // the protocol gets the entire bid amount
+    const expectedRewardForProtocol = expectedPurchasePrice;
+
+    // assert the data response contains the record
+    const buyRecordNoticeData = JSON.parse(submitBidResult.Messages?.[0]?.Data);
+    assert.deepEqual(buyRecordNoticeData, {
+      name: 'test-name',
+      ...expectedRecord,
+    });
+
+    // should send a debit notice
+    const debitNoticeTag = submitBidResult.Messages?.[1]?.Tags?.find(
+      (tag) => tag.name === 'Action' && tag.value === 'Debit-Notice',
+    );
+    assert.ok(debitNoticeTag);
+
+    // expect the target to be to the protocol balance
+    assert.equal(submitBidResult.Messages?.[1]?.Target, PROCESS_ID);
+
+    // assert the data response contains the record
+    const debitNoticeData = JSON.parse(submitBidResult.Messages?.[1]?.Data);
+    assert.deepEqual(debitNoticeData, {
+      record: expectedRecord,
+      bidder: bidderAddress,
+      bidAmount: expectedPurchasePrice,
+      rewardForInitiator: 0,
+      rewardForProtocol: expectedRewardForProtocol,
+      name: 'test-name',
+    });
+
+    // should add the record to the registry
+    const recordResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Record' },
+          { name: 'Name', value: 'test-name' },
+        ],
+        Timestamp: bidTimestamp,
+      },
+      submitBidResult.Memory,
+    );
+
+    const record = JSON.parse(recordResult.Messages?.[0]?.Data);
+    assert.deepEqual(record, expectedRecord);
+
+    // assert the balance of the initiator and the protocol where updated correctly
+    const balancesResult = await handle(
+      {
+        Tags: [{ name: 'Action', value: 'Balances' }],
+      },
+      submitBidResult.Memory,
+    );
+
+    const expectedProtocolBalance =
+      INITIAL_PROTOCOL_BALANCE +
+      initialRecord.purchasePrice +
+      expectedRewardForProtocol;
+    const balances = JSON.parse(balancesResult.Messages[0].Data);
+    assert.equal(balances[PROCESS_ID], expectedProtocolBalance);
+    assert.equal(balances[bidderAddress], 0);
+  });
 
   it('should compute the prices of an auction at a specific interval', async () => {
     // buy the name first

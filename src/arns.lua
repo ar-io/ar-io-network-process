@@ -488,8 +488,10 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 		purchasePrice = finalBidAmount,
 		type = type,
 	}
-	local rewardForInitiator = math.floor(finalBidAmount * 0.5)
-	local rewardForProtocol = finalBidAmount - rewardForInitiator
+
+	-- if the initiator is the protocol, all funds go to the protocol
+	local rewardForInitiator = auction.initiator ~= ao.id and math.floor(finalBidAmount * 0.5) or 0
+	local rewardForProtocol = auction.initiator ~= ao.id and finalBidAmount - rewardForInitiator or finalBidAmount
 	-- reduce bidder balance by the final bid amount
 	balances.transfer(auction.initiator, bidder, rewardForInitiator)
 	balances.transfer(ao.id, bidder, rewardForProtocol)

@@ -2350,7 +2350,7 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 	local bidder = utils.formatAddress(msg.From)
 	local processId = utils.formatAddress(msg.Tags["Process-Id"])
 	local timestamp = tonumber(msg.Timestamp)
-	local type = msg.Tags.Type or "permabuy"
+	local type = msg.Tags["Purchase-Type"] or "permabuy"
 	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
 
 	-- assert name, bidder, processId are provided
@@ -2376,7 +2376,7 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 					"Years must be an integer between 1 and 5"
 				)
 			else
-				years = 1
+				years = years or 1
 			end
 		end
 	end
