@@ -697,6 +697,11 @@ describe("arns", function()
 				local retrievedAuction = arns.getAuction("test-name")
 				assert.are.same(retrievedAuction, auction)
 			end)
+
+			it("should throw an error if the auction is not found", function()
+				local nonexistentAuction = arns.getAuction("nonexistent-auction")
+				assert.is_nil(nonexistentAuction)
+			end)
 		end)
 
 		describe("getPriceForAuctionAtTimestamp", function()
@@ -822,7 +827,7 @@ describe("arns", function()
 				local status, error =
 					pcall(arns.submitAuctionBid, "test-name-2", 1000000000, "test-bidder", 1000000, "test-process-id")
 				assert.is_false(status)
-				assert.match("Auction does not exist", error)
+				assert.match("Auction not found", error)
 			end)
 
 			it("should throw an error if the bid is not high enough", function()

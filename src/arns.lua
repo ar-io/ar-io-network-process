@@ -459,7 +459,7 @@ end
 function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, type, years)
 	local auction = arns.getAuction(name)
 	if not auction then
-		error("Auction does not exist")
+		error("Auction not found")
 	end
 
 	-- assert the bid is between auction start and end timestamps
