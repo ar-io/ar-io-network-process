@@ -488,8 +488,10 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 		purchasePrice = finalBidAmount,
 		type = type,
 	}
-	local rewardForInitiator = math.floor(finalBidAmount * 0.5)
-	local rewardForProtocol = finalBidAmount - rewardForInitiator
+
+	-- if the initiator is the protocol, all funds go to the protocol
+	local rewardForInitiator = auction.initiator ~= ao.id and math.floor(finalBidAmount * 0.5) or 0
+	local rewardForProtocol = auction.initiator ~= ao.id and finalBidAmount - rewardForInitiator or finalBidAmount
 	-- reduce bidder balance by the final bid amount
 	balances.transfer(auction.initiator, bidder, rewardForInitiator)
 	balances.transfer(ao.id, bidder, rewardForProtocol)
@@ -532,7 +534,9 @@ function arns.pruneRecords(currentTimestamp)
 	-- identify any records that are leases and that have expired, account for a one week grace period in seconds
 	for name, record in pairs(arns.getRecords()) do
 		if record.type == "lease" and record.endTimestamp + constants.gracePeriodMs <= currentTimestamp then
-			prunedRecords[name] = arns.removeRecord(name)
+			-- psych! create an auction for the name instantiated by protocol - it will get pruned out if the auction expires with no bids
+			prunedRecords[name] = record
+			arns.createAuction(name, currentTimestamp, ao.id)
 		end
 	end
 	return prunedRecords

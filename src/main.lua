@@ -213,7 +213,7 @@ end, function(msg)
 		NameRegistry = previousState.NameRegistry
 		Epochs = previousState.Epochs
 		Balances = previousState.Balances
-		msg.ioEvent:addField("TickError", tostring(resultOrError))
+		msg.ioEvent:addField("Tick-Error", tostring(resultOrError))
 		return true -- stop processing here and return
 	end
 
@@ -227,6 +227,18 @@ end, function(msg)
 			msg.ioEvent:addField("Pruned-Records", prunedRecordNames)
 			msg.ioEvent:addField("Pruned-Records-Count", prunedRecordsCount)
 			msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
+		end
+		local prunedAuctions = resultOrError.prunedAuctions or {}
+		local prunedAuctionsCount = utils.lengthOfTable(prunedAuctions)
+		if prunedAuctionsCount > 0 then
+			msg.ioEvent:addField("Pruned-Auctions", prunedAuctions)
+			msg.ioEvent:addField("Pruned-Auctions-Count", prunedAuctionsCount)
+		end
+		local prunedReserved = resultOrError.prunedReserved or {}
+		local prunedReservedCount = utils.lengthOfTable(prunedReserved)
+		if prunedReservedCount > 0 then
+			msg.ioEvent:addField("Pruned-Reserved", prunedReserved)
+			msg.ioEvent:addField("Pruned-Reserved-Count", prunedReservedCount)
 		end
 		local prunedVaultsCount = utils.lengthOfTable(resultOrError.prunedVaults or {})
 		if prunedVaultsCount > 0 then
@@ -2338,7 +2350,7 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 	local bidder = utils.formatAddress(msg.From)
 	local processId = utils.formatAddress(msg.Tags["Process-Id"])
 	local timestamp = tonumber(msg.Timestamp)
-	local type = msg.Tags.Type or "permabuy"
+	local type = msg.Tags["Purchase-Type"] or "permabuy"
 	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
 
 	-- assert name, bidder, processId are provided
@@ -2364,7 +2376,7 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 					"Years must be an integer between 1 and 5"
 				)
 			else
-				years = 1
+				years = years or 1
 			end
 		end
 	end

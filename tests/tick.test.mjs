@@ -7,6 +7,7 @@ import {
   STUB_ADDRESS,
   validGatewayTags,
   PROCESS_OWNER,
+  PROCESS_ID,
 } from '../tools/constants.mjs';
 
 describe('Tick', async () => {
@@ -51,7 +52,7 @@ describe('Tick', async () => {
     return transferResult.Memory;
   };
 
-  it('should prune record that are expired and after the grace period', async () => {
+  it('should prune record that are expired and after the grace period and create auctions for them', async () => {
     let mem = startMemory;
     const buyRecordResult = await handle(
       {
@@ -93,7 +94,7 @@ describe('Tick', async () => {
       {
         Tags: [
           { name: 'Action', value: 'Tick' },
-          { name: 'Timestamp', value: (futureTimestamp + 1).toString() },
+          { name: 'Timestamp', value: futureTimestamp.toString() },
         ],
       },
       buyRecordResult.Memory,
@@ -122,6 +123,32 @@ describe('Tick', async () => {
     const prunedRecordData = JSON.parse(prunedRecord.Messages[0].Data);
 
     assert.deepEqual(undefined, prunedRecordData);
+
+    // the auction should have been created
+    const auctionData = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Auction-Info' },
+          { name: 'Name', value: 'test-name' },
+        ],
+      },
+      futureTickResult.Memory,
+    );
+    const auctionInfoData = JSON.parse(auctionData.Messages[0].Data);
+    assert.deepEqual(auctionInfoData, {
+      name: 'test-name',
+      startTimestamp: futureTimestamp,
+      endTimestamp: futureTimestamp + 60 * 1000 * 60 * 24 * 14,
+      initiator: PROCESS_ID,
+      baseFee: 500000000,
+      demandFactor: 1,
+      settings: {
+        decayRate: 0.02037911 / (1000 * 60 * 60 * 24 * 14),
+        scalingExponent: 190,
+        startPriceMultiplier: 50,
+        durationMs: 60 * 1000 * 60 * 24 * 14,
+      },
+    });
   });
 
   it('should prune gateways that are expired', async () => {
