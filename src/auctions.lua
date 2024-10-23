@@ -77,12 +77,16 @@ function Auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
 end
 
 --- Returns the start price for the auction
+--- @param type string The type of auction
+--- @param years number The number of years for the auction
 --- @return number The start price for the auction
 function Auction:startPrice(type, years)
 	return self:floorPrice(type, years) * self.settings.startPriceMultiplier
 end
 
 --- Returns the floor price for the auction
+--- @param type string The type of auction
+--- @param years number The number of years for the auction
 --- @return number The floor price for the auction
 function Auction:floorPrice(type, years)
 	return self.registrationFeeCalculator(type, self.baseFee, years, self.demandFactor)
