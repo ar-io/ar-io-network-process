@@ -256,14 +256,24 @@ end, function(msg)
 		end
 
 		local pruneGatewayResults = resultOrError.pruneGatewayResults or {}
+
 		lastKnownCirculatingSupply = lastKnownCirculatingSupply
 			+ (pruneGatewayResults.delegateStakeReturned or 0)
 			+ (pruneGatewayResults.gatewayStakeReturned or 0)
+
 		lastKnownWithdrawSupply = lastKnownWithdrawSupply
 			- (pruneGatewayResults.delegateStakeReturned or 0)
 			- (pruneGatewayResults.gatewayStakeReturned or 0)
+			+ (pruneGatewayResults.delegateStakeWithdrawing or 0)
+			+ (pruneGatewayResults.gatewayStakeWithdrawing or 0)
+
+		lastKnownDelegatedSupply = lastKnownDelegatedSupply - (pruneGatewayResults.delegateStakeWithdrawing or 0)
+
 		local totalGwStakesSlashed = (pruneGatewayResults.stakeSlashed or 0)
-		lastKnownStakedSupply = lastKnownStakedSupply - totalGwStakesSlashed
+		lastKnownStakedSupply = lastKnownStakedSupply
+			- totalGwStakesSlashed
+			- (pruneGatewayResults.gatewayStakeWithdrawing or 0)
+
 		if totalGwStakesSlashed > 0 then
 			msg.ioEvent:addField("Total-Gateways-Stake-Slashed", totalGwStakesSlashed)
 		end

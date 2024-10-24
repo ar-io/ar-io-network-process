@@ -657,6 +657,8 @@ function gar.pruneGateways(currentTimestamp, msgId)
 		slashedGateways = {},
 		gatewayStakeReturned = 0,
 		delegateStakeReturned = 0,
+		gatewayStakeWithdrawing = 0,
+		delegateStakeWithdrawing = 0,
 		stakeSlashed = 0,
 	}
 
@@ -704,6 +706,8 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				local slashableOperatorStake = math.min(gateway.operatorStake, garSettings.operators.minStake)
 				local slashAmount =
 					math.floor(slashableOperatorStake * garSettings.operators.failedEpochSlashPercentage)
+				result.delegateStakeWithdrawing = result.delegateStakeWithdrawing + gateway.totalDelegatedStake
+				result.gatewayStakeWithdrawing = result.gatewayStakeWithdrawing + (gateway.operatorStake - slashAmount)
 				gar.slashOperatorStake(address, slashAmount)
 				gar.leaveNetwork(address, currentTimestamp, msgId)
 				result.slashedGateways[address] = slashAmount
