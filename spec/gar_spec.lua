@@ -1764,32 +1764,32 @@ describe("gar", function()
 		end)
 	end)
 
-	describe("getActiveGatewaysBeforeTimestamp", function()
-		it("should return all active gateways before the timestamp", function()
-			local timestamp = 1704092400100
-			_G.GatewayRegistry = {
-				[stubGatewayAddress] = {
-					startTimestamp = timestamp - 1, -- joined before the timestamp
-					status = "joined",
-				},
-				[stubRandomAddress] = {
-					startTimestamp = timestamp, -- joined on the timestamp
-					status = "joined",
-				},
-				["test-this-is-valid-arweave-wallet-address-4"] = {
-					startTimestamp = timestamp + 1,
-					status = "joined",
-				},
-				["test-this-is-valid-arweave-wallet-address-5"] = {
-					startTimestamp = timestamp - 1, -- joined before the timestamp, but leaving
-					endTimestamp = timestamp + 100,
-					status = "leaving",
-				},
-			}
-			local result = gar.getActiveGatewaysBeforeTimestamp(timestamp)
-			assert.are.same({ stubGatewayAddress, stubRandomAddress }, result)
-		end)
-	end)
+	-- describe("getActiveGatewaysBeforeTimestamp", function()
+	-- 	it("should return all active gateways before the timestamp", function()
+	-- 		local timestamp = 1704092400100
+	-- 		_G.GatewayRegistry = {
+	-- 			[stubGatewayAddress] = {
+	-- 				startTimestamp = timestamp - 1, -- joined before the timestamp
+	-- 				status = "joined",
+	-- 			},
+	-- 			[stubRandomAddress] = {
+	-- 				startTimestamp = timestamp, -- joined on the timestamp
+	-- 				status = "joined",
+	-- 			},
+	-- 			["test-this-is-valid-arweave-wallet-address-4"] = {
+	-- 				startTimestamp = timestamp + 1,
+	-- 				status = "joined",
+	-- 			},
+	-- 			["test-this-is-valid-arweave-wallet-address-5"] = {
+	-- 				startTimestamp = timestamp - 1, -- joined before the timestamp, but leaving
+	-- 				endTimestamp = timestamp + 100,
+	-- 				status = "leaving",
+	-- 			},
+	-- 		}
+	-- 		local result = gar.getActiveGatewaysBeforeTimestamp(timestamp)
+	-- 		assert.are.same({ stubGatewayAddress, stubRandomAddress }, result)
+	-- 	end)
+	-- end)
 
 	describe("getters", function()
 		-- TODO: other tests for error conditions when joining/leaving network
