@@ -7,10 +7,6 @@ function utils.hasMatchingTag(tag, value)
 	return Handlers.utils.hasMatchingTag(tag, value)
 end
 
-function utils.reply(msg)
-	Handlers.utils.reply(msg)
-end
-
 -- Then, check for a 43-character base64url pattern.
 -- The pattern checks for a string of length 43 containing alphanumeric characters, hyphens, or underscores.
 function utils.isValidBase64Url(url)
@@ -72,39 +68,46 @@ function utils.sortTableByField(prevTable, field, order)
 	end
 
 	table.sort(tableCopy, function(a, b)
-		-- If the field is not present in the table, return false
-		if not a[field] or not b[field] then
-			print("Field not found in table, skipping:" .. field .. " " .. json.encode(a) .. " " .. json.encode(b))
+		local aField = a[field]
+		local bField = b[field]
+		-- If one field is nil, ensure it goes to the end
+		if aField == nil and bField ~= nil then
+			return false
+		elseif aField ~= nil and bField == nil then
+			return true
+		elseif aField == nil and bField == nil then
+			-- If both fields are nil, consider them equal
 			return false
 		end
 
 		if order == "asc" then
-			return a[field] < b[field]
+			return aField < bField
 		else
-			return a[field] > b[field]
+			return aField > bField
 		end
 	end)
 	return tableCopy
 end
 
 function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, sortBy, sortOrder)
-	local sortedTable = utils.sortTableByField(tableArray, sortBy, sortOrder)
-	if not sortedTable or #sortedTable == 0 then
+	local sortedArray = utils.sortTableByField(tableArray, sortBy, sortOrder)
+
+	if not sortedArray or #sortedArray == 0 then
 		return {
 			items = {},
 			limit = limit,
 			totalItems = 0,
-			totalPages = 0,
 			sortBy = sortBy,
 			sortOrder = sortOrder,
 			nextCursor = nil,
+			hasMore = false,
 		}
 	end
 
 	local startIndex = 1
 
 	if cursor then
-		for i, obj in ipairs(sortedTable) do
+		for i, obj in ipairs(sortedArray) do
 			if obj[cursorField] == cursor then
 				startIndex = i + 1
 				break
@@ -113,24 +116,24 @@ function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, s
 	end
 
 	local items = {}
-	local endIndex = math.min(startIndex + limit - 1, #sortedTable)
+	local endIndex = math.min(startIndex + limit - 1, #sortedArray)
 
 	for i = startIndex, endIndex do
-		table.insert(items, sortedTable[i])
+		table.insert(items, sortedArray[i])
 	end
 
 	local nextCursor = nil
-	if endIndex < #sortedTable then
-		nextCursor = sortedTable[endIndex][cursorField]
+	if endIndex < #sortedArray then
+		nextCursor = sortedArray[endIndex][cursorField]
 	end
 
 	return {
 		items = items,
 		limit = limit,
-		totalItems = #sortedTable,
+		totalItems = #sortedArray,
 		sortBy = sortBy,
 		sortOrder = sortOrder,
-		nextCursor = nextCursor,
+		nextCursor = nextCursor, -- the last item in the current page
 		hasMore = nextCursor ~= nil,
 	}
 end
@@ -190,42 +193,6 @@ function utils.safeDecodeJson(jsonString)
 	return result
 end
 
-function utils.validateFQDN(fqdn)
-	-- Check if the fqdn is not nil and not empty
-	if not fqdn or fqdn == "" then
-		error("FQDN is empty")
-	end
-
-	-- Split the fqdn into parts by dot and validate each part
-	local parts = {}
-	for part in fqdn:gmatch("[^%.]+") do
-		table.insert(parts, part)
-	end
-
-	-- Validate each part of the domain
-	for _, part in ipairs(parts) do
-		-- Check that the part length is between 1 and 63 characters
-		if #part < 1 or #part > 63 then
-			error("Invalid fqdn format: each part must be between 1 and 63 characters")
-		end
-		-- Check that the part does not start or end with a hyphen
-		if part:match("^-") or part:match("-$") then
-			error("Invalid fqdn format: parts must not start or end with a hyphen")
-		end
-		-- Check that the part contains only alphanumeric characters and hyphen
-		if not part:match("^[A-Za-z0-9-]+$") then
-			error("Invalid fqdn format: parts must contain only alphanumeric characters or hyphen")
-		end
-	end
-
-	-- Check if there is at least one top-level domain (TLD)
-	if #parts < 2 then
-		error("Invalid fqdn format: missing top-level domain")
-	end
-
-	return fqdn
-end
-
 function utils.findInArray(array, predicate)
 	for i = 1, #array do
 		if predicate(array[i]) then
@@ -237,14 +204,6 @@ end
 
 function utils.walletHasSufficientBalance(wallet, quantity)
 	return Balances[wallet] ~= nil and Balances[wallet] >= quantity
-end
-
-function utils.copyTable(table)
-	local copy = {}
-	for key, value in pairs(table) do
-		copy[key] = value
-	end
-	return copy
 end
 
 function utils.deepCopy(original)
@@ -269,8 +228,10 @@ end
 
 function utils.lengthOfTable(table)
 	local count = 0
-	for _ in pairs(table) do
-		count = count + 1
+	for _, val in pairs(table) do
+		if val then
+			count = count + 1
+		end
 	end
 	return count
 end

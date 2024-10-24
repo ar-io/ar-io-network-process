@@ -5,8 +5,6 @@ Balances = Balances or {}
 local balances = {}
 local utils = require("utils")
 
--- TODO: if we need to append state at all we would do it here on token
-
 function balances.transfer(recipient, from, qty)
 	assert(type(recipient) == "string", "Recipient is required!")
 	assert(type(from) == "string", "From is required!")
@@ -23,8 +21,7 @@ function balances.transfer(recipient, from, qty)
 end
 
 function balances.getBalance(target)
-	local balance = balances.getBalances()[target]
-	return balance or 0
+	return utils.deepCopy(Balances[target] or 0)
 end
 
 function balances.getBalances()
@@ -33,7 +30,7 @@ function balances.getBalances()
 end
 
 function balances.reduceBalance(target, qty)
-	local prevBalance = balances.getBalance(target) or 0
+	local prevBalance = balances.getBalance(target)
 	if prevBalance < qty then
 		error("Insufficient balance")
 	end

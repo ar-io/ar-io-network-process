@@ -9,9 +9,10 @@ import { strict as assert } from 'node:assert';
 import { describe, it, before, after } from 'node:test';
 import { DockerComposeEnvironment, Wait } from 'testcontainers';
 
+const processId = process.env.IO_PROCESS_ID || IO_TESTNET_PROCESS_ID;
 const io = IO.init({
   process: new AOProcess({
-    processId: process.env.IO_PROCESS_ID || IO_TESTNET_PROCESS_ID,
+    processId,
     ao: connect({
       CU_URL: 'http://localhost:6363',
     }),
@@ -38,7 +39,7 @@ describe('setup', () => {
 
   describe('handlers', () => {
     it('should always have correct number of handlers', async () => {
-      const expectedHandlerCount = 52; // TODO: update this if more handlers are added
+      const expectedHandlerCount = processId === IO_DEVNET_PROCESS_ID ? 58 : 53; // TODO: update this if more handlers are added
       const { Handlers: handlersList } = await io.getInfo();
       /**
        * There are two security handlers before _eval and _default, so count is 52
@@ -65,7 +66,8 @@ describe('setup', () => {
       );
       assert.ok(
         handlersList.indexOf('_eval') === 2,
-        '_eval should be the third handler, got: ' + handlersList.indexOf('_eval'),
+        '_eval should be the third handler, got: ' +
+          handlersList.indexOf('_eval'),
       );
       assert.ok(
         handlersList.indexOf('_default') === 3,
@@ -74,12 +76,28 @@ describe('setup', () => {
       );
       assert.ok(
         handlersList.indexOf('prune') === 4,
-        'prune should be the fifth handler, got: ' + handlersList.indexOf('prune'),
+        'prune should be the fifth handler, got: ' +
+          handlersList.indexOf('prune'),
       );
       assert.ok(
         handlersList.length === expectedHandlerCount,
         `should have ${expectedHandlerCount} handlers, got: ${handlersList.length}`,
       ); // forces us to think critically about the order of handlers so intended to be sensitive to changes
+    });
+  });
+
+  describe('balances', () => {
+    it('should always be up to date', async () => {
+      const { items: balances } = await io.getBalances({
+        limit: 10_000,
+      });
+      // assert they are all integers
+      for (const balance of balances) {
+        assert(
+          Number.isInteger(balance.balance),
+          `Balance for ${balance.address} is not an integer: ${balance.balance}`,
+        );
+      }
     });
   });
 
@@ -125,10 +143,108 @@ describe('setup', () => {
 
   describe('token supply', () => {
     it('should always be 1 billion IO', async () => {
-      const totalSupply = await io.getTokenSupply();
+      const supplyData = await io.getTokenSupply();
       assert(
-        totalSupply === 1000000000 * 1000000,
-        `Total supply is not 1 billion IO: ${totalSupply}`,
+        supplyData.total === 1000000000 * 1000000,
+        `Total supply is not 1 billion IO: ${supplyData.total}`,
+      );
+      assert(
+        supplyData.protocolBalance > 0,
+        `Protocol balance is empty: ${supplyData.protocolBalance}`,
+      );
+      assert(
+        supplyData.circulating >= 0,
+        `Circulating supply is undefined: ${supplyData.circulating}`,
+      );
+      assert(
+        supplyData.locked >= 0,
+        `Locked supply is undefined: ${supplyData.locked}`,
+      );
+      assert(
+        supplyData.staked >= 0,
+        `Staked supply is undefined: ${supplyData.staked}`,
+      );
+      assert(
+        supplyData.withdrawn >= 0,
+        `Withdrawn supply is undefined: ${supplyData.withdrawn}`,
+      );
+      assert(
+        supplyData.delegated >= 0,
+        `Delegated supply is undefined: ${supplyData.delegated}`,
+      );
+
+      // TODO: there is an unknown precision loss on these values, we are discussing why with Forward. Once fixed, uncomment these tests
+      const { items: balances } = await io.getBalances({
+        limit: 10_000,
+      });
+
+      const protocolBalance = await io.getBalance({
+        address: processId,
+      });
+
+      assert(
+        protocolBalance === supplyData.protocolBalance,
+        `Protocol balance is not equal to the balance provided by the contract: ${protocolBalance} !== ${supplyData.protocolBalance}`,
+      );
+
+      const totalBalances = balances.reduce(
+        (acc, curr) => acc + curr.balance,
+        0,
+      );
+      const circulating = totalBalances - protocolBalance;
+      assert(
+        circulating === supplyData.circulating,
+        `Circulating supply is not equal to the sum of the balances minus the protocol balance: ${circulating} !== ${supplyData.circulating}`,
+      );
+
+      // get the supply staked
+      const { items: gateways } = await io.getGateways({
+        limit: 1000,
+      });
+
+      const staked = gateways.reduce(
+        (acc, curr) => acc + curr.operatorStake,
+        0,
+      );
+
+      assert(
+        staked === supplyData.staked,
+        `Staked supply is not equal to the sum of the operator stakes: ${staked} !== ${supplyData.staked}`,
+      );
+
+      const delegated = gateways.reduce(
+        (acc, curr) => acc + curr.totalDelegatedStake,
+        0,
+      );
+
+      assert(
+        delegated === supplyData.delegated,
+        `Delegated supply is not equal to the sum of the total delegated stakes: ${delegated} !== ${supplyData.delegated}`,
+      );
+
+      const computedTotal =
+        supplyData.circulating +
+        supplyData.locked +
+        supplyData.withdrawn +
+        supplyData.staked +
+        supplyData.delegated +
+        supplyData.protocolBalance;
+      assert(
+        supplyData.total === computedTotal &&
+          computedTotal === 1000000000 * 1000000,
+        `Computed total supply (${computedTotal}) is not equal to the sum of protocol balance, circulating, locked, staked, and delegated and withdrawn provided by the contract (${supplyData.total}) and does not match the expected total of 1 billion IO`,
+      );
+
+      const computedCirculating =
+        supplyData.total -
+        supplyData.locked -
+        supplyData.staked -
+        supplyData.delegated -
+        supplyData.withdrawn -
+        supplyData.protocolBalance;
+      assert(
+        supplyData.circulating === computedCirculating,
+        `Computed circulating supply (${computedCirculating}) is not equal to the total supply minus protocol balance, locked, staked, delegated, and withdrawn provided by the contract (${supplyData.circulating})`,
       );
     });
   });
@@ -147,9 +263,96 @@ describe('setup', () => {
         `Epoch index is not up to date: ${epochIndex}`,
       );
     });
+    it('should contain the startTimestamp, endTimestamp and distributions and observations for the current epoch', async () => {
+      const {
+        epochIndex,
+        startTimestamp,
+        endTimestamp,
+        distributions,
+        observations,
+      } = await io.getCurrentEpoch();
+      assert(epochIndex > 0, 'Epoch index is not valid');
+      assert(distributions, 'Distributions are not valid');
+      assert(observations, 'Observations are not valid');
+      assert(
+        startTimestamp > 0,
+        `Start timestamp is not valid: ${startTimestamp}`,
+      );
+      assert(
+        endTimestamp > startTimestamp,
+        `End timestamp is not greater than start timestamp: ${endTimestamp} > ${startTimestamp}`,
+      );
+      assert(distributions.rewards.eligible, 'Eligible rewards are not valid');
+
+      // compare the current gateway count to the current epoch totalEligibleRewards
+      const { items: gateways } = await io.getGateways({
+        limit: 1000, // we will need to update this if the number of gateways grows
+      });
+      const activeGatewayCount = gateways.filter(
+        (gateway) => gateway.status === 'joined',
+      ).length;
+      assert(
+        activeGatewayCount === distributions.totalEligibleGateways,
+        `Active gateway count (${activeGatewayCount}) does not match total eligible gateways (${distributions.totalEligibleGateways}) for the current epoch`,
+      );
+    });
+
+    it('the previous epoch should have a been distributed', async () => {
+      const { epochIndex: currentEpochIndex } = await io.getCurrentEpoch();
+      const previousEpochIndex = currentEpochIndex - 1;
+      const { epochIndex, distributions, endTimestamp, startTimestamp } =
+        await io.getEpoch({ epochIndex: previousEpochIndex });
+      assert(
+        epochIndex === previousEpochIndex,
+        'Previous epoch index is not valid',
+      );
+      assert(distributions, 'Distributions are not valid');
+      assert(
+        endTimestamp > startTimestamp,
+        'End timestamp is not greater than start timestamp',
+      );
+      assert(
+        distributions.distributedTimestamp >= endTimestamp,
+        'Distributed timestamp is not greater than epoch end timestamp',
+      );
+      assert(
+        distributions.rewards.eligible !== undefined,
+        'Eligible rewards are not valid',
+      );
+      // assert all eligible rewards are integers
+      assert(
+        Object.values(distributions.rewards.eligible).every(
+          (reward) =>
+            Number.isInteger(reward.operatorReward) &&
+            Object.values(reward.delegateRewards).every((delegateReward) =>
+              Number.isInteger(delegateReward),
+            ),
+        ),
+        `Eligible rewards for the previous epoch (${previousEpochIndex}) are not integers`,
+      );
+      assert(
+        distributions.rewards.distributed !== undefined,
+        'Distributed rewards are not valid',
+      );
+      // assert distributed rewards are integers
+      assert(
+        Object.values(distributions.rewards.distributed).every((reward) =>
+          Number.isInteger(reward),
+        ),
+        `Distributed rewards for the previous epoch (${previousEpochIndex}) are not integers`,
+      );
+    });
   });
 
-  // TODO: add demand factor tests
+  describe('demand factor', () => {
+    it('should always be greater than 0.5', async () => {
+      const demandFactor = await io.getDemandFactor();
+      assert(
+        demandFactor >= 0.5,
+        `Demand factor is less than 0.5: ${demandFactor}`,
+      );
+    });
+  });
 
   // gateway registry - ensure no invalid gateways
   describe('gateway registry', () => {
@@ -162,13 +365,32 @@ describe('setup', () => {
       );
 
       let cursor = '';
+      let totalGateways = 0;
+      const uniqueGateways = new Set();
       do {
-        const { items: gateways, nextCursor } = await io.getGateways({
+        const {
+          items: gateways,
+          nextCursor,
+          totalItems,
+        } = await io.getGateways({
           cursor,
         });
+        totalGateways = totalItems;
         for (const gateway of gateways) {
+          uniqueGateways.add(gateway.gatewayAddress);
           if (gateway.status === 'joined') {
-            assert(gateway.operatorStake >= 50_000_000_000);
+            assert(
+              Number.isInteger(gateway.operatorStake),
+              `Gateway ${gateway.gatewayAddress} has an invalid operator stake: ${gateway.operatorStake}`,
+            );
+            assert(
+              Number.isInteger(gateway.totalDelegatedStake),
+              `Gateway ${gateway.gatewayAddress} has an invalid total delegated stake: ${gateway.totalDelegatedStake}`,
+            );
+            assert(
+              gateway.operatorStake >= 50_000_000_000,
+              `Gateway ${gateway.gatewayAddress} has less than 50_000_000_000 IO staked`,
+            );
             assert(
               gateway.stats.failedConsecutiveEpochs >= 0,
               `Gateway ${gateway.gatewayAddress} has less than 0 failed consecutive epochs`,
@@ -202,18 +424,58 @@ describe('setup', () => {
               `Gateway ${gateway.gatewayAddress} has less than 0 prescribed epochs`,
             );
           }
+          if (gateway.delegates.length > 0) {
+            assert(
+              gateway.delegates?.every(
+                (delegate) =>
+                  Number.isInteger(delegate.balance) &&
+                  delegate.startTimestamp > 0 &&
+                  delegate.endTimestamp > delegate.startTimestamp,
+              ),
+              `Gateway ${gateway.gatewayAddress} has invalid delegate balances`,
+            );
+          }
           if (gateway.status === 'leaving') {
             assert(gateway.totalDelegatedStake === 0);
             assert(gateway.operatorStake === 0);
-            assert(
-              gateway.vaults[gateway.gatewayAddress].balance >= 0 &&
-                gateway.vaults[gateway.gatewayAddress].balance <= 50_000_000_000,
-              `Gateway ${gateway.gatewayAddress} is leaving with invalid amount of IO vaulted against the wallet address. Any stake higher than the minimum staked amount of 50_000_000_000 IO should be vaulted against the message id.`,
-            );
+            for (const [vaultId, vault] of Object.entries(gateway.vaults)) {
+              if (vaultId === gateway.gatewayAddress) {
+                assert(
+                  vault.balance <= 50_000_000_000,
+                  `Gateway ${gateway.gatewayAddress} is leaving with invalid amount of IO vaulted against the wallet address (${gateway.vaults?.[gateway.gatewayAddress]?.balance}). Any stake higher than the minimum staked amount of 50_000_000_000 IO should be vaulted against the message id.`,
+                );
+                assert(
+                  vault.endTimestamp ===
+                    vault.startTimestamp + 1000 * 60 * 60 * 24 * 90,
+                  `Vault ${vaultId} has an invalid end timestamp (${vault.endTimestamp}).`,
+                );
+              }
+              // assert vault balance is greater than 0 and startTimestamp and endTimestamp are valid timestamps 30 days apart
+              assert(
+                Number.isInteger(vault.balance),
+                `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid balance (${vault.balance})`,
+              );
+              assert(
+                vault.balance >= 0,
+                `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid balance (${vault.balance})`,
+              );
+              assert(
+                vault.startTimestamp > 0,
+                `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid start timestamp (${vault.startTimestamp})`,
+              );
+              assert(
+                vault.endTimestamp > 0,
+                `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`,
+              );
+            }
           }
         }
         cursor = nextCursor;
       } while (cursor !== undefined);
+      assert(
+        uniqueGateways.size === totalGateways,
+        `Counted total gateways (${uniqueGateways.size}) does not match total gateways (${totalGateways})`,
+      );
     });
   });
 
@@ -222,11 +484,19 @@ describe('setup', () => {
     const twoWeeks = 2 * 7 * 24 * 60 * 60 * 1000;
     it('should not have any arns records older than two weeks', async () => {
       let cursor = '';
+      let totalArns = 0;
+      const uniqueNames = new Set();
       do {
-        const { items: arns, nextCursor } = await io.getArNSRecords({
+        const {
+          items: arns,
+          nextCursor,
+          totalItems,
+        } = await io.getArNSRecords({
           cursor,
         });
+        totalArns = totalItems;
         for (const arn of arns) {
+          uniqueNames.add(arn.name);
           assert(arn.processId, `ARNs name '${arn.name}' has no processId`);
           assert(arn.type, `ARNs name '${arn.name}' has no type`);
           assert(
@@ -234,12 +504,12 @@ describe('setup', () => {
             `ARNs name '${arn.name}' has no start timestamp`,
           );
           assert(
-            arn.purchasePrice >= 0,
-            `ARNs name '${arn.name}' has no purchase price`,
+            Number.isInteger(arn.purchasePrice) && arn.purchasePrice >= 0,
+            `ARNs name '${arn.name}' has invalid purchase price: ${arn.purchasePrice}`,
           );
           assert(
-            arn.undernameLimit >= 10,
-            `ARNs name '${arn.name}' has no undername limit`,
+            Number.isInteger(arn.undernameLimit) && arn.undernameLimit >= 10,
+            `ARNs name '${arn.name}' has invalid undername limit: ${arn.undernameLimit}`,
           );
           if (arns.type === 'lease') {
             assert(
@@ -261,6 +531,10 @@ describe('setup', () => {
         }
         cursor = nextCursor;
       } while (cursor !== undefined);
+      assert(
+        uniqueNames.size === totalArns,
+        `Counted total ARNs (${uniqueNames.size}) does not match total ARNs (${totalArns})`,
+      );
     });
   });
 });

@@ -1,3 +1,4 @@
+local constants = require("constants")
 local gar = require("gar")
 local utils = require("utils")
 
@@ -16,6 +17,22 @@ local testSettings = {
 	label = "test",
 	delegateRewardShareRatio = 0,
 	properties = stubGatewayAddress,
+}
+local testServices = {
+	bundlers = {
+		{
+			fqdn = "bundler1.example.com",
+			port = 443,
+			protocol = "https",
+			path = "/bundler1",
+		},
+		{
+			fqdn = "bundler2.example.com",
+			port = 443,
+			protocol = "https",
+			path = "/bundler2",
+		},
+	},
 }
 local testServices = {
 	bundlers = {
@@ -147,6 +164,213 @@ describe("gar", function()
 			assert.are.equal(Balances[stubGatewayAddress], 0)
 			assert.are.same(expectation, result)
 			assert.are.same(expectation, gar.getGateway(stubGatewayAddress))
+		end)
+		it("should join the network with services and bundlers", function()
+			local expectation = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+				startTimestamp = startTimestamp,
+				stats = {
+					prescribedEpochCount = 0,
+					observedEpochCount = 0,
+					totalEpochCount = 0,
+					passedEpochCount = 0,
+					failedEpochCount = 0,
+					failedConsecutiveEpochs = 0,
+					passedConsecutiveEpochs = 0,
+				},
+				settings = {
+					allowDelegatedStaking = testSettings.allowDelegatedStaking,
+					delegateRewardShareRatio = testSettings.delegateRewardShareRatio,
+					autoStake = testSettings.autoStake,
+					minDelegatedStake = testSettings.minDelegatedStake,
+					label = testSettings.label,
+					fqdn = testSettings.fqdn,
+					protocol = testSettings.protocol,
+					port = testSettings.port,
+					properties = testSettings.properties,
+				},
+				services = testServices,
+				status = "joined",
+				observerAddress = stubGatewayAddress,
+			}
+
+			local status, result = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				gar.getSettings().operators.minStake,
+				testSettings,
+				testServices,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_true(status)
+			assert.are.equal(Balances[stubGatewayAddress], 0)
+			assert.are.same(expectation, result)
+			assert.are.same(expectation, gar.getGateway(stubGatewayAddress))
+		end)
+		it("should fail to join the network with invalid services key", function()
+			local invalidServices = {
+				invalidKey = {}, -- Invalid key not allowed
+			}
+			local status, error = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				gar.getSettings().operators.minStake,
+				testSettings,
+				invalidServices,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("services contains an invalid key", error)
+		end)
+		it("should fail to join the network with invalid bundler keys", function()
+			local servicesWithInvalidBundler = {
+				bundlers = {
+					{
+						fqdn = "bundler1.example.com",
+						port = 443,
+						protocol = "https",
+						path = "/bundler1",
+						invalidKey = "invalid", -- Invalid key in bundler
+					},
+				},
+			}
+			local status, error = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithInvalidBundler,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("bundler contains an invalid key", error)
+		end)
+		it("should fail to join the network with too many bundlers", function()
+			local servicesWithTooManyBundlers = {
+				bundlers = {},
+			}
+			for i = 1, 21 do -- Exceeding the maximum of 20 bundlers
+				table.insert(servicesWithTooManyBundlers.bundlers, {
+					fqdn = "bundler" .. i .. ".example.com",
+					port = 443,
+					protocol = "https",
+					path = "/bundler" .. i,
+				})
+			end
+
+			local status, error = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithTooManyBundlers,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("No more than 20 bundlers allowed", error)
+		end)
+		it("should fail to join the network with invalid bundler fqdn", function()
+			local servicesWithInvalidFqdn = {
+				bundlers = {
+					{
+						fqdn = 20, -- Invalid fqdn (a number)
+						port = 443,
+						protocol = "https",
+						path = "/bundler",
+					},
+				},
+			}
+
+			local status, error = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithInvalidFqdn,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("bundler.fqdn is required and must be a string", error)
+		end)
+		it("should fail to join the network with invalid bundler port", function()
+			local servicesWithInvalidPort = {
+				bundlers = {
+					{
+						fqdn = "bundler.example.com",
+						port = -1, -- Invalid port (negative number)
+						protocol = "https",
+						path = "/bundler",
+					},
+				},
+			}
+
+			local status, error = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithInvalidPort,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("bundler.port must be an integer between 0 and 65535", error)
+		end)
+		it("should fail to join the network with invalid bundler protocol", function()
+			local servicesWithInvalidProtocol = {
+				bundlers = {
+					{
+						fqdn = "bundler.example.com",
+						port = 443,
+						protocol = "ftp", -- Invalid protocol (should be 'https')
+						path = "/bundler",
+					},
+				},
+			}
+
+			local status, error = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithInvalidProtocol,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("bundler.protocol is required and must be 'https'", error)
+		end)
+		it("should fail to join the network with invalid bundler path", function()
+			local servicesWithInvalidPath = {
+				bundlers = {
+					{
+						fqdn = "bundler.example.com",
+						port = 443,
+						protocol = "https",
+						path = nil, -- Invalid path (nil value)
+					},
+				},
+			}
+
+			local status, error = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				gar.getSettings().operators.minStake,
+				testSettings,
+				servicesWithInvalidPath,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("bundler.path is required and must be a string", error)
 		end)
 		it("should join the network with services and bundlers", function()
 			local expectation = {
@@ -950,6 +1174,21 @@ describe("gar", function()
 			assert.is_not_nil(err)
 			assert.matches("Gateway is leaving the network and cannot be updated", err)
 		end)
+
+		it("should not update gateway settings if the gateway is not found", function()
+			local status, err = pcall(
+				gar.updateGatewaySettings,
+				stubGatewayAddress,
+				updatedSettings,
+				nil,
+				stubObserverAddress,
+				startTimestamp,
+				stubMessageId
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Gateway not found", err)
+		end)
 	end)
 
 	describe("delegateStake", function()
@@ -1083,8 +1322,13 @@ describe("gar", function()
 
 		it("should decrease delegated stake with instant withdrawal and apply penalty and remove delegate", function()
 			Balances[ao.id] = 0
+<<<<<<< HEAD
 			local penaltyAmount = 1000 * 0.80
 			local withdrawalAmount = 1000 - penaltyAmount
+=======
+			local expenditedWithdrawalFee = 1000 * 0.80
+			local withdrawalAmount = 1000 - expenditedWithdrawalFee
+>>>>>>> origin/develop
 			GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = gar.getSettings().delegates.minStake + 1000,
@@ -1125,13 +1369,66 @@ describe("gar", function()
 			assert.are.same(result.delegates[stubRandomAddress].delegatedStake, gar.getSettings().delegates.minStake)
 			assert.are.equal(result.totalDelegatedStake, gar.getSettings().delegates.minStake)
 			assert.are.equal(withdrawalAmount, Balances[stubRandomAddress])
+<<<<<<< HEAD
 			assert.are.equal(penaltyAmount, Balances[ao.id])
+=======
+			assert.are.equal(expenditedWithdrawalFee, Balances[ao.id])
+>>>>>>> origin/develop
 			assert.are.equal(
 				gar.getSettings().delegates.minStake,
 				_G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake
 			)
 		end)
 
+<<<<<<< HEAD
+=======
+		it("should error if the remaining delegate stake is less than the minimum stake", function()
+			local delegatedStake = gar.getSettings().delegates.minStake
+			GatewayRegistry[stubGatewayAddress] = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = gar.getSettings().delegates.minStake - 1,
+				vaults = {},
+				delegates = {
+					[stubRandomAddress] = {
+						delegatedStake = delegatedStake,
+						startTimestamp = startTimestamp,
+						vaults = {},
+					},
+				},
+				startTimestamp = startTimestamp,
+				stats = {
+					prescribedEpochCount = 0,
+					observedEpochCount = 0,
+					totalEpochCount = 0,
+					passedEpochCount = 0,
+					failedEpochCount = 0,
+					failedConsecutiveEpochs = 0,
+					passedConsecutiveEpochs = 0,
+				},
+				settings = testSettings,
+				status = "joined",
+				observerAddress = stubObserverAddress,
+			}
+
+			local status, err = pcall(
+				gar.decreaseDelegateStake,
+				stubGatewayAddress,
+				stubRandomAddress,
+				1,
+				startTimestamp,
+				stubMessageId
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches(
+				"Remaining delegated stake must be greater than the minimum delegated stake. Adjust the amount or withdraw all stake.",
+				err
+			)
+		end)
+	end)
+
+	describe("instantDelegateWithdrawal", function()
+>>>>>>> origin/develop
 		it(
 			"should successfully convert a standard delegate withdraw to instant with maximum penalty and remove delegate",
 			function()
@@ -1140,9 +1437,15 @@ describe("gar", function()
 				local currentTimestamp = 1000000
 				local startTimestamp = 1000000
 				local vaultBalance = 1000
+<<<<<<< HEAD
 				local expectedPenaltyRate = 0.80
 				local expectedPenaltyAmount = vaultBalance * expectedPenaltyRate
 				local expectedWithdrawalAmount = vaultBalance - expectedPenaltyAmount
+=======
+				local expectedPenaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+				local expectedexpenditedWithdrawalFee = vaultBalance * expectedPenaltyRate
+				local expectedWithdrawalAmount = vaultBalance - expectedexpenditedWithdrawalFee
+>>>>>>> origin/develop
 
 				Balances[ao.id] = 0
 
@@ -1189,7 +1492,11 @@ describe("gar", function()
 				assert.are.equal(nil, result.delegate) -- Delegate should be removed after full withdrawal
 				assert.are.equal(0, result.totalDelegatedStake)
 				assert.are.equal(expectedWithdrawalAmount, Balances[stubRandomAddress])
+<<<<<<< HEAD
 				assert.are.equal(expectedPenaltyAmount, Balances[ao.id])
+=======
+				assert.are.equal(expectedexpenditedWithdrawalFee, Balances[ao.id])
+>>>>>>> origin/develop
 				assert.are.equal(0, _G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
 			end
 		)
@@ -1204,12 +1511,22 @@ describe("gar", function()
 				local elapsedTime = 15 * 24 * 60 * 60 * 1000 -- Half of 30 days in milliseconds
 				local currentTimestamp = startTimestamp + elapsedTime
 				local vaultBalance = 1000
+<<<<<<< HEAD
 				local maxPenalty = 0.80
 				local minPenalty = 0.05
 				local penaltyRate = maxPenalty
 					- ((maxPenalty - minPenalty) * (elapsedTime / gar.getSettings().delegates.withdrawLengthMs))
 				local expectedPenaltyAmount = math.floor(vaultBalance * penaltyRate)
 				local expectedWithdrawalAmount = vaultBalance - expectedPenaltyAmount
+=======
+				local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+					- (
+						(constants.MAX_EXPEDITED_WITHDRAWAL_FEE - constants.MIN_EXPEDITED_WITHDRAWAL_FEE)
+						* (elapsedTime / gar.getSettings().delegates.withdrawLengthMs)
+					)
+				local expectedexpenditedWithdrawalFee = math.floor(vaultBalance * penaltyRate)
+				local expectedWithdrawalAmount = vaultBalance - expectedexpenditedWithdrawalFee
+>>>>>>> origin/develop
 				Balances[ao.id] = 0
 
 				_G.GatewayRegistry[stubGatewayAddress] = {
@@ -1255,7 +1572,11 @@ describe("gar", function()
 				assert.are.equal(nil, next(result.delegate.vaults)) -- Delegate should have no vaults remaining
 				assert.are.equal(remainingDelegateStakeBalance, result.totalDelegatedStake)
 				assert.are.equal(expectedWithdrawalAmount, Balances[stubRandomAddress])
+<<<<<<< HEAD
 				assert.are.equal(expectedPenaltyAmount, Balances[ao.id])
+=======
+				assert.are.equal(expectedexpenditedWithdrawalFee, Balances[ao.id])
+>>>>>>> origin/develop
 				assert.are.equal(
 					remainingDelegateStakeBalance,
 					_G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake
@@ -1272,12 +1593,22 @@ describe("gar", function()
 				local startTimestamp = 500000
 				local elapsedTime = 29 * 24 * 60 * 60 * 1000 -- Half of 30 days in milliseconds
 				local currentTimestamp = startTimestamp + elapsedTime
+<<<<<<< HEAD
 				local maxPenalty = 0.80
 				local minPenalty = 0.05
 				local penaltyRate = maxPenalty
 					- ((maxPenalty - minPenalty) * (elapsedTime / gar.getSettings().delegates.withdrawLengthMs))
 				local expectedPenaltyAmount = math.floor(vaultBalance * penaltyRate)
 				local expectedWithdrawalAmount = vaultBalance - expectedPenaltyAmount
+=======
+				local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+					- (
+						(constants.MAX_EXPEDITED_WITHDRAWAL_FEE - constants.MIN_EXPEDITED_WITHDRAWAL_FEE)
+						* (elapsedTime / gar.getSettings().delegates.withdrawLengthMs)
+					)
+				local expectedexpenditedWithdrawalFee = math.floor(vaultBalance * penaltyRate)
+				local expectedWithdrawalAmount = vaultBalance - expectedexpenditedWithdrawalFee
+>>>>>>> origin/develop
 				Balances[ao.id] = 0
 
 				_G.GatewayRegistry[stubGatewayAddress] = {
@@ -1323,10 +1654,83 @@ describe("gar", function()
 				assert.are.equal(nil, result.delegate) -- Delegate should be removed after full withdrawal
 				assert.are.equal(0, result.totalDelegatedStake)
 				assert.are.equal(expectedWithdrawalAmount, Balances[stubRandomAddress])
+<<<<<<< HEAD
 				assert.are.equal(expectedPenaltyAmount, Balances[ao.id])
 				assert.are.equal(0, _G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
 			end
 		)
+=======
+				assert.are.equal(expectedexpenditedWithdrawalFee, Balances[ao.id])
+				assert.are.equal(0, _G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
+			end
+		)
+
+		it("should error if the vault is not found", function()
+			local vaultId = "vault_id_1"
+			local vaultBalance = 1000
+			local startTimestamp = 500000
+			local currentTimestamp = startTimestamp + 1000
+
+			_G.GatewayRegistry[stubGatewayAddress] = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {
+					[stubRandomAddress] = {
+						delegatedStake = 0,
+						startTimestamp = startTimestamp,
+						vaults = {
+							[vaultId] = {
+								balance = vaultBalance,
+								startTimestamp = startTimestamp,
+							},
+						},
+					},
+				},
+				startTimestamp = startTimestamp,
+				stats = {
+					prescribedEpochCount = 0,
+					observedEpochCount = 0,
+					totalEpochCount = 0,
+					passedEpochCount = 0,
+					failedEpochCount = 0,
+					failedConsecutiveEpochs = 0,
+					passedConsecutiveEpochs = 0,
+				},
+				settings = testSettings,
+				status = "joined",
+				observerAddress = stubObserverAddress,
+			}
+
+			local status, err = pcall(
+				gar.instantDelegateWithdrawal,
+				stubRandomAddress,
+				stubGatewayAddress,
+				"non-existent-vault-id",
+				currentTimestamp
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Vault not found", err)
+		end)
+
+		it("should error if the gateway is not found", function()
+			local vaultId = "vault_id_1"
+			local startTimestamp = 500000
+			local currentTimestamp = startTimestamp + 1000
+
+			local status, err = pcall(
+				gar.instantDelegateWithdrawal,
+				stubRandomAddress,
+				"non-existent-gateway-address",
+				vaultId,
+				currentTimestamp
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Gateway not found", err)
+		end)
+>>>>>>> origin/develop
 	end)
 
 	describe("slashOperatorStake", function()
@@ -1451,12 +1855,17 @@ describe("gar", function()
 				local protocolBalanceBefore = _G.Balances[ao.id] or 0
 				local status, result = pcall(gar.pruneGateways, currentTimestamp, msgId)
 				assert.is_true(status)
+				local expectedSlashedStake = math.floor(gar.getSettings().operators.minStake * 0.2)
 				assert.are.same({
 					prunedGateways = { "address1" },
-					slashedGateways = { "address3" },
+					slashedGateways = {
+						address3 = expectedSlashedStake,
+					},
+					stakeSlashed = expectedSlashedStake,
+					delegateStakeReturned = 0,
+					gatewayStakeReturned = 0,
 				}, result)
 
-				local expectedSlashedStake = math.floor(gar.getSettings().operators.minStake * 0.2)
 				local expectedRemainingStake = math.floor(gar.getSettings().operators.minStake * 0.8) + 10000
 				assert.is_nil(GatewayRegistry["address1"]) -- removed
 				assert.is_not_nil(GatewayRegistry["address2"]) -- not removed
@@ -1559,7 +1968,7 @@ describe("gar", function()
 				},
 			}, _G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress])
 		end)
-		it("should not cancel a withdrawal if the delegate does not exist", function()
+		it("should not cancel a withdrawal if the delegate not found", function()
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
 			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = nil
 			_G.GatewayRegistry[stubGatewayAddress].settings.allowDelegatedStaking = true
@@ -1571,9 +1980,9 @@ describe("gar", function()
 			)
 			assert.is_false(status)
 			assert.is_not_nil(err)
-			assert.matches("Delegate does not exist", err)
+			assert.matches("Delegate not found", err)
 		end)
-		it("should not cancel a withdrawal if the withdrawal does not exist", function()
+		it("should not cancel a withdrawal if the withdrawal not found", function()
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
 			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = {
 				delegatedStake = 0,
@@ -1589,7 +1998,7 @@ describe("gar", function()
 			)
 			assert.is_false(status)
 			assert.is_not_nil(err)
-			assert.matches("Vault does not exist", err)
+			assert.matches("Vault not found", err)
 		end)
 		it("should not cancel a withdrawal if the gateway is leaving", function()
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
@@ -1616,6 +2025,36 @@ describe("gar", function()
 			assert.is_not_nil(err)
 			assert.matches("Gateway is leaving the network and cannot cancel withdrawals.", err)
 		end)
+		it("should not cancel a withdrawal if the withdrawal is not found", function()
+			_G.GatewayRegistry[stubGatewayAddress] = testGateway
+			_G.GatewayRegistry[stubGatewayAddress].status = "joined"
+			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = {
+				delegatedStake = 0,
+				vaults = {},
+				startTimestamp = 0,
+			}
+			local status, err = pcall(
+				gar.cancelDelegateWithdrawal,
+				stubRandomAddress,
+				stubGatewayAddress,
+				"some-previous-withdrawal-id"
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Vault not found", err)
+		end)
+		it("should not cancel a withdrawal if the gateway is not found", function()
+			_G.GatewayRegistry[stubGatewayAddress] = nil
+			local status, err = pcall(
+				gar.cancelDelegateWithdrawal,
+				stubRandomAddress,
+				stubGatewayAddress,
+				"some-previous-withdrawal-id"
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Gateway not found", err)
+		end)
 	end)
 
 	describe("getActiveGatewaysBeforeTimestamp", function()
@@ -1630,7 +2069,7 @@ describe("gar", function()
 					startTimestamp = timestamp + 10, -- joined after the timestamp
 					status = "joined",
 				},
-				["test-this-is-valid-arweave-wallet-address-3"] = {
+				["test-this-is-valid-arweave-wallet-address-4"] = {
 					startTimestamp = timestamp - 10, -- joined before the timestamp, but leaving
 					endTimestamp = timestamp + 100,
 					status = "leaving",
@@ -1657,6 +2096,46 @@ describe("gar", function()
 				[stubGatewayAddress] = testGateway,
 				[stubRandomAddress] = testGateway,
 			})
+		end)
+	end)
+
+	describe("getPaginatedGateways", function()
+		it("should return paginated gateways sorted by startTimestamp in ascending order (oldest first)", function()
+			local gateway1 = utils.deepCopy(testGateway)
+			local gateway2 = utils.deepCopy(testGateway)
+			gateway1.startTimestamp = 1000
+			gateway2.startTimestamp = 0
+			_G.GatewayRegistry = {
+				[stubGatewayAddress] = gateway1,
+				[stubRandomAddress] = gateway2,
+			}
+			local gateways = gar.getPaginatedGateways(nil, 1, "startTimestamp", "asc")
+			gateway1.gatewayAddress = stubGatewayAddress
+			gateway2.gatewayAddress = stubRandomAddress
+			assert.are.same({
+				limit = 1,
+				sortBy = "startTimestamp",
+				sortOrder = "asc",
+				hasMore = true,
+				nextCursor = stubRandomAddress,
+				totalItems = 2,
+				items = {
+					gateway2, -- should be first because it has a lower startTimestamp
+				},
+			}, gateways)
+			-- get the next page
+			local nextGateways = gar.getPaginatedGateways(gateways.nextCursor, 1, "startTimestamp", "asc")
+			assert.are.same({
+				limit = 1,
+				sortBy = "startTimestamp",
+				sortOrder = "asc",
+				hasMore = false,
+				nextCursor = nil,
+				totalItems = 2,
+				items = {
+					gateway1,
+				},
+			}, nextGateways)
 		end)
 	end)
 end)

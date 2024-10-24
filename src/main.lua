@@ -9,10 +9,11 @@ Logo = Logo or "qUjrTmHdVjXX4D6rU6Fik02bUOzWkOR6oOqUg39g4-s"
 Denomination = 6
 DemandFactor = DemandFactor or {}
 Owner = Owner or ao.env.Process.Owner
+Protocol = Protocol or ao.env.Process.Id
 Balances = Balances or {}
-if not Balances[ao.id] then -- initialize the balance for the process id
+if not Balances[Protocol] then -- initialize the balance for the process id
 	Balances = {
-		[ao.id] = math.floor(50000000 * 1000000), -- 50M IO
+		[Protocol] = math.floor(50000000 * 1000000), -- 50M IO
 		[Owner] = math.floor(constants.totalTokenSupply - (50000000 * 1000000)), -- 950M IO
 	}
 end
@@ -83,7 +84,28 @@ local ActionMap = {
 	CancelDelegateWithdrawal = "Cancel-Delegate-Withdrawal",
 	InstantDelegateWithdrawal = "Instant-Delegate-Withdrawal",
 	InstantOperatorWithdrawal = "Instant-Operator-Withdrawal",
+	-- auctions
+	Auctions = "Auctions",
+	ReleaseName = "Release-Name",
+	AuctionInfo = "Auction-Info",
+	AuctionBid = "Auction-Bid",
+	AuctionPrices = "Auction-Prices",
 }
+
+-- Low fidelity trackers
+local lastKnownCirculatingSupply = lastKnownCirculatingSupply or 0
+local lastKnownLockedSupply = lastKnownLockedSupply or 0
+local lastKnownStakedSupply = lastKnownStakedSupply or 0
+local lastKnownDelegatedSupply = lastKnownDelegatedSupply or 0
+local lastKnownWithdrawSupply = lastKnownWithdrawSupply or 0
+local function lastKnownTotalTokenSupply()
+	return lastKnownCirculatingSupply
+		+ lastKnownLockedSupply
+		+ lastKnownStakedSupply
+		+ lastKnownDelegatedSupply
+		+ lastKnownWithdrawSupply
+		+ Balances[Protocol]
+end
 
 local function eventingPcall(ioEvent, onError, fnToCall, ...)
 	local status, result = pcall(fnToCall, ...)
@@ -112,6 +134,17 @@ local function addRecordResultFields(ioEvent, result)
 			"purchasesThisPeriod",
 		})
 	end
+end
+
+local function addSupplyData(ioEvent, supplyData)
+	supplyData = supplyData or {}
+	ioEvent:addField("Circulating-Supply", supplyData.circulatingSupply or lastKnownCirculatingSupply)
+	ioEvent:addField("Locked-Supply", supplyData.lockedSupply or lastKnownLockedSupply)
+	ioEvent:addField("Staked-Supply", supplyData.stakedSupply or lastKnownStakedSupply)
+	ioEvent:addField("Delegated-Supply", supplyData.delegatedSupply or lastKnownDelegatedSupply)
+	ioEvent:addField("Withdraw-Supply", supplyData.withdrawSupply or lastKnownWithdrawSupply)
+	ioEvent:addField("Total-Token-Supply", supplyData.totalTokenSupply or lastKnownTotalTokenSupply())
+	ioEvent:addField("Protocol-Balance", Balances[Protocol])
 end
 
 local function gatewayStats()
@@ -160,6 +193,12 @@ end, function(msg)
 		NameRegistry = utils.deepCopy(NameRegistry),
 		Epochs = utils.deepCopy(Epochs),
 		Balances = utils.deepCopy(Balances),
+		lastKnownCirculatingSupply = lastKnownCirculatingSupply,
+		lastKnownLockedSupply = lastKnownLockedSupply,
+		lastKnownStakedSupply = lastKnownStakedSupply,
+		lastKnownDelegatedSupply = lastKnownDelegatedSupply,
+		lastKnownWithdrawSupply = lastKnownWithdrawSupply,
+		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
 	}
 	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId)
 	if not status then
@@ -174,7 +213,7 @@ end, function(msg)
 		NameRegistry = previousState.NameRegistry
 		Epochs = previousState.Epochs
 		Balances = previousState.Balances
-		msg.ioEvent:addField("TickError", tostring(resultOrError))
+		msg.ioEvent:addField("Tick-Error", tostring(resultOrError))
 		return true -- stop processing here and return
 	end
 
@@ -189,26 +228,84 @@ end, function(msg)
 			msg.ioEvent:addField("Pruned-Records-Count", prunedRecordsCount)
 			msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
 		end
+		local prunedAuctions = resultOrError.prunedAuctions or {}
+		local prunedAuctionsCount = utils.lengthOfTable(prunedAuctions)
+		if prunedAuctionsCount > 0 then
+			msg.ioEvent:addField("Pruned-Auctions", prunedAuctions)
+			msg.ioEvent:addField("Pruned-Auctions-Count", prunedAuctionsCount)
+		end
+		local prunedReserved = resultOrError.prunedReserved or {}
+		local prunedReservedCount = utils.lengthOfTable(prunedReserved)
+		if prunedReservedCount > 0 then
+			msg.ioEvent:addField("Pruned-Reserved", prunedReserved)
+			msg.ioEvent:addField("Pruned-Reserved-Count", prunedReservedCount)
+		end
+		local prunedVaultsCount = utils.lengthOfTable(resultOrError.prunedVaults or {})
+		if prunedVaultsCount > 0 then
+			msg.ioEvent:addField("Pruned-Vaults", resultOrError.prunedVaults)
+			msg.ioEvent:addField("Pruned-Vaults-Count", prunedVaultsCount)
+			for _, vault in pairs(resultOrError.prunedVaults) do
+				lastKnownLockedSupply = lastKnownLockedSupply - vault.balance
+				lastKnownCirculatingSupply = lastKnownCirculatingSupply + vault.balance
+			end
+		end
 		local prunedEpochsCount = utils.lengthOfTable(resultOrError.prunedEpochs or {})
 		if prunedEpochsCount > 0 then
 			msg.ioEvent:addField("Pruned-Epochs", resultOrError.prunedEpochs)
 			msg.ioEvent:addField("Pruned-Epochs-Count", prunedEpochsCount)
 		end
 
-		local prunedGatewaysCount = utils.lengthOfTable(resultOrError.prunedGateways or {})
+		local pruneGatewayResults = resultOrError.pruneGatewayResults or {}
+		lastKnownCirculatingSupply = lastKnownCirculatingSupply
+			+ (pruneGatewayResults.delegateStakeReturned or 0)
+			+ (pruneGatewayResults.gatewayStakeReturned or 0)
+		lastKnownWithdrawSupply = lastKnownWithdrawSupply
+			- (pruneGatewayResults.delegateStakeReturned or 0)
+			- (pruneGatewayResults.gatewayStakeReturned or 0)
+		local totalGwStakesSlashed = (pruneGatewayResults.stakeSlashed or 0)
+		lastKnownStakedSupply = lastKnownStakedSupply - totalGwStakesSlashed
+		if totalGwStakesSlashed > 0 then
+			msg.ioEvent:addField("Total-Gateways-Stake-Slashed", totalGwStakesSlashed)
+		end
+
+		local prunedGateways = pruneGatewayResults.prunedGateways or {}
+		local prunedGatewaysCount = utils.lengthOfTable(prunedGateways)
 		if prunedGatewaysCount > 0 then
-			msg.ioEvent:addField("Pruned-Gateways", resultOrError.prunedGateways)
+			msg.ioEvent:addField("Pruned-Gateways", prunedGateways)
 			msg.ioEvent:addField("Pruned-Gateways-Count", prunedGatewaysCount)
 			local gwStats = gatewayStats()
 			msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
 			msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
 		end
 
-		local slashedGatewaysCount = utils.lengthOfTable(resultOrError.slashedGateways or {})
+		local slashedGateways = pruneGatewayResults.slashedGateways or {}
+		local slashedGatewaysCount = utils.lengthOfTable(slashedGateways or {})
 		if slashedGatewaysCount > 0 then
-			msg.ioEvent:addField("Slashed-Gateways", resultOrError.slashedGateways)
+			msg.ioEvent:addField("Slashed-Gateway-Amounts", slashedGateways)
 			msg.ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
+			local invariantSlashedGateways = {}
+			for _, gwAddress in pairs(slashedGateways) do
+				local gw = gar.getGateway(gwAddress) or {}
+				if gw.totalDelegatedStake > 0 then
+					invariantSlashedGateways[gwAddress] = gw.totalDelegatedStake
+				end
+			end
+			if utils.lengthOfTable(invariantSlashedGateways) > 0 then
+				msg.ioEvent:addField("Invariant-Slashed-Gateways", invariantSlashedGateways)
+			end
 		end
+	end
+
+	if
+		lastKnownCirculatingSupply ~= previousState.lastKnownCirculatingSupply
+		or lastKnownLockedSupply ~= previousState.lastKnownLockedSupply
+		or lastKnownStakedSupply ~= previousState.lastKnownStakedSupply
+		or lastKnownDelegatedSupply ~= previousState.lastKnownDelegatedSupply
+		or lastKnownWithdrawSupply ~= previousState.lastKnownWithdrawSupply
+		or Balances[Protocol] ~= previousState.Balances[Protocol]
+		or lastKnownTotalTokenSupply() ~= previousState.lastKnownTotalSupply
+	then
+		addSupplyData(msg.ioEvent)
 	end
 
 	return status
@@ -315,9 +412,15 @@ addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionM
 		)
 	end
 
+	local from = utils.formatAddress(msg.From)
+	local quantity = tonumber(msg.Tags.Quantity)
+	local lockLengthMs = tonumber(msg.Tags["Lock-Length"])
+	local timestamp = tonumber(msg.Timestamp)
+	local msgId = msg.Id
+
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
-			Target = msg.From,
+			Target = from,
 			Tags = { Action = "Invalid-Create-Vault-Notice", Error = "Bad-Input" },
 			Data = tostring(error),
 		})
@@ -326,38 +429,33 @@ addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionM
 		return
 	end
 
-	local shouldContinue2, vault = eventingPcall(
-		ioEvent,
-		function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Invalid-Create-Vault-Notice", Error = "Invalid-Create-Vault" },
-				Data = tostring(error),
-			})
-		end,
-		vaults.createVault,
-		msg.From,
-		tonumber(msg.Tags.Quantity),
-		tonumber(msg.Tags["Lock-Length"]),
-		tonumber(msg.Timestamp),
-		msg.Id
-	)
+	local shouldContinue2, vault = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = from,
+			Tags = { Action = "Invalid-Create-Vault-Notice", Error = "Invalid-Create-Vault" },
+			Data = tostring(error),
+		})
+	end, vaults.createVault, from, quantity, lockLengthMs, timestamp, msgId)
 	if not shouldContinue2 then
 		return
 	end
 
 	if vault ~= nil then
-		msg.ioEvent:addField("Vault-Id", msg.Id)
-		msg.ioEvent:addField("VaultBalance", vault.balance)
-		msg.ioEvent:addField("VaultStartTimestamp", vault.startTimestamp)
-		msg.ioEvent:addField("VaultEndTimestamp", vault.endTimestamp)
+		msg.ioEvent:addField("Vault-Id", msgId)
+		msg.ioEvent:addField("Vault-Balance", vault.balance)
+		msg.ioEvent:addField("Vault-Start-Timestamp", vault.startTimestamp)
+		msg.ioEvent:addField("Vault-End-Timestamp", vault.endTimestamp)
 	end
 
+	lastKnownLockedSupply = lastKnownLockedSupply + quantity
+	lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
+	addSupplyData(msg.ioEvent)
+
 	ao.send({
-		Target = msg.From,
+		Target = from,
 		Tags = {
 			Action = "Vault-Created-Notice",
-			["Vault-Id"] = msg.Id,
+			["Vault-Id"] = msgId,
 		},
 		Data = json.encode(vault),
 	})
@@ -365,7 +463,7 @@ end)
 
 addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap.VaultedTransfer), function(msg)
 	local function checkAssertions()
-		assert(utils.isValidArweaveAddress(msg.Tags.Recipient), "Invalid recipient")
+		assert(utils.isValidAOAddress(msg.Tags.Recipient), "Invalid recipient")
 		assert(
 			tonumber(msg.Tags["Lock-Length"]) > 0 and utils.isInteger(tonumber(msg.Tags["Lock-Length"])),
 			"Invalid lock length. Must be integer greater than 0"
@@ -376,58 +474,76 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 		)
 	end
 
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Vaulted-Transfer-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
-	local result, err = balances.vaultedTransfer(
-		msg.From,
-		msg.Tags.Recipient,
-		tonumber(msg.Tags.Quantity),
-		tonumber(msg.Tags["Lock-Length"]),
-		msg.Timestamp,
-		msg.Id
-	)
-	if err then
+	local from = utils.formatAddress(msg.From)
+	local recipient = utils.formatAddress(msg.Tags.Recipient)
+	local quantity = tonumber(msg.Tags.Quantity)
+	local lockLengthMs = tonumber(msg.Tags["Lock-Length"])
+	local timestamp = tonumber(msg.Timestamp)
+	local msgId = msg.Id
+
+	local shouldContinue2, vault = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Vaulted-Transfer", Error = "Invalid-Vaulted-Transfer" },
-			Data = tostring(err),
+			Data = tostring(error),
 		})
-	else
-		ao.send({
-			Target = msg.From,
-			Recipient = msg.Tags.Recipient,
-			Quantity = msg.Tags.Quantity,
-			Tags = { Action = "Debit-Notice" },
-			Data = json.encode(result),
-		})
-		ao.send({
-			Target = msg.Tags.Recipient,
-			Tags = { Action = "Vaulted-Credit-Notice" },
-			Data = json.encode(result),
-		})
+	end, vaults.vaultedTransfer, from, recipient, quantity, lockLengthMs, timestamp, msgId)
+	if not shouldContinue2 then
+		return
 	end
+
+	if vault ~= nil then
+		msg.ioEvent:addField("Vault-Id", msgId)
+		msg.ioEvent:addField("Vault-Balance", vault.balance)
+		msg.ioEvent:addField("Vault-Start-Timestamp", vault.startTimestamp)
+		msg.ioEvent:addField("Vault-End-Timestamp", vault.endTimestamp)
+	end
+
+	lastKnownLockedSupply = lastKnownLockedSupply + quantity
+	lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
+	addSupplyData(msg.ioEvent)
+
+	-- sender gets an immediate debit notice as the quantity is debited from their balance
+	ao.send({
+		Target = from,
+		Recipient = recipient,
+		Quantity = quantity,
+		Tags = { Action = "Debit-Notice", ["Vault-Id"] = msgId },
+		Data = json.encode(vault),
+	})
+	-- to the receiver, they get a vault notice
+	ao.send({
+		Target = recipient,
+		Quantity = quantity,
+		Sender = from,
+		Tags = { Action = "Create-Vault-Notice", ["Vault-Id"] = msgId },
+		Data = json.encode(vault),
+	})
 end)
 
 addEventingHandler(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.ExtendVault), function(msg)
 	local checkAssertions = function()
-		assert(utils.isValidArweaveAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
+		assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
 		assert(
 			tonumber(msg.Tags["Extend-Length"]) > 0 and utils.isInteger(tonumber(msg.Tags["Extend-Length"])),
 			"Invalid extension length. Must be integer greater than 0"
 		)
 	end
-
-	local vaultId = msg.Tags["Vault-Id"]
-	local extendLength = tonumber(msg.Tags["Extend-Length"])
+	local from = utils.formatAddress(msg.From)
+	local vaultId = utils.formatAddress(msg.Tags["Vault-Id"])
+	local timestamp = tonumber(msg.Timestamp)
+	local extendLengthMs = tonumber(msg.Tags["Extend-Length"])
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
@@ -445,17 +561,17 @@ addEventingHandler(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionM
 			Tags = { Action = "Invalid-Extend-Vault-Notice", Error = "Invalid-Extend-Vault" },
 			Data = tostring(error),
 		})
-	end, vaults.extendVault, msg.From, extendLength, msg.Timestamp, vaultId)
+	end, vaults.extendVault, from, extendLengthMs, timestamp, vaultId)
 	if not shouldContinue2 then
 		return
 	end
 
 	if vault ~= nil then
 		msg.ioEvent:addField("Vault-Id", vaultId)
-		msg.ioEvent:addField("VaultBalance", vault.balance)
-		msg.ioEvent:addField("VaultStartTimestamp", vault.startTimestamp)
-		msg.ioEvent:addField("VaultEndTimestamp", vault.endTimestamp)
-		msg.ioEvent:addField("VaultPrevEndTimestamp", vault.endTimestamp - extendLength)
+		msg.ioEvent:addField("Vault-Balance", vault.balance)
+		msg.ioEvent:addField("Vault-Start-Timestamp", vault.startTimestamp)
+		msg.ioEvent:addField("Vault-End-Timestamp", vault.endTimestamp)
+		msg.ioEvent:addField("Vault-Prev-End-Timestamp", vault.endTimestamp - extendLengthMs)
 	end
 
 	ao.send({
@@ -507,6 +623,10 @@ addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", Actio
 		msg.ioEvent:addField("VaultEndTimestamp", vault.endTimestamp)
 	end
 
+	lastKnownLockedSupply = lastKnownLockedSupply + quantity
+	lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
+	addSupplyData(msg.ioEvent)
+
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = "Vault-Increased-Notice" },
@@ -542,26 +662,23 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 
 	msg.ioEvent:addField("nameLength", #msg.Tags.Name)
 
-	local shouldContinue2, result = eventingPcall(
-		msg.ioEvent,
-		function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Invalid-Buy-Record-Notice",
-					Error = "Invalid-Buy-Record",
-				},
-				Data = tostring(error),
-			})
-		end,
-		arns.buyRecord,
-		string.lower(msg.Tags.Name),
-		msg.Tags["Purchase-Type"],
-		tonumber(msg.Tags.Years),
-		msg.From,
-		msg.Timestamp,
-		msg.Tags["Process-Id"]
-	)
+	local name = string.lower(msg.Tags.Name)
+	local purchaseType = string.lower(msg.Tags["Purchase-Type"])
+	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
+	local from = utils.formatAddress(msg.From)
+	local processId = msg.Tags["Process-Id"]
+	local timestamp = tonumber(msg.Timestamp)
+
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Invalid-Buy-Record-Notice",
+				Error = "Invalid-Buy-Record",
+			},
+			Data = tostring(error),
+		})
+	end, arns.buyRecord, name, purchaseType, years, from, timestamp, processId)
 	if not shouldContinue2 then
 		return
 	end
@@ -570,6 +687,8 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	if result ~= nil then
 		record = result.record
 		addRecordResultFields(msg.ioEvent, result)
+		lastKnownCirculatingSupply = lastKnownCirculatingSupply - record.purchasePrice
+		addSupplyData(msg.ioEvent)
 	end
 
 	msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
@@ -577,7 +696,14 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = "Buy-Record-Notice", Name = msg.Tags.Name },
-		Data = json.encode(record),
+		Data = json.encode({
+			name = name,
+			startTimestamp = record.startTimestamp,
+			endTimestamp = record.endTimestamp,
+			undernameLimit = record.undernameLimit,
+			purchasePrice = record.purchasePrice,
+			processId = record.processId,
+		}),
 	})
 end)
 
@@ -617,6 +743,8 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 		recordResult = result.record
 		addRecordResultFields(msg.ioEvent, result)
 		msg.ioEvent:addField("totalExtensionFee", recordResult.totalExtensionFee)
+		lastKnownCirculatingSupply = lastKnownCirculatingSupply - recordResult.totalExtensionFee
+		addSupplyData(msg.ioEvent)
 	end
 
 	ao.send({
@@ -676,6 +804,8 @@ addEventingHandler(
 			addRecordResultFields(msg.ioEvent, result)
 			msg.ioEvent:addField("previousUndernameLimit", recordResult.undernameLimit - tonumber(msg.Tags.Quantity))
 			msg.ioEvent:addField("additionalUndernameCost", recordResult.additionalUndernameCost)
+			lastKnownCirculatingSupply = lastKnownCirculatingSupply - recordResult.additionalUndernameCost
+			addSupplyData(msg.ioEvent)
 		end
 
 		ao.send({
@@ -798,7 +928,7 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 	local timestamp = tonumber(msg.Timestamp)
 
 	msg.ioEvent:addField("Resolved-Observer-Address", formattedObserverAddress)
-	msg.ioEvent:addField("Sender-Previous-Balance", fromBalance)
+	msg.ioEvent:addField("Sender-Previous-Balance", Balances[fromAddress] or 0)
 
 	local shouldContinue, gateway = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
@@ -811,13 +941,17 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 		return
 	end
 
-	msg.ioEvent:addField("Sender-New-Balance", fromBalance)
+	msg.ioEvent:addField("Sender-New-Balance", Balances[fromAddress] or 0)
 	if gateway ~= nil then
 		msg.ioEvent:addField("GW-Start-Timestamp", gateway.startTimestamp)
 	end
 	local gwStats = gatewayStats()
 	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
 	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
+
+	lastKnownCirculatingSupply = lastKnownCirculatingSupply - stake
+	lastKnownStakedSupply = lastKnownStakedSupply + stake
+	addSupplyData(msg.ioEvent)
 
 	ao.send({
 		Target = fromAddress,
@@ -827,6 +961,13 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 end)
 
 addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", ActionMap.LeaveNetwork), function(msg)
+	local gatewayBeforeLeaving = gar.getGateway(from)
+	local gwPrevTotalDelegatedStake = 0
+	local gwPrevStake = 0
+	if gatewayBeforeLeaving ~= nil then
+		gwPrevTotalDelegatedStake = gatewayBeforeLeaving.totalDelegatedStake
+		gwPrevStake = gatewayBeforeLeaving.operatorStake
+	end
 	local shouldContinue, gateway = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
@@ -871,6 +1012,10 @@ addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", Action
 	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
 	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
 
+	lastKnownStakedSupply = lastKnownStakedSupply - gwPrevStake - gwPrevTotalDelegatedStake
+	lastKnownWithdrawSupply = lastKnownWithdrawSupply + gwPrevStake + gwPrevTotalDelegatedStake
+	addSupplyData(msg.ioEvent)
+
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = "Leave-Network-Notice" },
@@ -900,7 +1045,7 @@ addEventingHandler(
 			return
 		end
 
-		msg.ioEvent:addField("Sender-Previous-Balance", balances[msg.From])
+		msg.ioEvent:addField("Sender-Previous-Balance", Balances[msg.From])
 		local quantity = tonumber(msg.Tags.Quantity)
 
 		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
@@ -914,11 +1059,15 @@ addEventingHandler(
 			return
 		end
 
-		msg.ioEvent:addField("Sender-New-Balance", balances[msg.From])
+		msg.ioEvent:addField("Sender-New-Balance", Balances[msg.From])
 		if gateway ~= nil then
 			msg.ioEvent:addField("New-Operator-Stake", gateway.operatorStake)
 			msg.ioEvent:addField("Previous-Operator-Stake", gateway.operatorStake - quantity)
 		end
+
+		lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
+		lastKnownStakedSupply = lastKnownStakedSupply + quantity
+		addSupplyData(msg.ioEvent)
 
 		ao.send({
 			Target = msg.From,
@@ -955,7 +1104,7 @@ addEventingHandler(
 
 		local quantity = tonumber(msg.Tags.Quantity)
 		local instantWithdraw = msg.Tags.Instant == true
-		msg.ioEvent:addField("Sender-Previous-Balance", balances[msg.From])
+		msg.ioEvent:addField("Sender-Previous-Balance", Balances[msg.From])
 
 		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
@@ -968,7 +1117,7 @@ addEventingHandler(
 			return
 		end
 
-		msg.ioEvent:addField("Sender-New-Balance", balances[msg.From]) -- should be unchanged
+		msg.ioEvent:addField("Sender-New-Balance", Balances[msg.From]) -- should be unchanged
 		if gateway ~= nil then
 			local previousStake = gateway.operatorStake + quantity
 			msg.ioEvent:addField("New-Operator-Stake", gateway.operatorStake)
@@ -987,6 +1136,10 @@ addEventingHandler(
 				)
 			end
 		end
+
+		lastKnownStakedSupply = lastKnownStakedSupply - quantity
+		lastKnownWithdrawSupply = lastKnownWithdrawSupply + quantity
+		addSupplyData(msg.ioEvent)
 
 		ao.send({
 			Target = msg.From,
@@ -1096,6 +1249,10 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 		delegateResult = gateway.delegates[from]
 	end
 
+	lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
+	lastKnownStakedSupply = lastKnownStakedSupply + quantity
+	addSupplyData(msg.ioEvent)
+
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = "Delegate-Stake-Notice", Gateway = msg.Tags.Target },
@@ -1147,9 +1304,14 @@ addEventingHandler(
 			if result.delegate ~= nil then
 				delegateResult = result.delegate
 				local newStake = delegateResult.delegatedStake
-				msg.ioEvent:addField("PreviousStake", newStake - delegateResult.vaults[vaultId].balance)
+				local vaultBalance = delegateResult.vaults[vaultId].balance
+				msg.ioEvent:addField("PreviousStake", newStake - vaultBalance)
 				msg.ioEvent:addField("NewStake", newStake)
 				msg.ioEvent:addField("GatewayTotalDelegatedStake", result.totalDelegatedStake)
+
+				lastKnownStakedSupply = lastKnownStakedSupply + vaultBalance
+				lastKnownWithdrawSupply = lastKnownWithdrawSupply - vaultBalance
+				addSupplyData(msg.ioEvent)
 			end
 		end
 
@@ -1238,7 +1400,10 @@ addEventingHandler(
 				"Invalid quantity. Must be integer greater than 0"
 			)
 			if msg.Tags.Instant ~= nil then
-				assert(type(msg.Tags.Instant) == "boolean", "Instant must be a boolean value")
+				assert(
+					msg.Tags.Instant == "true" or msg.Tags.Instant == "false",
+					"Instant must be a string with value 'true' or 'false'"
+				)
 			end
 		end
 
@@ -1256,8 +1421,11 @@ addEventingHandler(
 		local from = utils.formatAddress(msg.From)
 		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 		local quantity = tonumber(msg.Tags.Quantity)
-		local instantWithdraw = msg.Tags.Instant == true
+		local instantWithdraw = msg.Tags.Instant and msg.Tags.Instant == "true" or false
+		local timestamp = tonumber(msg.Timestamp)
+		local messageId = msg.Id
 		msg.ioEvent:addField("TargetFormatted", target)
+		msg.ioEvent:addField("Quantity", quantity)
 
 		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
@@ -1265,7 +1433,7 @@ addEventingHandler(
 				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Invalid-Decrease-Delegate-Stake" },
 				Data = tostring(error),
 			})
-		end, gar.decreaseDelegateStake, target, from, quantity, msg.Timestamp, msg.Id, instantWithdraw)
+		end, gar.decreaseDelegateStake, target, from, quantity, timestamp, messageId, instantWithdraw)
 		if not shouldContinue2 then
 			return
 		end
@@ -1273,29 +1441,31 @@ addEventingHandler(
 		local delegateResult = {}
 		if gateway ~= nil then
 			local newStake = gateway.delegates[from].delegatedStake
-			msg.ioEvent:addField("PreviousStake", newStake + quantity)
-			msg.ioEvent:addField("NewStake", newStake)
-			msg.ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
-			if msg.Tags.Instant == true then
-				msg.ioEvent:addField("InstantWithdrawal", true)
-			end
+			msg.ioEvent:addField("Previous-Stake", newStake + quantity)
+			msg.ioEvent:addField("New-Stake", newStake)
+			msg.ioEvent:addField("Gateway-Total-Delegated-Stake", gateway.totalDelegatedStake)
+			msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
 			delegateResult = gateway.delegates[from]
 			local newDelegateVaults = delegateResult.vaults
 			if newDelegateVaults ~= nil then
-				msg.ioEvent:addField("VaultsCount", utils.lengthOfTable(newDelegateVaults))
+				msg.ioEvent:addField("Vaults-Count", utils.lengthOfTable(newDelegateVaults))
 				local newDelegateVault = newDelegateVaults[msg.Id]
 				if newDelegateVault ~= nil then
 					msg.ioEvent:addField("Vault-Id", msg.Id)
-					msg.ioEvent:addField("VaultBalance", newDelegateVault.balance)
-					msg.ioEvent:addField("VaultStartTimestamp", newDelegateVault.startTimestamp)
-					msg.ioEvent:addField("VaultEndTimestamp", newDelegateVault.endTimestamp)
+					msg.ioEvent:addField("Vault-Balance", newDelegateVault.balance)
+					msg.ioEvent:addField("Vaul-Start-Timestamp", newDelegateVault.startTimestamp)
+					msg.ioEvent:addField("Vault-End-Timestamp", newDelegateVault.endTimestamp)
 				end
 			end
 		end
 
+		lastKnownStakedSupply = lastKnownStakedSupply - quantity
+		lastKnownWithdrawSupply = lastKnownWithdrawSupply + quantity
+		addSupplyData(msg.ioEvent)
+
 		ao.send({
 			Target = from,
-			Tags = { Action = "Decrease-Delegate-Stake-Notice", Adddress = target, Quantity = msg.Tags.Quantity },
+			Tags = { Action = "Decrease-Delegate-Stake-Notice", Address = target, Quantity = quantity },
 			Data = json.encode(delegateResult),
 		})
 	end
@@ -1457,40 +1627,82 @@ addEventingHandler(
 addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Token-Supply"), function(msg)
 	-- add all the balances
 	local totalSupply = 0
-	local balances = balances.getBalances()
-	for _, balance in pairs(balances) do
-		totalSupply = totalSupply + balance
+	local circulatingSupply = 0
+	local lockedSupply = 0
+	local stakedSupply = 0
+	local delegatedSupply = 0
+	local withdrawSupply = 0
+	local protocolBalance = balances.getBalance(Protocol)
+	local userBalances = balances.getBalances()
+
+	-- tally circulating supply
+	for _, balance in pairs(userBalances) do
+		circulatingSupply = circulatingSupply + balance
 	end
-	-- gateways and delegates
+	circulatingSupply = circulatingSupply - protocolBalance
+	totalSupply = protocolBalance + circulatingSupply
+
+	-- tally supply stashed in gateways and delegates
 	local gateways = gar.getGateways()
 	for _, gateway in pairs(gateways) do
 		totalSupply = totalSupply + gateway.operatorStake + gateway.totalDelegatedStake
+		stakedSupply = stakedSupply + gateway.operatorStake
+		delegatedSupply = delegatedSupply + gateway.totalDelegatedStake
 		for _, delegate in pairs(gateway.delegates) do
-			-- check vaults
+			-- tally delegates' vaults
 			for _, vault in pairs(delegate.vaults) do
 				totalSupply = totalSupply + vault.balance
+				withdrawSupply = withdrawSupply + vault.balance
 			end
 		end
-		-- iterate through vaults
+		-- tally gateway's own vaults
 		for _, vault in pairs(gateway.vaults) do
 			totalSupply = totalSupply + vault.balance
+			withdrawSupply = withdrawSupply + vault.balance
 		end
 	end
 
-	-- vaults
-	local vaults = vaults.getVaults()
-	for _, vaultsForAddress in pairs(vaults) do
+	-- user vaults
+	local userVaults = vaults.getVaults()
+	for _, vaultsForAddress in pairs(userVaults) do
 		-- they may have several vaults iterate through them
 		for _, vault in pairs(vaultsForAddress) do
 			totalSupply = totalSupply + vault.balance
+			lockedSupply = lockedSupply + vault.balance
 		end
 	end
+
+	lastKnownCirculatingSupply = circulatingSupply
+	lastKnownLockedSupply = lockedSupply
+	lastKnownStakedSupply = stakedSupply
+	lastKnownDelegatedSupply = delegatedSupply
+	lastKnownWithdrawSupply = withdrawSupply
+
+	addSupplyData(msg.ioEvent, {
+		totalTokenSupply = totalSupply,
+	})
+	msg.ioEvent:addField("Last-Known-Total-Token-Supply", lastKnownTotalTokenSupply())
 
 	ao.send({
 		Target = msg.From,
 		Action = "Total-Token-Supply-Notice",
-		["Total-Token-Supply"] = totalSupply,
-		Data = json.encode(totalSupply),
+		["Total-Token-Supply"] = tostring(totalSupply),
+		["Circulating-Supply"] = tostring(circulatingSupply),
+		["Locked-Supply"] = tostring(lockedSupply),
+		["Staked-Supply"] = tostring(stakedSupply),
+		["Delegated-Supply"] = tostring(delegatedSupply),
+		["Withdraw-Supply"] = tostring(withdrawSupply),
+		["Protocol-Balance"] = tostring(protocolBalance),
+		Data = json.encode({
+			-- TODO: we are losing precision on these values unexpectedly. This has been brought to the AO team - for now the tags should be correct as they are stringified
+			total = totalSupply,
+			circulating = circulatingSupply,
+			locked = lockedSupply,
+			staked = stakedSupply,
+			delegated = delegatedSupply,
+			withdrawn = withdrawSupply,
+			protocolBalance = protocolBalance,
+		}),
 	})
 end)
 
@@ -1606,11 +1818,13 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	if utils.lengthOfTable(tickedRewardDistributions) > 0 then
 		msg.ioEvent:addField("Ticked-Reward-Distributions", tickedRewardDistributions)
 		msg.ioEvent:addField("Total-Ticked-Rewards-Distributed", totalTickedRewardsDistributed)
+		lastKnownCirculatingSupply = lastKnownCirculatingSupply + totalTickedRewardsDistributed
 	end
 
 	local gwStats = gatewayStats()
 	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
 	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
+	addSupplyData(msg.ioEvent)
 end)
 
 -- READ HANDLERS
@@ -1693,8 +1907,6 @@ end)
 
 addEventingHandler(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMap.Balance), function(msg)
 	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From)
-
-	-- TODO: arconnect et. all expect to accept Target
 	local balance = balances.getBalance(target)
 	-- must adhere to token.lua spec for arconnect compatibility
 	ao.send({
@@ -2008,5 +2220,291 @@ addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginate
 end)
 
 -- END READ HANDLERS
+
+-- AUCTION HANDLER
+addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.ReleaseName), function(msg)
+	-- validate the name and process id exist, then create the auction using the auction function
+	local name = msg.Tags.Name
+	local processId = msg.From
+	local record = arns.getRecord(name)
+	local initiator = msg.Tags.Initiator
+
+	-- TODO: validate processId and initiator are valid addresses
+	if not record then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Record-Not-Found",
+		})
+		return
+	end
+
+	if record.processId ~= processId then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Process-Id-Mismatch",
+		})
+		return
+	end
+
+	if record.type ~= "permabuy" then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Invalid-Record-Type",
+			-- only permabought names can be released by the process that owns the name
+		})
+		return
+	end
+
+	-- we should be able to create the auction here
+	local status, auctionOrError = pcall(arns.createAuction, name, tonumber(msg.Timestamp), initiator)
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Auction-Creation-Error",
+			Data = tostring(auctionOrError),
+		})
+		return
+	end
+
+	if not auctionOrError or not auctionOrError.name then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Auction-Creation-Error",
+			Data = tostring(auctionOrError),
+		})
+		return
+	end
+
+	local auction = {
+		name = auctionOrError.name,
+		startTimestamp = auctionOrError.startTimestamp,
+		endTimestamp = auctionOrError.endTimestamp,
+		initiator = auctionOrError.initiator,
+		baseFee = auctionOrError.baseFee,
+		demandFactor = auctionOrError.demandFactor,
+		settings = auctionOrError.settings,
+	}
+	ao.send({
+		Action = "Auction-Notice",
+		Name = name,
+		Data = json.encode(auction),
+	})
+	return
+end)
+
+-- AUCTIONS
+addEventingHandler("auctions", utils.hasMatchingTag("Action", ActionMap.Auctions), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local auctions = arns.getAuctions()
+	local auctionsWithoutFunctions = {}
+	for k, v in pairs(auctions) do
+		table.insert(auctionsWithoutFunctions, {
+			name = v.name,
+			startTimestamp = v.startTimestamp,
+			endTimestamp = v.endTimestamp,
+			initiator = v.initiator,
+			baseFee = v.baseFee,
+			demandFactor = v.demandFactor,
+			settings = v.settings,
+		})
+	end
+	-- paginate the auctions by name, showing auctions nearest to the endTimestamp first
+	local paginatedAuctions = utils.paginateTableWithCursor(
+		auctionsWithoutFunctions,
+		page.cursor,
+		"name",
+		page.limit,
+		page.sortBy or "endTimestamp",
+		page.sortOrder or "asc"
+	)
+	ao.send({
+		Target = msg.From,
+		Action = ActionMap.Auctions .. "-Notice",
+		Data = json.encode(paginatedAuctions),
+	})
+end)
+
+-- hadnler to get auction for a name
+addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.AuctionInfo), function(msg)
+	local name = string.lower(msg.Tags.Name)
+	local auction = arns.getAuction(name)
+	if not auction then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionInfo .. "-Notice",
+			Error = "Auction-Not-Found",
+		})
+		return
+	end
+
+	ao.send({
+		Target = msg.From,
+		Action = ActionMap.AuctionInfo .. "-Notice",
+		Data = json.encode({
+			name = auction.name,
+			startTimestamp = auction.startTimestamp,
+			endTimestamp = auction.endTimestamp,
+			initiator = auction.initiator,
+			baseFee = auction.baseFee,
+			demandFactor = auction.demandFactor,
+			settings = auction.settings,
+		}),
+	})
+end)
+
+-- Handler to get auction prices for a name
+addEventingHandler("auctionPrices", utils.hasMatchingTag("Action", ActionMap.AuctionPrices), function(msg)
+	local name = string.lower(msg.Tags.Name)
+	local auction = arns.getAuction(name)
+	local timestamp = tonumber(msg.Tags.Timestamp or msg.Timestamp)
+	local type = msg.Tags["Purchase-Type"] or "permabuy"
+	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
+	local intervalMs = msg.Tags["Price-Interval-Ms"] and tonumber(msg.Tags["Price-Interval-Ms"]) or 15 * 60 * 1000 -- 15 minute intervals by default
+
+	if not auction then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionPrices .. "-Notice",
+			Error = "Auction-Not-Found",
+		})
+		return
+	end
+
+	if not type then
+		type = "permabuy"
+	end
+
+	if type == "lease" then
+		years = years or 1
+	else
+		years = 20
+	end
+
+	local currentPrice = auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
+	local prices = auction:computePricesForAuction(type, years, intervalMs)
+	local jsonPrices = {}
+	for k, v in pairs(prices) do
+		jsonPrices[tostring(k)] = v
+	end
+
+	ao.send({
+		Target = msg.From,
+		Action = ActionMap.AuctionPrices .. "-Notice",
+		Data = json.encode({
+			name = auction.name,
+			type = type,
+			years = years,
+			prices = jsonPrices,
+			currentPrice = currentPrice,
+		}),
+	})
+end)
+
+addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.AuctionBid), function(msg)
+	local name = string.lower(msg.Tags.Name)
+	local bidAmount = msg.Tags.Quantity and tonumber(msg.Tags.Quantity) or nil -- if nil, we use the current bid price
+	local bidder = utils.formatAddress(msg.From)
+	local processId = utils.formatAddress(msg.Tags["Process-Id"])
+	local timestamp = tonumber(msg.Timestamp)
+	local type = msg.Tags["Purchase-Type"] or "permabuy"
+	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
+
+	-- assert name, bidder, processId are provided
+	local checkAssertions = function()
+		assert(name and #name > 0, "Name is required")
+		assert(bidder and utils.isValidAOAddress(bidder), "Bidder is required")
+		assert(processId and utils.isValidAOAddress(processId), "Process-Id is required")
+		assert(timestamp and timestamp > 0, "Timestamp is required")
+		-- if bidAmount is not nil assert that it is a number
+		if bidAmount then
+			assert(
+				type(bidAmount) == "number" and bidAmount > 0 and utils.isInteger(bidAmount),
+				"Bid amount must be a positive integer"
+			)
+		end
+		if type then
+			assert(type == "permabuy" or type == "lease", "Invalid auction type. Must be either 'permabuy' or 'lease'")
+		end
+		if type == "lease" then
+			if years then
+				assert(
+					years and utils.isInteger(years) and years > 0 and years <= constants.maxLeaseLengthYears,
+					"Years must be an integer between 1 and 5"
+				)
+			else
+				years = years or 1
+			end
+		end
+	end
+
+	local validateStatus, errorMessage = pcall(checkAssertions)
+	if not validateStatus then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice",
+			Error = "Bad-Input",
+			Data = tostring(errorMessage),
+		})
+		return
+	end
+
+	local auction = arns.getAuction(name)
+	if not auction then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice",
+			Error = "Auction-Not-Found",
+		})
+		return
+	end
+
+	local status, auctionBidOrError =
+		pcall(arns.submitAuctionBid, name, bidAmount, bidder, timestamp, processId, type, years)
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice",
+			Error = "Auction-Bid-Error",
+			Data = tostring(auctionBidOrError),
+		})
+		return
+	end
+
+	local record = auctionBidOrError.record
+
+	-- send buy record notice and auction close notice
+	ao.send({
+		Target = bidder,
+		Action = ActionMap.BuyRecord .. "-Notice",
+		Data = json.encode({
+			name = name,
+			startTimestamp = record.startTimestamp,
+			endTimestamp = record.endTimestamp,
+			undernameLimit = record.undernameLimit,
+			purchasePrice = record.purchasePrice,
+			processId = record.processId,
+			type = record.type,
+		}),
+	})
+
+	ao.send({
+		Target = auction.initiator,
+		Action = "Debit-Notice",
+		Quantity = tostring(auctionBidOrError.rewardForInitiator),
+		Data = json.encode({
+			name = name,
+			bidder = auctionBidOrError.bidder,
+			bidAmount = auctionBidOrError.bidAmount,
+			rewardForInitiator = auctionBidOrError.rewardForInitiator,
+			rewardForProtocol = auctionBidOrError.rewardForProtocol,
+			record = record,
+		}),
+	})
+end)
 
 return process

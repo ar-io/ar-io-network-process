@@ -1,5 +1,6 @@
 -- gar.lua
 local balances = require("balances")
+local constants = require("constants")
 local utils = require("utils")
 local gar = {}
 
@@ -77,7 +78,7 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 	local gateway = gar.getGateway(from)
 
 	if not gateway then
-		error("Gateway does not exist in the network")
+		error("Gateway not found")
 	end
 
 	if not gar.isGatewayEligibleToLeave(gateway, currentTimestamp) then
@@ -124,6 +125,7 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 		}
 
 		-- Reduce gateway stake and set this delegate stake to 0
+		-- TODO: It's an invariant if totalDelegatedStake isn't 0 at the end of this loop
 		gateway.totalDelegatedStake = gateway.totalDelegatedStake - delegate.delegatedStake
 		gateway.delegates[address].delegatedStake = 0
 	end
@@ -141,8 +143,8 @@ function gar.increaseOperatorStake(from, qty)
 
 	local gateway = gar.getGateway(from)
 
-	if gateway == nil then
-		error("Gateway does not exist")
+	if not gateway then
+		error("Gateway not found")
 	end
 
 	if gateway.status == "leaving" then
@@ -166,8 +168,8 @@ function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWi
 
 	local gateway = gar.getGateway(from)
 
-	if gateway == nil then
-		error("Gateway does not exist")
+	if not gateway then
+		error("Gateway not found")
 	end
 
 	if gateway.status == "leaving" then
@@ -213,7 +215,7 @@ function gar.updateGatewaySettings(from, updatedSettings, updatedServices, obser
 	local gateway = gar.getGateway(from)
 
 	if not gateway then
-		error("Gateway does not exist")
+		error("Gateway not found")
 	end
 
 	if gateway.status == "leaving" then
@@ -297,8 +299,8 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 	assert(type(from) == "string", "From is required and must be a string")
 
 	local gateway = gar.getGateway(target)
-	if gateway == nil then
-		error("Gateway does not exist")
+	if not gateway then
+		error("Gateway not found")
 	end
 
 	-- don't allow delegating to yourself
@@ -366,7 +368,7 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 	local gateway = gar.getGateway(gatewayAddress)
 
 	if not gateway then
-		error("Gateway does not exist")
+		error("Gateway not found")
 	end
 	if gateway.status == "leaving" then
 		error("Gateway is leaving the network and withdraw more stake.")
@@ -380,22 +382,24 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 	local requiredMinimumStake = gateway.settings.minDelegatedStake
 	local maxAllowedToWithdraw = existingStake - requiredMinimumStake
 	if maxAllowedToWithdraw < qty and qty ~= existingStake then
-		error("Remaining delegated stake must be greater than the minimum delegated stake amount.")
+		error(
+			"Remaining delegated stake must be greater than the minimum delegated stake. Adjust the amount or withdraw all stake."
+		)
 	end
 
 	-- Instant withdrawal logic with penalty
-	if instantWithdraw then
+
+	if instantWithdraw == true then
 		-- Unlock the tokens from the gateway and delegate
 		gateway.delegates[delegator].delegatedStake = gateway.delegates[delegator].delegatedStake - qty
 		gateway.totalDelegatedStake = gateway.totalDelegatedStake - qty
 
-		-- Calculate the penalty amount
-		local maxPenalty = 0.80
-		local penaltyAmount = qty * maxPenalty
-		local amountToWithdraw = qty - penaltyAmount
+		-- Calculate the amount to withdraw
+		local expeditedWithdrawalFee = qty * constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+		local amountToWithdraw = qty - expeditedWithdrawalFee
 
 		-- Add penalty to AR.IO protocol balance
-		balances.increaseBalance(ao.id, penaltyAmount)
+		balances.increaseBalance(ao.id, expeditedWithdrawalFee)
 
 		-- Withdraw the remaining tokens to the delegate
 		balances.increaseBalance(delegator, amountToWithdraw)
@@ -427,8 +431,8 @@ function gar.isGatewayLeaving(gateway)
 end
 
 function gar.isGatewayEligibleToLeave(gateway, timestamp)
-	if gateway == nil then
-		error("Gateway does not exist")
+	if not gateway then
+		error("Gateway not found")
 	end
 	local isJoined = gar.isGatewayJoined(gateway, timestamp)
 	return isJoined
@@ -611,7 +615,7 @@ end
 function gar.updateGatewayStats(address, stats)
 	local gateway = gar.getGateway(address)
 	if gateway == nil then
-		error("Gateway does not exist")
+		error("Gateway not found")
 	end
 
 	assert(stats.prescribedEpochCount, "prescribedEpochCount is required")
@@ -630,7 +634,7 @@ function gar.updateGatewayWeights(weightedGateway)
 	local address = weightedGateway.gatewayAddress
 	local gateway = gar.getGateway(address)
 	if gateway == nil then
-		error("Gateway does not exist")
+		error("Gateway not found")
 	end
 
 	assert(weightedGateway.stakeWeight, "stakeWeight is required")
@@ -666,6 +670,9 @@ function gar.pruneGateways(currentTimestamp, msgId)
 	local result = {
 		prunedGateways = {},
 		slashedGateways = {},
+		gatewayStakeReturned = 0,
+		delegateStakeReturned = 0,
+		stakeSlashed = 0,
 	}
 
 	if next(gateways) == nil then
@@ -679,6 +686,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 			for vaultId, vault in pairs(gateway.vaults) do
 				if vault.endTimestamp <= currentTimestamp then
 					balances.increaseBalance(address, vault.balance)
+					result.gatewayStakeReturned = result.gatewayStakeReturned + vault.balance
 					gateway.vaults[vaultId] = nil
 				end
 			end
@@ -687,6 +695,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				for vaultId, vault in pairs(delegate.vaults) do
 					if vault.endTimestamp <= currentTimestamp then
 						balances.increaseBalance(delegateAddress, vault.balance)
+						result.delegateStakeReturned = result.delegateStakeReturned + vault.balance
 						delegate.vaults[vaultId] = nil
 					end
 				end
@@ -712,7 +721,8 @@ function gar.pruneGateways(currentTimestamp, msgId)
 					math.floor(slashableOperatorStake * garSettings.operators.failedEpochSlashPercentage)
 				gar.slashOperatorStake(address, slashAmount)
 				gar.leaveNetwork(address, currentTimestamp, msgId)
-				table.insert(result.slashedGateways, address)
+				result.slashedGateways[address] = slashAmount
+				result.stakeSlashed = result.stakeSlashed + slashAmount
 			else
 				if gateway.status == "leaving" and gateway.endTimestamp <= currentTimestamp then
 					-- if the timestamp is after gateway end timestamp, mark the gateway as nil
@@ -731,7 +741,7 @@ function gar.slashOperatorStake(address, slashAmount)
 
 	local gateway = gar.getGateway(address)
 	if gateway == nil then
-		error("Gateway does not exist")
+		error("Gateway not found")
 	end
 	local garSettings = gar.getSettings()
 	if garSettings == nil then
@@ -759,7 +769,7 @@ end
 function gar.cancelDelegateWithdrawal(from, gatewayAddress, vaultId)
 	local gateway = gar.getGateway(gatewayAddress)
 	if gateway == nil then
-		error("Gateway does not exist")
+		error("Gateway not found")
 	end
 
 	if gateway.status == "leaving" then
@@ -768,12 +778,12 @@ function gar.cancelDelegateWithdrawal(from, gatewayAddress, vaultId)
 
 	local delegate = gateway.delegates[from]
 	if delegate == nil then
-		error("Delegate does not exist")
+		error("Delegate not found")
 	end
 
 	local vault = delegate.vaults[vaultId]
 	if vault == nil then
-		error("Vault does not exist")
+		error("Vault not found")
 	end
 
 	-- confirm the gateway still allow staking
@@ -795,17 +805,17 @@ end
 function gar.instantDelegateWithdrawal(from, gatewayAddress, vaultId, currentTimestamp)
 	local gateway = gar.getGateway(gatewayAddress)
 	if gateway == nil then
-		error("Gateway does not exist")
+		error("Gateway not found")
 	end
 
 	local delegate = gateway.delegates[from]
 	if delegate == nil then
-		error("Delegate does not exist")
+		error("Delegate not found")
 	end
 
 	local vault = delegate.vaults[vaultId]
 	if vault == nil then
-		error("Vault does not exist")
+		error("Vault not found")
 	end
 
 	-- Calculate elapsed time since the withdrawal started
@@ -817,20 +827,21 @@ function gar.instantDelegateWithdrawal(from, gatewayAddress, vaultId, currentTim
 		error("Invalid elapsed time")
 	end
 
-	-- Calculate the penalty rate based on elapsed time
-	local maxPenalty = 0.80
-	local minPenalty = 0.05
-	local penaltyRate = maxPenalty - ((maxPenalty - minPenalty) * (elapsedTime / totalWithdrawalTime))
-	penaltyRate = math.max(minPenalty, math.min(maxPenalty, penaltyRate)) -- Ensure penalty is within bounds
+	-- Calculate the withdrawal fee and the amount to withdraw
+	local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+		- (
+			(constants.MAX_EXPEDITED_WITHDRAWAL_FEE - constants.MIN_EXPEDITED_WITHDRAWAL_FEE)
+			* (elapsedTime / totalWithdrawalTime)
+		)
+	penaltyRate =
+		math.max(constants.MIN_EXPEDITED_WITHDRAWAL_FEE, math.min(constants.MAX_EXPEDITED_WITHDRAWAL_FEE, penaltyRate)) -- Ensure penalty is within bounds
 
-	-- Calculate the penalty amount and the amount to withdraw
 	local vaultBalance = vault.balance
+	local expeditedWithdrawalFee = math.floor(vaultBalance * penaltyRate)
+	local amountToWithdraw = vaultBalance - expeditedWithdrawalFee
 
-	local penaltyAmount = math.floor(vaultBalance * penaltyRate)
-	local amountToWithdraw = vaultBalance - penaltyAmount
-
-	-- Add penalty to AR.IO protocol balance
-	balances.increaseBalance(ao.id, penaltyAmount)
+	-- Withdraw the tokens to the delegate and the protocol balance
+	balances.increaseBalance(ao.id, expeditedWithdrawalFee)
 	balances.increaseBalance(from, amountToWithdraw)
 
 	-- Remove the vault after withdrawal
@@ -873,17 +884,18 @@ function gar.instantGatewayWithdrawal(from, vaultId, currentTimestamp)
 		error("Invalid elapsed time")
 	end
 
-	-- Calculate the penalty rate based on elapsed time
-	local maxPenalty = 0.80
-	local minPenalty = 0.05
-	local penaltyRate = maxPenalty - ((maxPenalty - minPenalty) * (elapsedTime / totalWithdrawalTime))
-	penaltyRate = math.max(minPenalty, math.min(maxPenalty, penaltyRate)) -- Ensure penalty is within bounds
+	-- Calculate the withdrawal fee and the amount to withdraw
+	local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+		- (
+			(constants.MAX_EXPEDITED_WITHDRAWAL_FEE - constants.MIN_EXPEDITED_WITHDRAWAL_FEE)
+			* (elapsedTime / totalWithdrawalTime)
+		)
+	penaltyRate =
+		math.max(constants.MIN_EXPEDITED_WITHDRAWAL_FEE, math.min(constants.MAX_EXPEDITED_WITHDRAWAL_FEE, penaltyRate)) -- Ensure penalty is within bounds
 
-	-- Calculate the penalty amount and the amount to withdraw
 	local vaultBalance = vault.balance
-
-	local penaltyAmount = math.floor(vaultBalance * penaltyRate)
-	local amountToWithdraw = vaultBalance - penaltyAmount
+	local expeditedWithdrawalFee = math.floor(vaultBalance * penaltyRate)
+	local amountToWithdraw = vaultBalance - expeditedWithdrawalFee
 
 	-- Add penalty to AR.IO protocol balance
 	balances.increaseBalance(ao.id, penaltyAmount)
