@@ -1525,6 +1525,7 @@ describe("gar", function()
 						stats = {
 							failedConsecutiveEpochs = 30,
 						},
+						totalDelegatedStake = 0,
 						-- Other gateway properties...
 					},
 					["address2"] = {
@@ -1537,6 +1538,7 @@ describe("gar", function()
 						stats = {
 							failedConsecutiveEpochs = 20,
 						},
+						totalDelegatedStake = 0,
 						-- Other gateway properties...
 					},
 					["address3"] = {
@@ -1549,6 +1551,7 @@ describe("gar", function()
 						stats = {
 							failedConsecutiveEpochs = 30,
 						},
+						totalDelegatedStake = 0,
 						-- Other gateway properties...
 					},
 				}
@@ -1566,6 +1569,8 @@ describe("gar", function()
 					stakeSlashed = expectedSlashedStake,
 					delegateStakeReturned = 0,
 					gatewayStakeReturned = 0,
+					delegateStakeWithdrawing = 0,
+					gatewayStakeWithdrawing = 40000010000,
 				}, result)
 
 				local expectedRemainingStake = math.floor(gar.getSettings().operators.minStake * 0.8) + 10000
