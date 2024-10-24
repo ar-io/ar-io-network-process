@@ -163,6 +163,56 @@ local function gatewayStats()
 	}
 end
 
+local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
+	lastKnownCirculatingSupply = lastKnownCirculatingSupply
+		+ (pruneGatewaysResult.delegateStakeReturned or 0)
+		+ (pruneGatewaysResult.gatewayStakeReturned or 0)
+
+	lastKnownWithdrawSupply = lastKnownWithdrawSupply
+		- (pruneGatewaysResult.delegateStakeReturned or 0)
+		- (pruneGatewaysResult.gatewayStakeReturned or 0)
+		+ (pruneGatewaysResult.delegateStakeWithdrawing or 0)
+		+ (pruneGatewaysResult.gatewayStakeWithdrawing or 0)
+
+	lastKnownDelegatedSupply = lastKnownDelegatedSupply - (pruneGatewaysResult.delegateStakeWithdrawing or 0)
+
+	local totalGwStakesSlashed = (pruneGatewaysResult.stakeSlashed or 0)
+	lastKnownStakedSupply = lastKnownStakedSupply
+		- totalGwStakesSlashed
+		- (pruneGatewaysResult.gatewayStakeWithdrawing or 0)
+
+	if totalGwStakesSlashed > 0 then
+		ioEvent:addField("Total-Gateways-Stake-Slashed", totalGwStakesSlashed)
+	end
+
+	local prunedGateways = pruneGatewaysResult.prunedGateways or {}
+	local prunedGatewaysCount = utils.lengthOfTable(prunedGateways)
+	if prunedGatewaysCount > 0 then
+		ioEvent:addField("Pruned-Gateways", prunedGateways)
+		ioEvent:addField("Pruned-Gateways-Count", prunedGatewaysCount)
+		local gwStats = gatewayStats()
+		ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
+		ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
+	end
+
+	local slashedGateways = pruneGatewaysResult.slashedGateways or {}
+	local slashedGatewaysCount = utils.lengthOfTable(slashedGateways or {})
+	if slashedGatewaysCount > 0 then
+		ioEvent:addField("Slashed-Gateway-Amounts", slashedGateways)
+		ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
+		local invariantSlashedGateways = {}
+		for _, gwAddress in pairs(slashedGateways) do
+			local gw = gar.getGateway(gwAddress) or {}
+			if gw.totalDelegatedStake > 0 then
+				invariantSlashedGateways[gwAddress] = gw.totalDelegatedStake
+			end
+		end
+		if utils.lengthOfTable(invariantSlashedGateways) > 0 then
+			ioEvent:addField("Invariant-Slashed-Gateways", invariantSlashedGateways)
+		end
+	end
+end
+
 local function addEventingHandler(handlerName, pattern, handleFn)
 	Handlers.add(handlerName, pattern, function(msg)
 		eventingPcall(msg.ioEvent, function()
@@ -255,55 +305,8 @@ end, function(msg)
 			msg.ioEvent:addField("Pruned-Epochs-Count", prunedEpochsCount)
 		end
 
-		local pruneGatewayResults = resultOrError.pruneGatewayResults or {}
-
-		lastKnownCirculatingSupply = lastKnownCirculatingSupply
-			+ (pruneGatewayResults.delegateStakeReturned or 0)
-			+ (pruneGatewayResults.gatewayStakeReturned or 0)
-
-		lastKnownWithdrawSupply = lastKnownWithdrawSupply
-			- (pruneGatewayResults.delegateStakeReturned or 0)
-			- (pruneGatewayResults.gatewayStakeReturned or 0)
-			+ (pruneGatewayResults.delegateStakeWithdrawing or 0)
-			+ (pruneGatewayResults.gatewayStakeWithdrawing or 0)
-
-		lastKnownDelegatedSupply = lastKnownDelegatedSupply - (pruneGatewayResults.delegateStakeWithdrawing or 0)
-
-		local totalGwStakesSlashed = (pruneGatewayResults.stakeSlashed or 0)
-		lastKnownStakedSupply = lastKnownStakedSupply
-			- totalGwStakesSlashed
-			- (pruneGatewayResults.gatewayStakeWithdrawing or 0)
-
-		if totalGwStakesSlashed > 0 then
-			msg.ioEvent:addField("Total-Gateways-Stake-Slashed", totalGwStakesSlashed)
-		end
-
-		local prunedGateways = pruneGatewayResults.prunedGateways or {}
-		local prunedGatewaysCount = utils.lengthOfTable(prunedGateways)
-		if prunedGatewaysCount > 0 then
-			msg.ioEvent:addField("Pruned-Gateways", prunedGateways)
-			msg.ioEvent:addField("Pruned-Gateways-Count", prunedGatewaysCount)
-			local gwStats = gatewayStats()
-			msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
-			msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
-		end
-
-		local slashedGateways = pruneGatewayResults.slashedGateways or {}
-		local slashedGatewaysCount = utils.lengthOfTable(slashedGateways or {})
-		if slashedGatewaysCount > 0 then
-			msg.ioEvent:addField("Slashed-Gateway-Amounts", slashedGateways)
-			msg.ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
-			local invariantSlashedGateways = {}
-			for _, gwAddress in pairs(slashedGateways) do
-				local gw = gar.getGateway(gwAddress) or {}
-				if gw.totalDelegatedStake > 0 then
-					invariantSlashedGateways[gwAddress] = gw.totalDelegatedStake
-				end
-			end
-			if utils.lengthOfTable(invariantSlashedGateways) > 0 then
-				msg.ioEvent:addField("Invariant-Slashed-Gateways", invariantSlashedGateways)
-			end
-		end
+		local pruneGatewaysResult = resultOrError.pruneGatewaysResult or {}
+		addPruneGatewaysResult(msg.ioEvent, pruneGatewaysResult)
 	end
 
 	if
@@ -1674,13 +1677,14 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 				+ distributedEpoch.distributions.totalDistributedRewards
 		end
 		-- prune any gateway that has hit the failed 30 consecutive epoch threshold after the epoch has been distributed
-		local prunedGateways = gar.pruneGateways(timestamp)
+		local pruneGatewaysResult = gar.pruneGateways(timestamp)
+
 		-- now create the new epoch with the current message hashchain and block height
 		local newEpoch = epochs.createEpoch(timestamp, tonumber(blockHeight), hashchain)
 		return {
 			maybeEpoch = newEpoch,
 			maybeDemandFactor = demandFactor,
-			prunedGateways = prunedGateways,
+			pruneGatewaysResult = pruneGatewaysResult,
 		}
 	end
 
@@ -1705,7 +1709,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	local tickedEpochIndexes = {}
 	local newEpochIndexes = {}
 	local newDemandFactors = {}
-	local newPrunedGateways = {}
+	local newPruneGatewaysResults = {}
 	for i = lastTickedEpochIndex + 1, targetCurrentEpochIndex do
 		print("Ticking epoch: " .. i)
 		local previousState = {
@@ -1738,8 +1742,8 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 			if resultOrError.maybeDemandFactor ~= nil then
 				table.insert(newDemandFactors, resultOrError.maybeDemandFactor)
 			end
-			if resultOrError.prunedGateways ~= nil and utils.lengthOfTable(resultOrError.prunedGateways) > 0 then
-				table.insert(newPrunedGateways, resultOrError.prunedGateways)
+			if resultOrError.pruneGatewaysResult ~= nil then
+				table.insert(newPruneGatewaysResults, resultOrError.pruneGatewaysResult)
 			end
 		else
 			-- reset the state to previous state
@@ -1772,9 +1776,30 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	if #newDemandFactors > 0 then
 		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors, ";")
 	end
-	if #newPrunedGateways > 0 then
-		msg.ioEvent:addField("Pruned-Gateways", newPrunedGateways)
-		msg.ioEvent:addField("Pruned-Gateways-Count", #newPrunedGateways)
+	if #newPruneGatewaysResults > 0 then
+		-- Reduce the prune gatways results and then track changes
+		local aggregatedPruneGatewaysResult = utils.reduce(newPruneGatewaysResults, function(acc, pruneGatewaysResult)
+			for _, address in pairs(pruneGatewaysResult.prunedGateways) do
+				table.insert(acc.prunedGateways, address)
+			end
+			for address, slashAmount in pairs(pruneGatewaysResult.slashedGateways) do
+				acc.slashedGateways[address] = (acc.slashedGateways[address] or 0) + slashAmount
+			end
+			acc.gatewayStakeReturned = acc.gatewayStakeReturned + pruneGatewaysResult.gatewayStakeReturned
+			acc.delegateStakeReturned = acc.delegateStakeReturned + pruneGatewaysResult.delegateStakeReturned
+			acc.gatewayStakeWithdrawing = acc.gatewayStakeWithdrawing + pruneGatewaysResult.gatewayStakeWithdrawing
+			acc.delegateStakeWithdrawing = acc.delegateStakeWithdrawing + pruneGatewaysResult.delegateStakeWithdrawing
+			return acc
+		end, {
+			prunedGateways = {},
+			slashedGateways = {},
+			gatewayStakeReturned = 0,
+			delegateStakeReturned = 0,
+			gatewayStakeWithdrawing = 0,
+			delegateStakeWithdrawing = 0,
+			stakeSlashed = 0,
+		})
+		addPruneGatewaysResults(msg.ioEvent, aggregatedPruneGatewaysResult)
 	end
 	if utils.lengthOfTable(tickedRewardDistributions) > 0 then
 		msg.ioEvent:addField("Ticked-Reward-Distributions", tickedRewardDistributions)
