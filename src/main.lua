@@ -1087,7 +1087,10 @@ addEventingHandler(
 				"Invalid quantity. Must be integer greater than 0"
 			)
 			if msg.Tags.Instant ~= nil then
-				assert(type(msg.Tags.Instant) == "boolean", "Instant must be a boolean value")
+				assert(
+					msg.Tags.Instant == "true" or msg.Tags.Instant == "false",
+					"Instant must be a string with value 'true' or 'false'"
+				)
 			end
 		end
 
@@ -1103,7 +1106,7 @@ addEventingHandler(
 		end
 
 		local quantity = tonumber(msg.Tags.Quantity)
-		local instantWithdraw = msg.Tags.Instant == true
+		local instantWithdraw = msg.Tags.Instant and msg.Tags.Instant == "true" or false
 		msg.ioEvent:addField("Sender-Previous-Balance", Balances[msg.From])
 
 		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
