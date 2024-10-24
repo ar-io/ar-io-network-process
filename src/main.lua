@@ -1655,6 +1655,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	local function tickEpoch(timestamp, blockHeight, hashchain)
 		-- update demand factor if necessary
 		local demandFactor = demand.updateDemandFactor(timestamp)
+		-- distribute rewards for the epoch and increments stats for gateways, this closes the epoch if the timestamp is greater than the epochs required distribution timestamp
 		local distributedEpoch = epochs.distributeRewardsForEpoch(timestamp)
 		if distributedEpoch ~= nil and distributedEpoch.epochIndex ~= nil then
 			tickedRewardDistributions[tostring(distributedEpoch.epochIndex)] =
@@ -1662,11 +1663,14 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 			totalTickedRewardsDistributed = totalTickedRewardsDistributed
 				+ distributedEpoch.distributions.totalDistributedRewards
 		end
-
+		-- prune any gateway that has hit the failed 30 consecutive epoch threshold after the epoch has been distributed
+		local prunedGateways = gar.pruneGateways(timestamp)
+		-- now create the new epoch with the current message hashchain and block height
 		local newEpoch = epochs.createEpoch(timestamp, tonumber(blockHeight), hashchain)
 		return {
 			maybeEpoch = newEpoch,
 			maybeDemandFactor = demandFactor,
+			prunedGateways = prunedGateways,
 		}
 	end
 
@@ -1691,6 +1695,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	local tickedEpochIndexes = {}
 	local newEpochIndexes = {}
 	local newDemandFactors = {}
+	local newPrunedGateways = {}
 	for i = lastTickedEpochIndex + 1, targetCurrentEpochIndex do
 		print("Ticking epoch: " .. i)
 		local previousState = {
@@ -1723,6 +1728,9 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 			if resultOrError.maybeDemandFactor ~= nil then
 				table.insert(newDemandFactors, resultOrError.maybeDemandFactor)
 			end
+			if resultOrError.prunedGateways ~= nil and utils.lengthOfTable(resultOrError.prunedGateways) > 0 then
+				table.insert(newPrunedGateways, resultOrError.prunedGateways)
+			end
 		else
 			-- reset the state to previous state
 			Balances = previousState.Balances
@@ -1753,6 +1761,10 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	end
 	if #newDemandFactors > 0 then
 		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors, ";")
+	end
+	if #newPrunedGateways > 0 then
+		msg.ioEvent:addField("Pruned-Gateways", newPrunedGateways)
+		msg.ioEvent:addField("Pruned-Gateways-Count", #newPrunedGateways)
 	end
 	if utils.lengthOfTable(tickedRewardDistributions) > 0 then
 		msg.ioEvent:addField("Ticked-Reward-Distributions", tickedRewardDistributions)

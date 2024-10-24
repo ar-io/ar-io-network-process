@@ -455,6 +455,34 @@ describe("epochs", function()
 							normalizedCompositeWeight = 0,
 						},
 					},
+					-- not eligible for rewards as it is leaving, so it should not be included in the eligible gateways count
+					["test-this-is-valid-arweave-wallet-address-2"] = {
+						operatorStake = gar.getSettings().operators.minStake,
+						totalDelegatedStake = 0,
+						vaults = {},
+						delegates = {},
+						startTimestamp = 0,
+						stats = {
+							prescribedEpochCount = 0,
+							observedEpochCount = 0,
+							totalEpochCount = 0,
+							passedEpochCount = 0,
+							failedEpochCount = 0,
+							failedConsecutiveEpochs = 0,
+							passedConsecutiveEpochs = 0,
+						},
+						settings = testSettings,
+						status = "leaving",
+						observerAddress = "test-this-is-valid-arweave-wallet-address-1",
+						weights = {
+							stakeWeight = 0,
+							tenureWeight = 0,
+							gatewayRewardRatioWeight = 0,
+							observerRewardRatioWeight = 0,
+							compositeWeight = 0,
+							normalizedCompositeWeight = 0,
+						},
+					},
 				}
 				local settings = epochs.getSettings()
 				local epochIndex = 1
@@ -521,6 +549,15 @@ describe("epochs", function()
 					compositeWeight = 4,
 					normalizedCompositeWeight = 1,
 				}, gar.getGateway("test-this-is-valid-arweave-wallet-address-1").weights)
+				-- confirm the leaving gateway weights were not updated
+				assert.are.same({
+					stakeWeight = 0,
+					tenureWeight = 0,
+					gatewayRewardRatioWeight = 0,
+					observerRewardRatioWeight = 0,
+					compositeWeight = 0,
+					normalizedCompositeWeight = 0,
+				}, gar.getGateway("test-this-is-valid-arweave-wallet-address-2").weights)
 			end
 		)
 	end)

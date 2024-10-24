@@ -1764,21 +1764,25 @@ describe("gar", function()
 			local timestamp = 1704092400100
 			_G.GatewayRegistry = {
 				[stubGatewayAddress] = {
-					startTimestamp = timestamp - 10, -- joined before the timestamp
+					startTimestamp = timestamp - 1, -- joined before the timestamp
 					status = "joined",
 				},
 				[stubRandomAddress] = {
-					startTimestamp = timestamp + 10, -- joined after the timestamp
+					startTimestamp = timestamp, -- joined on the timestamp
 					status = "joined",
 				},
 				["test-this-is-valid-arweave-wallet-address-4"] = {
-					startTimestamp = timestamp - 10, -- joined before the timestamp, but leaving
+					startTimestamp = timestamp + 1,
+					status = "joined",
+				},
+				["test-this-is-valid-arweave-wallet-address-5"] = {
+					startTimestamp = timestamp - 1, -- joined before the timestamp, but leaving
 					endTimestamp = timestamp + 100,
 					status = "leaving",
 				},
 			}
 			local result = gar.getActiveGatewaysBeforeTimestamp(timestamp)
-			assert.are.same({ stubGatewayAddress }, result)
+			assert.are.same({ stubGatewayAddress, stubRandomAddress }, result)
 		end)
 	end)
 
