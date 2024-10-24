@@ -753,12 +753,11 @@ describe("gar", function()
 				observerAddress = stubObserverAddress,
 			})
 		end)
-		it("should instantly withdraw operator stake with penalty", function()
+		it("should instantly withdraw operator stake with expedited withdrawal fee", function()
 			Balances[ao.id] = 0 -- Initialize protocol balance to 0
 			Balances[stubGatewayAddress] = 0
-			local penaltyRate = 0.80
-			local penaltyAmount = 1000 * penaltyRate
-			local withdrawalAmount = 1000 - penaltyAmount
+			local expeditedWithdrawalFee = 1000 * constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+			local withdrawalAmount = 1000 - expeditedWithdrawalFee
 
 			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake + 1000,
@@ -792,7 +791,7 @@ describe("gar", function()
 			assert.is_true(status)
 			assert.are.same(result.operatorStake, gar.getSettings().operators.minStake)
 			assert.are.equal(Balances[stubGatewayAddress], withdrawalAmount) -- The gateway's balance should increase with withdrawal amount
-			assert.are.equal(Balances[ao.id], penaltyAmount) -- Penalty amount should be added to protocol balance
+			assert.are.equal(Balances[ao.id], expeditedWithdrawalFee) -- expedited withdrawal fee amount should be added to protocol balance
 		end)
 
 		-- Unhappy path tests
@@ -822,14 +821,14 @@ describe("gar", function()
 			assert.matches("Resulting stake is not enough maintain the minimum operator stake", result)
 		end)
 
-		it("should fail if gateway does not exist", function()
+		it("should fail if Gateway not found", function()
 			local nonexistentGatewayAddress = "nonexistent_gateway"
 
 			local status, result =
 				pcall(gar.decreaseOperatorStake, nonexistentGatewayAddress, 1000, startTimestamp, stubMessageId, true)
 
 			assert.is_false(status)
-			assert.matches("Gateway does not exist", result)
+			assert.matches("Gateway not found", result)
 		end)
 
 		it("should fail if gateway is in 'leaving' status", function()
@@ -852,18 +851,17 @@ describe("gar", function()
 		end)
 	end)
 
-	describe("instantGatewayWithdrawal", function()
-		-- Happy path test: Successful instant withdrawal with maximum penalty
-		it("should successfully withdraw instantly with maximum penalty", function()
+	describe("instantOperatorWithdrawal", function()
+		-- Happy path test: Successful instant withdrawal with maximum expedited withdrawal fee
+		it("should successfully withdraw instantly with maximum expedited withdrawal fee", function()
 			-- Setup a valid gateway with a vault to withdraw from
 			local from = "gateway_address"
 			local vaultId = "vault_1"
 			local currentTimestamp = 1000000
 			local startTimestamp = 1000000
 			local vaultBalance = 1000
-			local expectedPenaltyRate = 0.80
-			local expectedPenaltyAmount = math.floor(vaultBalance * expectedPenaltyRate)
-			local expectedWithdrawalAmount = vaultBalance - expectedPenaltyAmount
+			local expectedExpeditedWithdrawalFee = math.floor(vaultBalance * constants.MAX_EXPEDITED_WITHDRAWAL_FEE)
+			local expectedWithdrawalAmount = vaultBalance - expectedExpeditedWithdrawalFee
 
 			-- Initialize balances
 			Balances[ao.id] = 0
@@ -880,66 +878,68 @@ describe("gar", function()
 			}
 
 			-- Attempt to withdraw instantly
-			local status, result = pcall(gar.instantGatewayWithdrawal, from, vaultId, currentTimestamp)
+			local status, result = pcall(gar.instantOperatorWithdrawal, from, vaultId, currentTimestamp)
 
 			-- Assertions
 			assert.is_true(status)
 			assert.are.same(result.gateway.vaults[vaultId], nil) -- Vault should be removed after withdrawal
 			assert.are.equal(Balances[from], expectedWithdrawalAmount) -- Withdrawal amount should be added to gateway balance
-			assert.are.equal(Balances[ao.id], expectedPenaltyAmount) -- Penalty should be added to protocol balance
+			assert.are.equal(Balances[ao.id], expectedExpeditedWithdrawalFee) -- expedited withdrawal fee should be added to protocol balance
 		end)
 
-		-- Happy path test: Successful instant withdrawal with reduced penalty
-		it("should successfully withdraw instantly with reduced penalty after partial time elapsed", function()
-			-- Setup a valid gateway with a vault to withdraw from
-			local from = "gateway_address"
-			local vaultId = "vault_1"
-			local startTimestamp = 1000000
-			local currentTimestamp = startTimestamp + (gar.getSettings().operators.withdrawLengthMs / 2) -- Halfway through the withdrawal period
-			local vaultBalance = 1000
-			local maxPenalty = 0.80
-			local minPenalty = 0.05
-			local expectedPenaltyRate = maxPenalty - ((maxPenalty - minPenalty) * 0.5) -- 50% elapsed time
-			local expectedPenaltyAmount = math.floor(vaultBalance * expectedPenaltyRate)
-			local expectedWithdrawalAmount = vaultBalance - expectedPenaltyAmount
+		-- Happy path test: Successful instant withdrawal with reduced expedited withdrawal fee
+		it(
+			"should successfully withdraw instantly with reduced expedited withdrawal fee after partial time elapsed",
+			function()
+				-- Setup a valid gateway with a vault to withdraw from
+				local from = "gateway_address"
+				local vaultId = "vault_1"
+				local startTimestamp = 1000000
+				local currentTimestamp = startTimestamp + (gar.getSettings().operators.withdrawLengthMs / 2) -- Halfway through the withdrawal period
+				local vaultBalance = 1000
+				local expectedExpeditedWithdrawalRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+					- ((constants.MAX_EXPEDITED_WITHDRAWAL_FEE - constants.MIN_EXPEDITED_WITHDRAWAL_FEE) * 0.5) -- 50% elapsed time
+				local expectedExpeditedWithdrawalFee = math.floor(vaultBalance * expectedExpeditedWithdrawalRate)
+				local expectedWithdrawalAmount = vaultBalance - expectedExpeditedWithdrawalFee
 
-			-- Initialize balances
-			Balances[ao.id] = 0
-			Balances[from] = 0
+				-- Initialize balances
+				Balances[ao.id] = 0
+				Balances[from] = 0
 
-			_G.GatewayRegistry[from] = {
-				operatorStake = 2000,
-				vaults = {
-					[vaultId] = {
-						balance = vaultBalance,
-						startTimestamp = startTimestamp,
+				_G.GatewayRegistry[from] = {
+					operatorStake = 2000,
+					vaults = {
+						[vaultId] = {
+							balance = vaultBalance,
+							startTimestamp = startTimestamp,
+						},
 					},
-				},
-			}
+				}
 
-			-- Attempt to withdraw instantly
-			local status, result = pcall(gar.instantGatewayWithdrawal, from, vaultId, currentTimestamp)
+				-- Attempt to withdraw instantly
+				local status, result = pcall(gar.instantOperatorWithdrawal, from, vaultId, currentTimestamp)
 
-			-- Assertions
-			assert.is_true(status)
-			assert.are.same(result.gateway.vaults[vaultId], nil) -- Vault should be removed after withdrawal
-			assert.are.equal(Balances[from], expectedWithdrawalAmount) -- Withdrawal amount should be added to gateway balance
-			assert.are.equal(Balances[ao.id], expectedPenaltyAmount) -- Penalty should be added to protocol balance
-		end)
+				-- Assertions
+				assert.is_true(status)
+				assert.are.same(result.gateway.vaults[vaultId], nil) -- Vault should be removed after withdrawal
+				assert.are.equal(Balances[from], expectedWithdrawalAmount) -- Withdrawal amount should be added to gateway balance
+				assert.are.equal(Balances[ao.id], expectedExpeditedWithdrawalFee) -- expedited withdrawal fee should be added to protocol balance
+			end
+		)
 
 		-- Unhappy path test: Gateway does not exist
-		it("should fail if the gateway does not exist", function()
+		it("should fail if the Gateway not found", function()
 			local nonexistentGateway = "nonexistent_gateway"
 			local vaultId = "vault_1"
 			local currentTimestamp = 1000000
 
-			local status, result = pcall(gar.instantGatewayWithdrawal, nonexistentGateway, vaultId, currentTimestamp)
+			local status, result = pcall(gar.instantOperatorWithdrawal, nonexistentGateway, vaultId, currentTimestamp)
 
 			assert.is_false(status)
-			assert.matches("Gateway does not exist", result)
+			assert.matches("Gateway not found", result)
 		end)
 
-		-- Unhappy path test: Vault does not exist
+		-- Unhappy path test: vault not found
 		it("should fail if the vault does not exist", function()
 			local from = "gateway_address"
 			local nonexistentVaultId = "nonexistent_vault"
@@ -950,10 +950,10 @@ describe("gar", function()
 				vaults = {},
 			}
 
-			local status, result = pcall(gar.instantGatewayWithdrawal, from, nonexistentVaultId, currentTimestamp)
+			local status, result = pcall(gar.instantOperatorWithdrawal, from, nonexistentVaultId, currentTimestamp)
 
 			assert.is_false(status)
-			assert.matches("Vault does not exist", result)
+			assert.matches("Vault not found", result)
 		end)
 
 		-- Unhappy path test: Withdrawal from leaving gateway
@@ -972,7 +972,7 @@ describe("gar", function()
 				},
 			}
 
-			local status, result = pcall(gar.instantGatewayWithdrawal, from, vaultId, currentTimestamp)
+			local status, result = pcall(gar.instantOperatorWithdrawal, from, vaultId, currentTimestamp)
 
 			assert.is_false(status)
 			assert.matches("This gateway is leaving and this vault cannot be instantly withdrawn.", result)
@@ -995,7 +995,7 @@ describe("gar", function()
 				},
 			}
 
-			local status, result = pcall(gar.instantGatewayWithdrawal, from, vaultId, currentTimestamp)
+			local status, result = pcall(gar.instantOperatorWithdrawal, from, vaultId, currentTimestamp)
 
 			assert.is_false(status)
 			assert.matches("Invalid elapsed time", result)
@@ -1175,7 +1175,7 @@ describe("gar", function()
 			assert.matches("Gateway is leaving the network and cannot be updated", err)
 		end)
 
-		it("should not update gateway settings if the gateway is not found", function()
+		it("should not update gateway settings if the Gateway not found", function()
 			local status, err = pcall(
 				gar.updateGatewaySettings,
 				stubGatewayAddress,
@@ -1320,68 +1320,63 @@ describe("gar", function()
 			assert.are.same(expectation, gar.getGateway(stubGatewayAddress))
 		end)
 
-		it("should decrease delegated stake with instant withdrawal and apply penalty and remove delegate", function()
-			Balances[ao.id] = 0
-<<<<<<< HEAD
-			local penaltyAmount = 1000 * 0.80
-			local withdrawalAmount = 1000 - penaltyAmount
-=======
-			local expenditedWithdrawalFee = 1000 * 0.80
-			local withdrawalAmount = 1000 - expenditedWithdrawalFee
->>>>>>> origin/develop
-			GatewayRegistry[stubGatewayAddress] = {
-				operatorStake = gar.getSettings().operators.minStake,
-				totalDelegatedStake = gar.getSettings().delegates.minStake + 1000,
-				vaults = {},
-				startTimestamp = startTimestamp,
-				stats = {
-					prescribedEpochCount = 0,
-					observedEpochCount = 0,
-					totalEpochCount = 0,
-					passedEpochCount = 0,
-					failedEpochCount = 0,
-					failedConsecutiveEpochs = 0,
-					passedConsecutiveEpochs = 0,
-				},
-				settings = testSettings,
-				status = "joined",
-				observerAddress = stubObserverAddress,
-				delegates = {
-					[stubRandomAddress] = {
-						delegatedStake = gar.getSettings().delegates.minStake + 1000,
-						startTimestamp = 0,
-						vaults = {},
+		it(
+			"should decrease delegated stake with instant withdrawal and apply expedited withdrawal fee and remove delegate",
+			function()
+				Balances[ao.id] = 0
+				local expenditedWithdrawalFee = 1000 * 0.80
+				local withdrawalAmount = 1000 - expenditedWithdrawalFee
+				GatewayRegistry[stubGatewayAddress] = {
+					operatorStake = gar.getSettings().operators.minStake,
+					totalDelegatedStake = gar.getSettings().delegates.minStake + 1000,
+					vaults = {},
+					startTimestamp = startTimestamp,
+					stats = {
+						prescribedEpochCount = 0,
+						observedEpochCount = 0,
+						totalEpochCount = 0,
+						passedEpochCount = 0,
+						failedEpochCount = 0,
+						failedConsecutiveEpochs = 0,
+						passedConsecutiveEpochs = 0,
 					},
-				},
-			}
+					settings = testSettings,
+					status = "joined",
+					observerAddress = stubObserverAddress,
+					delegates = {
+						[stubRandomAddress] = {
+							delegatedStake = gar.getSettings().delegates.minStake + 1000,
+							startTimestamp = 0,
+							vaults = {},
+						},
+					},
+				}
 
-			local status, result = pcall(
-				gar.decreaseDelegateStake,
-				stubGatewayAddress,
-				stubRandomAddress,
-				1000,
-				startTimestamp,
-				stubMessageId,
-				true -- instant withdrawal
-			)
+				local status, result = pcall(
+					gar.decreaseDelegateStake,
+					stubGatewayAddress,
+					stubRandomAddress,
+					1000,
+					startTimestamp,
+					stubMessageId,
+					true -- instant withdrawal
+				)
 
-			assert.is_true(status)
-			assert.are.same(result.delegates[stubRandomAddress].delegatedStake, gar.getSettings().delegates.minStake)
-			assert.are.equal(result.totalDelegatedStake, gar.getSettings().delegates.minStake)
-			assert.are.equal(withdrawalAmount, Balances[stubRandomAddress])
-<<<<<<< HEAD
-			assert.are.equal(penaltyAmount, Balances[ao.id])
-=======
-			assert.are.equal(expenditedWithdrawalFee, Balances[ao.id])
->>>>>>> origin/develop
-			assert.are.equal(
-				gar.getSettings().delegates.minStake,
-				_G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake
-			)
-		end)
+				assert.is_true(status)
+				assert.are.same(
+					result.delegates[stubRandomAddress].delegatedStake,
+					gar.getSettings().delegates.minStake
+				)
+				assert.are.equal(result.totalDelegatedStake, gar.getSettings().delegates.minStake)
+				assert.are.equal(withdrawalAmount, Balances[stubRandomAddress])
+				assert.are.equal(expenditedWithdrawalFee, Balances[ao.id])
+				assert.are.equal(
+					gar.getSettings().delegates.minStake,
+					_G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake
+				)
+			end
+		)
 
-<<<<<<< HEAD
-=======
 		it("should error if the remaining delegate stake is less than the minimum stake", function()
 			local delegatedStake = gar.getSettings().delegates.minStake
 			GatewayRegistry[stubGatewayAddress] = {
@@ -1428,24 +1423,16 @@ describe("gar", function()
 	end)
 
 	describe("instantDelegateWithdrawal", function()
->>>>>>> origin/develop
 		it(
-			"should successfully convert a standard delegate withdraw to instant with maximum penalty and remove delegate",
+			"should successfully convert a standard delegate withdraw to instant with maximum expedited withdrawal fee and remove delegate",
 			function()
 				-- Setup a valid gateway with a delegate vault
 				local vaultId = "vault_id_1"
 				local currentTimestamp = 1000000
 				local startTimestamp = 1000000
 				local vaultBalance = 1000
-<<<<<<< HEAD
-				local expectedPenaltyRate = 0.80
-				local expectedPenaltyAmount = vaultBalance * expectedPenaltyRate
-				local expectedWithdrawalAmount = vaultBalance - expectedPenaltyAmount
-=======
-				local expectedPenaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
-				local expectedexpenditedWithdrawalFee = vaultBalance * expectedPenaltyRate
-				local expectedWithdrawalAmount = vaultBalance - expectedexpenditedWithdrawalFee
->>>>>>> origin/develop
+				local expectedExpeditedWithdrawalFee = vaultBalance * constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+				local expectedWithdrawalAmount = vaultBalance - expectedExpeditedWithdrawalFee
 
 				Balances[ao.id] = 0
 
@@ -1492,17 +1479,13 @@ describe("gar", function()
 				assert.are.equal(nil, result.delegate) -- Delegate should be removed after full withdrawal
 				assert.are.equal(0, result.totalDelegatedStake)
 				assert.are.equal(expectedWithdrawalAmount, Balances[stubRandomAddress])
-<<<<<<< HEAD
-				assert.are.equal(expectedPenaltyAmount, Balances[ao.id])
-=======
-				assert.are.equal(expectedexpenditedWithdrawalFee, Balances[ao.id])
->>>>>>> origin/develop
+				assert.are.equal(expectedExpeditedWithdrawalFee, Balances[ao.id])
 				assert.are.equal(0, _G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
 			end
 		)
 
 		it(
-			"should withdraw delegate stake and apply reduced penalty based on elapsed time with remaining vault",
+			"should withdraw delegate stake and apply reduced expedited withdrawal fee based on elapsed time with remaining vault",
 			function()
 				-- Setup a valid gateway with a delegate vault
 				local vaultId = "vault_id_1"
@@ -1511,22 +1494,13 @@ describe("gar", function()
 				local elapsedTime = 15 * 24 * 60 * 60 * 1000 -- Half of 30 days in milliseconds
 				local currentTimestamp = startTimestamp + elapsedTime
 				local vaultBalance = 1000
-<<<<<<< HEAD
-				local maxPenalty = 0.80
-				local minPenalty = 0.05
-				local penaltyRate = maxPenalty
-					- ((maxPenalty - minPenalty) * (elapsedTime / gar.getSettings().delegates.withdrawLengthMs))
-				local expectedPenaltyAmount = math.floor(vaultBalance * penaltyRate)
-				local expectedWithdrawalAmount = vaultBalance - expectedPenaltyAmount
-=======
-				local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+				local expeditedWithdrawalRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
 					- (
 						(constants.MAX_EXPEDITED_WITHDRAWAL_FEE - constants.MIN_EXPEDITED_WITHDRAWAL_FEE)
 						* (elapsedTime / gar.getSettings().delegates.withdrawLengthMs)
 					)
-				local expectedexpenditedWithdrawalFee = math.floor(vaultBalance * penaltyRate)
+				local expectedexpenditedWithdrawalFee = math.floor(vaultBalance * expeditedWithdrawalRate)
 				local expectedWithdrawalAmount = vaultBalance - expectedexpenditedWithdrawalFee
->>>>>>> origin/develop
 				Balances[ao.id] = 0
 
 				_G.GatewayRegistry[stubGatewayAddress] = {
@@ -1572,11 +1546,7 @@ describe("gar", function()
 				assert.are.equal(nil, next(result.delegate.vaults)) -- Delegate should have no vaults remaining
 				assert.are.equal(remainingDelegateStakeBalance, result.totalDelegatedStake)
 				assert.are.equal(expectedWithdrawalAmount, Balances[stubRandomAddress])
-<<<<<<< HEAD
-				assert.are.equal(expectedPenaltyAmount, Balances[ao.id])
-=======
 				assert.are.equal(expectedexpenditedWithdrawalFee, Balances[ao.id])
->>>>>>> origin/develop
 				assert.are.equal(
 					remainingDelegateStakeBalance,
 					_G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake
@@ -1585,7 +1555,7 @@ describe("gar", function()
 		)
 
 		it(
-			"should withdraw delegate stake and apply reduced penalty based on more elapsed time and remove delegate",
+			"should withdraw delegate stake and apply reduced expedited withdrawal fee based on more elapsed time and remove delegate",
 			function()
 				-- Setup a valid gateway with a delegate vault
 				local vaultId = "vault_id_1"
@@ -1593,22 +1563,13 @@ describe("gar", function()
 				local startTimestamp = 500000
 				local elapsedTime = 29 * 24 * 60 * 60 * 1000 -- Half of 30 days in milliseconds
 				local currentTimestamp = startTimestamp + elapsedTime
-<<<<<<< HEAD
-				local maxPenalty = 0.80
-				local minPenalty = 0.05
-				local penaltyRate = maxPenalty
-					- ((maxPenalty - minPenalty) * (elapsedTime / gar.getSettings().delegates.withdrawLengthMs))
-				local expectedPenaltyAmount = math.floor(vaultBalance * penaltyRate)
-				local expectedWithdrawalAmount = vaultBalance - expectedPenaltyAmount
-=======
-				local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+				local expeditedWithdrawalRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
 					- (
 						(constants.MAX_EXPEDITED_WITHDRAWAL_FEE - constants.MIN_EXPEDITED_WITHDRAWAL_FEE)
 						* (elapsedTime / gar.getSettings().delegates.withdrawLengthMs)
 					)
-				local expectedexpenditedWithdrawalFee = math.floor(vaultBalance * penaltyRate)
-				local expectedWithdrawalAmount = vaultBalance - expectedexpenditedWithdrawalFee
->>>>>>> origin/develop
+				local expectedExpeditedWithdrawalFee = math.floor(vaultBalance * expeditedWithdrawalRate)
+				local expectedWithdrawalAmount = vaultBalance - expectedExpeditedWithdrawalFee
 				Balances[ao.id] = 0
 
 				_G.GatewayRegistry[stubGatewayAddress] = {
@@ -1654,13 +1615,7 @@ describe("gar", function()
 				assert.are.equal(nil, result.delegate) -- Delegate should be removed after full withdrawal
 				assert.are.equal(0, result.totalDelegatedStake)
 				assert.are.equal(expectedWithdrawalAmount, Balances[stubRandomAddress])
-<<<<<<< HEAD
-				assert.are.equal(expectedPenaltyAmount, Balances[ao.id])
-				assert.are.equal(0, _G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
-			end
-		)
-=======
-				assert.are.equal(expectedexpenditedWithdrawalFee, Balances[ao.id])
+				assert.are.equal(expectedExpeditedWithdrawalFee, Balances[ao.id])
 				assert.are.equal(0, _G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
 			end
 		)
@@ -1714,7 +1669,7 @@ describe("gar", function()
 			assert.matches("Vault not found", err)
 		end)
 
-		it("should error if the gateway is not found", function()
+		it("should error if the Gateway not found", function()
 			local vaultId = "vault_id_1"
 			local startTimestamp = 500000
 			local currentTimestamp = startTimestamp + 1000
@@ -1730,7 +1685,6 @@ describe("gar", function()
 			assert.is_not_nil(err)
 			assert.matches("Gateway not found", err)
 		end)
->>>>>>> origin/develop
 	end)
 
 	describe("slashOperatorStake", function()
@@ -2043,7 +1997,7 @@ describe("gar", function()
 			assert.is_not_nil(err)
 			assert.matches("Vault not found", err)
 		end)
-		it("should not cancel a withdrawal if the gateway is not found", function()
+		it("should not cancel a withdrawal if the Gateway not found", function()
 			_G.GatewayRegistry[stubGatewayAddress] = nil
 			local status, err = pcall(
 				gar.cancelDelegateWithdrawal,

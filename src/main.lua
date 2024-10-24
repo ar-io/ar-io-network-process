@@ -1170,7 +1170,7 @@ addEventingHandler(
 
 		local fromAddress = utils.formatAddress(msg.From)
 		local vaultId = msg.Tags["Vault-Id"]
-		msg.ioEvent:addField("TargetFormatted", gatewayAddress)
+		msg.ioEvent:addField("Target-Formatted", gatewayAddress)
 
 		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
@@ -1181,7 +1181,7 @@ addEventingHandler(
 				},
 				Data = tostring(error),
 			})
-		end, gar.instantOperataorWithdrawal, fromAddress, vaultId, msg.Timestamp)
+		end, gar.instantOperatorWithdrawal, fromAddress, vaultId, msg.Timestamp)
 		if not shouldContinue2 then
 			return
 		end
@@ -1189,7 +1189,7 @@ addEventingHandler(
 		local gatewayResult = {}
 		if result ~= nil then
 			if result.gateway ~= nil then
-				msg.ioEvent:addField("GatewayTotalOperatorStake", result.operatorStake)
+				msg.ioEvent:addField("Gateway-Total-Operator-Stake", result.operatorStake)
 			end
 		end
 
@@ -1227,7 +1227,7 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 	local from = utils.formatAddress(msg.From)
 	local quantity = tonumber(msg.Tags.Quantity)
-	msg.ioEvent:addField("TargetFormatted", target)
+	msg.ioEvent:addField("Target-Formatted", target)
 
 	local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
@@ -1243,9 +1243,9 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 	local delegateResult = {}
 	if gateway ~= nil then
 		local newStake = gateway.delegates[from].delegatedStake
-		msg.ioEvent:addField("PreviousStake", newStake - quantity)
-		msg.ioEvent:addField("NewStake", newStake)
-		msg.ioEvent:addField("GatewayTotalDelegatedStake", gateway.totalDelegatedStake)
+		msg.ioEvent:addField("Previous-Stake", newStake - quantity)
+		msg.ioEvent:addField("New-Stake", newStake)
+		msg.ioEvent:addField("Gateway-Total-Delegated-Stake", gateway.totalDelegatedStake)
 		delegateResult = gateway.delegates[from]
 	end
 
@@ -1283,7 +1283,7 @@ addEventingHandler(
 		local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 		local fromAddress = utils.formatAddress(msg.From)
 		local vaultId = msg.Tags["Vault-Id"]
-		msg.ioEvent:addField("TargetFormatted", gatewayAddress)
+		msg.ioEvent:addField("Target-Formatted", gatewayAddress)
 
 		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
@@ -1305,9 +1305,9 @@ addEventingHandler(
 				delegateResult = result.delegate
 				local newStake = delegateResult.delegatedStake
 				local vaultBalance = delegateResult.vaults[vaultId].balance
-				msg.ioEvent:addField("PreviousStake", newStake - vaultBalance)
-				msg.ioEvent:addField("NewStake", newStake)
-				msg.ioEvent:addField("GatewayTotalDelegatedStake", result.totalDelegatedStake)
+				msg.ioEvent:addField("Previous-Stake", newStake - vaultBalance)
+				msg.ioEvent:addField("New-Stake", newStake)
+				msg.ioEvent:addField("Gateway-Total-Delegated-Stake", result.totalDelegatedStake)
 
 				lastKnownStakedSupply = lastKnownStakedSupply + vaultBalance
 				lastKnownWithdrawSupply = lastKnownWithdrawSupply - vaultBalance
@@ -1350,7 +1350,7 @@ addEventingHandler(
 		local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 		local fromAddress = utils.formatAddress(msg.From)
 		local vaultId = msg.Tags["Vault-Id"]
-		msg.ioEvent:addField("TargetFormatted", gatewayAddress)
+		msg.ioEvent:addField("Target-Formatted", gatewayAddress)
 
 		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
@@ -1371,9 +1371,9 @@ addEventingHandler(
 			if result.delegate ~= nil then
 				delegateResult = result.delegate
 				local newStake = delegateResult.delegatedStake
-				msg.ioEvent:addField("PreviousStake", newStake - delegateResult.vaults[vaultId].balance)
-				msg.ioEvent:addField("NewStake", newStake)
-				msg.ioEvent:addField("GatewayTotalDelegatedStake", result.totalDelegatedStake)
+				msg.ioEvent:addField("Previous-Stake", newStake - delegateResult.vaults[vaultId].balance)
+				msg.ioEvent:addField("New-Stake", newStake)
+				msg.ioEvent:addField("Gateway-Total-Delegated-Stake", result.totalDelegatedStake)
 			end
 		end
 
@@ -1424,7 +1424,7 @@ addEventingHandler(
 		local instantWithdraw = msg.Tags.Instant and msg.Tags.Instant == "true" or false
 		local timestamp = tonumber(msg.Timestamp)
 		local messageId = msg.Id
-		msg.ioEvent:addField("TargetFormatted", target)
+		msg.ioEvent:addField("Target-Formatted", target)
 		msg.ioEvent:addField("Quantity", quantity)
 
 		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)

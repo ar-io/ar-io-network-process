@@ -190,12 +190,11 @@ function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWi
 	-- Instant withdrawal logic with penalty
 	if instantWithdraw then
 		-- Calculate the penalty amount
-		local maxPenalty = 0.80
-		local penaltyAmount = qty * maxPenalty
-		local amountToWithdraw = qty - penaltyAmount
+		local expeditedWithdrawalFee = qty * constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+		local amountToWithdraw = qty - expeditedWithdrawalFee
 
 		-- Add penalty to AR.IO protocol balance
-		balances.increaseBalance(ao.id, penaltyAmount)
+		balances.increaseBalance(ao.id, expeditedWithdrawalFee)
 
 		-- Withdraw the remaining tokens to the delegate
 		balances.increaseBalance(from, amountToWithdraw)
@@ -828,16 +827,18 @@ function gar.instantDelegateWithdrawal(from, gatewayAddress, vaultId, currentTim
 	end
 
 	-- Calculate the withdrawal fee and the amount to withdraw
-	local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+	local expeditedWithdrawalRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
 		- (
 			(constants.MAX_EXPEDITED_WITHDRAWAL_FEE - constants.MIN_EXPEDITED_WITHDRAWAL_FEE)
 			* (elapsedTime / totalWithdrawalTime)
 		)
-	penaltyRate =
-		math.max(constants.MIN_EXPEDITED_WITHDRAWAL_FEE, math.min(constants.MAX_EXPEDITED_WITHDRAWAL_FEE, penaltyRate)) -- Ensure penalty is within bounds
+	expeditedWithdrawalRate = math.max(
+		constants.MIN_EXPEDITED_WITHDRAWAL_FEE,
+		math.min(constants.MAX_EXPEDITED_WITHDRAWAL_FEE, expeditedWithdrawalRate)
+	) -- Ensure penalty is within bounds
 
 	local vaultBalance = vault.balance
-	local expeditedWithdrawalFee = math.floor(vaultBalance * penaltyRate)
+	local expeditedWithdrawalFee = math.floor(vaultBalance * expeditedWithdrawalRate)
 	local amountToWithdraw = vaultBalance - expeditedWithdrawalFee
 
 	-- Withdraw the tokens to the delegate and the protocol balance
@@ -860,15 +861,16 @@ function gar.instantDelegateWithdrawal(from, gatewayAddress, vaultId, currentTim
 	}
 end
 
-function gar.instantGatewayWithdrawal(from, vaultId, currentTimestamp)
+function gar.instantOperatorWithdrawal(from, vaultId, currentTimestamp)
 	local gateway = gar.getGateway(from)
+
 	if gateway == nil then
-		error("Gateway does not exist")
+		error("Gateway not found")
 	end
 
 	local vault = gateway.vaults[vaultId]
 	if vault == nil then
-		error("Vault does not exist")
+		error("Vault not found")
 	end
 
 	if vaultId == from then
@@ -885,20 +887,22 @@ function gar.instantGatewayWithdrawal(from, vaultId, currentTimestamp)
 	end
 
 	-- Calculate the withdrawal fee and the amount to withdraw
-	local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+	local expeditedWithdrawalRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
 		- (
 			(constants.MAX_EXPEDITED_WITHDRAWAL_FEE - constants.MIN_EXPEDITED_WITHDRAWAL_FEE)
 			* (elapsedTime / totalWithdrawalTime)
 		)
-	penaltyRate =
-		math.max(constants.MIN_EXPEDITED_WITHDRAWAL_FEE, math.min(constants.MAX_EXPEDITED_WITHDRAWAL_FEE, penaltyRate)) -- Ensure penalty is within bounds
+	expeditedWithdrawalRate = math.max(
+		constants.MIN_EXPEDITED_WITHDRAWAL_FEE,
+		math.min(constants.MAX_EXPEDITED_WITHDRAWAL_FEE, expeditedWithdrawalRate)
+	) -- Ensure penalty is within bounds
 
 	local vaultBalance = vault.balance
-	local expeditedWithdrawalFee = math.floor(vaultBalance * penaltyRate)
+	local expeditedWithdrawalFee = math.floor(vaultBalance * expeditedWithdrawalRate)
 	local amountToWithdraw = vaultBalance - expeditedWithdrawalFee
 
 	-- Add penalty to AR.IO protocol balance
-	balances.increaseBalance(ao.id, penaltyAmount)
+	balances.increaseBalance(ao.id, expeditedWithdrawalFee)
 	balances.increaseBalance(from, amountToWithdraw)
 
 	-- Remove the vault after withdrawal
