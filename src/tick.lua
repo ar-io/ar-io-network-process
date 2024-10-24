@@ -8,14 +8,14 @@ function tick.pruneState(timestamp, msgId)
 	local prunedAuctions = arns.pruneAuctions(timestamp)
 	local prunedReserved = arns.pruneReservedNames(timestamp)
 	local prunedVaults = vaults.pruneVaults(timestamp)
-	local gatewayResults = gar.pruneGateways(timestamp, msgId)
+	local pruneGatewaysResult = gar.pruneGateways(timestamp, msgId)
 	local prunedEpochs = epochs.pruneEpochs(timestamp)
 	return {
 		prunedRecords = prunedRecords,
 		prunedAuctions = prunedAuctions,
 		prunedReserved = prunedReserved,
 		prunedVaults = prunedVaults,
-		pruneGatewayResults = gatewayResults,
+		pruneGatewaysResult = pruneGatewaysResult,
 		prunedEpochs = prunedEpochs,
 	}
 end
