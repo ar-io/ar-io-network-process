@@ -393,10 +393,11 @@ describe('GatewayRegistry', async () => {
     const newStubAddress = ''.padEnd(43, '3');
 
     it('should allow delegating stake', async () => {
-      // TRANSFER 1K IO to our next stubbed address
+      // TRANSFER 2K IO to our next stubbed address
+      const quantity = 2_000_000_000;
       const transferMemory = await transfer({
         recipient: newStubAddress,
-        quantity: 1_000_000_000,
+        quantity: quantity,
         memory: sharedMemory,
       });
 
@@ -406,7 +407,7 @@ describe('GatewayRegistry', async () => {
           Owner: newStubAddress,
           Tags: [
             { name: 'Action', value: 'Delegate-Stake' },
-            { name: 'Quantity', value: '1000000000' }, // 1K IO
+            { name: 'Quantity', value: quantity }, // 2K IO
             { name: 'Address', value: STUB_ADDRESS }, // our gateway address
           ],
           Timestamp: STUB_TIMESTAMP + 1,
@@ -434,12 +435,12 @@ describe('GatewayRegistry', async () => {
 
       assert.deepEqual(gatewayData.delegates, {
         [newStubAddress]: {
-          delegatedStake: 1_000_000_000,
+          delegatedStake: quantity,
           startTimestamp: STUB_TIMESTAMP + 1,
           vaults: [],
         },
       });
-      assert.deepEqual(gatewayData.totalDelegatedStake, 1_000_000_000);
+      assert.deepEqual(gatewayData.totalDelegatedStake, quantity);
       sharedMemory = delegateStakeResult.Memory;
     });
 
@@ -454,7 +455,7 @@ describe('GatewayRegistry', async () => {
           Tags: [
             { name: 'Action', value: 'Decrease-Delegate-Stake' },
             { name: 'Address', value: STUB_ADDRESS },
-            { name: 'Quantity', value: '1000000000' }, // 1K IO
+            { name: 'Quantity', value: '500000000' }, // 500 IO
           ],
         },
         sharedMemory,
@@ -473,18 +474,18 @@ describe('GatewayRegistry', async () => {
       const gatewayData = JSON.parse(gateway.Messages[0].Data);
       assert.deepEqual(gatewayData.delegates, {
         [newStubAddress]: {
-          delegatedStake: 0,
+          delegatedStake: 1_500_000_000,
           startTimestamp: STUB_TIMESTAMP + 1,
           vaults: {
             [''.padEnd(43, 'x')]: {
-              balance: 1_000_000_000,
+              balance: 500_000_000,
               startTimestamp: decreaseStakeTimestamp, // 15 minutes after stubbedTimestamp
               endTimestamp: decreaseStakeTimestamp + 1000 * 60 * 60 * 24 * 30, // 30 days
             },
           },
         },
       });
-      assert.deepEqual(gatewayData.totalDelegatedStake, 1_000_000_000);
+      assert.deepEqual(gatewayData.totalDelegatedStake, 1_500_000_000);
       sharedMemory = decreaseStakeResult.Memory;
     });
 
@@ -521,7 +522,7 @@ describe('GatewayRegistry', async () => {
       assert.deepEqual(gatewayData.delegates, {
         [newStubAddress]: {
           delegatedStake: 2_000_000_000,
-          startTimestamp: stubbedTimestamp,
+          startTimestamp: STUB_TIMESTAMP + 1,
           vaults: [],
         },
       });
@@ -541,7 +542,7 @@ describe('GatewayRegistry', async () => {
             { name: 'Action', value: 'Decrease-Delegate-Stake' },
             { name: 'Address', value: STUB_ADDRESS },
             { name: 'Quantity', value: '1000000000' }, // 1K IO
-            { name: 'Instant', value: true },
+            { name: 'Instant', value: 'true' },
           ],
         },
         sharedMemory,
