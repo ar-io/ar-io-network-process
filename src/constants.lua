@@ -7,8 +7,8 @@ constants.oneYearSeconds = 60 * 60 * 24 * 365
 constants.thirtyDaysSeconds = 60 * 60 * 24 * 30
 constants.defaultundernameLimit = 10
 constants.totalTokenSupply = 1000000000 * 1000000 -- 1 billion tokens
-constants.MIN_EXPEDITED_WITHDRAWAL_FEE = 0.05
-constants.MAX_EXPEDITED_WITHDRAWAL_FEE = 0.80
+constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.05
+constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.80
 
 -- ARNS
 constants.DEFAULT_UNDERNAME_COUNT = 10
