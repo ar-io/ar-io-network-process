@@ -1823,7 +1823,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 				stakeSlashed = 0,
 			}
 		)
-		addPruneGatewaysResults(msg.ioEvent, aggregatedPruneGatewaysResult)
+		addPruneGatewaysResult(msg.ioEvent, aggregatedPruneGatewaysResult)
 	end
 	if utils.lengthOfTable(tickedRewardDistributions) > 0 then
 		msg.ioEvent:addField("Ticked-Reward-Distributions", tickedRewardDistributions)
