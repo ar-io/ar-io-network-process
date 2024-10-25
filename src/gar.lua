@@ -826,7 +826,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 					math.floor(slashableOperatorStake * garSettings.operators.failedEpochSlashPercentage)
 				result.delegateStakeWithdrawing = result.delegateStakeWithdrawing + gateway.totalDelegatedStake
 				result.gatewayStakeWithdrawing = result.gatewayStakeWithdrawing + (gateway.operatorStake - slashAmount)
-				gar.slashOperatorStake(address, slashAmount)
+				gar.slashOperatorStake(address, slashAmount, currentTimestamp)
 				gar.leaveNetwork(address, currentTimestamp, msgId)
 				result.slashedGateways[address] = slashAmount
 				result.stakeSlashed = result.stakeSlashed + slashAmount
@@ -842,7 +842,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 	return result
 end
 
-function gar.slashOperatorStake(address, slashAmount)
+function gar.slashOperatorStake(address, slashAmount, currentTimestamp)
 	assert(utils.isInteger(slashAmount), "Slash amount must be an integer")
 	assert(slashAmount > 0, "Slash amount must be greater than 0")
 
@@ -856,6 +856,8 @@ function gar.slashOperatorStake(address, slashAmount)
 	end
 
 	gateway.operatorStake = gateway.operatorStake - slashAmount
+	gateway.slashings = gateway.slashings or {}
+	gateway.slashings[currentTimestamp] = slashAmount
 	balances.increaseBalance(ao.id, slashAmount)
 	GatewayRegistry[address] = gateway
 	-- TODO: send slash notice to gateway address
