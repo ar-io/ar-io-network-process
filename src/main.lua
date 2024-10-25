@@ -1317,16 +1317,23 @@ addEventingHandler(
 			return
 		end
 
-		local delegateResult = {}
+		local delegateResult = result and result.delegate or {
+			delegatedStake = 0,
+			vaults = {},
+		}
+		msg.ioEvent:addField("Remaining-Delegate-Stake", delegateResult.delegatedStake)
 		if result ~= nil then
-			if result.delegate ~= nil then
-				delegateResult = result.delegate
-				local newStake = delegateResult.delegatedStake
-				msg.ioEvent:addField("PreviousStake", newStake - delegateResult.vaults[vaultId].balance)
-				msg.ioEvent:addField("NewStake", newStake)
-				msg.ioEvent:addField("GatewayTotalDelegatedStake", result.totalDelegatedStake)
-			end
+			msg.ioEvent:addField("Vault-Elapsed-Time", result.elapsedTime)
+			msg.ioEvent:addField("Vault-Remaining-Time", result.remainingTime)
+			msg.ioEvent:addField("Penalty-Rate", result.penaltyRate)
+			msg.ioEvent:addField("Expedited-Withdrawal-Fee", result.expeditedWithdrawalFee)
+			msg.ioEvent:addField("Amount-Withdrawn", result.amountWithdrawn)
+			msg.ioEvent:addField("Previous-Vault-Balance", result.amountWithdrawn + result.expeditedWithdrawalFee)
+			lastKnownCirculatingSupply = lastKnownCirculatingSupply + result.amountWithdrawn
+			lastKnownWithdrawSupply = lastKnownWithdrawSupply - result.amountWithdrawn - result.expeditedWithdrawalFee
 		end
+
+		addSupplyData(msg.ioEvent)
 
 		ao.send({
 			Target = msg.From,
@@ -1393,7 +1400,7 @@ addEventingHandler(
 		local instantWithdrawalFee = 0
 		local amountWithdrawn = 0
 		if instantWithdraw then
-			instantWithdrawalFee = quantity * constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+			instantWithdrawalFee = quantity * constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
 			amountWithdrawn = quantity - instantWithdrawalFee
 			msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
 			msg.ioEvent:addField("Instant-Withdrawal-Fee", instantWithdrawalFee)
