@@ -1390,13 +1390,22 @@ addEventingHandler(
 			return
 		end
 
+		local instantWithdrawalFee = 0
+		local amountWithdrawn = 0
+		if instantWithdraw then
+			instantWithdrawalFee = quantity * constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+			amountWithdrawn = quantity - instantWithdrawalFee
+			msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
+			msg.ioEvent:addField("Instant-Withdrawal-Fee", instantWithdrawalFee)
+			msg.ioEvent:addField("Amount-Withdrawn", amountWithdrawn)
+		end
+
 		local delegateResult = {}
 		if gateway ~= nil then
 			local newStake = gateway.delegates[from].delegatedStake
 			msg.ioEvent:addField("Previous-Stake", newStake + quantity)
 			msg.ioEvent:addField("New-Stake", newStake)
 			msg.ioEvent:addField("Gateway-Total-Delegated-Stake", gateway.totalDelegatedStake)
-			msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
 			delegateResult = gateway.delegates[from]
 			local newDelegateVaults = delegateResult.vaults
 			if newDelegateVaults ~= nil then
@@ -1411,8 +1420,9 @@ addEventingHandler(
 			end
 		end
 
-		lastKnownStakedSupply = lastKnownStakedSupply - quantity
-		lastKnownWithdrawSupply = lastKnownWithdrawSupply + quantity
+		lastKnownDelegatedSupply = lastKnownDelegatedSupply - quantity
+		lastKnownWithdrawSupply = lastKnownWithdrawSupply + quantity - amountWithdrawn
+		lastKnownCirculatingSupply = lastKnownCirculatingSupply + amountWithdrawn
 		addSupplyData(msg.ioEvent)
 
 		ao.send({

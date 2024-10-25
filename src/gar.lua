@@ -380,11 +380,11 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 		gateway.totalDelegatedStake = gateway.totalDelegatedStake - qty
 
 		-- Calculate the penalty amount
-		local expenditedWithdrawalFee = qty * constants.MAX_EXPEDITED_WITHDRAWAL_FEE
-		local amountToWithdraw = qty - expenditedWithdrawalFee
+		local expeditedWithdrawalFee = qty * constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+		local amountToWithdraw = qty - expeditedWithdrawalFee
 
 		-- Add penalty to AR.IO protocol balance
-		balances.increaseBalance(ao.id, expenditedWithdrawalFee)
+		balances.increaseBalance(ao.id, expeditedWithdrawalFee)
 
 		-- Withdraw the remaining tokens to the delegate
 		balances.increaseBalance(delegator, amountToWithdraw)
