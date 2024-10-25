@@ -1797,27 +1797,32 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	end
 	if #newPruneGatewaysResults > 0 then
 		-- Reduce the prune gatways results and then track changes
-		local aggregatedPruneGatewaysResult = utils.reduce(newPruneGatewaysResults, function(acc, pruneGatewaysResult)
-			for _, address in pairs(pruneGatewaysResult.prunedGateways) do
-				table.insert(acc.prunedGateways, address)
-			end
-			for address, slashAmount in pairs(pruneGatewaysResult.slashedGateways) do
-				acc.slashedGateways[address] = (acc.slashedGateways[address] or 0) + slashAmount
-			end
-			acc.gatewayStakeReturned = acc.gatewayStakeReturned + pruneGatewaysResult.gatewayStakeReturned
-			acc.delegateStakeReturned = acc.delegateStakeReturned + pruneGatewaysResult.delegateStakeReturned
-			acc.gatewayStakeWithdrawing = acc.gatewayStakeWithdrawing + pruneGatewaysResult.gatewayStakeWithdrawing
-			acc.delegateStakeWithdrawing = acc.delegateStakeWithdrawing + pruneGatewaysResult.delegateStakeWithdrawing
-			return acc
-		end, {
-			prunedGateways = {},
-			slashedGateways = {},
-			gatewayStakeReturned = 0,
-			delegateStakeReturned = 0,
-			gatewayStakeWithdrawing = 0,
-			delegateStakeWithdrawing = 0,
-			stakeSlashed = 0,
-		})
+		local aggregatedPruneGatewaysResult = utils.reduce(
+			newPruneGatewaysResults,
+			function(acc, _, pruneGatewaysResult)
+				for _, address in pairs(pruneGatewaysResult.prunedGateways) do
+					table.insert(acc.prunedGateways, address)
+				end
+				for address, slashAmount in pairs(pruneGatewaysResult.slashedGateways) do
+					acc.slashedGateways[address] = (acc.slashedGateways[address] or 0) + slashAmount
+				end
+				acc.gatewayStakeReturned = acc.gatewayStakeReturned + pruneGatewaysResult.gatewayStakeReturned
+				acc.delegateStakeReturned = acc.delegateStakeReturned + pruneGatewaysResult.delegateStakeReturned
+				acc.gatewayStakeWithdrawing = acc.gatewayStakeWithdrawing + pruneGatewaysResult.gatewayStakeWithdrawing
+				acc.delegateStakeWithdrawing = acc.delegateStakeWithdrawing
+					+ pruneGatewaysResult.delegateStakeWithdrawing
+				return acc
+			end,
+			{
+				prunedGateways = {},
+				slashedGateways = {},
+				gatewayStakeReturned = 0,
+				delegateStakeReturned = 0,
+				gatewayStakeWithdrawing = 0,
+				delegateStakeWithdrawing = 0,
+				stakeSlashed = 0,
+			}
+		)
 		addPruneGatewaysResults(msg.ioEvent, aggregatedPruneGatewaysResult)
 	end
 	if utils.lengthOfTable(tickedRewardDistributions) > 0 then
