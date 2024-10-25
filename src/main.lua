@@ -1326,7 +1326,7 @@ addEventingHandler(
 			msg.ioEvent:addField("Vault-Elapsed-Time", result.elapsedTime)
 			msg.ioEvent:addField("Vault-Remaining-Time", result.remainingTime)
 			msg.ioEvent:addField("Penalty-Rate", result.penaltyRate)
-			msg.ioEvent:addField("Expedited-Withdrawal-Fee", result.expeditedWithdrawalFee)
+			msg.ioEvent:addField("Instant-Withdrawal-Fee", result.expeditedWithdrawalFee)
 			msg.ioEvent:addField("Amount-Withdrawn", result.amountWithdrawn)
 			msg.ioEvent:addField("Previous-Vault-Balance", result.amountWithdrawn + result.expeditedWithdrawalFee)
 			lastKnownCirculatingSupply = lastKnownCirculatingSupply + result.amountWithdrawn
