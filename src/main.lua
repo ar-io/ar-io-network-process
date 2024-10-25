@@ -1428,7 +1428,9 @@ addEventingHandler(
 		end
 
 		lastKnownDelegatedSupply = lastKnownDelegatedSupply - quantity
-		lastKnownWithdrawSupply = lastKnownWithdrawSupply + quantity - amountWithdrawn
+		if not instantWithdraw then
+			lastKnownWithdrawSupply = lastKnownWithdrawSupply + quantity
+		end
 		lastKnownCirculatingSupply = lastKnownCirculatingSupply + amountWithdrawn
 		addSupplyData(msg.ioEvent)
 
