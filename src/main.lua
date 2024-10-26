@@ -163,6 +163,56 @@ local function gatewayStats()
 	}
 end
 
+local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
+	lastKnownCirculatingSupply = lastKnownCirculatingSupply
+		+ (pruneGatewaysResult.delegateStakeReturned or 0)
+		+ (pruneGatewaysResult.gatewayStakeReturned or 0)
+
+	lastKnownWithdrawSupply = lastKnownWithdrawSupply
+		- (pruneGatewaysResult.delegateStakeReturned or 0)
+		- (pruneGatewaysResult.gatewayStakeReturned or 0)
+		+ (pruneGatewaysResult.delegateStakeWithdrawing or 0)
+		+ (pruneGatewaysResult.gatewayStakeWithdrawing or 0)
+
+	lastKnownDelegatedSupply = lastKnownDelegatedSupply - (pruneGatewaysResult.delegateStakeWithdrawing or 0)
+
+	local totalGwStakesSlashed = (pruneGatewaysResult.stakeSlashed or 0)
+	lastKnownStakedSupply = lastKnownStakedSupply
+		- totalGwStakesSlashed
+		- (pruneGatewaysResult.gatewayStakeWithdrawing or 0)
+
+	if totalGwStakesSlashed > 0 then
+		ioEvent:addField("Total-Gateways-Stake-Slashed", totalGwStakesSlashed)
+	end
+
+	local prunedGateways = pruneGatewaysResult.prunedGateways or {}
+	local prunedGatewaysCount = utils.lengthOfTable(prunedGateways)
+	if prunedGatewaysCount > 0 then
+		ioEvent:addField("Pruned-Gateways", prunedGateways)
+		ioEvent:addField("Pruned-Gateways-Count", prunedGatewaysCount)
+		local gwStats = gatewayStats()
+		ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
+		ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
+	end
+
+	local slashedGateways = pruneGatewaysResult.slashedGateways or {}
+	local slashedGatewaysCount = utils.lengthOfTable(slashedGateways or {})
+	if slashedGatewaysCount > 0 then
+		ioEvent:addField("Slashed-Gateway-Amounts", slashedGateways)
+		ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
+		local invariantSlashedGateways = {}
+		for _, gwAddress in pairs(slashedGateways) do
+			local gw = gar.getGateway(gwAddress) or {}
+			if gw.totalDelegatedStake > 0 then
+				invariantSlashedGateways[gwAddress] = gw.totalDelegatedStake
+			end
+		end
+		if utils.lengthOfTable(invariantSlashedGateways) > 0 then
+			ioEvent:addField("Invariant-Slashed-Gateways", invariantSlashedGateways)
+		end
+	end
+end
+
 local function addEventingHandler(handlerName, pattern, handleFn)
 	Handlers.add(handlerName, pattern, function(msg)
 		eventingPcall(msg.ioEvent, function()
@@ -255,45 +305,8 @@ end, function(msg)
 			msg.ioEvent:addField("Pruned-Epochs-Count", prunedEpochsCount)
 		end
 
-		local pruneGatewayResults = resultOrError.pruneGatewayResults or {}
-		lastKnownCirculatingSupply = lastKnownCirculatingSupply
-			+ (pruneGatewayResults.delegateStakeReturned or 0)
-			+ (pruneGatewayResults.gatewayStakeReturned or 0)
-		lastKnownWithdrawSupply = lastKnownWithdrawSupply
-			- (pruneGatewayResults.delegateStakeReturned or 0)
-			- (pruneGatewayResults.gatewayStakeReturned or 0)
-		local totalGwStakesSlashed = (pruneGatewayResults.stakeSlashed or 0)
-		lastKnownStakedSupply = lastKnownStakedSupply - totalGwStakesSlashed
-		if totalGwStakesSlashed > 0 then
-			msg.ioEvent:addField("Total-Gateways-Stake-Slashed", totalGwStakesSlashed)
-		end
-
-		local prunedGateways = pruneGatewayResults.prunedGateways or {}
-		local prunedGatewaysCount = utils.lengthOfTable(prunedGateways)
-		if prunedGatewaysCount > 0 then
-			msg.ioEvent:addField("Pruned-Gateways", prunedGateways)
-			msg.ioEvent:addField("Pruned-Gateways-Count", prunedGatewaysCount)
-			local gwStats = gatewayStats()
-			msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
-			msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
-		end
-
-		local slashedGateways = pruneGatewayResults.slashedGateways or {}
-		local slashedGatewaysCount = utils.lengthOfTable(slashedGateways or {})
-		if slashedGatewaysCount > 0 then
-			msg.ioEvent:addField("Slashed-Gateway-Amounts", slashedGateways)
-			msg.ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
-			local invariantSlashedGateways = {}
-			for _, gwAddress in pairs(slashedGateways) do
-				local gw = gar.getGateway(gwAddress) or {}
-				if gw.totalDelegatedStake > 0 then
-					invariantSlashedGateways[gwAddress] = gw.totalDelegatedStake
-				end
-			end
-			if utils.lengthOfTable(invariantSlashedGateways) > 0 then
-				msg.ioEvent:addField("Invariant-Slashed-Gateways", invariantSlashedGateways)
-			end
-		end
+		local pruneGatewaysResult = resultOrError.pruneGatewaysResult or {}
+		addPruneGatewaysResult(msg.ioEvent, pruneGatewaysResult)
 	end
 
 	if
@@ -1369,16 +1382,23 @@ addEventingHandler(
 			return
 		end
 
-		local delegateResult = {}
+		local delegateResult = result and result.delegate or {
+			delegatedStake = 0,
+			vaults = {},
+		}
+		msg.ioEvent:addField("Remaining-Delegate-Stake", delegateResult.delegatedStake)
 		if result ~= nil then
-			if result.delegate ~= nil then
-				delegateResult = result.delegate
-				local newStake = delegateResult.delegatedStake
-				msg.ioEvent:addField("Previous-Stake", newStake - delegateResult.vaults[vaultId].balance)
-				msg.ioEvent:addField("New-Stake", newStake)
-				msg.ioEvent:addField("Gateway-Total-Delegated-Stake", result.totalDelegatedStake)
-			end
+			msg.ioEvent:addField("Vault-Elapsed-Time", result.elapsedTime)
+			msg.ioEvent:addField("Vault-Remaining-Time", result.remainingTime)
+			msg.ioEvent:addField("Penalty-Rate", result.penaltyRate)
+			msg.ioEvent:addField("Instant-Withdrawal-Fee", result.expeditedWithdrawalFee)
+			msg.ioEvent:addField("Amount-Withdrawn", result.amountWithdrawn)
+			msg.ioEvent:addField("Previous-Vault-Balance", result.amountWithdrawn + result.expeditedWithdrawalFee)
+			lastKnownCirculatingSupply = lastKnownCirculatingSupply + result.amountWithdrawn
+			lastKnownWithdrawSupply = lastKnownWithdrawSupply - result.amountWithdrawn - result.expeditedWithdrawalFee
 		end
+
+		addSupplyData(msg.ioEvent)
 
 		ao.send({
 			Target = msg.From,
@@ -1441,13 +1461,22 @@ addEventingHandler(
 			return
 		end
 
+		local instantWithdrawalFee = 0
+		local amountWithdrawn = 0
+		if instantWithdraw then
+			instantWithdrawalFee = quantity * constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
+			amountWithdrawn = quantity - instantWithdrawalFee
+			msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
+			msg.ioEvent:addField("Instant-Withdrawal-Fee", instantWithdrawalFee)
+			msg.ioEvent:addField("Amount-Withdrawn", amountWithdrawn)
+		end
+
 		local delegateResult = {}
 		if gateway ~= nil then
 			local newStake = gateway.delegates[from].delegatedStake
 			msg.ioEvent:addField("Previous-Stake", newStake + quantity)
 			msg.ioEvent:addField("New-Stake", newStake)
 			msg.ioEvent:addField("Gateway-Total-Delegated-Stake", gateway.totalDelegatedStake)
-			msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
 			delegateResult = gateway.delegates[from]
 			local newDelegateVaults = delegateResult.vaults
 			if newDelegateVaults ~= nil then
@@ -1462,8 +1491,11 @@ addEventingHandler(
 			end
 		end
 
-		lastKnownStakedSupply = lastKnownStakedSupply - quantity
-		lastKnownWithdrawSupply = lastKnownWithdrawSupply + quantity
+		lastKnownDelegatedSupply = lastKnownDelegatedSupply - quantity
+		if not instantWithdraw then
+			lastKnownWithdrawSupply = lastKnownWithdrawSupply + quantity
+		end
+		lastKnownCirculatingSupply = lastKnownCirculatingSupply + amountWithdrawn
 		addSupplyData(msg.ioEvent)
 
 		ao.send({
@@ -1719,6 +1751,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	local function tickEpoch(timestamp, blockHeight, hashchain)
 		-- update demand factor if necessary
 		local demandFactor = demand.updateDemandFactor(timestamp)
+		-- distribute rewards for the epoch and increments stats for gateways, this closes the epoch if the timestamp is greater than the epochs required distribution timestamp
 		local distributedEpoch = epochs.distributeRewardsForEpoch(timestamp)
 		if distributedEpoch ~= nil and distributedEpoch.epochIndex ~= nil then
 			tickedRewardDistributions[tostring(distributedEpoch.epochIndex)] =
@@ -1726,11 +1759,15 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 			totalTickedRewardsDistributed = totalTickedRewardsDistributed
 				+ distributedEpoch.distributions.totalDistributedRewards
 		end
+		-- prune any gateway that has hit the failed 30 consecutive epoch threshold after the epoch has been distributed
+		local pruneGatewaysResult = gar.pruneGateways(timestamp)
 
+		-- now create the new epoch with the current message hashchain and block height
 		local newEpoch = epochs.createEpoch(timestamp, tonumber(blockHeight), hashchain)
 		return {
 			maybeEpoch = newEpoch,
 			maybeDemandFactor = demandFactor,
+			pruneGatewaysResult = pruneGatewaysResult,
 		}
 	end
 
@@ -1755,6 +1792,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	local tickedEpochIndexes = {}
 	local newEpochIndexes = {}
 	local newDemandFactors = {}
+	local newPruneGatewaysResults = {}
 	for i = lastTickedEpochIndex + 1, targetCurrentEpochIndex do
 		print("Ticking epoch: " .. i)
 		local previousState = {
@@ -1787,6 +1825,9 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 			if resultOrError.maybeDemandFactor ~= nil then
 				table.insert(newDemandFactors, resultOrError.maybeDemandFactor)
 			end
+			if resultOrError.pruneGatewaysResult ~= nil then
+				table.insert(newPruneGatewaysResults, resultOrError.pruneGatewaysResult)
+			end
 		else
 			-- reset the state to previous state
 			Balances = previousState.Balances
@@ -1817,6 +1858,31 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	end
 	if #newDemandFactors > 0 then
 		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors, ";")
+	end
+	if #newPruneGatewaysResults > 0 then
+		-- Reduce the prune gatways results and then track changes
+		local aggregatedPruneGatewaysResult = utils.reduce(newPruneGatewaysResults, function(acc, pruneGatewaysResult)
+			for _, address in pairs(pruneGatewaysResult.prunedGateways) do
+				table.insert(acc.prunedGateways, address)
+			end
+			for address, slashAmount in pairs(pruneGatewaysResult.slashedGateways) do
+				acc.slashedGateways[address] = (acc.slashedGateways[address] or 0) + slashAmount
+			end
+			acc.gatewayStakeReturned = acc.gatewayStakeReturned + pruneGatewaysResult.gatewayStakeReturned
+			acc.delegateStakeReturned = acc.delegateStakeReturned + pruneGatewaysResult.delegateStakeReturned
+			acc.gatewayStakeWithdrawing = acc.gatewayStakeWithdrawing + pruneGatewaysResult.gatewayStakeWithdrawing
+			acc.delegateStakeWithdrawing = acc.delegateStakeWithdrawing + pruneGatewaysResult.delegateStakeWithdrawing
+			return acc
+		end, {
+			prunedGateways = {},
+			slashedGateways = {},
+			gatewayStakeReturned = 0,
+			delegateStakeReturned = 0,
+			gatewayStakeWithdrawing = 0,
+			delegateStakeWithdrawing = 0,
+			stakeSlashed = 0,
+		})
+		addPruneGatewaysResults(msg.ioEvent, aggregatedPruneGatewaysResult)
 	end
 	if utils.lengthOfTable(tickedRewardDistributions) > 0 then
 		msg.ioEvent:addField("Ticked-Reward-Distributions", tickedRewardDistributions)

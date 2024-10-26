@@ -165,13 +165,15 @@ end
 -- Utility function to calculate withdrawal details and handle balance adjustments
 local function processInstantWithdrawal(vault, elapsedTime, totalWithdrawalTime, from, qty)
 	-- Calculate the withdrawal fee and the amount to withdraw
-	local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
+	local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
 		- (
-			(constants.MAX_EXPEDITED_WITHDRAWAL_FEE - constants.MIN_EXPEDITED_WITHDRAWAL_FEE)
+			(constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE - constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE)
 			* (elapsedTime / totalWithdrawalTime)
 		)
-	penaltyRate =
-		math.max(constants.MIN_EXPEDITED_WITHDRAWAL_FEE, math.min(constants.MAX_EXPEDITED_WITHDRAWAL_FEE, penaltyRate)) -- Ensure penalty is within bounds
+	penaltyRate = math.max(
+		constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE,
+		math.min(constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE, penaltyRate)
+	) -- Ensure penalty is within bounds
 
 	local vaultBalance = qty or vault.balance
 	local expeditedWithdrawalFee = math.floor(vaultBalance * penaltyRate)
@@ -181,7 +183,7 @@ local function processInstantWithdrawal(vault, elapsedTime, totalWithdrawalTime,
 	balances.increaseBalance(ao.id, expeditedWithdrawalFee)
 	balances.increaseBalance(from, amountToWithdraw)
 
-	return expeditedWithdrawalFee, amountToWithdraw
+	return expeditedWithdrawalFee, amountToWithdraw, penaltyRate
 end
 
 function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWithdraw)
@@ -685,6 +687,8 @@ function gar.pruneGateways(currentTimestamp, msgId)
 		slashedGateways = {},
 		gatewayStakeReturned = 0,
 		delegateStakeReturned = 0,
+		gatewayStakeWithdrawing = 0,
+		delegateStakeWithdrawing = 0,
 		stakeSlashed = 0,
 	}
 
@@ -732,6 +736,8 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				local slashableOperatorStake = math.min(gateway.operatorStake, garSettings.operators.minStake)
 				local slashAmount =
 					math.floor(slashableOperatorStake * garSettings.operators.failedEpochSlashPercentage)
+				result.delegateStakeWithdrawing = result.delegateStakeWithdrawing + gateway.totalDelegatedStake
+				result.gatewayStakeWithdrawing = result.gatewayStakeWithdrawing + (gateway.operatorStake - slashAmount)
 				gar.slashOperatorStake(address, slashAmount)
 				gar.leaveNetwork(address, currentTimestamp, msgId)
 				result.slashedGateways[address] = slashAmount
@@ -833,7 +839,7 @@ function gar.instantDelegateWithdrawal(from, gatewayAddress, vaultId, currentTim
 
 	-- Calculate elapsed time since the withdrawal started
 	local elapsedTime = currentTimestamp - vault.startTimestamp
-	local totalWithdrawalTime = gar.getSettings().delegates.withdrawLengthMs
+	local totalWithdrawalTime = vault.endTimestamp - vault.startTimestamp
 
 	-- Ensure the elapsed time is not negative
 	if elapsedTime < 0 then
@@ -841,7 +847,7 @@ function gar.instantDelegateWithdrawal(from, gatewayAddress, vaultId, currentTim
 	end
 
 	-- Process the instant withdrawal
-	local expeditedWithdrawalFee, amountToWithdraw =
+	local expeditedWithdrawalFee, amountToWithdraw, penaltyRate =
 		processInstantWithdrawal(vault, elapsedTime, totalWithdrawalTime, from)
 
 	-- Remove the vault after withdrawal
@@ -856,7 +862,9 @@ function gar.instantDelegateWithdrawal(from, gatewayAddress, vaultId, currentTim
 	GatewayRegistry[gatewayAddress] = gateway
 	return {
 		delegate = gar.getGateway(gatewayAddress).delegates[from],
-		totalDelegatedStake = gateway.totalDelegatedStake,
+		elapsedTime = elapsedTime,
+		remainingTime = totalWithdrawalTime - elapsedTime,
+		penaltyRate = penaltyRate,
 		expeditedWithdrawalFee = expeditedWithdrawalFee,
 		amountWithdrawn = amountToWithdraw,
 	}
@@ -898,7 +906,9 @@ function gar.instantOperatorWithdrawal(from, vaultId, currentTimestamp)
 	GatewayRegistry[from] = gateway
 	return {
 		gateway = gar.getGateway(from),
-		operatorStake = gateway.operatorStake,
+		elapsedTime = elapsedTime,
+		remainingTime = totalWithdrawalTime - elapsedTime,
+		penaltyRate = penaltyRate,
 		expeditedWithdrawalFee = expeditedWithdrawalFee,
 		amountWithdrawn = amountToWithdraw,
 	}

@@ -924,7 +924,6 @@ describe('ArNS', async () => {
       'Current price should be positive',
     );
   });
-  
 
   // TODO: add several error scenarios
 });
