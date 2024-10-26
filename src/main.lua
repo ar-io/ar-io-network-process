@@ -1176,7 +1176,7 @@ addEventingHandler(
 		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Invalid-Instant-Gateway-Withdrawal-Notice", Error = "Bad-Input" },
+				Tags = { Action = "Invalid-Instant-Operator-Withdrawal-Notice", Error = "Bad-Input" },
 				Data = tostring(error),
 			})
 		end, checkAssertions)
@@ -1192,8 +1192,8 @@ addEventingHandler(
 			ao.send({
 				Target = msg.From,
 				Tags = {
-					Action = "Invalid-Instant-Gateway-Withdrawal-Notice",
-					Error = "Invalid-Instant-Gateway-Withdrawal",
+					Action = "Invalid-Instant-Operator-Withdrawal-Notice",
+					Error = "Invalid-Instant-Operator-Withdrawal",
 				},
 				Data = tostring(error),
 			})
@@ -1202,18 +1202,33 @@ addEventingHandler(
 			return
 		end
 
-		local gatewayResult = {}
+		local gatewayResult = result and result.gateway or {
+			operatorStake = 0,
+			vaults = {},
+		}
+
+		local amountWithdrawn
+		msg.ioEvent:addField("Remaining-Operator-Stake", gatewayResult.operatorStake)
 		if result ~= nil then
-			if result.gateway ~= nil then
-				msg.ioEvent:addField("Gateway-Total-Operator-Stake", result.operatorStake)
-			end
+			msg.ioEvent:addField("Vault-Elapsed-Time", result.elapsedTime)
+			msg.ioEvent:addField("Vault-Remaining-Time", result.remainingTime)
+			msg.ioEvent:addField("Penalty-Rate", result.penaltyRate)
+			msg.ioEvent:addField("Instant-Withdrawal-Fee", result.expeditedWithdrawalFee)
+			msg.ioEvent:addField("Amount-Withdrawn", result.amountWithdrawn)
+			msg.ioEvent:addField("Previous-Vault-Balance", result.amountWithdrawn + result.expeditedWithdrawalFee)
+			lastKnownCirculatingSupply = lastKnownCirculatingSupply + result.amountWithdrawn
+			lastKnownWithdrawSupply = lastKnownWithdrawSupply - result.amountWithdrawn - result.expeditedWithdrawalFee
+			amountWithdrawn = result.amountWithdrawn
 		end
+
+		addSupplyData(msg.ioEvent)
 
 		ao.send({
 			Target = msg.From,
 			Tags = {
 				Action = "Instant-Operator-Withdrawal-Notice",
 				["Vault-Id"] = msg.Tags["Vault-Id"],
+				["Amount-Withdrawn"] = amountWithdrawn,
 			},
 			Data = json.encode(gatewayResult),
 		})
@@ -1386,6 +1401,8 @@ addEventingHandler(
 			delegatedStake = 0,
 			vaults = {},
 		}
+
+		local amountWithdrawn
 		msg.ioEvent:addField("Remaining-Delegate-Stake", delegateResult.delegatedStake)
 		if result ~= nil then
 			msg.ioEvent:addField("Vault-Elapsed-Time", result.elapsedTime)
@@ -1396,6 +1413,7 @@ addEventingHandler(
 			msg.ioEvent:addField("Previous-Vault-Balance", result.amountWithdrawn + result.expeditedWithdrawalFee)
 			lastKnownCirculatingSupply = lastKnownCirculatingSupply + result.amountWithdrawn
 			lastKnownWithdrawSupply = lastKnownWithdrawSupply - result.amountWithdrawn - result.expeditedWithdrawalFee
+			amountWithdrawn = result.amountWithdrawn
 		end
 
 		addSupplyData(msg.ioEvent)
@@ -1406,6 +1424,7 @@ addEventingHandler(
 				Action = "Instant-Delegate-Withdrawal-Notice",
 				Address = gatewayAddress,
 				["Vault-Id"] = msg.Tags["Vault-Id"],
+				["Amount-Withdrawn"] = amountWithdrawn,
 			},
 			Data = json.encode(delegateResult),
 		})
