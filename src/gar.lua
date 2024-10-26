@@ -896,7 +896,7 @@ function gar.instantOperatorWithdrawal(from, vaultId, currentTimestamp)
 	end
 
 	-- Process the instant withdrawal
-	local expeditedWithdrawalFee, amountToWithdraw =
+	local expeditedWithdrawalFee, amountToWithdraw, penaltyRate =
 		processInstantWithdrawal(vault, elapsedTime, totalWithdrawalTime, from)
 
 	-- Remove the vault after withdrawal
