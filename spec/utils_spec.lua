@@ -63,12 +63,28 @@ describe("utils", function()
 			assert.are.same("foo", utils.reduce(input, stubReducer, "foo"))
 		end)
 
-		it("should return the reduced value", function()
-			local input = { 1, 2, 3, 4, 5 }
-			local reducer = function(acc, value)
+		it("should return the reduced value for a numeric table", function()
+			local input = { 1, 3, 5, 7, 9 }
+			assert.are.same(
+				15,
+				utils.reduce(input, function(acc, key)
+					return acc + key
+				end, 0)
+			)
+			assert.are.same(
+				25,
+				utils.reduce(input, function(acc, _, value)
+					return acc + value
+				end, 0)
+			)
+		end)
+
+		it("should return the reduced value for a keyed table", function()
+			local input = { foo = 2, bar = 4, baz = 6, oof = 8, rab = 10 }
+			local reducer = function(acc, _, value)
 				return acc + value
 			end
-			assert.are.same(15, utils.reduce(input, reducer, 0))
+			assert.are.same(30, utils.reduce(input, reducer, 0))
 		end)
 	end)
 

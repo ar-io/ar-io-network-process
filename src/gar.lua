@@ -380,11 +380,11 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 		gateway.totalDelegatedStake = gateway.totalDelegatedStake - qty
 
 		-- Calculate the penalty amount
-		local expenditedWithdrawalFee = qty * constants.MAX_EXPEDITED_WITHDRAWAL_FEE
-		local amountToWithdraw = qty - expenditedWithdrawalFee
+		local expeditedWithdrawalFee = qty * constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
+		local amountToWithdraw = qty - expeditedWithdrawalFee
 
 		-- Add penalty to AR.IO protocol balance
-		balances.increaseBalance(ao.id, expenditedWithdrawalFee)
+		balances.increaseBalance(ao.id, expeditedWithdrawalFee)
 
 		-- Withdraw the remaining tokens to the delegate
 		balances.increaseBalance(delegator, amountToWithdraw)
@@ -657,6 +657,8 @@ function gar.pruneGateways(currentTimestamp, msgId)
 		slashedGateways = {},
 		gatewayStakeReturned = 0,
 		delegateStakeReturned = 0,
+		gatewayStakeWithdrawing = 0,
+		delegateStakeWithdrawing = 0,
 		stakeSlashed = 0,
 	}
 
@@ -704,9 +706,11 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				local slashableOperatorStake = math.min(gateway.operatorStake, garSettings.operators.minStake)
 				local slashAmount =
 					math.floor(slashableOperatorStake * garSettings.operators.failedEpochSlashPercentage)
+				result.delegateStakeWithdrawing = result.delegateStakeWithdrawing + gateway.totalDelegatedStake
+				result.gatewayStakeWithdrawing = result.gatewayStakeWithdrawing + (gateway.operatorStake - slashAmount)
 				gar.slashOperatorStake(address, slashAmount)
 				gar.leaveNetwork(address, currentTimestamp, msgId)
-				table.insert(result.slashedGateways, address)
+				result.slashedGateways[address] = slashAmount
 				result.stakeSlashed = result.stakeSlashed + slashAmount
 			else
 				if gateway.status == "leaving" and gateway.endTimestamp <= currentTimestamp then
@@ -805,7 +809,7 @@ function gar.instantDelegateWithdrawal(from, gatewayAddress, vaultId, currentTim
 
 	-- Calculate elapsed time since the withdrawal started
 	local elapsedTime = currentTimestamp - vault.startTimestamp
-	local totalWithdrawalTime = gar.getSettings().delegates.withdrawLengthMs
+	local totalWithdrawalTime = vault.endTimestamp - vault.startTimestamp
 
 	-- Ensure the elapsed time is not negative
 	if elapsedTime < 0 then
@@ -813,22 +817,22 @@ function gar.instantDelegateWithdrawal(from, gatewayAddress, vaultId, currentTim
 	end
 
 	-- Calculate the penalty rate based on elapsed time
-	local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_FEE
-		- (
-			(constants.MAX_EXPEDITED_WITHDRAWAL_FEE - constants.MIN_EXPEDITED_WITHDRAWAL_FEE)
-			* (elapsedTime / totalWithdrawalTime)
-		)
-	penaltyRate =
-		math.max(constants.MIN_EXPEDITED_WITHDRAWAL_FEE, math.min(constants.MAX_EXPEDITED_WITHDRAWAL_FEE, penaltyRate)) -- Ensure penalty is within bounds
+	local maxPenaltyRateReduction = constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
+		- constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE
+	local earnedPenaltyRateReduction = maxPenaltyRateReduction * (elapsedTime / totalWithdrawalTime)
+	local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE - earnedPenaltyRateReduction
+	penaltyRate = math.max(
+		constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE,
+		math.min(constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE, penaltyRate)
+	) -- Ensure penalty is within bounds
 
 	-- Calculate the penalty amount and the amount to withdraw
 	local vaultBalance = vault.balance
-
-	local expenditedWithdrawalFee = math.floor(vaultBalance * penaltyRate)
-	local amountToWithdraw = vaultBalance - expenditedWithdrawalFee
+	local expeditedWithdrawalFee = math.floor(vaultBalance * penaltyRate)
+	local amountToWithdraw = vaultBalance - expeditedWithdrawalFee
 
 	-- Add penalty to AR.IO protocol balance
-	balances.increaseBalance(ao.id, expenditedWithdrawalFee)
+	balances.increaseBalance(ao.id, expeditedWithdrawalFee)
 	balances.increaseBalance(from, amountToWithdraw)
 
 	-- Remove the vault after withdrawal
@@ -843,7 +847,11 @@ function gar.instantDelegateWithdrawal(from, gatewayAddress, vaultId, currentTim
 	GatewayRegistry[gatewayAddress] = gateway
 	return {
 		delegate = gar.getGateway(gatewayAddress).delegates[from],
-		totalDelegatedStake = gateway.totalDelegatedStake,
+		elapsedTime = elapsedTime,
+		remainingTime = totalWithdrawalTime - elapsedTime,
+		penaltyRate = penaltyRate,
+		expeditedWithdrawalFee = expeditedWithdrawalFee,
+		amountWithdrawn = amountToWithdraw,
 	}
 end
 

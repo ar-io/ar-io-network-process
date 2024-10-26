@@ -39,7 +39,7 @@ describe('setup', () => {
 
   describe('handlers', () => {
     it('should always have correct number of handlers', async () => {
-      const expectedHandlerCount = 53; // TODO: update this if more handlers are added
+      const expectedHandlerCount = processId === IO_DEVNET_PROCESS_ID ? 58 : 53; // TODO: update this if more handlers are added
       const { Handlers: handlersList } = await io.getInfo();
       /**
        * There are two security handlers before _eval and _default, so count is 52
@@ -365,8 +365,8 @@ describe('setup', () => {
       );
 
       let cursor = '';
-      let countedTotalGateways = 0;
       let totalGateways = 0;
+      const uniqueGateways = new Set();
       do {
         const {
           items: gateways,
@@ -376,8 +376,8 @@ describe('setup', () => {
           cursor,
         });
         totalGateways = totalItems;
-        countedTotalGateways += gateways.length;
         for (const gateway of gateways) {
+          uniqueGateways.add(gateway.gatewayAddress);
           if (gateway.status === 'joined') {
             assert(
               Number.isInteger(gateway.operatorStake),
@@ -473,8 +473,8 @@ describe('setup', () => {
         cursor = nextCursor;
       } while (cursor !== undefined);
       assert(
-        countedTotalGateways === totalGateways,
-        `Counted total gateways (${countedTotalGateways}) does not match total gateways (${totalGateways})`,
+        uniqueGateways.size === totalGateways,
+        `Counted total gateways (${uniqueGateways.size}) does not match total gateways (${totalGateways})`,
       );
     });
   });
@@ -483,58 +483,67 @@ describe('setup', () => {
   describe('arns names', () => {
     const twoWeeks = 2 * 7 * 24 * 60 * 60 * 1000;
     it('should not have any arns records older than two weeks', async () => {
-      let cursor = '';
-      let countedTotalArns = 0;
-      let totalArns = 0;
-      do {
-        const {
-          items: arns,
-          nextCursor,
-          totalItems,
-        } = await io.getArNSRecords({
-          cursor,
-        });
-        totalArns = totalItems;
-        countedTotalArns += arns.length;
-        for (const arn of arns) {
-          assert(arn.processId, `ARNs name '${arn.name}' has no processId`);
-          assert(arn.type, `ARNs name '${arn.name}' has no type`);
-          assert(
-            arn.startTimestamp,
-            `ARNs name '${arn.name}' has no start timestamp`,
-          );
-          assert(
-            Number.isInteger(arn.purchasePrice) && arn.purchasePrice >= 0,
-            `ARNs name '${arn.name}' has invalid purchase price: ${arn.purchasePrice}`,
-          );
-          assert(
-            Number.isInteger(arn.undernameLimit) && arn.undernameLimit >= 10,
-            `ARNs name '${arn.name}' has invalid undername limit: ${arn.undernameLimit}`,
-          );
-          if (arns.type === 'lease') {
-            assert(
-              arn.endTimestamp,
-              `ARNs name '${arn.name}' has no end timestamp`,
-            );
-            assert(
-              arn.endTimestamp > Date.now() - twoWeeks,
-              `ARNs name '${arn.name}' is older than two weeks`,
-            );
-          }
-          // if permabuy, assert no endTimestamp
-          if (arn.type === 'permabuy') {
-            assert(
-              !arn.endTimestamp,
-              `ARNs name '${arn.name}' has an end timestamp`,
-            );
-          }
-        }
-        cursor = nextCursor;
-      } while (cursor !== undefined);
-      assert(
-        countedTotalArns === totalArns,
-        `Counted total ARNs (${countedTotalArns}) does not match total ARNs (${totalArns})`,
+      // TODO: Remove this when we figure out whether do/while is causing test hanging
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Test timed out after 60 seconds')), 60000)
       );
+
+      const testLogicPromise = (async () => {
+        let cursor = '';
+        let totalArns = 0;
+        const uniqueNames = new Set();
+        do {
+          const {
+            items: arns,
+            nextCursor,
+            totalItems,
+          } = await io.getArNSRecords({
+            cursor,
+          });
+          totalArns = totalItems;
+          for (const arn of arns) {
+            uniqueNames.add(arn.name);
+            assert(arn.processId, `ARNs name '${arn.name}' has no processId`);
+            assert(arn.type, `ARNs name '${arn.name}' has no type`);
+            assert(
+              arn.startTimestamp,
+              `ARNs name '${arn.name}' has no start timestamp`,
+            );
+            assert(
+              Number.isInteger(arn.purchasePrice) && arn.purchasePrice >= 0,
+              `ARNs name '${arn.name}' has invalid purchase price: ${arn.purchasePrice}`,
+            );
+            assert(
+              Number.isInteger(arn.undernameLimit) && arn.undernameLimit >= 10,
+              `ARNs name '${arn.name}' has invalid undername limit: ${arn.undernameLimit}`,
+            );
+            if (arns.type === 'lease') {
+              assert(
+                arn.endTimestamp,
+                `ARNs name '${arn.name}' has no end timestamp`,
+              );
+              assert(
+                arn.endTimestamp > Date.now() - twoWeeks,
+                `ARNs name '${arn.name}' is older than two weeks`,
+              );
+            }
+            // if permabuy, assert no endTimestamp
+            if (arn.type === 'permabuy') {
+              assert(
+                !arn.endTimestamp,
+                `ARNs name '${arn.name}' has an end timestamp`,
+              );
+            }
+          }
+          cursor = nextCursor;
+        } while (cursor !== undefined);
+        assert(
+          uniqueNames.size === totalArns,
+          `Counted total ARNs (${uniqueNames.size}) does not match total ARNs (${totalArns})`,
+        );
+      })();
+
+      await Promise.race([testLogicPromise, timeoutPromise]);
     });
   });
 });

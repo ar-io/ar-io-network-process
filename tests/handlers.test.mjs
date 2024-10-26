@@ -38,13 +38,16 @@ describe('handlers', async () => {
     const evalIndex = handlersList.indexOf('_eval');
     const defaultIndex = handlersList.indexOf('_default');
     const pruneIndex = handlersList.indexOf('prune');
-    const expectedHandlerCount = 51; // TODO: update this if more handlers are added
+    const expectedHandlerCount = 56; // TODO: update this if more handlers are added
     assert.ok(evalIndex === 0);
     assert.ok(defaultIndex === 1);
     assert.ok(pruneIndex === 2);
     assert.ok(
       handlersList.length === expectedHandlerCount,
-      'should only have 3 handlers',
+      'should have ' +
+        expectedHandlerCount +
+        ' handlers; got ' +
+        handlersList.length,
     ); // forces us to think critically about the order of handlers so intended to be sensitive to changes
   });
 

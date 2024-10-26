@@ -83,20 +83,27 @@ local ActionMap = {
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
 	CancelDelegateWithdrawal = "Cancel-Delegate-Withdrawal",
 	InstantDelegateWithdrawal = "Instant-Delegate-Withdrawal",
+
+	-- auctions
+	Auctions = "Auctions",
+	ReleaseName = "Release-Name",
+	AuctionInfo = "Auction-Info",
+	AuctionBid = "Auction-Bid",
+	AuctionPrices = "Auction-Prices",
 }
 
 -- Low fidelity trackers
-local lastKnownCirculatingSupply = lastKnownCirculatingSupply or 0
-local lastKnownLockedSupply = lastKnownLockedSupply or 0
-local lastKnownStakedSupply = lastKnownStakedSupply or 0
-local lastKnownDelegatedSupply = lastKnownDelegatedSupply or 0
-local lastKnownWithdrawSupply = lastKnownWithdrawSupply or 0
+LastKnownCirculatingSupply = LastKnownCirculatingSupply or 0
+LastKnownLockedSupply = LastKnownLockedSupply or 0
+LastKnownStakedSupply = LastKnownStakedSupply or 0
+LastKnownDelegatedSupply = LastKnownDelegatedSupply or 0
+LastKnownWithdrawSupply = LastKnownWithdrawSupply or 0
 local function lastKnownTotalTokenSupply()
-	return lastKnownCirculatingSupply
-		+ lastKnownLockedSupply
-		+ lastKnownStakedSupply
-		+ lastKnownDelegatedSupply
-		+ lastKnownWithdrawSupply
+	return LastKnownCirculatingSupply
+		+ LastKnownLockedSupply
+		+ LastKnownStakedSupply
+		+ LastKnownDelegatedSupply
+		+ LastKnownWithdrawSupply
 		+ Balances[Protocol]
 end
 
@@ -131,11 +138,11 @@ end
 
 local function addSupplyData(ioEvent, supplyData)
 	supplyData = supplyData or {}
-	ioEvent:addField("Circulating-Supply", supplyData.circulatingSupply or lastKnownCirculatingSupply)
-	ioEvent:addField("Locked-Supply", supplyData.lockedSupply or lastKnownLockedSupply)
-	ioEvent:addField("Staked-Supply", supplyData.stakedSupply or lastKnownStakedSupply)
-	ioEvent:addField("Delegated-Supply", supplyData.delegatedSupply or lastKnownDelegatedSupply)
-	ioEvent:addField("Withdraw-Supply", supplyData.withdrawSupply or lastKnownWithdrawSupply)
+	ioEvent:addField("Circulating-Supply", supplyData.circulatingSupply or LastKnownCirculatingSupply)
+	ioEvent:addField("Locked-Supply", supplyData.lockedSupply or LastKnownLockedSupply)
+	ioEvent:addField("Staked-Supply", supplyData.stakedSupply or LastKnownStakedSupply)
+	ioEvent:addField("Delegated-Supply", supplyData.delegatedSupply or LastKnownDelegatedSupply)
+	ioEvent:addField("Withdraw-Supply", supplyData.withdrawSupply or LastKnownWithdrawSupply)
 	ioEvent:addField("Total-Token-Supply", supplyData.totalTokenSupply or lastKnownTotalTokenSupply())
 	ioEvent:addField("Protocol-Balance", Balances[Protocol])
 end
@@ -154,6 +161,56 @@ local function gatewayStats()
 		joined = numJoinedGateways,
 		leaving = numLeavingGateways,
 	}
+end
+
+local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply
+		+ (pruneGatewaysResult.delegateStakeReturned or 0)
+		+ (pruneGatewaysResult.gatewayStakeReturned or 0)
+
+	LastKnownWithdrawSupply = LastKnownWithdrawSupply
+		- (pruneGatewaysResult.delegateStakeReturned or 0)
+		- (pruneGatewaysResult.gatewayStakeReturned or 0)
+		+ (pruneGatewaysResult.delegateStakeWithdrawing or 0)
+		+ (pruneGatewaysResult.gatewayStakeWithdrawing or 0)
+
+	LastKnownDelegatedSupply = LastKnownDelegatedSupply - (pruneGatewaysResult.delegateStakeWithdrawing or 0)
+
+	local totalGwStakesSlashed = (pruneGatewaysResult.stakeSlashed or 0)
+	LastKnownStakedSupply = LastKnownStakedSupply
+		- totalGwStakesSlashed
+		- (pruneGatewaysResult.gatewayStakeWithdrawing or 0)
+
+	if totalGwStakesSlashed > 0 then
+		ioEvent:addField("Total-Gateways-Stake-Slashed", totalGwStakesSlashed)
+	end
+
+	local prunedGateways = pruneGatewaysResult.prunedGateways or {}
+	local prunedGatewaysCount = utils.lengthOfTable(prunedGateways)
+	if prunedGatewaysCount > 0 then
+		ioEvent:addField("Pruned-Gateways", prunedGateways)
+		ioEvent:addField("Pruned-Gateways-Count", prunedGatewaysCount)
+		local gwStats = gatewayStats()
+		ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
+		ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
+	end
+
+	local slashedGateways = pruneGatewaysResult.slashedGateways or {}
+	local slashedGatewaysCount = utils.lengthOfTable(slashedGateways or {})
+	if slashedGatewaysCount > 0 then
+		ioEvent:addField("Slashed-Gateway-Amounts", slashedGateways)
+		ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
+		local invariantSlashedGateways = {}
+		for _, gwAddress in pairs(slashedGateways) do
+			local gw = gar.getGateway(gwAddress) or {}
+			if gw.totalDelegatedStake > 0 then
+				invariantSlashedGateways[gwAddress] = gw.totalDelegatedStake
+			end
+		end
+		if utils.lengthOfTable(invariantSlashedGateways) > 0 then
+			ioEvent:addField("Invariant-Slashed-Gateways", invariantSlashedGateways)
+		end
+	end
 end
 
 local function addEventingHandler(handlerName, pattern, handleFn)
@@ -186,11 +243,11 @@ end, function(msg)
 		NameRegistry = utils.deepCopy(NameRegistry),
 		Epochs = utils.deepCopy(Epochs),
 		Balances = utils.deepCopy(Balances),
-		lastKnownCirculatingSupply = lastKnownCirculatingSupply,
-		lastKnownLockedSupply = lastKnownLockedSupply,
-		lastKnownStakedSupply = lastKnownStakedSupply,
-		lastKnownDelegatedSupply = lastKnownDelegatedSupply,
-		lastKnownWithdrawSupply = lastKnownWithdrawSupply,
+		lastKnownCirculatingSupply = LastKnownCirculatingSupply,
+		lastKnownLockedSupply = LastKnownLockedSupply,
+		lastKnownStakedSupply = LastKnownStakedSupply,
+		lastKnownDelegatedSupply = LastKnownDelegatedSupply,
+		lastKnownWithdrawSupply = LastKnownWithdrawSupply,
 		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
 	}
 	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId)
@@ -206,7 +263,7 @@ end, function(msg)
 		NameRegistry = previousState.NameRegistry
 		Epochs = previousState.Epochs
 		Balances = previousState.Balances
-		msg.ioEvent:addField("TickError", tostring(resultOrError))
+		msg.ioEvent:addField("Tick-Error", tostring(resultOrError))
 		return true -- stop processing here and return
 	end
 
@@ -221,13 +278,25 @@ end, function(msg)
 			msg.ioEvent:addField("Pruned-Records-Count", prunedRecordsCount)
 			msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
 		end
+		local prunedAuctions = resultOrError.prunedAuctions or {}
+		local prunedAuctionsCount = utils.lengthOfTable(prunedAuctions)
+		if prunedAuctionsCount > 0 then
+			msg.ioEvent:addField("Pruned-Auctions", prunedAuctions)
+			msg.ioEvent:addField("Pruned-Auctions-Count", prunedAuctionsCount)
+		end
+		local prunedReserved = resultOrError.prunedReserved or {}
+		local prunedReservedCount = utils.lengthOfTable(prunedReserved)
+		if prunedReservedCount > 0 then
+			msg.ioEvent:addField("Pruned-Reserved", prunedReserved)
+			msg.ioEvent:addField("Pruned-Reserved-Count", prunedReservedCount)
+		end
 		local prunedVaultsCount = utils.lengthOfTable(resultOrError.prunedVaults or {})
 		if prunedVaultsCount > 0 then
 			msg.ioEvent:addField("Pruned-Vaults", resultOrError.prunedVaults)
 			msg.ioEvent:addField("Pruned-Vaults-Count", prunedVaultsCount)
 			for _, vault in pairs(resultOrError.prunedVaults) do
-				lastKnownLockedSupply = lastKnownLockedSupply - vault.balance
-				lastKnownCirculatingSupply = lastKnownCirculatingSupply + vault.balance
+				LastKnownLockedSupply = LastKnownLockedSupply - vault.balance
+				LastKnownCirculatingSupply = LastKnownCirculatingSupply + vault.balance
 			end
 		end
 		local prunedEpochsCount = utils.lengthOfTable(resultOrError.prunedEpochs or {})
@@ -236,49 +305,16 @@ end, function(msg)
 			msg.ioEvent:addField("Pruned-Epochs-Count", prunedEpochsCount)
 		end
 
-		local pruneGatewayResults = resultOrError.pruneGatewayResults or {}
-		lastKnownCirculatingSupply = lastKnownCirculatingSupply
-			+ (pruneGatewayResults.delegateStakeReturned or 0)
-			+ (pruneGatewayResults.gatewayStakeReturned or 0)
-		lastKnownWithdrawSupply = lastKnownWithdrawSupply
-			- (pruneGatewayResults.delegateStakeReturned or 0)
-			- (pruneGatewayResults.gatewayStakeReturned or 0)
-		lastKnownStakedSupply = lastKnownStakedSupply - (pruneGatewayResults.stakeSlashed or 0)
-
-		local prunedGateways = pruneGatewayResults.prunedGateways or {}
-		local prunedGatewaysCount = utils.lengthOfTable(prunedGateways)
-		if prunedGatewaysCount > 0 then
-			msg.ioEvent:addField("Pruned-Gateways", prunedGateways)
-			msg.ioEvent:addField("Pruned-Gateways-Count", prunedGatewaysCount)
-			local gwStats = gatewayStats()
-			msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
-			msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
-		end
-
-		local slashedGateways = pruneGatewayResults.slashedGateways or {}
-		local slashedGatewaysCount = utils.lengthOfTable(slashedGateways or {})
-		if slashedGatewaysCount > 0 then
-			msg.ioEvent:addField("Slashed-Gateways", slashedGateways)
-			msg.ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
-			local invariantSlashedGateways = {}
-			for _, gwAddress in pairs(slashedGateways) do
-				local gw = gar.getGateway(gwAddress) or {}
-				if gw.totalDelegatedStake > 0 then
-					invariantSlashedGateways[gwAddress] = gw.totalDelegatedStake
-				end
-			end
-			if utils.lengthOfTable(invariantSlashedGateways) > 0 then
-				msg.ioEvent:addField("Invariant-Slashed-Gateways", invariantSlashedGateways)
-			end
-		end
+		local pruneGatewaysResult = resultOrError.pruneGatewaysResult or {}
+		addPruneGatewaysResult(msg.ioEvent, pruneGatewaysResult)
 	end
 
 	if
-		lastKnownCirculatingSupply ~= previousState.lastKnownCirculatingSupply
-		or lastKnownLockedSupply ~= previousState.lastKnownLockedSupply
-		or lastKnownStakedSupply ~= previousState.lastKnownStakedSupply
-		or lastKnownDelegatedSupply ~= previousState.lastKnownDelegatedSupply
-		or lastKnownWithdrawSupply ~= previousState.lastKnownWithdrawSupply
+		LastKnownCirculatingSupply ~= previousState.lastKnownCirculatingSupply
+		or LastKnownLockedSupply ~= previousState.lastKnownLockedSupply
+		or LastKnownStakedSupply ~= previousState.lastKnownStakedSupply
+		or LastKnownDelegatedSupply ~= previousState.lastKnownDelegatedSupply
+		or LastKnownWithdrawSupply ~= previousState.lastKnownWithdrawSupply
 		or Balances[Protocol] ~= previousState.Balances[Protocol]
 		or lastKnownTotalTokenSupply() ~= previousState.lastKnownTotalSupply
 	then
@@ -424,8 +460,8 @@ addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionM
 		msg.ioEvent:addField("Vault-End-Timestamp", vault.endTimestamp)
 	end
 
-	lastKnownLockedSupply = lastKnownLockedSupply + quantity
-	lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
+	LastKnownLockedSupply = LastKnownLockedSupply + quantity
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
 	addSupplyData(msg.ioEvent)
 
 	ao.send({
@@ -487,8 +523,8 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 		msg.ioEvent:addField("Vault-End-Timestamp", vault.endTimestamp)
 	end
 
-	lastKnownLockedSupply = lastKnownLockedSupply + quantity
-	lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
+	LastKnownLockedSupply = LastKnownLockedSupply + quantity
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
 	addSupplyData(msg.ioEvent)
 
 	-- sender gets an immediate debit notice as the quantity is debited from their balance
@@ -600,8 +636,8 @@ addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", Actio
 		msg.ioEvent:addField("VaultEndTimestamp", vault.endTimestamp)
 	end
 
-	lastKnownLockedSupply = lastKnownLockedSupply + quantity
-	lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
+	LastKnownLockedSupply = LastKnownLockedSupply + quantity
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
 	addSupplyData(msg.ioEvent)
 
 	ao.send({
@@ -639,26 +675,23 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 
 	msg.ioEvent:addField("nameLength", #msg.Tags.Name)
 
-	local shouldContinue2, result = eventingPcall(
-		msg.ioEvent,
-		function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Invalid-Buy-Record-Notice",
-					Error = "Invalid-Buy-Record",
-				},
-				Data = tostring(error),
-			})
-		end,
-		arns.buyRecord,
-		string.lower(msg.Tags.Name),
-		msg.Tags["Purchase-Type"],
-		tonumber(msg.Tags.Years),
-		msg.From,
-		msg.Timestamp,
-		msg.Tags["Process-Id"]
-	)
+	local name = string.lower(msg.Tags.Name)
+	local purchaseType = string.lower(msg.Tags["Purchase-Type"])
+	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
+	local from = utils.formatAddress(msg.From)
+	local processId = msg.Tags["Process-Id"]
+	local timestamp = tonumber(msg.Timestamp)
+
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Invalid-Buy-Record-Notice",
+				Error = "Invalid-Buy-Record",
+			},
+			Data = tostring(error),
+		})
+	end, arns.buyRecord, name, purchaseType, years, from, timestamp, processId)
 	if not shouldContinue2 then
 		return
 	end
@@ -667,7 +700,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	if result ~= nil then
 		record = result.record
 		addRecordResultFields(msg.ioEvent, result)
-		lastKnownCirculatingSupply = lastKnownCirculatingSupply - record.purchasePrice
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply - record.purchasePrice
 		addSupplyData(msg.ioEvent)
 	end
 
@@ -676,7 +709,14 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = "Buy-Record-Notice", Name = msg.Tags.Name },
-		Data = json.encode(record),
+		Data = json.encode({
+			name = name,
+			startTimestamp = record.startTimestamp,
+			endTimestamp = record.endTimestamp,
+			undernameLimit = record.undernameLimit,
+			purchasePrice = record.purchasePrice,
+			processId = record.processId,
+		}),
 	})
 end)
 
@@ -716,7 +756,7 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 		recordResult = result.record
 		addRecordResultFields(msg.ioEvent, result)
 		msg.ioEvent:addField("totalExtensionFee", recordResult.totalExtensionFee)
-		lastKnownCirculatingSupply = lastKnownCirculatingSupply - recordResult.totalExtensionFee
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply - recordResult.totalExtensionFee
 		addSupplyData(msg.ioEvent)
 	end
 
@@ -777,7 +817,7 @@ addEventingHandler(
 			addRecordResultFields(msg.ioEvent, result)
 			msg.ioEvent:addField("previousUndernameLimit", recordResult.undernameLimit - tonumber(msg.Tags.Quantity))
 			msg.ioEvent:addField("additionalUndernameCost", recordResult.additionalUndernameCost)
-			lastKnownCirculatingSupply = lastKnownCirculatingSupply - recordResult.additionalUndernameCost
+			LastKnownCirculatingSupply = LastKnownCirculatingSupply - recordResult.additionalUndernameCost
 			addSupplyData(msg.ioEvent)
 		end
 
@@ -922,8 +962,8 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
 	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
 
-	lastKnownCirculatingSupply = lastKnownCirculatingSupply - stake
-	lastKnownStakedSupply = lastKnownStakedSupply + stake
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply - stake
+	LastKnownStakedSupply = LastKnownStakedSupply + stake
 	addSupplyData(msg.ioEvent)
 
 	ao.send({
@@ -985,8 +1025,8 @@ addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", Action
 	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
 	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
 
-	lastKnownStakedSupply = lastKnownStakedSupply - gwPrevStake - gwPrevTotalDelegatedStake
-	lastKnownWithdrawSupply = lastKnownWithdrawSupply + gwPrevStake + gwPrevTotalDelegatedStake
+	LastKnownStakedSupply = LastKnownStakedSupply - gwPrevStake - gwPrevTotalDelegatedStake
+	LastKnownWithdrawSupply = LastKnownWithdrawSupply + gwPrevStake + gwPrevTotalDelegatedStake
 	addSupplyData(msg.ioEvent)
 
 	ao.send({
@@ -1038,8 +1078,8 @@ addEventingHandler(
 			msg.ioEvent:addField("Previous-Operator-Stake", gateway.operatorStake - quantity)
 		end
 
-		lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
-		lastKnownStakedSupply = lastKnownStakedSupply + quantity
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
+		LastKnownStakedSupply = LastKnownStakedSupply + quantity
 		addSupplyData(msg.ioEvent)
 
 		ao.send({
@@ -1103,8 +1143,8 @@ addEventingHandler(
 			end
 		end
 
-		lastKnownStakedSupply = lastKnownStakedSupply - quantity
-		lastKnownWithdrawSupply = lastKnownWithdrawSupply + quantity
+		LastKnownStakedSupply = LastKnownStakedSupply - quantity
+		LastKnownWithdrawSupply = LastKnownWithdrawSupply + quantity
 		addSupplyData(msg.ioEvent)
 
 		ao.send({
@@ -1160,8 +1200,8 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 		delegateResult = gateway.delegates[from]
 	end
 
-	lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
-	lastKnownStakedSupply = lastKnownStakedSupply + quantity
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
+	LastKnownStakedSupply = LastKnownStakedSupply + quantity
 	addSupplyData(msg.ioEvent)
 
 	ao.send({
@@ -1220,8 +1260,8 @@ addEventingHandler(
 				msg.ioEvent:addField("NewStake", newStake)
 				msg.ioEvent:addField("GatewayTotalDelegatedStake", result.totalDelegatedStake)
 
-				lastKnownStakedSupply = lastKnownStakedSupply + vaultBalance
-				lastKnownWithdrawSupply = lastKnownWithdrawSupply - vaultBalance
+				LastKnownStakedSupply = LastKnownStakedSupply + vaultBalance
+				LastKnownWithdrawSupply = LastKnownWithdrawSupply - vaultBalance
 				addSupplyData(msg.ioEvent)
 			end
 		end
@@ -1277,16 +1317,23 @@ addEventingHandler(
 			return
 		end
 
-		local delegateResult = {}
+		local delegateResult = result and result.delegate or {
+			delegatedStake = 0,
+			vaults = {},
+		}
+		msg.ioEvent:addField("Remaining-Delegate-Stake", delegateResult.delegatedStake)
 		if result ~= nil then
-			if result.delegate ~= nil then
-				delegateResult = result.delegate
-				local newStake = delegateResult.delegatedStake
-				msg.ioEvent:addField("PreviousStake", newStake - delegateResult.vaults[vaultId].balance)
-				msg.ioEvent:addField("NewStake", newStake)
-				msg.ioEvent:addField("GatewayTotalDelegatedStake", result.totalDelegatedStake)
-			end
+			msg.ioEvent:addField("Vault-Elapsed-Time", result.elapsedTime)
+			msg.ioEvent:addField("Vault-Remaining-Time", result.remainingTime)
+			msg.ioEvent:addField("Penalty-Rate", result.penaltyRate)
+			msg.ioEvent:addField("Instant-Withdrawal-Fee", result.expeditedWithdrawalFee)
+			msg.ioEvent:addField("Amount-Withdrawn", result.amountWithdrawn)
+			msg.ioEvent:addField("Previous-Vault-Balance", result.amountWithdrawn + result.expeditedWithdrawalFee)
+			LastKnownCirculatingSupply = LastKnownCirculatingSupply + result.amountWithdrawn
+			LastKnownWithdrawSupply = LastKnownWithdrawSupply - result.amountWithdrawn - result.expeditedWithdrawalFee
 		end
+
+		addSupplyData(msg.ioEvent)
 
 		ao.send({
 			Target = msg.From,
@@ -1350,13 +1397,22 @@ addEventingHandler(
 			return
 		end
 
+		local instantWithdrawalFee = 0
+		local amountWithdrawn = 0
+		if instantWithdraw then
+			instantWithdrawalFee = quantity * constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
+			amountWithdrawn = quantity - instantWithdrawalFee
+			msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
+			msg.ioEvent:addField("Instant-Withdrawal-Fee", instantWithdrawalFee)
+			msg.ioEvent:addField("Amount-Withdrawn", amountWithdrawn)
+		end
+
 		local delegateResult = {}
 		if gateway ~= nil then
 			local newStake = gateway.delegates[from].delegatedStake
 			msg.ioEvent:addField("Previous-Stake", newStake + quantity)
 			msg.ioEvent:addField("New-Stake", newStake)
 			msg.ioEvent:addField("Gateway-Total-Delegated-Stake", gateway.totalDelegatedStake)
-			msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
 			delegateResult = gateway.delegates[from]
 			local newDelegateVaults = delegateResult.vaults
 			if newDelegateVaults ~= nil then
@@ -1371,8 +1427,11 @@ addEventingHandler(
 			end
 		end
 
-		lastKnownStakedSupply = lastKnownStakedSupply - quantity
-		lastKnownWithdrawSupply = lastKnownWithdrawSupply + quantity
+		LastKnownDelegatedSupply = LastKnownDelegatedSupply - quantity
+		if not instantWithdraw then
+			LastKnownWithdrawSupply = LastKnownWithdrawSupply + quantity
+		end
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply + amountWithdrawn
 		addSupplyData(msg.ioEvent)
 
 		ao.send({
@@ -1584,11 +1643,11 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 		end
 	end
 
-	lastKnownCirculatingSupply = circulatingSupply
-	lastKnownLockedSupply = lockedSupply
-	lastKnownStakedSupply = stakedSupply
-	lastKnownDelegatedSupply = delegatedSupply
-	lastKnownWithdrawSupply = withdrawSupply
+	LastKnownCirculatingSupply = circulatingSupply
+	LastKnownLockedSupply = lockedSupply
+	LastKnownStakedSupply = stakedSupply
+	LastKnownDelegatedSupply = delegatedSupply
+	LastKnownWithdrawSupply = withdrawSupply
 
 	addSupplyData(msg.ioEvent, {
 		totalTokenSupply = totalSupply,
@@ -1628,6 +1687,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	local function tickEpoch(timestamp, blockHeight, hashchain)
 		-- update demand factor if necessary
 		local demandFactor = demand.updateDemandFactor(timestamp)
+		-- distribute rewards for the epoch and increments stats for gateways, this closes the epoch if the timestamp is greater than the epochs required distribution timestamp
 		local distributedEpoch = epochs.distributeRewardsForEpoch(timestamp)
 		if distributedEpoch ~= nil and distributedEpoch.epochIndex ~= nil then
 			tickedRewardDistributions[tostring(distributedEpoch.epochIndex)] =
@@ -1635,11 +1695,15 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 			totalTickedRewardsDistributed = totalTickedRewardsDistributed
 				+ distributedEpoch.distributions.totalDistributedRewards
 		end
+		-- prune any gateway that has hit the failed 30 consecutive epoch threshold after the epoch has been distributed
+		local pruneGatewaysResult = gar.pruneGateways(timestamp)
 
+		-- now create the new epoch with the current message hashchain and block height
 		local newEpoch = epochs.createEpoch(timestamp, tonumber(blockHeight), hashchain)
 		return {
 			maybeEpoch = newEpoch,
 			maybeDemandFactor = demandFactor,
+			pruneGatewaysResult = pruneGatewaysResult,
 		}
 	end
 
@@ -1664,6 +1728,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	local tickedEpochIndexes = {}
 	local newEpochIndexes = {}
 	local newDemandFactors = {}
+	local newPruneGatewaysResults = {}
 	for i = lastTickedEpochIndex + 1, targetCurrentEpochIndex do
 		print("Ticking epoch: " .. i)
 		local previousState = {
@@ -1696,6 +1761,9 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 			if resultOrError.maybeDemandFactor ~= nil then
 				table.insert(newDemandFactors, resultOrError.maybeDemandFactor)
 			end
+			if resultOrError.pruneGatewaysResult ~= nil then
+				table.insert(newPruneGatewaysResults, resultOrError.pruneGatewaysResult)
+			end
 		else
 			-- reset the state to previous state
 			Balances = previousState.Balances
@@ -1727,10 +1795,40 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	if #newDemandFactors > 0 then
 		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors, ";")
 	end
+	if #newPruneGatewaysResults > 0 then
+		-- Reduce the prune gatways results and then track changes
+		local aggregatedPruneGatewaysResult = utils.reduce(
+			newPruneGatewaysResults,
+			function(acc, _, pruneGatewaysResult)
+				for _, address in pairs(pruneGatewaysResult.prunedGateways) do
+					table.insert(acc.prunedGateways, address)
+				end
+				for address, slashAmount in pairs(pruneGatewaysResult.slashedGateways) do
+					acc.slashedGateways[address] = (acc.slashedGateways[address] or 0) + slashAmount
+				end
+				acc.gatewayStakeReturned = acc.gatewayStakeReturned + pruneGatewaysResult.gatewayStakeReturned
+				acc.delegateStakeReturned = acc.delegateStakeReturned + pruneGatewaysResult.delegateStakeReturned
+				acc.gatewayStakeWithdrawing = acc.gatewayStakeWithdrawing + pruneGatewaysResult.gatewayStakeWithdrawing
+				acc.delegateStakeWithdrawing = acc.delegateStakeWithdrawing
+					+ pruneGatewaysResult.delegateStakeWithdrawing
+				return acc
+			end,
+			{
+				prunedGateways = {},
+				slashedGateways = {},
+				gatewayStakeReturned = 0,
+				delegateStakeReturned = 0,
+				gatewayStakeWithdrawing = 0,
+				delegateStakeWithdrawing = 0,
+				stakeSlashed = 0,
+			}
+		)
+		addPruneGatewaysResult(msg.ioEvent, aggregatedPruneGatewaysResult)
+	end
 	if utils.lengthOfTable(tickedRewardDistributions) > 0 then
 		msg.ioEvent:addField("Ticked-Reward-Distributions", tickedRewardDistributions)
 		msg.ioEvent:addField("Total-Ticked-Rewards-Distributed", totalTickedRewardsDistributed)
-		lastKnownCirculatingSupply = lastKnownCirculatingSupply + totalTickedRewardsDistributed
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply + totalTickedRewardsDistributed
 	end
 
 	local gwStats = gatewayStats()
@@ -1819,8 +1917,6 @@ end)
 
 addEventingHandler(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMap.Balance), function(msg)
 	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From)
-
-	-- TODO: arconnect et. all expect to accept Target
 	local balance = balances.getBalance(target)
 	-- must adhere to token.lua spec for arconnect compatibility
 	ao.send({
@@ -2134,5 +2230,291 @@ addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginate
 end)
 
 -- END READ HANDLERS
+
+-- AUCTION HANDLER
+addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.ReleaseName), function(msg)
+	-- validate the name and process id exist, then create the auction using the auction function
+	local name = msg.Tags.Name
+	local processId = msg.From
+	local record = arns.getRecord(name)
+	local initiator = msg.Tags.Initiator
+
+	-- TODO: validate processId and initiator are valid addresses
+	if not record then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Record-Not-Found",
+		})
+		return
+	end
+
+	if record.processId ~= processId then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Process-Id-Mismatch",
+		})
+		return
+	end
+
+	if record.type ~= "permabuy" then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Invalid-Record-Type",
+			-- only permabought names can be released by the process that owns the name
+		})
+		return
+	end
+
+	-- we should be able to create the auction here
+	local status, auctionOrError = pcall(arns.createAuction, name, tonumber(msg.Timestamp), initiator)
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Auction-Creation-Error",
+			Data = tostring(auctionOrError),
+		})
+		return
+	end
+
+	if not auctionOrError or not auctionOrError.name then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Auction-Creation-Error",
+			Data = tostring(auctionOrError),
+		})
+		return
+	end
+
+	local auction = {
+		name = auctionOrError.name,
+		startTimestamp = auctionOrError.startTimestamp,
+		endTimestamp = auctionOrError.endTimestamp,
+		initiator = auctionOrError.initiator,
+		baseFee = auctionOrError.baseFee,
+		demandFactor = auctionOrError.demandFactor,
+		settings = auctionOrError.settings,
+	}
+	ao.send({
+		Action = "Auction-Notice",
+		Name = name,
+		Data = json.encode(auction),
+	})
+	return
+end)
+
+-- AUCTIONS
+addEventingHandler("auctions", utils.hasMatchingTag("Action", ActionMap.Auctions), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local auctions = arns.getAuctions()
+	local auctionsWithoutFunctions = {}
+	for k, v in pairs(auctions) do
+		table.insert(auctionsWithoutFunctions, {
+			name = v.name,
+			startTimestamp = v.startTimestamp,
+			endTimestamp = v.endTimestamp,
+			initiator = v.initiator,
+			baseFee = v.baseFee,
+			demandFactor = v.demandFactor,
+			settings = v.settings,
+		})
+	end
+	-- paginate the auctions by name, showing auctions nearest to the endTimestamp first
+	local paginatedAuctions = utils.paginateTableWithCursor(
+		auctionsWithoutFunctions,
+		page.cursor,
+		"name",
+		page.limit,
+		page.sortBy or "endTimestamp",
+		page.sortOrder or "asc"
+	)
+	ao.send({
+		Target = msg.From,
+		Action = ActionMap.Auctions .. "-Notice",
+		Data = json.encode(paginatedAuctions),
+	})
+end)
+
+-- hadnler to get auction for a name
+addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.AuctionInfo), function(msg)
+	local name = string.lower(msg.Tags.Name)
+	local auction = arns.getAuction(name)
+	if not auction then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionInfo .. "-Notice",
+			Error = "Auction-Not-Found",
+		})
+		return
+	end
+
+	ao.send({
+		Target = msg.From,
+		Action = ActionMap.AuctionInfo .. "-Notice",
+		Data = json.encode({
+			name = auction.name,
+			startTimestamp = auction.startTimestamp,
+			endTimestamp = auction.endTimestamp,
+			initiator = auction.initiator,
+			baseFee = auction.baseFee,
+			demandFactor = auction.demandFactor,
+			settings = auction.settings,
+		}),
+	})
+end)
+
+-- Handler to get auction prices for a name
+addEventingHandler("auctionPrices", utils.hasMatchingTag("Action", ActionMap.AuctionPrices), function(msg)
+	local name = string.lower(msg.Tags.Name)
+	local auction = arns.getAuction(name)
+	local timestamp = tonumber(msg.Tags.Timestamp or msg.Timestamp)
+	local type = msg.Tags["Purchase-Type"] or "permabuy"
+	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
+	local intervalMs = msg.Tags["Price-Interval-Ms"] and tonumber(msg.Tags["Price-Interval-Ms"]) or 15 * 60 * 1000 -- 15 minute intervals by default
+
+	if not auction then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionPrices .. "-Notice",
+			Error = "Auction-Not-Found",
+		})
+		return
+	end
+
+	if not type then
+		type = "permabuy"
+	end
+
+	if type == "lease" then
+		years = years or 1
+	else
+		years = 20
+	end
+
+	local currentPrice = auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
+	local prices = auction:computePricesForAuction(type, years, intervalMs)
+	local jsonPrices = {}
+	for k, v in pairs(prices) do
+		jsonPrices[tostring(k)] = v
+	end
+
+	ao.send({
+		Target = msg.From,
+		Action = ActionMap.AuctionPrices .. "-Notice",
+		Data = json.encode({
+			name = auction.name,
+			type = type,
+			years = years,
+			prices = jsonPrices,
+			currentPrice = currentPrice,
+		}),
+	})
+end)
+
+addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.AuctionBid), function(msg)
+	local name = string.lower(msg.Tags.Name)
+	local bidAmount = msg.Tags.Quantity and tonumber(msg.Tags.Quantity) or nil -- if nil, we use the current bid price
+	local bidder = utils.formatAddress(msg.From)
+	local processId = utils.formatAddress(msg.Tags["Process-Id"])
+	local timestamp = tonumber(msg.Timestamp)
+	local type = msg.Tags["Purchase-Type"] or "permabuy"
+	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
+
+	-- assert name, bidder, processId are provided
+	local checkAssertions = function()
+		assert(name and #name > 0, "Name is required")
+		assert(bidder and utils.isValidAOAddress(bidder), "Bidder is required")
+		assert(processId and utils.isValidAOAddress(processId), "Process-Id is required")
+		assert(timestamp and timestamp > 0, "Timestamp is required")
+		-- if bidAmount is not nil assert that it is a number
+		if bidAmount then
+			assert(
+				type(bidAmount) == "number" and bidAmount > 0 and utils.isInteger(bidAmount),
+				"Bid amount must be a positive integer"
+			)
+		end
+		if type then
+			assert(type == "permabuy" or type == "lease", "Invalid auction type. Must be either 'permabuy' or 'lease'")
+		end
+		if type == "lease" then
+			if years then
+				assert(
+					years and utils.isInteger(years) and years > 0 and years <= constants.maxLeaseLengthYears,
+					"Years must be an integer between 1 and 5"
+				)
+			else
+				years = years or 1
+			end
+		end
+	end
+
+	local validateStatus, errorMessage = pcall(checkAssertions)
+	if not validateStatus then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice",
+			Error = "Bad-Input",
+			Data = tostring(errorMessage),
+		})
+		return
+	end
+
+	local auction = arns.getAuction(name)
+	if not auction then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice",
+			Error = "Auction-Not-Found",
+		})
+		return
+	end
+
+	local status, auctionBidOrError =
+		pcall(arns.submitAuctionBid, name, bidAmount, bidder, timestamp, processId, type, years)
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice",
+			Error = "Auction-Bid-Error",
+			Data = tostring(auctionBidOrError),
+		})
+		return
+	end
+
+	local record = auctionBidOrError.record
+
+	-- send buy record notice and auction close notice
+	ao.send({
+		Target = bidder,
+		Action = ActionMap.BuyRecord .. "-Notice",
+		Data = json.encode({
+			name = name,
+			startTimestamp = record.startTimestamp,
+			endTimestamp = record.endTimestamp,
+			undernameLimit = record.undernameLimit,
+			purchasePrice = record.purchasePrice,
+			processId = record.processId,
+			type = record.type,
+		}),
+	})
+
+	ao.send({
+		Target = auction.initiator,
+		Action = "Debit-Notice",
+		Quantity = tostring(auctionBidOrError.rewardForInitiator),
+		Data = json.encode({
+			name = name,
+			bidder = auctionBidOrError.bidder,
+			bidAmount = auctionBidOrError.bidAmount,
+			rewardForInitiator = auctionBidOrError.rewardForInitiator,
+			rewardForProtocol = auctionBidOrError.rewardForProtocol,
+			record = record,
+		}),
+	})
+end)
 
 return process
