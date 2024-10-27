@@ -1201,7 +1201,7 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 	end
 
 	LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
-	LastKnownStakedSupply = LastKnownStakedSupply + quantity
+	LastKnownDelegatedSupply = LastKnownDelegatedSupply + quantity
 	addSupplyData(msg.ioEvent)
 
 	ao.send({
@@ -1255,12 +1255,12 @@ addEventingHandler(
 			if result.delegate ~= nil then
 				delegateResult = result.delegate
 				local newStake = delegateResult.delegatedStake
-				local vaultBalance = delegateResult.vaults[vaultId].balance
-				msg.ioEvent:addField("PreviousStake", newStake - vaultBalance)
-				msg.ioEvent:addField("NewStake", newStake)
-				msg.ioEvent:addField("GatewayTotalDelegatedStake", result.totalDelegatedStake)
+				local vaultBalance = result.vaultBalance
+				msg.ioEvent:addField("Previous-Stake", newStake - vaultBalance)
+				msg.ioEvent:addField("New-Stake", newStake)
+				msg.ioEvent:addField("Gateway-Total-Delegated-Stake", result.totalDelegatedStake)
 
-				LastKnownStakedSupply = LastKnownStakedSupply + vaultBalance
+				LastKnownDelegatedSupply = LastKnownDelegatedSupply + vaultBalance
 				LastKnownWithdrawSupply = LastKnownWithdrawSupply - vaultBalance
 				addSupplyData(msg.ioEvent)
 			end
