@@ -692,17 +692,24 @@ end
 --- Prunes records that have expired
 --- @param currentTimestamp number The current timestamp
 --- @return table The pruned records
-function arns.pruneRecords(currentTimestamp)
+function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
+	lastGracePeriodEntryEndTimestamp = lastGracePeriodEntryEndTimestamp or 0
 	local prunedRecords = {}
+	local newGracePeriodRecords = {}
 	-- identify any records that are leases and that have expired, account for a one week grace period in seconds
 	for name, record in pairs(arns.getRecords()) do
-		if record.type == "lease" and record.endTimestamp + constants.gracePeriodMs <= currentTimestamp then
-			-- psych! create an auction for the name instantiated by protocol - it will get pruned out if the auction expires with no bids
-			prunedRecords[name] = record
-			arns.createAuction(name, currentTimestamp, ao.id)
+		if record.type == "lease" and currentTimestamp > record.endTimestamp then
+			if currentTimestamp >= record.endTimestamp + constants.gracePeriodMs then
+				-- lease is outside the grade period. start a dutch auction. it will get pruned out if it expires with no bids
+				prunedRecords[name] = record
+				arns.createAuction(name, currentTimestamp, ao.id)
+			elseif record.endTimestamp > lastGracePeriodEntryEndTimestamp then
+				-- lease is newly recognized as being within the grace period
+				newGracePeriodRecords[name] = record
+			end
 		end
 	end
-	return prunedRecords
+	return prunedRecords, newGracePeriodRecords
 end
 
 --- Prunes auctions that have expired
