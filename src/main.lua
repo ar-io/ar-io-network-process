@@ -753,11 +753,13 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 
 	local recordResult = {}
 	if result ~= nil then
-		recordResult = result.record
+		msg.ioEvent:addField("Total-Extension-Fee", result.totalExtensionFee)
 		addRecordResultFields(msg.ioEvent, result)
-		msg.ioEvent:addField("totalExtensionFee", recordResult.totalExtensionFee)
-		LastKnownCirculatingSupply = LastKnownCirculatingSupply - recordResult.totalExtensionFee
+
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply - result.totalExtensionFee
 		addSupplyData(msg.ioEvent)
+
+		recordResult = result.record
 	end
 
 	ao.send({
@@ -793,7 +795,7 @@ addEventingHandler(
 		end
 
 		local shouldContinue2, result = eventingPcall(
-			ioEvent,
+			msg.ioEvent,
 			function(error)
 				ao.send({
 					Target = msg.From,
@@ -816,8 +818,8 @@ addEventingHandler(
 			recordResult = result.record
 			addRecordResultFields(msg.ioEvent, result)
 			msg.ioEvent:addField("previousUndernameLimit", recordResult.undernameLimit - tonumber(msg.Tags.Quantity))
-			msg.ioEvent:addField("additionalUndernameCost", recordResult.additionalUndernameCost)
-			LastKnownCirculatingSupply = LastKnownCirculatingSupply - recordResult.additionalUndernameCost
+			msg.ioEvent:addField("additionalUndernameCost", result.additionalUndernameCost)
+			LastKnownCirculatingSupply = LastKnownCirculatingSupply - result.additionalUndernameCost
 			addSupplyData(msg.ioEvent)
 		end
 
@@ -1201,7 +1203,7 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 	end
 
 	LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
-	LastKnownStakedSupply = LastKnownStakedSupply + quantity
+	LastKnownDelegatedSupply = LastKnownDelegatedSupply + quantity
 	addSupplyData(msg.ioEvent)
 
 	ao.send({
@@ -1255,12 +1257,12 @@ addEventingHandler(
 			if result.delegate ~= nil then
 				delegateResult = result.delegate
 				local newStake = delegateResult.delegatedStake
-				local vaultBalance = delegateResult.vaults[vaultId].balance
-				msg.ioEvent:addField("PreviousStake", newStake - vaultBalance)
-				msg.ioEvent:addField("NewStake", newStake)
-				msg.ioEvent:addField("GatewayTotalDelegatedStake", result.totalDelegatedStake)
+				local vaultBalance = result.vaultBalance
+				msg.ioEvent:addField("Previous-Stake", newStake - vaultBalance)
+				msg.ioEvent:addField("New-Stake", newStake)
+				msg.ioEvent:addField("Gateway-Total-Delegated-Stake", result.totalDelegatedStake)
 
-				LastKnownStakedSupply = LastKnownStakedSupply + vaultBalance
+				LastKnownDelegatedSupply = LastKnownDelegatedSupply + vaultBalance
 				LastKnownWithdrawSupply = LastKnownWithdrawSupply - vaultBalance
 				addSupplyData(msg.ioEvent)
 			end
