@@ -795,7 +795,7 @@ addEventingHandler(
 		end
 
 		local shouldContinue2, result = eventingPcall(
-			ioEvent,
+			msg.ioEvent,
 			function(error)
 				ao.send({
 					Target = msg.From,
