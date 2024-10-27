@@ -1662,6 +1662,7 @@ describe("gar", function()
 					delegatedStake = 1000,
 					vaults = {},
 				},
+				vaultBalance = 1000,
 			})
 			-- assert the vault is removed and the delegated stake is added back to the delegate
 			assert.are.equal(
