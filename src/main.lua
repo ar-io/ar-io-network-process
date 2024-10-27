@@ -816,8 +816,8 @@ addEventingHandler(
 			recordResult = result.record
 			addRecordResultFields(msg.ioEvent, result)
 			msg.ioEvent:addField("previousUndernameLimit", recordResult.undernameLimit - tonumber(msg.Tags.Quantity))
-			msg.ioEvent:addField("additionalUndernameCost", recordResult.additionalUndernameCost)
-			LastKnownCirculatingSupply = LastKnownCirculatingSupply - recordResult.additionalUndernameCost
+			msg.ioEvent:addField("additionalUndernameCost", result.additionalUndernameCost)
+			LastKnownCirculatingSupply = LastKnownCirculatingSupply - result.additionalUndernameCost
 			addSupplyData(msg.ioEvent)
 		end
 
