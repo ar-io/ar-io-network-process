@@ -753,11 +753,13 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 
 	local recordResult = {}
 	if result ~= nil then
-		recordResult = result.record
+		msg.ioEvent:addField("Total-Extension-Fee", result.totalExtensionFee)
 		addRecordResultFields(msg.ioEvent, result)
-		msg.ioEvent:addField("totalExtensionFee", recordResult.totalExtensionFee)
-		LastKnownCirculatingSupply = LastKnownCirculatingSupply - recordResult.totalExtensionFee
+
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply - result.totalExtensionFee
 		addSupplyData(msg.ioEvent)
+
+		recordResult = result.record
 	end
 
 	ao.send({
