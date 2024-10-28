@@ -53,7 +53,7 @@ describe("epochs", function()
 
 	describe("computePrescribedObserversForEpoch", function()
 		it("should return all eligible gateways if fewer than the maximum in network", function()
-			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {},
@@ -93,7 +93,7 @@ describe("epochs", function()
 		end)
 
 		it("should return the maximum number of gateways if more are enrolled in network", function()
-			local hashchain = "c29tZSBzYW1wbGUgaGFzaA==" -- base64 of "some sample hash"
+			local testHashchain = "c29tZSBzYW1wbGUgaGFzaA==" -- base64 of "some sample hash"
 			epochs.updateEpochSettings({
 				maxObservers = 2, -- limit to 2 observers
 				epochZeroStartTimestamp = startTimestamp,
@@ -121,7 +121,7 @@ describe("epochs", function()
 					observerAddress = "observerAddress",
 				}
 				-- note - ordering of keys is not guaranteed when insert into maps
-				GatewayRegistry["observer" .. i] = gateway
+				_G.GatewayRegistry["observer" .. i] = gateway
 			end
 
 			local expectation = {
@@ -150,7 +150,7 @@ describe("epochs", function()
 					normalizedCompositeWeight = 1 / 3,
 				},
 			}
-			local status, result = pcall(epochs.computePrescribedObserversForEpoch, 0, hashchain)
+			local status, result = pcall(epochs.computePrescribedObserversForEpoch, 0, testHashchain)
 			assert.is_true(status)
 			assert.are.equal(2, #result)
 			assert.are.same(expectation, result)
@@ -252,7 +252,7 @@ describe("epochs", function()
 			local failedGateways = {
 				"test-this-is-valid-arweave-wallet-address-1",
 			}
-			Epochs[0].prescribedObservers = {
+			_G.Epochs[0].prescribedObservers = {
 				{
 					gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
 					observerAddress = "test-this-is-valid-arweave-wallet-address-1",
@@ -548,7 +548,7 @@ describe("epochs", function()
 					observerRewardRatioWeight = 1,
 					compositeWeight = 4,
 					normalizedCompositeWeight = 1,
-				}, gar.getGateway("test-this-is-valid-arweave-wallet-address-1").weights)
+				}, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].weights)
 				-- confirm the leaving gateway weights were not updated
 				assert.are.same({
 					stakeWeight = 0,
@@ -557,7 +557,7 @@ describe("epochs", function()
 					observerRewardRatioWeight = 0,
 					compositeWeight = 0,
 					normalizedCompositeWeight = 0,
-				}, gar.getGateway("test-this-is-valid-arweave-wallet-address-2").weights)
+				}, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-2"].weights)
 			end
 		)
 	end)
@@ -724,13 +724,13 @@ describe("epochs", function()
 				gar.addGateway("test-this-is-valid-arweave-wallet-address-" .. i, gateway)
 			end
 			-- clear the balances for the gateways
-			Balances["test-this-is-valid-arweave-wallet-address-1"] = 0
+			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 0
 			local epoch = epochs.getEpoch(epochIndex)
 			local expectedGatewayReward = epoch.distributions.totalEligibleGatewayReward
 			local expectedObserverReward = epoch.distributions.totalEligibleObserverReward
 
 			-- distribute rewards for the epoch
-			local status, result = pcall(epochs.distributeRewardsForEpoch, epoch.distributionTimestamp)
+			local status = pcall(epochs.distributeRewardsForEpoch, epoch.distributionTimestamp)
 			assert.is_true(status)
 			-- gateway 1 should not get any rewards - failed observation and did not observe, should not get any rewards
 			assert.are.same({
@@ -741,10 +741,10 @@ describe("epochs", function()
 				failedConsecutiveEpochs = 1,
 				passedConsecutiveEpochs = 0,
 				totalEpochCount = 1,
-			}, gar.getGateway("test-this-is-valid-arweave-wallet-address-1").stats)
+			}, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].stats)
 			assert.are.equal(
 				gar.getSettings().operators.minStake,
-				gar.getGateway("test-this-is-valid-arweave-wallet-address-1").operatorStake
+				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].operatorStake
 			)
 
 			-- passed observation, did not observe
@@ -756,9 +756,9 @@ describe("epochs", function()
 				failedConsecutiveEpochs = 0,
 				passedConsecutiveEpochs = 1,
 				totalEpochCount = 1,
-			}, gar.getGateway("test-this-is-valid-arweave-wallet-address-2").stats)
-			local gateway1 = gar.getGateway("test-this-is-valid-arweave-wallet-address-2")
-			local balance1 = balances.getBalance("test-this-is-valid-arweave-wallet-address-2")
+			}, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-2"].stats)
+			local gateway1 = _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-2"]
+			local balance1 = _G.Balances["test-this-is-valid-arweave-wallet-address-2"]
 			assert.are.equal(
 				-- it passed, but did not observe, so it gets 75% of the gateway reward and then 90% of that bc of the delegate reward share
 				gar.getSettings().operators.minStake + math.floor((expectedGatewayReward * 0.75) * 0.90),
@@ -774,14 +774,14 @@ describe("epochs", function()
 				failedConsecutiveEpochs = 1,
 				passedConsecutiveEpochs = 0,
 				totalEpochCount = 1,
-			}, gar.getGateway("test-this-is-valid-arweave-wallet-address-3").stats)
+			}, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-3"].stats)
 			assert.are.equal(
 				math.floor(expectedObserverReward * 0.90), -- 10% is given to delegates
-				balances.getBalance("test-this-is-valid-arweave-wallet-address-3")
+				_G.Balances["test-this-is-valid-arweave-wallet-address-3"]
 			)
 			assert.are.equal(
 				gar.getSettings().operators.minStake,
-				gar.getGateway("test-this-is-valid-arweave-wallet-address-3").operatorStake
+				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-3"].operatorStake
 			)
 			-- passed observation, did observe
 			assert.are.same({
@@ -792,14 +792,14 @@ describe("epochs", function()
 				failedConsecutiveEpochs = 0,
 				passedConsecutiveEpochs = 1,
 				totalEpochCount = 1,
-			}, gar.getGateway("test-this-is-valid-arweave-wallet-address-4").stats)
+			}, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-4"].stats)
 			assert.are.equal(
 				math.floor((expectedGatewayReward + expectedObserverReward) * 0.90), -- 10% is given to delegates
-				balances.getBalance("test-this-is-valid-arweave-wallet-address-4")
+				_G.Balances["test-this-is-valid-arweave-wallet-address-4"]
 			)
 			assert.are.equal(
 				gar.getSettings().operators.minStake,
-				gar.getGateway("test-this-is-valid-arweave-wallet-address-4").operatorStake
+				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-4"].operatorStake
 			)
 			-- passed observation, did observe
 			assert.are.same({
@@ -810,14 +810,14 @@ describe("epochs", function()
 				failedConsecutiveEpochs = 0,
 				passedConsecutiveEpochs = 1,
 				totalEpochCount = 1,
-			}, gar.getGateway("test-this-is-valid-arweave-wallet-address-5").stats)
+			}, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-5"].stats)
 			assert.are.equal(
 				(expectedGatewayReward + expectedObserverReward) * 0.90, -- 10% is given to delegates
-				balances.getBalance("test-this-is-valid-arweave-wallet-address-5")
+				_G.Balances["test-this-is-valid-arweave-wallet-address-5"]
 			)
 			assert.are.equal(
 				gar.getSettings().operators.minStake,
-				gar.getGateway("test-this-is-valid-arweave-wallet-address-5").operatorStake
+				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-5"].operatorStake
 			)
 
 			-- check the epoch was updated
@@ -826,8 +826,6 @@ describe("epochs", function()
 				+ math.floor(expectedGatewayReward * 0.75) -- gateway 2 got 75% of the gateway reward
 				+ expectedObserverReward * 3 -- gateway 3, 4, 5 got observer rewards
 				+ expectedGatewayReward * 2 -- gateway 4, 5 got gateway rewards
-
-			local distributedEpoch = epochs.getEpoch(epochIndex)
 
 			-- confirm the updated epoch values
 			assert.are.equal(expectedTotalDistribution, distributions.totalDistributedRewards)

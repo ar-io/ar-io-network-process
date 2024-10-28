@@ -120,8 +120,6 @@ describe("utils", function()
 			{ name = "bar" },
 			{ name = "baz" },
 		}
-		local cursorField = "name"
-		local sortBy = "name"
 
 		it("paginates, limits to less than list size, and sorts in ascending order with an empty cursor", function()
 			local cursor = ""
@@ -165,8 +163,10 @@ describe("utils", function()
 
 		it("paginates, limits to less than list size, and sorts in descending order with an empty cursor", function()
 			local cursor = ""
+			local cursorField = "name"
 			local limit = 1
 			local sortOrder = "desc"
+			local sortBy = "name"
 			local result = utils.paginateTableWithCursor(threeItemTable, cursor, cursorField, limit, sortBy, sortOrder)
 			assert.are.same({
 				items = {
@@ -183,8 +183,10 @@ describe("utils", function()
 
 		it("paginates, limits to less than list size, and sorts in descending order with a valid cursor", function()
 			local cursor = "foo"
+			local cursorField = "name"
 			local limit = 1
 			local sortOrder = "desc"
+			local sortBy = "name"
 			local result = utils.paginateTableWithCursor(threeItemTable, cursor, cursorField, limit, sortBy, sortOrder)
 			assert.are.same({
 				items = {
@@ -201,8 +203,10 @@ describe("utils", function()
 
 		it("correctly handles a nil cursor", function()
 			local cursor = nil
+			local cursorField = "name"
 			local limit = 1
 			local sortOrder = "asc"
+			local sortBy = "name"
 			local result = utils.paginateTableWithCursor(threeItemTable, cursor, cursorField, limit, sortBy, sortOrder)
 			assert.are.same({
 				items = {
@@ -219,8 +223,10 @@ describe("utils", function()
 
 		it("correctly handles a random cursor", function()
 			local cursor = "bing"
+			local cursorField = "name"
 			local limit = 1
 			local sortOrder = "asc"
+			local sortBy = "name"
 			local result = utils.paginateTableWithCursor(threeItemTable, cursor, cursorField, limit, sortBy, sortOrder)
 			assert.are.same({
 				items = {
@@ -237,8 +243,10 @@ describe("utils", function()
 
 		it("correctly handles a numeric string cursor", function()
 			local cursor = "1001"
+			local cursorField = "name"
 			local limit = 1
 			local sortOrder = "asc"
+			local sortBy = "name"
 			local table = {
 				{ name = "1000" },
 				{ name = "1001" },
@@ -259,8 +267,10 @@ describe("utils", function()
 
 		it("correctly handles an irrelevant numeric cursor", function()
 			local cursor = 1001
+			local cursorField = "name"
 			local limit = 1
 			local sortOrder = "asc"
+			local sortBy = "name"
 			local table = {
 				{ name = "1000" },
 				{ name = "1001" },

@@ -25,8 +25,7 @@ function balances.getBalance(target)
 end
 
 function balances.getBalances()
-	local balances = utils.deepCopy(Balances)
-	return balances or {}
+	return utils.deepCopy(balances) or {}
 end
 
 function balances.reduceBalance(target, qty)
@@ -45,10 +44,10 @@ function balances.increaseBalance(target, qty)
 end
 
 function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder)
-	local balances = balances.getBalances()
+	local allBalances = balances.getBalances()
 	local balancesArray = {}
 	local cursorField = "address" -- the cursor will be the wallet address
-	for address, balance in pairs(balances) do
+	for address, balance in pairs(allBalances) do
 		table.insert(balancesArray, {
 			address = address,
 			balance = balance,

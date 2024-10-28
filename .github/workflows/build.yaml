@@ -7,6 +7,15 @@ on:
       - src/**/*
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leafo/gh-actions-lua@v10
+        with:
+          luaVersion: '5.3'
+      - run: luacheck src spec
+
   integration:
     runs-on: ubuntu-latest
     steps:
@@ -66,7 +75,7 @@ jobs:
 
   evolve:
     runs-on: ubuntu-latest
-    needs: [integration, unit, sdk]
+    needs: [integration, unit, sdk, lint]
     if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
     environment: ${{ github.ref_name }}
     steps:

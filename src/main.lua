@@ -976,6 +976,7 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 end)
 
 addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", ActionMap.LeaveNetwork), function(msg)
+	local from = utils.formatAddress(msg.From)
 	local gatewayBeforeLeaving = gar.getGateway(from)
 	local gwPrevTotalDelegatedStake = 0
 	local gwPrevStake = 0
@@ -989,7 +990,7 @@ addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", Action
 			Tags = { Action = "Invalid-Leave-Network-Notice", Error = "Invalid-Leave-Network" },
 			Data = tostring(error),
 		})
-	end, gar.leaveNetwork, msg.From, msg.Timestamp, msg.Id)
+	end, gar.leaveNetwork, from, msg.Timestamp, msg.Id)
 	if not shouldContinue then
 		return
 	end
@@ -1147,7 +1148,6 @@ addEventingHandler(
 			local gateway = result.gateway
 			local previousStake = gateway.operatorStake + quantity
 			msg.ioEvent:addField("New-Operator-Stake", gateway.operatorStake)
-			msg.ioEvent:addField("Previous-Operator-Stake", previousStake)
 			msg.ioEvent:addField("GW-Vaults-Count", utils.lengthOfTable(gateway.vaults or {}))
 			if instantWithdraw then
 				msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
@@ -1164,6 +1164,7 @@ addEventingHandler(
 					{ "balance", "startTimestamp", "endTimestamp" }
 				)
 			end
+			msg.ioEvent:addField("Previous-Operator-Stake", previousStake)
 		end
 
 		LastKnownStakedSupply = LastKnownStakedSupply - quantity
@@ -1204,7 +1205,7 @@ addEventingHandler(
 
 		local fromAddress = utils.formatAddress(msg.From)
 		local vaultId = msg.Tags["Vault-Id"]
-		msg.ioEvent:addField("Target-Formatted", gatewayAddress)
+		msg.ioEvent:addField("Target-Formatted", fromAddress)
 
 		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
@@ -1540,7 +1541,7 @@ addEventingHandler(
 		if not instantWithdraw then
 			LastKnownWithdrawSupply = LastKnownWithdrawSupply + quantity
 		end
-		LastKnownCirculatingSupply = LastKnownCirculatingSupply + amountWithdrawn
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply + decreaseDelegateStakeResult.amountWithdrawn
 		addSupplyData(msg.ioEvent)
 
 		ao.send({
@@ -1727,7 +1728,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 		circulatingSupply = circulatingSupply + balance
 	end
 	circulatingSupply = circulatingSupply - protocolBalance
-	totalSupply = protocolBalance + circulatingSupply
+	totalSupply = totalSupply + protocolBalance + circulatingSupply
 
 	-- tally supply stashed in gateways and delegates
 	local gateways = gar.getGateways()
@@ -1856,9 +1857,11 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 			LastTickedEpochIndex = utils.deepCopy(LastTickedEpochIndex),
 		}
 		local _, _, epochDistributionTimestamp = epochs.getEpochTimestampsForIndex(i)
-		-- use the minimum of the msg timestamp or the epoch distribution timestamp, this ensures an epoch gets created for the genesis block and that we don't try and distribute before an epoch is created
+		-- use the minimum of the msg timestamp or the epoch distribution timestamp, this ensures an epoch gets created for the genesis block
+		-- and that we don't try and distribute before an epoch is created
 		local tickTimestamp = math.min(msgTimestamp or 0, epochDistributionTimestamp)
-		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height, we should set the prescribed observers and names to empty arrays and distribute rewards accordingly
+		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height,
+		-- we should set the prescribed observers and names to empty arrays and distribute rewards accordingly
 		local tickSuceeded, resultOrError =
 			pcall(tickEpoch, tickTimestamp, msg["Block-Height"], msg["Hash-Chain"], msgId)
 		if tickSuceeded then
@@ -2144,8 +2147,8 @@ addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epo
 end)
 
 addEventingHandler(ActionMap.Epochs, utils.hasMatchingTag("Action", ActionMap.Epochs), function(msg)
-	local epochs = epochs.getEpochs()
-	ao.send({ Target = msg.From, Action = "Epochs-Notice", Data = epochs })
+	local allEpochs = epochs.getEpochs()
+	ao.send({ Target = msg.From, Action = "Epochs-Notice", Data = json.encode(allEpochs) })
 end)
 
 addEventingHandler(
@@ -2430,7 +2433,7 @@ addEventingHandler("auctions", utils.hasMatchingTag("Action", ActionMap.Auctions
 	local page = utils.parsePaginationTags(msg)
 	local auctions = arns.getAuctions()
 	local auctionsWithoutFunctions = {}
-	for k, v in pairs(auctions) do
+	for _, v in ipairs(auctions) do
 		table.insert(auctionsWithoutFunctions, {
 			name = v.name,
 			startTimestamp = v.startTimestamp,
