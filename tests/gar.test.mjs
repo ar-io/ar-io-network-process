@@ -86,7 +86,7 @@ describe('GatewayRegistry', async () => {
       const gatewayData = JSON.parse(gateway.Messages[0].Data);
       assert.deepEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
-        operatorStake: initialOperatorStake,
+        operatorStake: 100_000_000_000, // matches the initial operator stake from the test setup
         totalDelegatedStake: 0,
         status: 'joined',
         delegates: [],
@@ -157,7 +157,7 @@ describe('GatewayRegistry', async () => {
 
       assert.deepEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
-        operatorStake: initialOperatorStake,
+        operatorStake: 100_000_000_000, // matches the initial operator stake from the test setup
         totalDelegatedStake: 0,
         status: 'joined',
         delegates: [],
@@ -217,7 +217,7 @@ describe('GatewayRegistry', async () => {
       const gatewayData = JSON.parse(gateway.Messages[0].Data);
       assert.deepEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
-        operatorStake: initialOperatorStake + increaseStakeQuantity,
+        operatorStake: 100_000_000_000 + increaseStakeQuantity, // matches the initial operator stake from the test setup plus the increase
         totalDelegatedStake: 0,
         status: 'joined',
         delegates: [],
@@ -273,7 +273,7 @@ describe('GatewayRegistry', async () => {
       const gatewayData = JSON.parse(decreaseStakeResult.Messages[0].Data);
       assert.deepStrictEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
-        operatorStake: initialOperatorStake - decreaseStakeQuantity,
+        operatorStake: 100_000_000_000 - decreaseStakeQuantity, // matches the initial operator stake from the test setup minus the decrease
         totalDelegatedStake: 0,
         status: 'joined',
         delegates: [],
@@ -324,8 +324,7 @@ describe('GatewayRegistry', async () => {
     });
 
     it('should allow decreasing the operator stake to the exact minimum stake value', async () => {
-      const minStake = 50_000_000_000;
-      const amountToWithdraw = initialOperatorStake - minStake;
+      const amountToWithdraw = 50_000_000_000; // matches the initial operator stake from the test setup minus the minimum stake
 
       // Execute the handler for decreasing operator stake to the minimum allowed stake
       const decreaseStakeResult = await handle(
@@ -351,7 +350,7 @@ describe('GatewayRegistry', async () => {
 
       assert.deepStrictEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
-        operatorStake: minStake,
+        operatorStake: 50_000_000_000, // matches the minimum stake after the decrease
         totalDelegatedStake: 0,
         status: 'joined',
         delegates: [],
@@ -413,8 +412,7 @@ describe('GatewayRegistry', async () => {
     });
 
     it('should allow decreasing the operator stake with instant withdrawal to the exact minimum stake value', async () => {
-      const minStake = 50_000_000_000; // Minimum operator stake allowed (50K IO)
-      const amountToWithdraw = initialOperatorStake - minStake;
+      const amountToWithdraw = 50_000_000_000; // matches the minimum stake after the decrease
 
       // Execute the handler for decreasing operator stake with instant withdrawal to the minimum allowed stake
       const decreaseStakeResult = await handle(
@@ -440,7 +438,7 @@ describe('GatewayRegistry', async () => {
       const gatewayData = JSON.parse(decreaseStakeResult.Messages[0].Data);
       assert.deepStrictEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
-        operatorStake: minStake,
+        operatorStake: 50_000_000_000, // matches the minimum stake after the decrease
         totalDelegatedStake: 0,
         status: 'joined',
         delegates: [],
@@ -503,8 +501,6 @@ describe('GatewayRegistry', async () => {
         expeditedWithdrawalFee,
         expectedExpeditedWithdrawalFee,
       );
-
-      // Do Not update shared memory for the next test
     });
 
     it('should allow decreasing the operator stake with instant withdrawal as long as it is above the minimum', async () => {
@@ -534,7 +530,7 @@ describe('GatewayRegistry', async () => {
       const gatewayData = JSON.parse(decreaseStakeResult.Messages[0].Data);
       assert.deepStrictEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
-        operatorStake: initialOperatorStake - amountToWithdraw,
+        operatorStake: 100_000_000_000 - amountToWithdraw, // matches the initial operator stake from the test setup minus the decrease
         totalDelegatedStake: 0,
         status: 'joined',
         delegates: [],
@@ -658,7 +654,7 @@ describe('GatewayRegistry', async () => {
       const gatewayData = JSON.parse(gateway.Messages[0].Data);
       assert.deepStrictEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
-        operatorStake: initialOperatorStake - decreaseStakeQuantity,
+        operatorStake: 100_000_000_000 - decreaseStakeQuantity, // matches the initial operator stake from the test setup minus the decrease
         totalDelegatedStake: 0,
         status: 'joined',
         delegates: [],
@@ -693,7 +689,6 @@ describe('GatewayRegistry', async () => {
   // leave network
   describe('Leave-Network', () => {
     it('should allow leaving the network', async () => {
-      const minStake = 50_000_000_000;
       const leaveNetworkResult = await handle(
         {
           From: STUB_ADDRESS,
@@ -726,13 +721,13 @@ describe('GatewayRegistry', async () => {
           leaveNetworkData.startTimestamp + 1000 * 60 * 60 * 24 * 90, // 90 days
         vaults: {
           [STUB_ADDRESS]: {
-            balance: minStake,
+            balance: 50_000_000_000, // matches the minimum stake after the decrease
             startTimestamp: leaveNetworkData.startTimestamp,
             endTimestamp:
               leaveNetworkData.startTimestamp + 1000 * 60 * 60 * 24 * 90, // 90 days
           },
           [STUB_MESSAGE_ID]: {
-            balance: initialOperatorStake - minStake,
+            balance: 50_000_000_000, // all stake greater than the minimum stake and only vaulted for 30 days instead of 90
             startTimestamp: leaveNetworkData.startTimestamp,
             endTimestamp:
               leaveNetworkData.startTimestamp + 1000 * 60 * 60 * 24 * 30, // 30 days
