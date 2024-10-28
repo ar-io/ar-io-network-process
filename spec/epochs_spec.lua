@@ -861,7 +861,6 @@ describe("epochs", function()
 			assert.are.equal(expectedGateway4Balance, _G.Balances["test-this-is-valid-arweave-wallet-address-4"])
 			assert.are.equal(expectedGateway5Balance, _G.Balances["test-this-is-valid-arweave-wallet-address-5"])
 
-			-- validate delegate stakes are updated
 			-- gateway 1 did not get any rewards, so the delegate stake should be the original amount
 			assert.are.equal(
 				gateway1DelegateRewards,
