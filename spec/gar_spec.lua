@@ -820,7 +820,7 @@ describe("gar", function()
 			)
 
 			assert.is_false(status)
-			assert.matches("Resulting stake is not enough maintain the minimum operator stake", result)
+			assert.matches("Resulting stake is not enough to maintain the minimum operator stake", result)
 		end)
 
 		it("should fail if Gateway not found", function()
