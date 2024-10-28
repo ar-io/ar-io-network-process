@@ -395,7 +395,7 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 		error("Gateway not found")
 	end
 	if gateway.status == "leaving" then
-		error("Gateway is leaving the network and withdraw more stake.")
+		error("Gateway is leaving the network and cannot withdraw more stake.")
 	end
 
 	if gateway.delegates[delegator] == nil then
