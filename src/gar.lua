@@ -211,10 +211,12 @@ function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWi
 	end
 	gateway.operatorStake = gar.getGateway(from).operatorStake - qty
 
+	local expeditedWithdrawalFee = 0
+	local amountToWithdraw = 0
+	local penaltyRate = 0
 	if instantWithdraw == true then
 		-- Calculate the penalty and withdraw using the utility function
-		-- TO DO: RETURN THESE!
-		expeditedWithdrawalFee, amountToWithdraw = processInstantWithdrawal(nil, 0, 0, from, qty)
+		expeditedWithdrawalFee, amountToWithdraw, penaltyRate = processInstantWithdrawal(nil, 0, 0, from, qty)
 	else
 		gateway.vaults[msgId] = {
 			balance = qty,
@@ -229,7 +231,12 @@ function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWi
 	-- Update the gateway
 	GatewayRegistry[from] = gateway
 
-	return gar.getGateway(from)
+	return {
+		gateway = gar.getGateway(from),
+		penaltyRate = penaltyRate,
+		expeditedWithdrawalFee = expeditedWithdrawalFee,
+		amountWithdrawn = amountToWithdraw,
+	}
 end
 
 function gar.updateGatewaySettings(from, updatedSettings, updatedServices, observerAddress, currentTimestamp, msgId)
@@ -409,15 +416,16 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 	end
 
 	-- Instant withdrawal logic with penalty
-
+	local expeditedWithdrawalFee = 0
+	local amountToWithdraw = 0
+	local penaltyRate = 0
 	if instantWithdraw == true then
 		-- Unlock the tokens from the gateway and delegate
 		gateway.delegates[delegator].delegatedStake = gateway.delegates[delegator].delegatedStake - qty
 		gateway.totalDelegatedStake = gateway.totalDelegatedStake - qty
 
 		-- Calculate the penalty and withdraw using the utility function
-		-- TO DO: RETURN THESE!
-		expeditedWithdrawalFee, amountToWithdraw = processInstantWithdrawal(nil, 0, 0, delegator, qty)
+		expeditedWithdrawalFee, amountToWithdraw, penaltyRate = processInstantWithdrawal(nil, 0, 0, delegator, qty)
 
 		-- Remove the delegate if no stake is left
 		if gateway.delegates[delegator].delegatedStake == 0 and next(gateway.delegates[delegator].vaults) == nil then
@@ -438,7 +446,12 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 	end
 	-- update the gateway
 	GatewayRegistry[gatewayAddress] = gateway
-	return gar.getGateway(gatewayAddress)
+	return {
+		gateway = gar.getGateway(gatewayAddress),
+		penaltyRate = penaltyRate,
+		expeditedWithdrawalFee = expeditedWithdrawalFee,
+		amountWithdrawn = amountToWithdraw,
+	}
 end
 
 function gar.isGatewayLeaving(gateway)

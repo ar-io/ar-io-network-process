@@ -727,7 +727,7 @@ describe("gar", function()
 			local status, result =
 				pcall(gar.decreaseOperatorStake, stubGatewayAddress, 1000, startTimestamp, stubMessageId)
 			assert.is_true(status)
-			assert.are.same(result, {
+			assert.are.same(result.gateway, {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {
@@ -789,7 +789,9 @@ describe("gar", function()
 			)
 
 			assert.is_true(status)
-			assert.are.same(result.operatorStake, gar.getSettings().operators.minStake)
+			assert.are.same(result.gateway.operatorStake, gar.getSettings().operators.minStake)
+			assert.are.same(result.amountWithdrawn, withdrawalAmount)
+			assert.are.same(result.expeditedWithdrawalFee, expeditedWithdrawalFee)
 			assert.are.equal(Balances[stubGatewayAddress], withdrawalAmount) -- The gateway's balance should increase with withdrawal amount
 			assert.are.equal(Balances[ao.id], expeditedWithdrawalFee) -- expedited withdrawal fee amount should be added to protocol balance
 		end)
@@ -1322,7 +1324,7 @@ describe("gar", function()
 				stubMessageId
 			)
 			assert.is_true(status)
-			assert.are.same(expectation, result)
+			assert.are.same(expectation, result.gateway)
 			assert.are.same(expectation, gar.getGateway(stubGatewayAddress))
 		end)
 
@@ -1376,10 +1378,16 @@ describe("gar", function()
 			)
 
 			assert.is_true(status)
-			assert.are.same(result.delegates[stubRandomAddress].delegatedStake, gar.getSettings().delegates.minStake)
-			assert.are.equal(result.totalDelegatedStake, gar.getSettings().delegates.minStake)
+			assert.are.same(
+				result.gateway.delegates[stubRandomAddress].delegatedStake,
+				gar.getSettings().delegates.minStake
+			)
+			assert.are.equal(result.gateway.totalDelegatedStake, gar.getSettings().delegates.minStake)
+			assert.are.equal(withdrawalAmount, result.amountWithdrawn)
 			assert.are.equal(withdrawalAmount, Balances[stubRandomAddress])
+			assert.are.equal(expeditedWithdrawalFee, result.expeditedWithdrawalFee)
 			assert.are.equal(expeditedWithdrawalFee, Balances[ao.id])
+			assert.are.equal(constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE, result.penaltyRate)
 			assert.are.equal(
 				gar.getSettings().delegates.minStake,
 				_G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake

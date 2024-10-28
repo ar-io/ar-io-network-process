@@ -1122,7 +1122,7 @@ addEventingHandler(
 		local instantWithdraw = msg.Tags.Instant and msg.Tags.Instant == "true" or false
 		msg.ioEvent:addField("Sender-Previous-Balance", Balances[msg.From])
 
-		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
+		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = { Action = "Invalid-Decrease-Operator-Stake-Notice", Error = "Invalid-Stake-Decrease" },
@@ -1133,14 +1133,24 @@ addEventingHandler(
 			return
 		end
 
+		local decreaseOperatorStakeResult = {
+			gateway = result and result.gateway or {},
+			penaltyRate = result and result.penaltyRate or 0,
+			expeditedWithdrawalFee = result and result.expeditedWithdrawalFee or 0,
+			amountWithdrawn = result and result.amountWithdrawn or 0,
+		}
+
 		msg.ioEvent:addField("Sender-New-Balance", Balances[msg.From]) -- should be unchanged
-		if gateway ~= nil then
+		if result ~= nil and result.gateway ~= nil then
+			local gateway = result.gateway
 			local previousStake = gateway.operatorStake + quantity
 			msg.ioEvent:addField("New-Operator-Stake", gateway.operatorStake)
 			msg.ioEvent:addField("Previous-Operator-Stake", previousStake)
 			msg.ioEvent:addField("GW-Vaults-Count", utils.lengthOfTable(gateway.vaults or {}))
-			if msg.Tags.Instant == true then
-				msg.ioEvent:addField("InstantWithdrawal", true)
+			if instantWithdraw then
+				msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
+				msg.ioEvent:addField("Instant-Withdrawal-Fee", result.expeditedWithdrawalFee)
+				msg.ioEvent:addField("Amount-Withdrawn", result.amountWithdrawn)
 			end
 			local decreaseStakeVault = gateway.vaults[msg.Id]
 			if decreaseStakeVault ~= nil then
@@ -1159,8 +1169,13 @@ addEventingHandler(
 
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Decrease-Operator-Stake-Notice" },
-			Data = json.encode(gateway),
+			Tags = {
+				Action = "Decrease-Operator-Stake-Notice",
+				["Penalty-Rate"] = tostring(decreaseOperatorStakeResult.penaltyRate),
+				["Expedited-Withdrawal-Fee"] = tostring(decreaseOperatorStakeResult.expeditedWithdrawalFee),
+				["Amount-Withdrawn"] = tostring(decreaseOperatorStakeResult.amountWithdrawn),
+			},
+			Data = json.encode(decreaseOperatorStakeResult.gateway),
 		})
 	end
 )
@@ -1469,7 +1484,7 @@ addEventingHandler(
 		msg.ioEvent:addField("Target-Formatted", target)
 		msg.ioEvent:addField("Quantity", quantity)
 
-		local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
+		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = from,
 				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Invalid-Decrease-Delegate-Stake" },
@@ -1480,22 +1495,29 @@ addEventingHandler(
 			return
 		end
 
-		local instantWithdrawalFee = 0
-		local amountWithdrawn = 0
-		if instantWithdraw then
-			instantWithdrawalFee = quantity * constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
-			amountWithdrawn = quantity - instantWithdrawalFee
-			msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
-			msg.ioEvent:addField("Instant-Withdrawal-Fee", instantWithdrawalFee)
-			msg.ioEvent:addField("Amount-Withdrawn", amountWithdrawn)
-		end
+		local decreaseDelegateStakeResult = {
+			gateway = result and result.gateway or {},
+			penaltyRate = result and result.penaltyRate or 0,
+			expeditedWithdrawalFee = result and result.expeditedWithdrawalFee or 0,
+			amountWithdrawn = result and result.amountWithdrawn or 0,
+		}
+
+		msg.ioEvent:addField("Sender-New-Balance", Balances[msg.From]) -- should be unchanged
 
 		local delegateResult = {}
-		if gateway ~= nil then
+		if result ~= nil and result.gateway ~= nil then
+			local gateway = result.gateway
 			local newStake = gateway.delegates[from].delegatedStake
 			msg.ioEvent:addField("Previous-Stake", newStake + quantity)
 			msg.ioEvent:addField("New-Stake", newStake)
 			msg.ioEvent:addField("Gateway-Total-Delegated-Stake", gateway.totalDelegatedStake)
+
+			if instantWithdraw then
+				msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
+				msg.ioEvent:addField("Instant-Withdrawal-Fee", result.expeditedWithdrawalFee)
+				msg.ioEvent:addField("Amount-Withdrawn", result.amountWithdrawn)
+			end
+
 			delegateResult = gateway.delegates[from]
 			local newDelegateVaults = delegateResult.vaults
 			if newDelegateVaults ~= nil then
@@ -1519,7 +1541,14 @@ addEventingHandler(
 
 		ao.send({
 			Target = from,
-			Tags = { Action = "Decrease-Delegate-Stake-Notice", Address = target, Quantity = quantity },
+			Tags = {
+				Action = "Decrease-Delegate-Stake-Notice",
+				Address = target,
+				Quantity = quantity,
+				["Penalty-Rate"] = tostring(decreaseDelegateStakeResult.penaltyRate),
+				["Expedited-Withdrawal-Fee"] = tostring(decreaseDelegateStakeResult.expeditedWithdrawalFee),
+				["Amount-Withdrawn"] = tostring(decreaseDelegateStakeResult.amountWithdrawn),
+			},
 			Data = json.encode(delegateResult),
 		})
 	end

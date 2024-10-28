@@ -8,6 +8,8 @@ import {
   STUB_MESSAGE_ID,
   STUB_ADDRESS,
   PROCESS_OWNER,
+  MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE,
+  MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE,
   validGatewayTags,
 } from '../tools/constants.mjs';
 
@@ -265,17 +267,7 @@ describe('GatewayRegistry', async () => {
       );
       assert.strictEqual(errorTag, undefined);
 
-      // check the gateway record from contract
-      const gateway = await handle(
-        {
-          Tags: [
-            { name: 'Action', value: 'Gateway' },
-            { name: 'Address', value: STUB_ADDRESS },
-          ],
-        },
-        decreaseStakeResult.Memory,
-      );
-      const gatewayData = JSON.parse(gateway.Messages[0].Data);
+      const gatewayData = JSON.parse(decreaseStakeResult.Messages[0].Data);
       assert.deepEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
         operatorStake: 95_000_000_000,
@@ -312,40 +304,247 @@ describe('GatewayRegistry', async () => {
           observedEpochCount: 0,
         },
       });
+
+      const expeditedWithdrawalFeeTag =
+        decreaseStakeResult.Messages?.[0]?.Tags?.find(
+          (tag) => tag.name === 'Expedited-Withdrawal-Fee',
+        );
+      const amountWithdrawnTag = decreaseStakeResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Amount-Withdrawn',
+      );
+      const penaltyRateTag = decreaseStakeResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Penalty-Rate',
+      );
+      assert.strictEqual(Number(amountWithdrawnTag?.value ?? '0'), 0);
+      assert.strictEqual(Number(penaltyRateTag?.value ?? '0'), 0);
+      assert.strictEqual(Number(expeditedWithdrawalFeeTag?.value ?? '0'), 0);
+
       sharedMemory = decreaseStakeResult.Memory;
     });
 
-    it('should allow decreasing the operator stake with instant withdrawal as long as it is above the minimum', async () => {
+    it('should allow decreasing the operator stake to the exact minimum stake value', async () => {
+      const currentStake = 95_000_000_000;
+      const minStake = 50_000_000_000;
+      const amountToWithdraw = currentStake - minStake;
+
+      // Execute the handler for decreasing operator stake to the minimum allowed stake
       const decreaseStakeResult = await handle(
         {
           From: STUB_ADDRESS,
           Owner: STUB_ADDRESS,
           Tags: [
             { name: 'Action', value: 'Decrease-Operator-Stake' },
-            { name: 'Quantity', value: '5000000000' }, // 5K IO
+            { name: 'Quantity', value: amountToWithdraw.toString() }, // Withdraw to reach the minimum stake
+          ],
+        },
+        sharedMemory,
+      );
+
+      // Assert no error tag
+      const errorTag = decreaseStakeResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Error',
+      );
+      assert.strictEqual(errorTag, undefined);
+
+      // Parse and validate gateway data from the decreaseStakeResult message
+      const gatewayData = JSON.parse(decreaseStakeResult.Messages[0].Data);
+
+      assert.deepEqual(gatewayData, {
+        observerAddress: STUB_ADDRESS,
+        operatorStake: minStake,
+        totalDelegatedStake: 0,
+        status: 'joined',
+        delegates: [],
+        vaults: {
+          [STUB_MESSAGE_ID]: {
+            balance: amountToWithdraw,
+            startTimestamp: STUB_TIMESTAMP,
+            endTimestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 30, // thirty days
+          },
+        },
+        startTimestamp: STUB_TIMESTAMP,
+        settings: {
+          label: 'test-gateway',
+          note: 'test-note',
+          fqdn: 'test-fqdn',
+          port: 443,
+          protocol: 'https',
+          allowDelegatedStaking: true,
+          minDelegatedStake: 500_000_000,
+          delegateRewardShareRatio: 0,
+          properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
+          autoStake: true,
+        },
+        stats: {
+          passedConsecutiveEpochs: 0,
+          failedConsecutiveEpochs: 0,
+          totalEpochCount: 0,
+          failedEpochCount: 0,
+          passedEpochCount: 0,
+          prescribedEpochCount: 0,
+          observedEpochCount: 0,
+        },
+      });
+
+      // Retrieve the tags from the response message
+      const penaltyRateTag = decreaseStakeResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Penalty-Rate',
+      );
+      const expeditedWithdrawalFeeTag =
+        decreaseStakeResult.Messages?.[0]?.Tags?.find(
+          (tag) => tag.name === 'Expedited-Withdrawal-Fee',
+        );
+      const amountWithdrawnTag = decreaseStakeResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Amount-Withdrawn',
+      );
+
+      // Assert that the tags exist and have the correct default values (0, since this is a regular decrease)
+      assert(penaltyRateTag, 'Penalty-Rate tag should exist');
+      assert.strictEqual(Number(penaltyRateTag.value), 0);
+
+      assert(
+        expeditedWithdrawalFeeTag,
+        'Expedited-Withdrawal-Fee tag should exist',
+      );
+      assert.strictEqual(Number(expeditedWithdrawalFeeTag.value), 0);
+
+      assert(amountWithdrawnTag, 'Amount-Withdrawn tag should exist');
+      assert.strictEqual(Number(amountWithdrawnTag.value), 0);
+
+      // Do not update shared memory so we can perform additional tests
+    });
+
+    it('should allow decreasing the operator stake with instant withdrawal to the exact minimum stake value', async () => {
+      const currentStake = 95_000_000_000; // Initial operator stake (95K IO)
+      const minStake = 50_000_000_000; // Minimum operator stake allowed (50K IO)
+      const amountToWithdraw = currentStake - minStake;
+
+      // Execute the handler for decreasing operator stake with instant withdrawal to the minimum allowed stake
+      const decreaseStakeResult = await handle(
+        {
+          From: STUB_ADDRESS,
+          Owner: STUB_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Decrease-Operator-Stake' },
+            { name: 'Quantity', value: amountToWithdraw.toString() }, // Withdraw to reach the minimum stake
             { name: 'Instant', value: 'true' },
           ],
         },
         sharedMemory,
       );
 
-      // assert no error tag
+      // Assert no error tag
       const errorTag = decreaseStakeResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.Name === 'Error',
+        (tag) => tag.name === 'Error',
       );
       assert.strictEqual(errorTag, undefined);
 
-      // check the gateway record from contract
-      const gateway = await handle(
+      // Parse and validate gateway data from the decreaseStakeResult message
+      const gatewayData = JSON.parse(decreaseStakeResult.Messages[0].Data);
+      assert.deepEqual(gatewayData, {
+        observerAddress: STUB_ADDRESS,
+        operatorStake: minStake,
+        totalDelegatedStake: 0,
+        status: 'joined',
+        delegates: [],
+        vaults: {
+          [STUB_MESSAGE_ID]: {
+            balance: 5_000_000_000,
+            startTimestamp: STUB_TIMESTAMP,
+            endTimestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 30, // thirty days
+          },
+        },
+        startTimestamp: STUB_TIMESTAMP,
+        settings: {
+          label: 'test-gateway',
+          note: 'test-note',
+          fqdn: 'test-fqdn',
+          port: 443,
+          protocol: 'https',
+          allowDelegatedStaking: true,
+          minDelegatedStake: 500_000_000,
+          delegateRewardShareRatio: 0,
+          properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
+          autoStake: true,
+        },
+        stats: {
+          passedConsecutiveEpochs: 0,
+          failedConsecutiveEpochs: 0,
+          totalEpochCount: 0,
+          failedEpochCount: 0,
+          passedEpochCount: 0,
+          prescribedEpochCount: 0,
+          observedEpochCount: 0,
+        },
+      });
+
+      // Retrieve the tags from the response message
+      const penaltyRateTag = decreaseStakeResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Penalty-Rate',
+      );
+      const expeditedWithdrawalFeeTag =
+        decreaseStakeResult.Messages?.[0]?.Tags?.find(
+          (tag) => tag.name === 'Expedited-Withdrawal-Fee',
+        );
+      const amountWithdrawnTag = decreaseStakeResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Amount-Withdrawn',
+      );
+
+      // Convert tag values to numbers for comparison
+      const penaltyRate = Number(penaltyRateTag.value);
+      const expeditedWithdrawalFee = Number(expeditedWithdrawalFeeTag.value);
+      const amountWithdrawn = Number(amountWithdrawnTag.value);
+
+      // Log values for easier debugging
+      console.log(`Penalty Rate: ${penaltyRate}`);
+      console.log(`Amount Withdrawn: ${amountWithdrawn}`);
+      console.log(`Expedited Withdrawal Fee: ${expeditedWithdrawalFee}`);
+
+      // Define the expected values based on penalty rate
+      const expectedPenaltyRate = MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE;
+      assert.strictEqual(penaltyRate, expectedPenaltyRate);
+
+      // Recalculate the expected values based on the penalty rate
+      const expectedExpeditedWithdrawalFee =
+        amountToWithdraw * expectedPenaltyRate;
+      const expectedAmountWithdrawn =
+        amountToWithdraw - expectedExpeditedWithdrawalFee;
+
+      // Assert correct values for amount withdrawn and expedited withdrawal fee
+      assert.strictEqual(amountWithdrawn, expectedAmountWithdrawn);
+      assert.strictEqual(
+        expeditedWithdrawalFee,
+        expectedExpeditedWithdrawalFee,
+      );
+
+      // Do Not update shared memory for the next test
+    });
+
+    it('should allow decreasing the operator stake with instant withdrawal as long as it is above the minimum', async () => {
+      const amountToWithdraw = 5000000000;
+
+      // Execute the handler for decreaseOperatorStake with instant withdrawal
+      const decreaseStakeResult = await handle(
         {
+          From: STUB_ADDRESS,
+          Owner: STUB_ADDRESS,
           Tags: [
-            { name: 'Action', value: 'Gateway' },
-            { name: 'Address', value: STUB_ADDRESS },
+            { name: 'Action', value: 'Decrease-Operator-Stake' },
+            { name: 'Quantity', value: amountToWithdraw.toString() }, // 5K IO
+            { name: 'Instant', value: 'true' },
           ],
         },
-        decreaseStakeResult.Memory,
+        sharedMemory,
       );
-      const gatewayData = JSON.parse(gateway.Messages[0].Data);
+
+      // Assert no error tag
+      const errorTag = decreaseStakeResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Error',
+      );
+      assert.strictEqual(errorTag, undefined);
+
+      // Parse and validate gateway data from the decreaseStakeResult message
+      const gatewayData = JSON.parse(decreaseStakeResult.Messages[0].Data);
       assert.deepEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
         operatorStake: 90_000_000_000,
@@ -382,6 +581,47 @@ describe('GatewayRegistry', async () => {
           observedEpochCount: 0,
         },
       });
+
+      // Retrieve the tags from the response message
+      const penaltyRateTag = decreaseStakeResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Penalty-Rate',
+      );
+      const expeditedWithdrawalFeeTag =
+        decreaseStakeResult.Messages?.[0]?.Tags?.find(
+          (tag) => tag.name === 'Expedited-Withdrawal-Fee',
+        );
+      const amountWithdrawnTag = decreaseStakeResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Amount-Withdrawn',
+      );
+
+      // Assert that the tags exist
+      assert(penaltyRateTag, 'Penalty-Rate tag should exist');
+      assert(
+        expeditedWithdrawalFeeTag,
+        'Expedited-Withdrawal-Fee tag should exist',
+      );
+      assert(amountWithdrawnTag, 'Amount-Withdrawn tag should exist');
+
+      // Convert tag values to numbers for comparison
+      const penaltyRate = Number(penaltyRateTag.value);
+      const expeditedWithdrawalFee = Number(expeditedWithdrawalFeeTag.value);
+      const amountWithdrawn = Number(amountWithdrawnTag.value);
+
+      // Define the expected values
+      const expectedPenaltyRate = MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE;
+      const expectedExpeditedWithdrawalFee = Math.floor(
+        amountToWithdraw * expectedPenaltyRate,
+      );
+      const expectedAmountWithdrawn =
+        amountToWithdraw - expectedExpeditedWithdrawalFee;
+
+      // Assert correct values for penalty rate, expedited withdrawal fee, and amount withdrawn
+      assert.strictEqual(penaltyRate, expectedPenaltyRate);
+      assert.strictEqual(amountWithdrawn, expectedAmountWithdrawn);
+      assert.strictEqual(
+        expeditedWithdrawalFee,
+        expectedExpeditedWithdrawalFee,
+      );
     });
 
     it('should allow instantly withdrawing from an existing operator vault for a withdrawal fee', async () => {
