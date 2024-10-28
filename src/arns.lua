@@ -354,16 +354,17 @@ function arns.getTokenCost(intendedAction)
 		local purchaseType = intendedAction.purchaseType
 		local years = intendedAction.years
 		local name = intendedAction.name
+		local baseFee = demand.getFees()[#name]
 		assert(type(name) == "string", "Name is required and must be a string.")
 		assert(purchaseType == "lease" or purchaseType == "permabuy", "PurchaseType is invalid.")
 		if purchaseType == "lease" then
 			assert(years >= 1 and years <= 5, "Years is invalid. Must be an integer between 1 and 5")
 		end
-		local baseFee = demand.getFees()[#name]
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
 	elseif intendedAction.intent == "Extend-Lease" then
 		local name = intendedAction.name
 		local years = intendedAction.years
+		local baseFee = demand.getFees()[#intendedAction.name]
 		assert(type(name) == "string", "Name is required and must be a string.")
 		assert(years >= 1 and years <= 5, "Years is invalid. Must be an integer between 1 and 5")
 		local record = arns.getRecord(name)
@@ -373,13 +374,12 @@ function arns.getTokenCost(intendedAction)
 		if record.type == "permabuy" then
 			error("Name is permabought and cannot be extended")
 		end
-		local years = intendedAction.years
-		local baseFee = demand.getFees()[#intendedAction.name]
 		tokenCost = arns.calculateExtensionFee(baseFee, years, demand.getDemandFactor())
 	elseif intendedAction.intent == "Increase-Undername-Limit" then
 		local name = intendedAction.name
 		local qty = tonumber(intendedAction.quantity)
 		local currentTimestamp = intendedAction.currentTimestamp
+		local baseFee = demand.getFees()[#intendedAction.name]
 		assert(type(name) == "string", "Name is required and must be a string.")
 		assert(
 			qty >= 1 and qty <= 9990 and utils.isInteger(qty),
@@ -394,7 +394,6 @@ function arns.getTokenCost(intendedAction)
 		if record.type == "lease" then
 			yearsRemaining = arns.calculateYearsBetweenTimestamps(currentTimestamp, record.endTimestamp)
 		end
-		local baseFee = demand.getFees()[#intendedAction.name]
 		tokenCost = arns.calculateUndernameCost(baseFee, qty, record.type, yearsRemaining, demand.getDemandFactor())
 	end
 	return tokenCost

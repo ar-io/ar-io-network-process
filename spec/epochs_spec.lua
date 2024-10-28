@@ -1,6 +1,5 @@
 local epochs = require("epochs")
 local gar = require("gar")
-local balances = require("balances")
 local utils = require("utils")
 local testSettings = {
 	fqdn = "test.com",
@@ -93,7 +92,7 @@ describe("epochs", function()
 		end)
 
 		it("should return the maximum number of gateways if more are enrolled in network", function()
-			local hashchain = "c29tZSBzYW1wbGUgaGFzaA==" -- base64 of "some sample hash"
+			local testHashchain = "c29tZSBzYW1wbGUgaGFzaA==" -- base64 of "some sample hash"
 			epochs.updateEpochSettings({
 				maxObservers = 2, -- limit to 2 observers
 				epochZeroStartTimestamp = startTimestamp,
@@ -150,7 +149,7 @@ describe("epochs", function()
 					normalizedCompositeWeight = 1 / 3,
 				},
 			}
-			local status, result = pcall(epochs.computePrescribedObserversForEpoch, 0, hashchain)
+			local status, result = pcall(epochs.computePrescribedObserversForEpoch, 0, testHashchain)
 			assert.is_true(status)
 			assert.are.equal(2, #result)
 			assert.are.same(expectation, result)
@@ -252,7 +251,7 @@ describe("epochs", function()
 			local failedGateways = {
 				"test-this-is-valid-arweave-wallet-address-1",
 			}
-			Epochs[0].prescribedObservers = {
+			_G.Epochs[0].prescribedObservers = {
 				{
 					gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
 					observerAddress = "test-this-is-valid-arweave-wallet-address-1",
@@ -548,7 +547,7 @@ describe("epochs", function()
 					observerRewardRatioWeight = 1,
 					compositeWeight = 4,
 					normalizedCompositeWeight = 1,
-				}, gar.getGateway("test-this-is-valid-arweave-wallet-address-1").weights)
+				}, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].weights)
 				-- confirm the leaving gateway weights were not updated
 				assert.are.same({
 					stakeWeight = 0,
@@ -557,7 +556,7 @@ describe("epochs", function()
 					observerRewardRatioWeight = 0,
 					compositeWeight = 0,
 					normalizedCompositeWeight = 0,
-				}, gar.getGateway("test-this-is-valid-arweave-wallet-address-2").weights)
+				}, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-2"].weights)
 			end
 		)
 	end)
@@ -724,7 +723,7 @@ describe("epochs", function()
 				gar.addGateway("test-this-is-valid-arweave-wallet-address-" .. i, gateway)
 			end
 			-- clear the balances for the gateways
-			Balances["test-this-is-valid-arweave-wallet-address-1"] = 0
+			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 0
 			local epoch = epochs.getEpoch(epochIndex)
 			local expectedGatewayReward = epoch.distributions.totalEligibleGatewayReward
 			local expectedObserverReward = epoch.distributions.totalEligibleObserverReward
@@ -792,7 +791,13 @@ describe("epochs", function()
 
 			-- check the epoch was updated
 			local distributions = epochs.getEpoch(epochIndex).distributions
-			local expectedTotalDistribution = math.floor(expectedGateway1TotalRewards + expectedGateway2TotalRewards + expectedGateway3TotalRewards + expectedGateway4TotalRewards + expectedGateway5TotalRewards)
+			local expectedTotalDistribution = math.floor(
+				expectedGateway1TotalRewards
+					+ expectedGateway2TotalRewards
+					+ expectedGateway3TotalRewards
+					+ expectedGateway4TotalRewards
+					+ expectedGateway5TotalRewards
+			)
 
 			-- the updated operator stakes after rewards are distributed and restaked for the delegate
 			local gateway1OperatorStake = 50000000000 -- no rewards
@@ -828,11 +833,26 @@ describe("epochs", function()
 				["this-is-a-delegate"] = expectedTotalDistribution * 0.10,
 			}, distributions.rewards.distributed)
 			-- assert the gateway operator stakes are updated
-			assert.are.equal(gateway1OperatorStake, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].operatorStake) -- no rewards
-			assert.are.equal(gateway2OperatorStake, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-2"].operatorStake) -- autostake enabled
-			assert.are.equal(gateway3OperatorStake, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-3"].operatorStake) -- autostake enabled
-			assert.are.equal(gateway4OperatorStake, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-4"].operatorStake) -- autostake enabled
-			assert.are.equal(gateway5OperatorStake, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-5"].operatorStake) -- autostake DISABLED - return directly to owner
+			assert.are.equal(
+				gateway1OperatorStake,
+				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].operatorStake
+			) -- no rewards
+			assert.are.equal(
+				gateway2OperatorStake,
+				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-2"].operatorStake
+			) -- autostake enabled
+			assert.are.equal(
+				gateway3OperatorStake,
+				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-3"].operatorStake
+			) -- autostake enabled
+			assert.are.equal(
+				gateway4OperatorStake,
+				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-4"].operatorStake
+			) -- autostake enabled
+			assert.are.equal(
+				gateway5OperatorStake,
+				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-5"].operatorStake
+			) -- autostake DISABLED - return directly to owner
 
 			-- assert that gateway 5 balance increased by the expected amount as it is the only one that is autostaking disabled and returns directly to owner, all other balances should be 0
 			assert.are.equal(expectedGateway1Balance, _G.Balances["test-this-is-valid-arweave-wallet-address-1"])
@@ -841,7 +861,6 @@ describe("epochs", function()
 			assert.are.equal(expectedGateway4Balance, _G.Balances["test-this-is-valid-arweave-wallet-address-4"])
 			assert.are.equal(expectedGateway5Balance, _G.Balances["test-this-is-valid-arweave-wallet-address-5"])
 
-			-- validate delegate stakes are updated
 			-- gateway 1 did not get any rewards, so the delegate stake should be the original amount
 			assert.are.equal(
 				gateway1DelegateRewards,

@@ -259,8 +259,8 @@ function gar.updateGatewaySettings(from, updatedSettings, updatedServices, obser
 
 	local gateways = gar.getGateways()
 
-	for gatewayAddress, gateway in pairs(gateways) do
-		if gateway.observerAddress == observerAddress and gatewayAddress ~= from then
+	for gatewayAddress, existingGateway in pairs(gateways) do
+		if existingGateway.observerAddress == observerAddress and gatewayAddress ~= from then
 			error("Invalid observer wallet. The provided observer wallet is correlated with another gateway.")
 		end
 	end
@@ -649,7 +649,7 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 
 			assert(utils.lengthOfTable(services.bundlers) <= 20, "No more than 20 bundlers allowed")
 
-			for index, bundler in ipairs(services.bundlers) do
+			for _, bundler in ipairs(services.bundlers) do
 				local allowedBundlerKeys = { fqdn = true, port = true, protocol = true, path = true }
 				for key, _ in pairs(bundler) do
 					assert(allowedBundlerKeys[key], "bundler contains an invalid key: " .. tostring(key))

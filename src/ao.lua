@@ -26,7 +26,7 @@ end
 local function isArray(table)
 	if type(table) == "table" then
 		local maxIndex = 0
-		for k, v in pairs(table) do
+		for k, _ in pairs(table) do
 			if type(k) ~= "number" or k < 1 or math.floor(k) ~= k then
 				return false -- If there's a non-integer key, it's not an array
 			end

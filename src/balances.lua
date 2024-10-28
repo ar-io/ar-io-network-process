@@ -35,8 +35,7 @@ end
 --- Gets all balances in the system
 ---@return table All address:balance pairs
 function balances.getBalances()
-	local balances = utils.deepCopy(Balances) or {}
-	return balances
+	return utils.deepCopy(Balances) or {}
 end
 
 --- Reduces the balance of an address
@@ -68,10 +67,10 @@ end
 ---@param sortOrder string|nil "asc" or "desc" sort direction
 ---@return table Array of {address, balance} objects
 function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder)
-	local balances = balances.getBalances()
+	local allBalances = balances.getBalances()
 	local balancesArray = {}
 	local cursorField = "address" -- the cursor will be the wallet address
-	for address, balance in pairs(balances) do
+	for address, balance in pairs(allBalances) do
 		table.insert(balancesArray, {
 			address = address,
 			balance = balance,

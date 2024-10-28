@@ -59,7 +59,7 @@ describe("arns", function()
 							endTimestamp = timestamp + constants.oneYearMs * 1,
 						},
 					}, arns.getRecords())
-					assert.are.equal(balances.getBalance(testAddress), startBalance - 600000000)
+					assert.are.equal(_G.Balances[testAddress], startBalance - 600000000)
 					assert.are.equal(balances.getBalance(_G.ao.id), 600000000)
 					assert.are.equal(demandBefore + 600000000, demand.getCurrentPeriodRevenue())
 					assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
@@ -91,15 +91,13 @@ describe("arns", function()
 						endTimestamp = timestamp + constants.oneYearMs,
 					}, arns.getRecord("test-name"))
 
-					local balances = balances.getBalances()
-
 					assert.is.equal(
-						balances[testAddress],
+						_G.Balances[testAddress],
 						startBalance - 600000000,
 						"Balance should be reduced by the purchase price"
 					)
 					assert.is.equal(
-						balances[_G.ao.id],
+						_G.Balances[_G.ao.id],
 						600000000,
 						"Protocol balance should be increased by the purchase price"
 					)
@@ -131,12 +129,12 @@ describe("arns", function()
 					type = "lease",
 					undernameLimit = 10,
 				}
-				NameRegistry.records["test-name"] = existingRecord
+				_G.NameRegistry.records["test-name"] = existingRecord
 				local status, result =
 					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
 				assert.is_false(status)
 				assert.match("Name is already registered", result)
-				assert.are.same(existingRecord, NameRegistry.records["test-name"])
+				assert.are.same(existingRecord, _G.NameRegistry.records["test-name"])
 			end)
 
 			it("should throw an error if the record is reserved for someone else [" .. addressType .. "]", function()
@@ -144,19 +142,19 @@ describe("arns", function()
 					target = "test",
 					endTimestamp = 1000,
 				}
-				NameRegistry.reserved["test-name"] = reservedName
+				_G.NameRegistry.reserved["test-name"] = reservedName
 				local status, result =
 					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
 				assert.is_false(status)
 				assert.match("Name is reserved", result)
 				assert.are.same({}, arns.getRecords())
-				assert.are.same(reservedName, NameRegistry.reserved["test-name"])
+				assert.are.same(reservedName, _G.NameRegistry.reserved["test-name"])
 			end)
 
 			it("should allow you to buy a reserved name if reserved for caller [" .. addressType .. "]", function()
 				local demandBefore = demand.getCurrentPeriodRevenue()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
-				NameRegistry.reserved["test-name"] = {
+				_G.NameRegistry.reserved["test-name"] = {
 					target = testAddress,
 					endTimestamp = 1000,
 				}
@@ -174,16 +172,14 @@ describe("arns", function()
 				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, arns.getRecords())
 
-				local balances = balances.getBalances()
-
 				assert.is.equal(
-					balances[testAddress],
+					_G.Balances[testAddress],
 					startBalance - 600000000,
 					"Balance should be reduced by the purchase price"
 				)
 
 				assert.is.equal(
-					balances[_G.ao.id],
+					_G.Balances[_G.ao.id],
 					600000000,
 					"Protocol balance should be increased by the purchase price"
 				)
@@ -193,7 +189,7 @@ describe("arns", function()
 			end)
 
 			it("should throw an error if the user does not have enough balance [" .. addressType .. "]", function()
-				Balances[testAddress] = 0
+				_G.Balances[testAddress] = 0
 				local status, result =
 					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
 				assert.is_false(status)
@@ -211,7 +207,7 @@ describe("arns", function()
 
 			--  throw an error on insufficient balance
 			it("should throw an error on insufficient balance [" .. addressType .. "]", function()
-				NameRegistry.records["test-name"] = {
+				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = timestamp + constants.oneYearMs,
 					processId = testProcessId,
 					purchasePrice = 600000000,
@@ -219,14 +215,14 @@ describe("arns", function()
 					type = "lease",
 					undernameLimit = 10,
 				}
-				Balances[testAddress] = 0
+				_G.Balances[testAddress] = 0
 				local status, error = pcall(arns.increaseundernameLimit, testAddress, "test-name", 50, timestamp)
 				assert.is_false(status)
 				assert.match("Insufficient balance", error)
 			end)
 
 			it("should throw an error if the name is in the grace period [" .. addressType .. "]", function()
-				NameRegistry.records["test-name"] = {
+				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = timestamp + constants.oneYearMs,
 					processId = testProcessId,
 					purchasePrice = 600000000,
@@ -241,7 +237,7 @@ describe("arns", function()
 			end)
 
 			it("should increase the undername count and properly deduct balance [" .. addressType .. "]", function()
-				NameRegistry.records["test-name"] = {
+				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = timestamp + constants.oneYearMs,
 					processId = testProcessId,
 					purchasePrice = 600000000,
@@ -264,16 +260,14 @@ describe("arns", function()
 				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, arns.getRecords())
 
-				local balances = balances.getBalances()
-
 				assert.is.equal(
-					balances[testAddress],
+					_G.Balances[testAddress],
 					startBalance - 25000000,
 					"Balance should be reduced by the purchase price"
 				)
 
 				assert.is.equal(
-					balances[_G.ao.id],
+					_G.Balances[_G.ao.id],
 					25000000,
 					"Protocol balance should be increased by the purchase price"
 				)
@@ -293,7 +287,7 @@ describe("arns", function()
 			it(
 				"should throw an error if the lease is expired and beyond the grace period [" .. addressType .. "]",
 				function()
-					NameRegistry.records["test-name"] = {
+					_G.NameRegistry.records["test-name"] = {
 						endTimestamp = timestamp + constants.oneYearMs,
 						processId = testProcessId,
 						purchasePrice = 600000000,
@@ -314,7 +308,7 @@ describe("arns", function()
 			)
 
 			it("should throw an error if the lease is permabought [" .. addressType .. "]", function()
-				NameRegistry.records["test-name"] = {
+				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = nil,
 					processId = testProcessId,
 					purchasePrice = 600000000,
@@ -329,7 +323,7 @@ describe("arns", function()
 
 			-- throw an error of insufficient balance
 			it("should throw an error on insufficient balance [" .. addressType .. "]", function()
-				NameRegistry.records["test-name"] = {
+				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = timestamp + constants.oneYearMs,
 					processId = testProcessId,
 					purchasePrice = 600000000,
@@ -337,14 +331,14 @@ describe("arns", function()
 					type = "lease",
 					undernameLimit = 10,
 				}
-				Balances[testAddress] = 0
+				_G.Balances[testAddress] = 0
 				local status, error = pcall(arns.extendLease, testAddress, "test-name", 1, timestamp)
 				assert.is_false(status)
 				assert.match("Insufficient balance", error)
 			end)
 
 			it("should allow extension for existing lease up to 5 years [" .. addressType .. "]", function()
-				NameRegistry.records["test-name"] = {
+				_G.NameRegistry.records["test-name"] = {
 					-- 1 year lease
 					endTimestamp = timestamp + constants.oneYearMs,
 					processId = testProcessId,
@@ -376,15 +370,13 @@ describe("arns", function()
 					},
 				}, arns.getRecords())
 
-				local balances = balances.getBalances()
-
 				assert.is.equal(
-					balances[testAddress],
+					_G.Balances[testAddress],
 					startBalance - 400000000,
 					"Balance should be reduced by the purchase price"
 				)
 				assert.is.equal(
-					balances[_G.ao.id],
+					_G.Balances[_G.ao.id],
 					400000000,
 					"Protocol balance should be increased by the purchase price"
 				)
@@ -394,7 +386,7 @@ describe("arns", function()
 			end)
 
 			it("should throw an error when trying to extend beyond 5 years [" .. addressType .. "]", function()
-				NameRegistry.records["test-name"] = {
+				_G.NameRegistry.records["test-name"] = {
 					-- 1 year lease
 					endTimestamp = timestamp + constants.oneYearMs,
 					processId = testProcessId,
@@ -688,7 +680,7 @@ describe("arns", function()
 				assert.are.equal(auction.settings.scalingExponent, 190)
 				assert.are.equal(auction.settings.startPriceMultiplier, 50)
 				assert.are.equal(auction.settings.durationMs, twoWeeksMs)
-				assert.are.equal(NameRegistry.records["test-name"], nil)
+				assert.are.equal(_G.NameRegistry.records["test-name"], nil)
 			end)
 
 			it("should throw an error if the name is already in the auction map", function()
@@ -806,14 +798,8 @@ describe("arns", function()
 						"permabuy",
 						nil
 					)
-					local balances = balances.getBalances()
-					local expectedPrice = math.floor(
-						startPrice
-							* (
-								(1 - (auction.settings.decayRate * (bidTimestamp - startTimestamp)))
-								^ auction.settings.scalingExponent
-							)
-					)
+					local totalDecay = auction.settings.decayRate * (bidTimestamp - startTimestamp)
+					local expectedPrice = math.floor(startPrice * ((1 - totalDecay) ^ auction.settings.scalingExponent))
 					local expectedRecord = {
 						endTimestamp = nil,
 						processId = "test-process-id",
@@ -824,10 +810,10 @@ describe("arns", function()
 					}
 					local expectedInitiatorReward = math.floor(expectedPrice * 0.5)
 					local expectedProtocolReward = expectedPrice - expectedInitiatorReward
-					assert.are.equal(expectedInitiatorReward, balances["test-initiator"])
-					assert.are.equal(expectedProtocolReward, balances[_G.ao.id])
-					assert.are.equal(nil, NameRegistry.auctions["test-name"])
-					assert.are.same(expectedRecord, NameRegistry.records["test-name"])
+					assert.are.equal(expectedInitiatorReward, _G.Balances["test-initiator"])
+					assert.are.equal(expectedProtocolReward, _G.Balances[_G.ao.id])
+					assert.are.equal(nil, _G.NameRegistry.auctions["test-name"])
+					assert.are.same(expectedRecord, _G.NameRegistry.records["test-name"])
 					assert.are.same(expectedRecord, result.record)
 					assert.are.equal(
 						demandBefore + 1,

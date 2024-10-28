@@ -18,8 +18,7 @@ EpochSettings = EpochSettings
 	}
 
 function epochs.getEpochs()
-	local epochs = utils.deepCopy(Epochs) or {}
-	return epochs
+	return utils.deepCopy(epochs) or {}
 end
 
 function epochs.getEpoch(epochIndex)
@@ -339,8 +338,7 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	assert(type(timestamp) == "number", "Timestamp is required")
 
 	local epochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	local epochStartTimestamp, epochEndTimestamp, epochDistributionTimestamp =
-		epochs.getEpochTimestampsForIndex(epochIndex)
+	local epochStartTimestamp, _, epochDistributionTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 
 	-- avoid observations before the previous epoch distribution has occurred, as distributions affect weights of the current epoch
 	if timestamp < epochStartTimestamp + epochs.getSettings().distributionDelayMs then

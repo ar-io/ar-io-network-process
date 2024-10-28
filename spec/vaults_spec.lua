@@ -31,7 +31,7 @@ describe("vaults", function()
 		end)
 
 		it("should throw an insufficient balance error if not enough tokens to create the vault", function()
-			Balances["test-this-is-valid-arweave-wallet-address-1"] = 50
+			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 50
 			local status, result = pcall(
 				vaults.createVault,
 				"test-this-is-valid-arweave-wallet-address-1",
@@ -45,7 +45,7 @@ describe("vaults", function()
 		end)
 
 		it("should throw an error if the lock length would be larger than the maximum", function()
-			local status, result = pcall(
+			local status = pcall(
 				vaults.createVault,
 				"test-this-is-valid-arweave-wallet-address-1",
 				100,
@@ -57,7 +57,7 @@ describe("vaults", function()
 		end)
 
 		it("should throw an error if the lock length is less than the minimum", function()
-			local status, error = pcall(
+			local status = pcall(
 				vaults.createVault,
 				"test-this-is-valid-arweave-wallet-address-1",
 				100,
@@ -69,7 +69,7 @@ describe("vaults", function()
 		end)
 
 		it("should throw an error if the vault already exists", function()
-			local status, result = pcall(
+			local status = pcall(
 				vaults.createVault,
 				"test-this-is-valid-arweave-wallet-address-1",
 				100,
@@ -78,7 +78,7 @@ describe("vaults", function()
 				"msgId"
 			)
 			assert.is_true(status)
-			local status, result = pcall(
+			local secondStatus, result = pcall(
 				vaults.createVault,
 				"test-this-is-valid-arweave-wallet-address-1",
 				100,
@@ -86,7 +86,7 @@ describe("vaults", function()
 				startTimestamp,
 				"msgId"
 			)
-			assert.is_false(status)
+			assert.is_false(secondStatus)
 			assert.match("Vault with id msgId already exists", result)
 		end)
 	end)
@@ -255,7 +255,7 @@ describe("vaults", function()
 			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS - 1
 			local timestamp = 1000000
 			local msgId = "msgId"
-			local status, result =
+			local status =
 				pcall(vaults.vaultedTransfer, from, recipient, quantity, lockLengthMs, timestamp, msgId)
 			assert.is_false(status)
 		end)

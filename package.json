@@ -4,20 +4,33 @@
     "build": "node tools/bundle-aos.mjs",
     "test:integration": "yarn build && node --test --experimental-wasm-memory64 **/*.test.mjs",
     "format:fix": "prettier --write .",
+    "lint": "luacheck src spec",
     "test:unit": "busted . && luacov",
     "test": "yarn format:fix && yarn test:unit && yarn test:integration",
     "monitor": "node --test tests/monitor/monitor.test.mjs",
     "monitor:devnet": "IO_PROCESS_ID=GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc node --test tests/monitor/monitor.test.mjs",
     "monitor:testnet": "IO_PROCESS_ID=agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA node --test tests/monitor/monitor.test.mjs",
-    "evolve": "yarn build && node tools/evolve.mjs"
+    "evolve": "yarn build && node tools/evolve.mjs",
+    "prepare": "husky install"
   },
   "devDependencies": {
     "@ar.io/sdk": "alpha",
     "@permaweb/ao-loader": "^0.0.36",
     "@permaweb/aoconnect": "^0.0.59",
     "arweave": "^1.15.1",
+    "husky": "^9.1.6",
+    "lint-staged": "^15.2.10",
     "prettier": "^3.3.2",
     "testcontainers": "^10.13.1"
+  },
+  "lint-staged": {
+    "*.lua": [
+      "stylua",
+      "luacheck --config .luacheckrc"
+    ],
+    "*.{js,mjs}": [
+      "prettier --write"
+    ]
   },
   "license": "AGPL-3.0-or-later"
 }
