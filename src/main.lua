@@ -1686,7 +1686,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
 	local tickedRewardDistributions = {}
 	local totalTickedRewardsDistributed = 0
-	local function tickEpoch(timestamp, blockHeight, hashchain)
+	local function tickEpoch(timestamp, blockHeight, hashchain, msgId)
 		-- update demand factor if necessary
 		local demandFactor = demand.updateDemandFactor(timestamp)
 		-- distribute rewards for the epoch and increments stats for gateways, this closes the epoch if the timestamp is greater than the epochs required distribution timestamp
@@ -1698,7 +1698,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 				+ distributedEpoch.distributions.totalDistributedRewards
 		end
 		-- prune any gateway that has hit the failed 30 consecutive epoch threshold after the epoch has been distributed
-		local pruneGatewaysResult = gar.pruneGateways(timestamp)
+		local pruneGatewaysResult = gar.pruneGateways(timestamp, msgId)
 
 		-- now create the new epoch with the current message hashchain and block height
 		local newEpoch = epochs.createEpoch(timestamp, tonumber(blockHeight), hashchain)
@@ -1709,6 +1709,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 		}
 	end
 
+	local msgId = msg.Id
 	local lastTickedEpochIndex = LastTickedEpochIndex
 	local targetCurrentEpochIndex = epochs.getEpochIndexForTimestamp(msgTimestamp)
 	msg.ioEvent:addField("Last-Ticked-Epoch-Index", lastTickedEpochIndex)
@@ -1744,7 +1745,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 		-- use the minimum of the msg timestamp or the epoch distribution timestamp, this ensures an epoch gets created for the genesis block and that we don't try and distribute before an epoch is created
 		local tickTimestamp = math.min(msgTimestamp or 0, epochDistributionTimestamp)
 		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height, we should set the prescribed observers and names to empty arrays and distribute rewards accordingly
-		local tickSuceeded, resultOrError = pcall(tickEpoch, tickTimestamp, msg["Block-Height"], msg["Hash-Chain"])
+		local tickSuceeded, resultOrError = pcall(tickEpoch, tickTimestamp, msg["Block-Height"], msg["Hash-Chain"], msgId)
 		if tickSuceeded then
 			if tickTimestamp == epochDistributionTimestamp then
 				-- if we are distributing rewards, we should update the last ticked epoch index to the current epoch index
