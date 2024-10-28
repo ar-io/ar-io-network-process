@@ -201,9 +201,9 @@ local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
 		ioEvent:addField("Slashed-Gateway-Amounts", slashedGateways)
 		ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
 		local invariantSlashedGateways = {}
-		for _, gwAddress in pairs(slashedGateways) do
+		for gwAddress, _ in pairs(slashedGateways) do
 			local gw = gar.getGateway(gwAddress) or {}
-			if gw.totalDelegatedStake > 0 then
+			if gw and (gw.totalDelegatedStake > 0) then
 				invariantSlashedGateways[gwAddress] = gw.totalDelegatedStake
 			end
 		end
@@ -1745,7 +1745,8 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 		-- use the minimum of the msg timestamp or the epoch distribution timestamp, this ensures an epoch gets created for the genesis block and that we don't try and distribute before an epoch is created
 		local tickTimestamp = math.min(msgTimestamp or 0, epochDistributionTimestamp)
 		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height, we should set the prescribed observers and names to empty arrays and distribute rewards accordingly
-		local tickSuceeded, resultOrError = pcall(tickEpoch, tickTimestamp, msg["Block-Height"], msg["Hash-Chain"], msgId)
+		local tickSuceeded, resultOrError =
+			pcall(tickEpoch, tickTimestamp, msg["Block-Height"], msg["Hash-Chain"], msgId)
 		if tickSuceeded then
 			if tickTimestamp == epochDistributionTimestamp then
 				-- if we are distributing rewards, we should update the last ticked epoch index to the current epoch index
