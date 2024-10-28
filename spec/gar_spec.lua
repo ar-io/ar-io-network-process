@@ -583,7 +583,7 @@ describe("gar", function()
 
 	describe("leaveNetwork", function()
 		it("should leave the network", function()
-			GatewayRegistry[stubGatewayAddress] = {
+			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = (gar.getSettings().operators.minStake + 1000),
 				totalDelegatedStake = gar.getSettings().delegates.minStake,
 				vaults = {},
@@ -660,7 +660,7 @@ describe("gar", function()
 	describe("increaseOperatorStake", function()
 		it("should increase operator stake", function()
 			Balances[stubGatewayAddress] = 1000
-			GatewayRegistry[stubGatewayAddress] = {
+			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {},
@@ -1012,7 +1012,7 @@ describe("gar", function()
 
 	describe("updateGatewaySettings", function()
 		it("should update gateway settings", function()
-			GatewayRegistry[stubGatewayAddress] = {
+			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {},
@@ -1078,7 +1078,7 @@ describe("gar", function()
 		end)
 
 		it("should allow updating gateway services", function()
-			GatewayRegistry[stubGatewayAddress] = {
+			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {},
@@ -1137,7 +1137,7 @@ describe("gar", function()
 		end)
 
 		it("should not allow editing of gateway settings for a gateway that is leaving", function()
-			GatewayRegistry[stubGatewayAddress] = {
+			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {},
@@ -1202,7 +1202,7 @@ describe("gar", function()
 	describe("delegateStake", function()
 		it("should delegate stake to a gateway", function()
 			Balances[stubRandomAddress] = gar.getSettings().delegates.minStake
-			GatewayRegistry[stubGatewayAddress] = {
+			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {},
@@ -1258,7 +1258,7 @@ describe("gar", function()
 		end)
 
 		it("should decrease delegated stake", function()
-			GatewayRegistry[stubGatewayAddress] = {
+			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = gar.getSettings().delegates.minStake + 1000,
 				vaults = {},
@@ -1332,7 +1332,7 @@ describe("gar", function()
 			Balances[ao.id] = 0
 			local expeditedWithdrawalFee = 1000 * 0.50
 			local withdrawalAmount = 1000 - expeditedWithdrawalFee
-			GatewayRegistry[stubGatewayAddress] = {
+			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = gar.getSettings().delegates.minStake + 1000,
 				vaults = {},
@@ -1396,7 +1396,7 @@ describe("gar", function()
 
 		it("should error if the remaining delegate stake is less than the minimum stake", function()
 			local delegatedStake = gar.getSettings().delegates.minStake
-			GatewayRegistry[stubGatewayAddress] = {
+			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = gar.getSettings().delegates.minStake - 1,
 				vaults = {},
@@ -1741,7 +1741,7 @@ describe("gar", function()
 		it("should slash operator stake by the provided slash amount and return it to the protocol balance", function()
 			local slashAmount = 10000
 			Balances[ao.id] = 0
-			GatewayRegistry[stubGatewayAddress] = {
+			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {},
@@ -1752,7 +1752,7 @@ describe("gar", function()
 			assert.is_nil(err)
 			assert.are.equal(
 				gar.getSettings().operators.minStake - slashAmount,
-				GatewayRegistry[stubGatewayAddress].operatorStake
+				_G.GatewayRegistry[stubGatewayAddress].operatorStake
 			)
 			assert.are.equal(slashAmount, Balances[ao.id])
 		end)
@@ -1760,7 +1760,7 @@ describe("gar", function()
 
 	describe("getGatewayWeightsAtTimestamp", function()
 		it("shoulud properly compute weights based on gateways for a given timestamp", function()
-			GatewayRegistry[stubGatewayAddress] = {
+			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {},
@@ -1876,25 +1876,25 @@ describe("gar", function()
 				}, result)
 
 				local expectedRemainingStake = math.floor(gar.getSettings().operators.minStake * 0.8) + 10000
-				assert.is_nil(GatewayRegistry["address1"]) -- removed
-				assert.is_not_nil(GatewayRegistry["address2"]) -- not removed
-				assert.is_not_nil(GatewayRegistry["address3"]) -- not removed
+				assert.is_nil(_G.GatewayRegistry["address1"]) -- removed
+				assert.is_not_nil(_G.GatewayRegistry["address2"]) -- not removed
+				assert.is_not_nil(_G.GatewayRegistry["address3"]) -- not removed
 				-- Check that gateway 3's operator stake is slashed by 20% and the remaining stake is vaulted
-				assert.are.equal("leaving", GatewayRegistry["address3"].status)
-				assert.are.equal(0, GatewayRegistry["address3"].operatorStake)
+				assert.are.equal("leaving", _G.GatewayRegistry["address3"].status)
+				assert.are.equal(0, _G.GatewayRegistry["address3"].operatorStake)
 				assert.are.same({
 					balance = expectedRemainingStake,
 					startTimestamp = currentTimestamp,
 					endTimestamp = currentTimestamp + gar.getSettings().operators.leaveLengthMs,
-				}, GatewayRegistry["address3"].vaults["address3"])
+				}, _G.GatewayRegistry["address3"].vaults["address3"])
 				assert.are.equal(protocolBalanceBefore + expectedSlashedStake, Balances[ao.id])
 			end
 		)
 
-		it("should handle empty GatewayRegistry", function()
+		it("should handle empty _G.GatewayRegistry", function()
 			local currentTimestamp = 1000000
 
-			-- Set up empty GatewayRegistry
+			-- Set up empty _G.GatewayRegistry
 			_G.GatewayRegistry = {}
 
 			-- Call pruneGateways
@@ -1937,13 +1937,13 @@ describe("gar", function()
 			-- assert the vault is removed and the delegated stake is added back to the delegate
 			assert.are.equal(
 				1000, -- added back to the delegate
-				GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress].delegatedStake
+				_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress].delegatedStake
 			)
 			assert.are.equal(
 				nil,
-				GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress].vaults["some-previous-withdrawal-id"]
+				_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress].vaults["some-previous-withdrawal-id"]
 			)
-			assert.are.equal(1000, GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
+			assert.are.equal(1000, _G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
 		end)
 		it("should not cancel a withdrawal if the gateway does not allow staking", function()
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
@@ -2090,21 +2090,25 @@ describe("gar", function()
 	-- 			},
 	-- 		}
 	-- 		local result = gar.getActiveGatewaysBeforeTimestamp(timestamp)
-	-- 		assert.are.same({ stubGatewayAddress, stubRandomAddress }, result)
+	-- 		-- assert both gateways are returned, in no particular ordering
+	-- 		assert.is_true(utils.isSubset(result, {
+	-- 			[stubGatewayAddress] = testGateway,
+	-- 			[stubRandomAddress] = testGateway,
+	-- 		}))
 	-- 	end)
 	-- end)
 
 	describe("getters", function()
 		-- TODO: other tests for error conditions when joining/leaving network
 		it("should get single gateway", function()
-			GatewayRegistry[stubGatewayAddress] = testGateway
+			_G.GatewayRegistry[stubGatewayAddress] = testGateway
 			local result = gar.getGateway(stubGatewayAddress)
 			assert.are.same(result, testGateway)
 		end)
 
 		it("should get multiple gateways", function()
-			GatewayRegistry[stubGatewayAddress] = testGateway
-			GatewayRegistry[stubRandomAddress] = testGateway
+			_G.GatewayRegistry[stubGatewayAddress] = testGateway
+			_G.GatewayRegistry[stubRandomAddress] = testGateway
 			local result = gar.getGateways()
 			assert.are.same(result, {
 				[stubGatewayAddress] = testGateway,

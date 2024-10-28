@@ -53,7 +53,7 @@ describe("epochs", function()
 
 	describe("computePrescribedObserversForEpoch", function()
 		it("should return all eligible gateways if fewer than the maximum in network", function()
-			GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
 				vaults = {},
@@ -121,7 +121,7 @@ describe("epochs", function()
 					observerAddress = "observerAddress",
 				}
 				-- note - ordering of keys is not guaranteed when insert into maps
-				GatewayRegistry["observer" .. i] = gateway
+				_G.GatewayRegistry["observer" .. i] = gateway
 			end
 
 			local expectation = {

@@ -135,11 +135,13 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 	return gateway
 end
 
+--- Increases the operator stake for a gateway
+---@param from string # The address of the gateway to increase stake for
+---@param qty number # The amount of stake to increase by - must be positive integer
+---@return table # The updated gateway object
 function gar.increaseOperatorStake(from, qty)
 	assert(type(qty) == "number", "Quantity is required and must be a number")
-	-- asssert it is an integer
-	assert(utils.isInteger(qty), "Quantity must be an integer")
-	assert(qty > 0, "Quantity must be greater than 0")
+	assert(qty > 0 and utils.isInteger(qty), "Quantity must be an integer greater than 0")
 
 	local gateway = gar.getGateway(from)
 
@@ -159,7 +161,7 @@ function gar.increaseOperatorStake(from, qty)
 	gateway.operatorStake = gateway.operatorStake + qty
 	-- update the gateway
 	GatewayRegistry[from] = gateway
-	return gar.getGateway(from)
+	return gateway
 end
 
 -- Utility function to calculate withdrawal details and handle balance adjustments
@@ -228,7 +230,7 @@ function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWi
 	GatewayRegistry[from] = gateway
 
 	return {
-		gateway = gar.getGateway(from),
+		gateway = gateway,
 		penaltyRate = penaltyRate,
 		expeditedWithdrawalFee = expeditedWithdrawalFee,
 		amountWithdrawn = amountToWithdraw,
@@ -301,9 +303,9 @@ function gar.updateGatewaySettings(from, updatedSettings, updatedServices, obser
 	if observerAddress then
 		gateway.observerAddress = observerAddress
 	end
-	-- update the gateway
+	-- update the gateway on the global state
 	GatewayRegistry[from] = gateway
-	return gar.getGateway(from)
+	return gateway
 end
 
 --- Gets a gateway by address
