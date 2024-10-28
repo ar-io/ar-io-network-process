@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - src/**/*
+      - spec/**/*
 
 jobs:
   lint:
