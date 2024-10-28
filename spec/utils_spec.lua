@@ -63,12 +63,28 @@ describe("utils", function()
 			assert.are.same("foo", utils.reduce(input, stubReducer, "foo"))
 		end)
 
-		it("should return the reduced value", function()
-			local input = { 1, 2, 3, 4, 5 }
-			local reducer = function(acc, value)
+		it("should return the reduced value for a numeric table", function()
+			local input = { 1, 3, 5, 7, 9 }
+			assert.are.same(
+				15,
+				utils.reduce(input, function(acc, key)
+					return acc + key
+				end, 0)
+			)
+			assert.are.same(
+				25,
+				utils.reduce(input, function(acc, _, value)
+					return acc + value
+				end, 0)
+			)
+		end)
+
+		it("should return the reduced value for a keyed table", function()
+			local input = { foo = 2, bar = 4, baz = 6, oof = 8, rab = 10 }
+			local reducer = function(acc, _, value)
 				return acc + value
 			end
-			assert.are.same(15, utils.reduce(input, reducer, 0))
+			assert.are.same(30, utils.reduce(input, reducer, 0))
 		end)
 	end)
 
@@ -95,6 +111,173 @@ describe("utils", function()
 			assert.are.same("Hello-World", utils.toTrainCase("Hello-World"))
 			assert.are.same("Hello-Worl-D", utils.toTrainCase("Hello-WorlD"))
 			assert.are.same("HW-Hello-World", utils.toTrainCase("HW-helloWorld"))
+		end)
+	end)
+
+	describe("paginateTableWithCursor", function()
+		local threeItemTable = {
+			{ name = "foo" },
+			{ name = "bar" },
+			{ name = "baz" },
+		}
+		local cursorField = "name"
+		local sortBy = "name"
+
+		it("paginates, limits to less than list size, and sorts in ascending order with an empty cursor", function()
+			local cursor = ""
+			local cursorField = "name"
+			local limit = 1
+			local sortBy = "name"
+			local sortOrder = "asc"
+			local result = utils.paginateTableWithCursor(threeItemTable, cursor, cursorField, limit, sortBy, sortOrder)
+			assert.are.same({
+				items = {
+					{ name = "bar" },
+				},
+				limit = 1,
+				totalItems = 3,
+				sortBy = "name",
+				sortOrder = "asc",
+				nextCursor = "bar",
+				hasMore = true,
+			}, result)
+		end)
+
+		it("paginates, limits to less than list size, and sorts in ascending order with a valid cursor", function()
+			local cursor = "bar"
+			local cursorField = "name"
+			local limit = 1
+			local sortBy = "name"
+			local sortOrder = "asc"
+			local result = utils.paginateTableWithCursor(threeItemTable, cursor, cursorField, limit, sortBy, sortOrder)
+			assert.are.same({
+				items = {
+					{ name = "baz" },
+				},
+				limit = 1,
+				totalItems = 3,
+				sortBy = "name",
+				sortOrder = "asc",
+				nextCursor = "baz",
+				hasMore = true,
+			}, result)
+		end)
+
+		it("paginates, limits to less than list size, and sorts in descending order with an empty cursor", function()
+			local cursor = ""
+			local limit = 1
+			local sortOrder = "desc"
+			local result = utils.paginateTableWithCursor(threeItemTable, cursor, cursorField, limit, sortBy, sortOrder)
+			assert.are.same({
+				items = {
+					{ name = "foo" },
+				},
+				limit = 1,
+				totalItems = 3,
+				sortBy = "name",
+				sortOrder = "desc",
+				nextCursor = "foo",
+				hasMore = true,
+			}, result)
+		end)
+
+		it("paginates, limits to less than list size, and sorts in descending order with a valid cursor", function()
+			local cursor = "foo"
+			local limit = 1
+			local sortOrder = "desc"
+			local result = utils.paginateTableWithCursor(threeItemTable, cursor, cursorField, limit, sortBy, sortOrder)
+			assert.are.same({
+				items = {
+					{ name = "baz" },
+				},
+				limit = 1,
+				totalItems = 3,
+				sortBy = "name",
+				sortOrder = "desc",
+				nextCursor = "baz",
+				hasMore = true,
+			}, result)
+		end)
+
+		it("correctly handles a nil cursor", function()
+			local cursor = nil
+			local limit = 1
+			local sortOrder = "asc"
+			local result = utils.paginateTableWithCursor(threeItemTable, cursor, cursorField, limit, sortBy, sortOrder)
+			assert.are.same({
+				items = {
+					{ name = "bar" },
+				},
+				limit = 1,
+				totalItems = 3,
+				sortBy = "name",
+				sortOrder = "asc",
+				nextCursor = "bar",
+				hasMore = true,
+			}, result)
+		end)
+
+		it("correctly handles a random cursor", function()
+			local cursor = "bing"
+			local limit = 1
+			local sortOrder = "asc"
+			local result = utils.paginateTableWithCursor(threeItemTable, cursor, cursorField, limit, sortBy, sortOrder)
+			assert.are.same({
+				items = {
+					{ name = "bar" },
+				},
+				limit = 1,
+				totalItems = 3,
+				sortBy = "name",
+				sortOrder = "asc",
+				nextCursor = "bar",
+				hasMore = true,
+			}, result)
+		end)
+
+		it("correctly handles a numeric string cursor", function()
+			local cursor = "1001"
+			local limit = 1
+			local sortOrder = "asc"
+			local table = {
+				{ name = "1000" },
+				{ name = "1001" },
+				{ name = "1002" },
+			}
+			local result = utils.paginateTableWithCursor(table, cursor, cursorField, limit, sortBy, sortOrder)
+			assert.are.same({
+				items = {
+					{ name = "1002" },
+				},
+				limit = 1,
+				totalItems = 3,
+				sortBy = "name",
+				sortOrder = "asc",
+				hasMore = false,
+			}, result)
+		end)
+
+		it("correctly handles an irrelevant numeric cursor", function()
+			local cursor = 1001
+			local limit = 1
+			local sortOrder = "asc"
+			local table = {
+				{ name = "1000" },
+				{ name = "1001" },
+				{ name = "1002" },
+			}
+			local result = utils.paginateTableWithCursor(table, cursor, cursorField, limit, sortBy, sortOrder)
+			assert.are.same({
+				items = {
+					{ name = "1000" },
+				},
+				limit = 1,
+				totalItems = 3,
+				sortBy = "name",
+				sortOrder = "asc",
+				hasMore = true,
+				nextCursor = "1000",
+			}, result)
 		end)
 	end)
 end)

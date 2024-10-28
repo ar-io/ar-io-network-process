@@ -44,7 +44,7 @@ function utils.slice(tbl, first, last, step)
 end
 
 function utils.parsePaginationTags(msg)
-	local cursor = tonumber(msg.Tags.Cursor) or msg.Tags.Cursor
+	local cursor = msg.Tags.Cursor
 	local limit = tonumber(msg.Tags["Limit"]) or 100
 	local sortOrder = msg.Tags["Sort-Order"] and string.lower(msg.Tags["Sort-Order"]) or "desc"
 	local sortBy = msg.Tags["Sort-By"] and msg.Tags["Sort-By"]

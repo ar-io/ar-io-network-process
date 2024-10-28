@@ -93,17 +93,17 @@ local ActionMap = {
 }
 
 -- Low fidelity trackers
-local lastKnownCirculatingSupply = lastKnownCirculatingSupply or 0
-local lastKnownLockedSupply = lastKnownLockedSupply or 0
-local lastKnownStakedSupply = lastKnownStakedSupply or 0
-local lastKnownDelegatedSupply = lastKnownDelegatedSupply or 0
-local lastKnownWithdrawSupply = lastKnownWithdrawSupply or 0
+LastKnownCirculatingSupply = LastKnownCirculatingSupply or 0
+LastKnownLockedSupply = LastKnownLockedSupply or 0
+LastKnownStakedSupply = LastKnownStakedSupply or 0
+LastKnownDelegatedSupply = LastKnownDelegatedSupply or 0
+LastKnownWithdrawSupply = LastKnownWithdrawSupply or 0
 local function lastKnownTotalTokenSupply()
-	return lastKnownCirculatingSupply
-		+ lastKnownLockedSupply
-		+ lastKnownStakedSupply
-		+ lastKnownDelegatedSupply
-		+ lastKnownWithdrawSupply
+	return LastKnownCirculatingSupply
+		+ LastKnownLockedSupply
+		+ LastKnownStakedSupply
+		+ LastKnownDelegatedSupply
+		+ LastKnownWithdrawSupply
 		+ Balances[Protocol]
 end
 
@@ -138,11 +138,11 @@ end
 
 local function addSupplyData(ioEvent, supplyData)
 	supplyData = supplyData or {}
-	ioEvent:addField("Circulating-Supply", supplyData.circulatingSupply or lastKnownCirculatingSupply)
-	ioEvent:addField("Locked-Supply", supplyData.lockedSupply or lastKnownLockedSupply)
-	ioEvent:addField("Staked-Supply", supplyData.stakedSupply or lastKnownStakedSupply)
-	ioEvent:addField("Delegated-Supply", supplyData.delegatedSupply or lastKnownDelegatedSupply)
-	ioEvent:addField("Withdraw-Supply", supplyData.withdrawSupply or lastKnownWithdrawSupply)
+	ioEvent:addField("Circulating-Supply", supplyData.circulatingSupply or LastKnownCirculatingSupply)
+	ioEvent:addField("Locked-Supply", supplyData.lockedSupply or LastKnownLockedSupply)
+	ioEvent:addField("Staked-Supply", supplyData.stakedSupply or LastKnownStakedSupply)
+	ioEvent:addField("Delegated-Supply", supplyData.delegatedSupply or LastKnownDelegatedSupply)
+	ioEvent:addField("Withdraw-Supply", supplyData.withdrawSupply or LastKnownWithdrawSupply)
 	ioEvent:addField("Total-Token-Supply", supplyData.totalTokenSupply or lastKnownTotalTokenSupply())
 	ioEvent:addField("Protocol-Balance", Balances[Protocol])
 end
@@ -164,20 +164,20 @@ local function gatewayStats()
 end
 
 local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
-	lastKnownCirculatingSupply = lastKnownCirculatingSupply
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply
 		+ (pruneGatewaysResult.delegateStakeReturned or 0)
 		+ (pruneGatewaysResult.gatewayStakeReturned or 0)
 
-	lastKnownWithdrawSupply = lastKnownWithdrawSupply
+	LastKnownWithdrawSupply = LastKnownWithdrawSupply
 		- (pruneGatewaysResult.delegateStakeReturned or 0)
 		- (pruneGatewaysResult.gatewayStakeReturned or 0)
 		+ (pruneGatewaysResult.delegateStakeWithdrawing or 0)
 		+ (pruneGatewaysResult.gatewayStakeWithdrawing or 0)
 
-	lastKnownDelegatedSupply = lastKnownDelegatedSupply - (pruneGatewaysResult.delegateStakeWithdrawing or 0)
+	LastKnownDelegatedSupply = LastKnownDelegatedSupply - (pruneGatewaysResult.delegateStakeWithdrawing or 0)
 
 	local totalGwStakesSlashed = (pruneGatewaysResult.stakeSlashed or 0)
-	lastKnownStakedSupply = lastKnownStakedSupply
+	LastKnownStakedSupply = LastKnownStakedSupply
 		- totalGwStakesSlashed
 		- (pruneGatewaysResult.gatewayStakeWithdrawing or 0)
 
@@ -201,9 +201,9 @@ local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
 		ioEvent:addField("Slashed-Gateway-Amounts", slashedGateways)
 		ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
 		local invariantSlashedGateways = {}
-		for _, gwAddress in pairs(slashedGateways) do
+		for gwAddress, _ in pairs(slashedGateways) do
 			local gw = gar.getGateway(gwAddress) or {}
-			if gw.totalDelegatedStake > 0 then
+			if gw and (gw.totalDelegatedStake > 0) then
 				invariantSlashedGateways[gwAddress] = gw.totalDelegatedStake
 			end
 		end
@@ -243,11 +243,11 @@ end, function(msg)
 		NameRegistry = utils.deepCopy(NameRegistry),
 		Epochs = utils.deepCopy(Epochs),
 		Balances = utils.deepCopy(Balances),
-		lastKnownCirculatingSupply = lastKnownCirculatingSupply,
-		lastKnownLockedSupply = lastKnownLockedSupply,
-		lastKnownStakedSupply = lastKnownStakedSupply,
-		lastKnownDelegatedSupply = lastKnownDelegatedSupply,
-		lastKnownWithdrawSupply = lastKnownWithdrawSupply,
+		lastKnownCirculatingSupply = LastKnownCirculatingSupply,
+		lastKnownLockedSupply = LastKnownLockedSupply,
+		lastKnownStakedSupply = LastKnownStakedSupply,
+		lastKnownDelegatedSupply = LastKnownDelegatedSupply,
+		lastKnownWithdrawSupply = LastKnownWithdrawSupply,
 		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
 	}
 	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId)
@@ -295,8 +295,8 @@ end, function(msg)
 			msg.ioEvent:addField("Pruned-Vaults", resultOrError.prunedVaults)
 			msg.ioEvent:addField("Pruned-Vaults-Count", prunedVaultsCount)
 			for _, vault in pairs(resultOrError.prunedVaults) do
-				lastKnownLockedSupply = lastKnownLockedSupply - vault.balance
-				lastKnownCirculatingSupply = lastKnownCirculatingSupply + vault.balance
+				LastKnownLockedSupply = LastKnownLockedSupply - vault.balance
+				LastKnownCirculatingSupply = LastKnownCirculatingSupply + vault.balance
 			end
 		end
 		local prunedEpochsCount = utils.lengthOfTable(resultOrError.prunedEpochs or {})
@@ -310,11 +310,11 @@ end, function(msg)
 	end
 
 	if
-		lastKnownCirculatingSupply ~= previousState.lastKnownCirculatingSupply
-		or lastKnownLockedSupply ~= previousState.lastKnownLockedSupply
-		or lastKnownStakedSupply ~= previousState.lastKnownStakedSupply
-		or lastKnownDelegatedSupply ~= previousState.lastKnownDelegatedSupply
-		or lastKnownWithdrawSupply ~= previousState.lastKnownWithdrawSupply
+		LastKnownCirculatingSupply ~= previousState.lastKnownCirculatingSupply
+		or LastKnownLockedSupply ~= previousState.lastKnownLockedSupply
+		or LastKnownStakedSupply ~= previousState.lastKnownStakedSupply
+		or LastKnownDelegatedSupply ~= previousState.lastKnownDelegatedSupply
+		or LastKnownWithdrawSupply ~= previousState.lastKnownWithdrawSupply
 		or Balances[Protocol] ~= previousState.Balances[Protocol]
 		or lastKnownTotalTokenSupply() ~= previousState.lastKnownTotalSupply
 	then
@@ -460,8 +460,8 @@ addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionM
 		msg.ioEvent:addField("Vault-End-Timestamp", vault.endTimestamp)
 	end
 
-	lastKnownLockedSupply = lastKnownLockedSupply + quantity
-	lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
+	LastKnownLockedSupply = LastKnownLockedSupply + quantity
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
 	addSupplyData(msg.ioEvent)
 
 	ao.send({
@@ -523,8 +523,8 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 		msg.ioEvent:addField("Vault-End-Timestamp", vault.endTimestamp)
 	end
 
-	lastKnownLockedSupply = lastKnownLockedSupply + quantity
-	lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
+	LastKnownLockedSupply = LastKnownLockedSupply + quantity
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
 	addSupplyData(msg.ioEvent)
 
 	-- sender gets an immediate debit notice as the quantity is debited from their balance
@@ -636,8 +636,8 @@ addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", Actio
 		msg.ioEvent:addField("VaultEndTimestamp", vault.endTimestamp)
 	end
 
-	lastKnownLockedSupply = lastKnownLockedSupply + quantity
-	lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
+	LastKnownLockedSupply = LastKnownLockedSupply + quantity
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
 	addSupplyData(msg.ioEvent)
 
 	ao.send({
@@ -700,7 +700,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	if result ~= nil then
 		record = result.record
 		addRecordResultFields(msg.ioEvent, result)
-		lastKnownCirculatingSupply = lastKnownCirculatingSupply - record.purchasePrice
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply - record.purchasePrice
 		addSupplyData(msg.ioEvent)
 	end
 
@@ -753,11 +753,13 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 
 	local recordResult = {}
 	if result ~= nil then
-		recordResult = result.record
+		msg.ioEvent:addField("Total-Extension-Fee", result.totalExtensionFee)
 		addRecordResultFields(msg.ioEvent, result)
-		msg.ioEvent:addField("totalExtensionFee", recordResult.totalExtensionFee)
-		lastKnownCirculatingSupply = lastKnownCirculatingSupply - recordResult.totalExtensionFee
+
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply - result.totalExtensionFee
 		addSupplyData(msg.ioEvent)
+
+		recordResult = result.record
 	end
 
 	ao.send({
@@ -793,7 +795,7 @@ addEventingHandler(
 		end
 
 		local shouldContinue2, result = eventingPcall(
-			ioEvent,
+			msg.ioEvent,
 			function(error)
 				ao.send({
 					Target = msg.From,
@@ -816,8 +818,8 @@ addEventingHandler(
 			recordResult = result.record
 			addRecordResultFields(msg.ioEvent, result)
 			msg.ioEvent:addField("previousUndernameLimit", recordResult.undernameLimit - tonumber(msg.Tags.Quantity))
-			msg.ioEvent:addField("additionalUndernameCost", recordResult.additionalUndernameCost)
-			lastKnownCirculatingSupply = lastKnownCirculatingSupply - recordResult.additionalUndernameCost
+			msg.ioEvent:addField("additionalUndernameCost", result.additionalUndernameCost)
+			LastKnownCirculatingSupply = LastKnownCirculatingSupply - result.additionalUndernameCost
 			addSupplyData(msg.ioEvent)
 		end
 
@@ -962,8 +964,8 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
 	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
 
-	lastKnownCirculatingSupply = lastKnownCirculatingSupply - stake
-	lastKnownStakedSupply = lastKnownStakedSupply + stake
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply - stake
+	LastKnownStakedSupply = LastKnownStakedSupply + stake
 	addSupplyData(msg.ioEvent)
 
 	ao.send({
@@ -1025,8 +1027,8 @@ addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", Action
 	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
 	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
 
-	lastKnownStakedSupply = lastKnownStakedSupply - gwPrevStake - gwPrevTotalDelegatedStake
-	lastKnownWithdrawSupply = lastKnownWithdrawSupply + gwPrevStake + gwPrevTotalDelegatedStake
+	LastKnownStakedSupply = LastKnownStakedSupply - gwPrevStake - gwPrevTotalDelegatedStake
+	LastKnownWithdrawSupply = LastKnownWithdrawSupply + gwPrevStake + gwPrevTotalDelegatedStake
 	addSupplyData(msg.ioEvent)
 
 	ao.send({
@@ -1078,8 +1080,8 @@ addEventingHandler(
 			msg.ioEvent:addField("Previous-Operator-Stake", gateway.operatorStake - quantity)
 		end
 
-		lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
-		lastKnownStakedSupply = lastKnownStakedSupply + quantity
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
+		LastKnownStakedSupply = LastKnownStakedSupply + quantity
 		addSupplyData(msg.ioEvent)
 
 		ao.send({
@@ -1164,8 +1166,8 @@ addEventingHandler(
 			end
 		end
 
-		lastKnownStakedSupply = lastKnownStakedSupply - quantity
-		lastKnownWithdrawSupply = lastKnownWithdrawSupply + quantity
+		LastKnownStakedSupply = LastKnownStakedSupply - quantity
+		LastKnownWithdrawSupply = LastKnownWithdrawSupply + quantity
 		addSupplyData(msg.ioEvent)
 
 		ao.send({
@@ -1296,8 +1298,8 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 		delegateResult = gateway.delegates[from]
 	end
 
-	lastKnownCirculatingSupply = lastKnownCirculatingSupply - quantity
-	lastKnownStakedSupply = lastKnownStakedSupply + quantity
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
+	LastKnownDelegatedSupply = LastKnownDelegatedSupply + quantity
 	addSupplyData(msg.ioEvent)
 
 	ao.send({
@@ -1351,13 +1353,13 @@ addEventingHandler(
 			if result.delegate ~= nil then
 				delegateResult = result.delegate
 				local newStake = delegateResult.delegatedStake
-				local vaultBalance = delegateResult.vaults[vaultId].balance
+				local vaultBalance = result.vaultBalance
 				msg.ioEvent:addField("Previous-Stake", newStake - vaultBalance)
 				msg.ioEvent:addField("New-Stake", newStake)
 				msg.ioEvent:addField("Gateway-Total-Delegated-Stake", result.totalDelegatedStake)
 
-				lastKnownStakedSupply = lastKnownStakedSupply + vaultBalance
-				lastKnownWithdrawSupply = lastKnownWithdrawSupply - vaultBalance
+				LastKnownDelegatedSupply = LastKnownDelegatedSupply + vaultBalance
+				LastKnownWithdrawSupply = LastKnownWithdrawSupply - vaultBalance
 				addSupplyData(msg.ioEvent)
 			end
 		end
@@ -1427,8 +1429,8 @@ addEventingHandler(
 			msg.ioEvent:addField("Instant-Withdrawal-Fee", result.expeditedWithdrawalFee)
 			msg.ioEvent:addField("Amount-Withdrawn", result.amountWithdrawn)
 			msg.ioEvent:addField("Previous-Vault-Balance", result.amountWithdrawn + result.expeditedWithdrawalFee)
-			lastKnownCirculatingSupply = lastKnownCirculatingSupply + result.amountWithdrawn
-			lastKnownWithdrawSupply = lastKnownWithdrawSupply - result.amountWithdrawn - result.expeditedWithdrawalFee
+			LastKnownCirculatingSupply = LastKnownCirculatingSupply + result.amountWithdrawn
+			LastKnownWithdrawSupply = LastKnownWithdrawSupply - result.amountWithdrawn - result.expeditedWithdrawalFee
 			amountWithdrawn = result.amountWithdrawn
 		end
 
@@ -1534,11 +1536,11 @@ addEventingHandler(
 			end
 		end
 
-		lastKnownDelegatedSupply = lastKnownDelegatedSupply - quantity
+		LastKnownDelegatedSupply = LastKnownDelegatedSupply - quantity
 		if not instantWithdraw then
-			lastKnownWithdrawSupply = lastKnownWithdrawSupply + quantity
+			LastKnownWithdrawSupply = LastKnownWithdrawSupply + quantity
 		end
-		lastKnownCirculatingSupply = lastKnownCirculatingSupply + amountWithdrawn
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply + amountWithdrawn
 		addSupplyData(msg.ioEvent)
 
 		ao.send({
@@ -1757,11 +1759,11 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", "Total-Tok
 		end
 	end
 
-	lastKnownCirculatingSupply = circulatingSupply
-	lastKnownLockedSupply = lockedSupply
-	lastKnownStakedSupply = stakedSupply
-	lastKnownDelegatedSupply = delegatedSupply
-	lastKnownWithdrawSupply = withdrawSupply
+	LastKnownCirculatingSupply = circulatingSupply
+	LastKnownLockedSupply = lockedSupply
+	LastKnownStakedSupply = stakedSupply
+	LastKnownDelegatedSupply = delegatedSupply
+	LastKnownWithdrawSupply = withdrawSupply
 
 	addSupplyData(msg.ioEvent, {
 		totalTokenSupply = totalSupply,
@@ -1798,7 +1800,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
 	local tickedRewardDistributions = {}
 	local totalTickedRewardsDistributed = 0
-	local function tickEpoch(timestamp, blockHeight, hashchain)
+	local function tickEpoch(timestamp, blockHeight, hashchain, msgId)
 		-- update demand factor if necessary
 		local demandFactor = demand.updateDemandFactor(timestamp)
 		-- distribute rewards for the epoch and increments stats for gateways, this closes the epoch if the timestamp is greater than the epochs required distribution timestamp
@@ -1810,7 +1812,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 				+ distributedEpoch.distributions.totalDistributedRewards
 		end
 		-- prune any gateway that has hit the failed 30 consecutive epoch threshold after the epoch has been distributed
-		local pruneGatewaysResult = gar.pruneGateways(timestamp)
+		local pruneGatewaysResult = gar.pruneGateways(timestamp, msgId)
 
 		-- now create the new epoch with the current message hashchain and block height
 		local newEpoch = epochs.createEpoch(timestamp, tonumber(blockHeight), hashchain)
@@ -1821,6 +1823,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 		}
 	end
 
+	local msgId = msg.Id
 	local lastTickedEpochIndex = LastTickedEpochIndex
 	local targetCurrentEpochIndex = epochs.getEpochIndexForTimestamp(msgTimestamp)
 	msg.ioEvent:addField("Last-Ticked-Epoch-Index", lastTickedEpochIndex)
@@ -1856,7 +1859,8 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 		-- use the minimum of the msg timestamp or the epoch distribution timestamp, this ensures an epoch gets created for the genesis block and that we don't try and distribute before an epoch is created
 		local tickTimestamp = math.min(msgTimestamp or 0, epochDistributionTimestamp)
 		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height, we should set the prescribed observers and names to empty arrays and distribute rewards accordingly
-		local tickSuceeded, resultOrError = pcall(tickEpoch, tickTimestamp, msg["Block-Height"], msg["Hash-Chain"])
+		local tickSuceeded, resultOrError =
+			pcall(tickEpoch, tickTimestamp, msg["Block-Height"], msg["Hash-Chain"], msgId)
 		if tickSuceeded then
 			if tickTimestamp == epochDistributionTimestamp then
 				-- if we are distributing rewards, we should update the last ticked epoch index to the current epoch index
@@ -1911,33 +1915,38 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	end
 	if #newPruneGatewaysResults > 0 then
 		-- Reduce the prune gatways results and then track changes
-		local aggregatedPruneGatewaysResult = utils.reduce(newPruneGatewaysResults, function(acc, pruneGatewaysResult)
-			for _, address in pairs(pruneGatewaysResult.prunedGateways) do
-				table.insert(acc.prunedGateways, address)
-			end
-			for address, slashAmount in pairs(pruneGatewaysResult.slashedGateways) do
-				acc.slashedGateways[address] = (acc.slashedGateways[address] or 0) + slashAmount
-			end
-			acc.gatewayStakeReturned = acc.gatewayStakeReturned + pruneGatewaysResult.gatewayStakeReturned
-			acc.delegateStakeReturned = acc.delegateStakeReturned + pruneGatewaysResult.delegateStakeReturned
-			acc.gatewayStakeWithdrawing = acc.gatewayStakeWithdrawing + pruneGatewaysResult.gatewayStakeWithdrawing
-			acc.delegateStakeWithdrawing = acc.delegateStakeWithdrawing + pruneGatewaysResult.delegateStakeWithdrawing
-			return acc
-		end, {
-			prunedGateways = {},
-			slashedGateways = {},
-			gatewayStakeReturned = 0,
-			delegateStakeReturned = 0,
-			gatewayStakeWithdrawing = 0,
-			delegateStakeWithdrawing = 0,
-			stakeSlashed = 0,
-		})
-		addPruneGatewaysResults(msg.ioEvent, aggregatedPruneGatewaysResult)
+		local aggregatedPruneGatewaysResult = utils.reduce(
+			newPruneGatewaysResults,
+			function(acc, _, pruneGatewaysResult)
+				for _, address in pairs(pruneGatewaysResult.prunedGateways) do
+					table.insert(acc.prunedGateways, address)
+				end
+				for address, slashAmount in pairs(pruneGatewaysResult.slashedGateways) do
+					acc.slashedGateways[address] = (acc.slashedGateways[address] or 0) + slashAmount
+				end
+				acc.gatewayStakeReturned = acc.gatewayStakeReturned + pruneGatewaysResult.gatewayStakeReturned
+				acc.delegateStakeReturned = acc.delegateStakeReturned + pruneGatewaysResult.delegateStakeReturned
+				acc.gatewayStakeWithdrawing = acc.gatewayStakeWithdrawing + pruneGatewaysResult.gatewayStakeWithdrawing
+				acc.delegateStakeWithdrawing = acc.delegateStakeWithdrawing
+					+ pruneGatewaysResult.delegateStakeWithdrawing
+				return acc
+			end,
+			{
+				prunedGateways = {},
+				slashedGateways = {},
+				gatewayStakeReturned = 0,
+				delegateStakeReturned = 0,
+				gatewayStakeWithdrawing = 0,
+				delegateStakeWithdrawing = 0,
+				stakeSlashed = 0,
+			}
+		)
+		addPruneGatewaysResult(msg.ioEvent, aggregatedPruneGatewaysResult)
 	end
 	if utils.lengthOfTable(tickedRewardDistributions) > 0 then
 		msg.ioEvent:addField("Ticked-Reward-Distributions", tickedRewardDistributions)
 		msg.ioEvent:addField("Total-Ticked-Rewards-Distributed", totalTickedRewardsDistributed)
-		lastKnownCirculatingSupply = lastKnownCirculatingSupply + totalTickedRewardsDistributed
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply + totalTickedRewardsDistributed
 	end
 
 	local gwStats = gatewayStats()
