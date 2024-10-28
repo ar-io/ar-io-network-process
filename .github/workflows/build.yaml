@@ -14,6 +14,13 @@ jobs:
       - uses: leafo/gh-actions-lua@v10
         with:
           luaVersion: '5.3'
+
+      - name: Setup LuaRocks
+        uses: leafo/gh-actions-luarocks@v4.3.0
+
+      - name: Install Luacheck
+        run: luarocks install luacheck
+
       - run: luacheck src spec
 
   integration:
