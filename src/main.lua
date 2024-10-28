@@ -1151,6 +1151,7 @@ addEventingHandler(
 				msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
 				msg.ioEvent:addField("Instant-Withdrawal-Fee", result.expeditedWithdrawalFee)
 				msg.ioEvent:addField("Amount-Withdrawn", result.amountWithdrawn)
+				msg.ioEvent:addField("Penalty-Rate", result.penaltyRate)
 			end
 			local decreaseStakeVault = gateway.vaults[msg.Id]
 			if decreaseStakeVault ~= nil then
@@ -1516,6 +1517,7 @@ addEventingHandler(
 				msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
 				msg.ioEvent:addField("Instant-Withdrawal-Fee", result.expeditedWithdrawalFee)
 				msg.ioEvent:addField("Amount-Withdrawn", result.amountWithdrawn)
+				msg.ioEvent:addField("Penalty-Rate", result.penaltyRate)
 			end
 
 			delegateResult = gateway.delegates[from]
