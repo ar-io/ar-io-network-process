@@ -8,6 +8,7 @@ import {
   validGatewayTags,
   PROCESS_OWNER,
   PROCESS_ID,
+  STUB_TIMESTAMP,
 } from '../tools/constants.mjs';
 
 describe('Tick', async () => {
@@ -392,6 +393,7 @@ describe('Tick', async () => {
 
     // give balance to delegate
     const delegateQuantity = 50_000_000_000;
+    const delegateTimestamp = STUB_TIMESTAMP + 1;
     const transferMemory = await transfer({
       recipient: delegateAddress,
       quantity: delegateQuantity,
@@ -415,6 +417,7 @@ describe('Tick', async () => {
         ],
         From: delegateAddress,
         Owner: delegateAddress,
+        Timestamp: delegateTimestamp,
       },
       transferMemory,
     );
@@ -587,6 +590,72 @@ describe('Tick', async () => {
         reports: {
           [STUB_ADDRESS]: reportTxId,
         },
+      },
+    });
+    // assert the new epoch was created
+    const newEpoch = await handle(
+      {
+        Tags: [{ name: 'Action', value: 'Epoch' }],
+        Timestamp: distributionTimestamp,
+      },
+      distributionTick.Memory,
+    );
+    const newEpochData = JSON.parse(newEpoch.Messages[0].Data);
+    assert.equal(newEpochData.epochIndex, 1);
+    // assert the gateway stakes were updated and match the distributed rewards
+    const gateway = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Gateway' },
+          { name: 'Address', value: STUB_ADDRESS },
+        ],
+        Timestamp: distributionTimestamp,
+      },
+      distributionTick.Memory,
+    );
+    const gatewayData = JSON.parse(gateway.Messages[0].Data);
+    assert.deepStrictEqual(gatewayData, {
+      status: 'joined',
+      vaults: [],
+      startTimestamp: STUB_TIMESTAMP,
+      observerAddress: STUB_ADDRESS,
+      operatorStake: 100_000_000_000 + expectedGatewayOperatorReward,
+      totalDelegatedStake: 50_000_000_000 + expectedGatewayDelegateReward,
+      delegates: {
+        [delegateAddress]: {
+          delegatedStake: 50_000_000_000 + expectedGatewayDelegateReward,
+          startTimestamp: delegateTimestamp,
+          vaults: [],
+        },
+      },
+      settings: {
+        allowDelegatedStaking: true,
+        autoStake: true,
+        delegateRewardShareRatio: 25,
+        minDelegatedStake: 500_000_000,
+        fqdn: 'test-fqdn',
+        label: 'test-gateway',
+        note: 'test-note',
+        port: 443,
+        properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
+        protocol: 'https',
+      },
+      stats: {
+        failedConsecutiveEpochs: 0,
+        failedEpochCount: 0,
+        observedEpochCount: 1,
+        passedEpochCount: 1,
+        passedConsecutiveEpochs: 1,
+        prescribedEpochCount: 1,
+        totalEpochCount: 1,
+      },
+      weights: {
+        compositeWeight: 14,
+        gatewayRewardRatioWeight: 1,
+        normalizedCompositeWeight: 1,
+        observerRewardRatioWeight: 1,
+        stakeWeight: 3.5,
+        tenureWeight: 4,
       },
     });
   });
