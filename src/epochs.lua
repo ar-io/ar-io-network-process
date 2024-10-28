@@ -586,7 +586,9 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 					local actualDelegateReward = math.floor(eligibleDelegateReward * percentOfEligibleEarned)
 					-- distribute the rewards to the delegate if greater than 0
 					if actualDelegateReward > 0 then
-						balances.transfer(delegateAddress, ao.id, actualDelegateReward)
+						-- increase the stake and decrease the protocol balance
+						gar.increaseExistingDelegateStake(gatewayAddress, delegateAddress, actualDelegateReward)
+						balances.reduceBalance(ao.id, actualDelegateReward)
 					end
 					-- increment the total distributed
 					totalDistributed = math.floor(totalDistributed + actualDelegateReward)

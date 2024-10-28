@@ -350,6 +350,7 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 	-- Assuming `gateway` is a table and `fromAddress` is defined
 	local existingDelegate = gateway.delegates[from]
 	local minimumStakeForGatewayAndDelegate
+	-- if it is not an auto stake provided by the protocol, then we need to validate the stake amount meets the gateway's minDelegatedStake
 	if existingDelegate and existingDelegate.delegatedStake ~= 0 then
 		-- It already has a stake that is not zero
 		minimumStakeForGatewayAndDelegate = 1 -- Delegate must provide at least one additional IO
@@ -379,6 +380,24 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 	-- update the gateway
 	GatewayRegistry[target] = gateway
 	return gar.getGateway(target)
+end
+
+function gar.increaseExistingDelegateStake(gatewayAddress, delegateAddress, qty)
+	local gateway = gar.getGateway(gatewayAddress)
+
+	if not gateway then
+		error("Gateway not found")
+	end
+
+	local delegate = gateway.delegates[delegateAddress]
+	if not delegate then
+		error("Delegate not found")
+	end
+
+	gateway.delegates[delegateAddress].delegatedStake = delegate.delegatedStake + qty
+	gateway.totalDelegatedStake = gateway.totalDelegatedStake + qty
+	GatewayRegistry[gatewayAddress] = gateway
+	return gar.getGateway(gatewayAddress)
 end
 
 function gar.getSettings()
