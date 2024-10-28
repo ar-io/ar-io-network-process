@@ -384,9 +384,16 @@ end
 
 function gar.increaseExistingDelegateStake(gatewayAddress, delegateAddress, qty)
 	local gateway = gar.getGateway(gatewayAddress)
-
 	if not gateway then
 		error("Gateway not found")
+	end
+
+	if not delegateAddress then
+		error("Delegate address is required")
+	end
+
+	if not qty or not utils.isInteger(qty) or qty <= 0 then
+		error("Quantity is required and must be an integer greater than 0: " .. qty)
 	end
 
 	local delegate = gateway.delegates[delegateAddress]
