@@ -10,7 +10,8 @@
     "monitor": "node --test tests/monitor/monitor.test.mjs",
     "monitor:devnet": "IO_PROCESS_ID=GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc node --test tests/monitor/monitor.test.mjs",
     "monitor:testnet": "IO_PROCESS_ID=agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA node --test tests/monitor/monitor.test.mjs",
-    "evolve": "yarn build && node tools/evolve.mjs"
+    "evolve": "yarn build && node tools/evolve.mjs",
+    "prepare": "husky install"
   },
   "devDependencies": {
     "@ar.io/sdk": "alpha",
@@ -27,7 +28,7 @@
       "stylua",
       "luacheck --config .luacheckrc"
     ],
-    "*.js": [
+    "*.{js,mjs}": [
       "prettier --write"
     ]
   },
