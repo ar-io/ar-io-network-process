@@ -163,7 +163,7 @@ function gar.increaseOperatorStake(from, qty)
 end
 
 -- Utility function to calculate withdrawal details and handle balance adjustments
-local function processInstantWithdrawal(vault, elapsedTime, totalWithdrawalTime, from, qty)
+local function processInstantWithdrawal(qty, elapsedTime, totalWithdrawalTime, from)
 	-- Calculate the withdrawal fee and the amount to withdraw
 	local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
 		- (
@@ -175,9 +175,8 @@ local function processInstantWithdrawal(vault, elapsedTime, totalWithdrawalTime,
 		math.min(constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE, penaltyRate)
 	) -- Ensure penalty is within bounds
 
-	local vaultBalance = qty or vault.balance
-	local expeditedWithdrawalFee = math.floor(vaultBalance * penaltyRate)
-	local amountToWithdraw = vaultBalance - expeditedWithdrawalFee
+	local expeditedWithdrawalFee = math.floor(qty * penaltyRate)
+	local amountToWithdraw = qty - expeditedWithdrawalFee
 
 	-- Withdraw the tokens to the delegate and the protocol balance
 	balances.increaseBalance(ao.id, expeditedWithdrawalFee)
@@ -204,19 +203,19 @@ function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWi
 
 	if qty > maxWithdraw then
 		return error(
-			"Resulting stake is not enough maintain the minimum operator stake of "
+			"Resulting stake is not enough to maintain the minimum operator stake of "
 				.. gar.getSettings().operators.minStake
 				.. " IO"
 		)
 	end
-	gateway.operatorStake = gar.getGateway(from).operatorStake - qty
+	gateway.operatorStake = gateway.operatorStake - qty
 
 	local expeditedWithdrawalFee = 0
 	local amountToWithdraw = 0
 	local penaltyRate = 0
 	if instantWithdraw == true then
 		-- Calculate the penalty and withdraw using the utility function
-		expeditedWithdrawalFee, amountToWithdraw, penaltyRate = processInstantWithdrawal(nil, 0, 0, from, qty)
+		expeditedWithdrawalFee, amountToWithdraw, penaltyRate = processInstantWithdrawal(qty, 0, 0, from)
 	else
 		gateway.vaults[msgId] = {
 			balance = qty,
@@ -224,9 +223,6 @@ function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWi
 			endTimestamp = currentTimestamp + gar.getSettings().operators.withdrawLengthMs,
 		}
 	end
-
-	-- Update the operator stake if not an instant withdrawal
-	gateway.operatorStake = gar.getGateway(from).operatorStake - qty
 
 	-- Update the gateway
 	GatewayRegistry[from] = gateway
@@ -425,7 +421,7 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 		gateway.totalDelegatedStake = gateway.totalDelegatedStake - qty
 
 		-- Calculate the penalty and withdraw using the utility function
-		expeditedWithdrawalFee, amountToWithdraw, penaltyRate = processInstantWithdrawal(nil, 0, 0, delegator, qty)
+		expeditedWithdrawalFee, amountToWithdraw, penaltyRate = processInstantWithdrawal(qty, 0, 0, delegator)
 
 		-- Remove the delegate if no stake is left
 		if gateway.delegates[delegator].delegatedStake == 0 and next(gateway.delegates[delegator].vaults) == nil then
@@ -861,7 +857,7 @@ function gar.instantDelegateWithdrawal(from, gatewayAddress, vaultId, currentTim
 
 	-- Process the instant withdrawal
 	local expeditedWithdrawalFee, amountToWithdraw, penaltyRate =
-		processInstantWithdrawal(vault, elapsedTime, totalWithdrawalTime, from)
+		processInstantWithdrawal(vault.balance, elapsedTime, totalWithdrawalTime, from)
 
 	-- Remove the vault after withdrawal
 	delegate.vaults[vaultId] = nil
@@ -910,7 +906,7 @@ function gar.instantOperatorWithdrawal(from, vaultId, currentTimestamp)
 
 	-- Process the instant withdrawal
 	local expeditedWithdrawalFee, amountToWithdraw, penaltyRate =
-		processInstantWithdrawal(vault, elapsedTime, totalWithdrawalTime, from)
+		processInstantWithdrawal(vault.balance, elapsedTime, totalWithdrawalTime, from)
 
 	-- Remove the vault after withdrawal
 	gateway.vaults[vaultId] = nil
