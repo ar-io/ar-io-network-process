@@ -6,4 +6,4 @@ globals = {
     "Handlers",
     "ao"
 }
-max_line_length = 180
+max_line_length = 185

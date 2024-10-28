@@ -10,7 +10,7 @@ GatewayRegistrySettings = GatewayRegistrySettings
 		observers = {
 			maxPerEpoch = 50,
 			tenureWeightDays = 180,
-			tenureWeightPeriod = 180 * 24 * 60 * 60 * 1000, -- aproximately 2 years
+			tenureWeightPeriod = 180 * 24 * 60 * 60 * 1000, -- aproximately 180 days
 			maxTenureWeight = 4,
 		},
 		operators = {
@@ -135,11 +135,13 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 	return gateway
 end
 
+--- Increases the operator stake for a gateway
+---@param from string # The address of the gateway to increase stake for
+---@param qty number # The amount of stake to increase by - must be positive integer
+---@return table # The updated gateway object
 function gar.increaseOperatorStake(from, qty)
 	assert(type(qty) == "number", "Quantity is required and must be a number")
-	-- asssert it is an integer
-	assert(utils.isInteger(qty), "Quantity must be an integer")
-	assert(qty > 0, "Quantity must be greater than 0")
+	assert(qty > 0 and utils.isInteger(qty), "Quantity must be an integer greater than 0")
 
 	local gateway = gar.getGateway(from)
 
@@ -159,7 +161,7 @@ function gar.increaseOperatorStake(from, qty)
 	gateway.operatorStake = gateway.operatorStake + qty
 	-- update the gateway
 	GatewayRegistry[from] = gateway
-	return gar.getGateway(from)
+	return gateway
 end
 
 -- Utility function to calculate withdrawal details and handle balance adjustments
@@ -228,7 +230,7 @@ function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWi
 	GatewayRegistry[from] = gateway
 
 	return {
-		gateway = gar.getGateway(from),
+		gateway = gateway,
 		penaltyRate = penaltyRate,
 		expeditedWithdrawalFee = expeditedWithdrawalFee,
 		amountWithdrawn = amountToWithdraw,
@@ -301,16 +303,20 @@ function gar.updateGatewaySettings(from, updatedSettings, updatedServices, obser
 	if observerAddress then
 		gateway.observerAddress = observerAddress
 	end
-	-- update the gateway
+	-- update the gateway on the global state
 	GatewayRegistry[from] = gateway
-	return gar.getGateway(from)
-end
-
-function gar.getGateway(address)
-	local gateway = utils.deepCopy(GatewayRegistry[address])
 	return gateway
 end
 
+--- Gets a gateway by address
+---@param address string The address to get the gateway for
+---@return table|nil The gateway object or nil if not found
+function gar.getGateway(address)
+	return utils.deepCopy(GatewayRegistry[address])
+end
+
+--- Gets all gateways
+---@return table All gateway objects
 function gar.getGateways()
 	local gateways = utils.deepCopy(GatewayRegistry)
 	return gateways or {}
@@ -350,6 +356,7 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 	-- Assuming `gateway` is a table and `fromAddress` is defined
 	local existingDelegate = gateway.delegates[from]
 	local minimumStakeForGatewayAndDelegate
+	-- if it is not an auto stake provided by the protocol, then we need to validate the stake amount meets the gateway's minDelegatedStake
 	if existingDelegate and existingDelegate.delegatedStake ~= 0 then
 		-- It already has a stake that is not zero
 		minimumStakeForGatewayAndDelegate = 1 -- Delegate must provide at least one additional IO
@@ -379,6 +386,35 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 	-- update the gateway
 	GatewayRegistry[target] = gateway
 	return gar.getGateway(target)
+end
+
+--- Internal function to increase the stake of an existing delegate. This should only be called from epochs.lua
+---@param gatewayAddress string # The gateway address to increase stake for (required)
+---@param gateway table # The gateway object to increase stake for (required)
+---@param delegateAddress string # The address of the delegate to increase stake for (required)
+---@param qty number # The amount of stake to increase by - must be positive integer (required)
+function gar.increaseExistingDelegateStake(gatewayAddress, gateway, delegateAddress, qty)
+	if not gateway then
+		error("Gateway not found")
+	end
+
+	if not delegateAddress then
+		error("Delegate address is required")
+	end
+
+	if not qty or not utils.isInteger(qty) or qty <= 0 then
+		error("Quantity is required and must be an integer greater than 0: " .. qty)
+	end
+
+	local delegate = gateway.delegates[delegateAddress]
+	if not delegate then
+		error("Delegate not found")
+	end
+
+	gateway.delegates[delegateAddress].delegatedStake = delegate.delegatedStake + qty
+	gateway.totalDelegatedStake = gateway.totalDelegatedStake + qty
+	GatewayRegistry[gatewayAddress] = gateway
+	return gateway
 end
 
 function gar.getSettings()
@@ -636,8 +672,11 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 	end
 end
 
-function gar.updateGatewayStats(address, stats)
-	local gateway = gar.getGateway(address)
+--- Updates the stats for a gateway
+---@param address string # The address of the gateway to update stats for
+---@param gateway table # The gateway object to update stats for
+---@param stats table # The stats to update the gateway with
+function gar.updateGatewayStats(address, gateway, stats)
 	if gateway == nil then
 		error("Gateway not found")
 	end
@@ -652,6 +691,7 @@ function gar.updateGatewayStats(address, stats)
 
 	gateway.stats = stats
 	GatewayRegistry[address] = gateway
+	return gateway
 end
 
 function gar.updateGatewayWeights(weightedGateway)

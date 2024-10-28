@@ -338,8 +338,7 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	assert(type(timestamp) == "number", "Timestamp is required")
 
 	local epochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	local epochStartTimestamp, _, epochDistributionTimestamp =
-		epochs.getEpochTimestampsForIndex(epochIndex)
+	local epochStartTimestamp, _, epochDistributionTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 
 	-- avoid observations before the previous epoch distribution has occurred, as distributions affect weights of the current epoch
 	if timestamp < epochStartTimestamp + epochs.getSettings().distributionDelayMs then
@@ -538,8 +537,8 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 					or gateway.stats.observedEpochCount,
 			}
 
-			-- update the gateway stats
-			gar.updateGatewayStats(gatewayAddress, updatedStats)
+			-- update the gateway stats, returns the updated gateway
+			gateway = gar.updateGatewayStats(gatewayAddress, gateway, updatedStats)
 
 			-- scenarioes
 			-- 1. Gateway passed and was prescribed and submittied an observation - it gets full gateway reward
@@ -585,7 +584,14 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 					local actualDelegateReward = math.floor(eligibleDelegateReward * percentOfEligibleEarned)
 					-- distribute the rewards to the delegate if greater than 0
 					if actualDelegateReward > 0 then
-						balances.transfer(delegateAddress, ao.id, actualDelegateReward)
+						-- increase the stake and decrease the protocol balance, returns the updated gateway
+						gateway = gar.increaseExistingDelegateStake(
+							gatewayAddress,
+							gateway,
+							delegateAddress,
+							actualDelegateReward
+						)
+						balances.reduceBalance(ao.id, actualDelegateReward)
 					end
 					-- increment the total distributed
 					totalDistributed = math.floor(totalDistributed + actualDelegateReward)

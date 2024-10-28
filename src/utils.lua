@@ -206,6 +206,9 @@ function utils.walletHasSufficientBalance(wallet, quantity)
 	return Balances[wallet] ~= nil and Balances[wallet] >= quantity
 end
 
+--- Deep copies a table
+---@param original table The table to copy
+---@return table|nil The deep copy of the table or nil if the original is nil
 function utils.deepCopy(original)
 	if not original then
 		return nil

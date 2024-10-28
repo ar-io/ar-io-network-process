@@ -1659,7 +1659,7 @@ describe("gar", function()
 					startTimestamp = currentTimestamp,
 					endTimestamp = currentTimestamp + gar.getSettings().operators.leaveLengthMs,
 				}, _G.GatewayRegistry["address3"].vaults["address3"])
-				assert.are.equal(protocolBalanceBefore + expectedSlashedStake, _G.Balances[ao.id])
+				assert.are.equal(protocolBalanceBefore + expectedSlashedStake, Balances[ao.id])
 			end
 		)
 
@@ -1863,7 +1863,11 @@ describe("gar", function()
 	-- 			},
 	-- 		}
 	-- 		local result = gar.getActiveGatewaysBeforeTimestamp(timestamp)
-	-- 		assert.are.same({ stubGatewayAddress, stubRandomAddress }, result)
+	-- 		-- assert both gateways are returned, in no particular ordering
+	-- 		assert.is_true(utils.isSubset(result, {
+	-- 			[stubGatewayAddress] = testGateway,
+	-- 			[stubRandomAddress] = testGateway,
+	-- 		}))
 	-- 	end)
 	-- end)
 
