@@ -1225,7 +1225,7 @@ addEventingHandler(
 			vaults = {},
 		}
 
-		local amountWithdrawn
+		local amountWithdrawn = 0
 		msg.ioEvent:addField("Remaining-Operator-Stake", gatewayResult.operatorStake)
 		if result ~= nil then
 			msg.ioEvent:addField("Vault-Elapsed-Time", result.elapsedTime)
@@ -1420,7 +1420,7 @@ addEventingHandler(
 			vaults = {},
 		}
 
-		local amountWithdrawn
+		local amountWithdrawn = 0
 		msg.ioEvent:addField("Remaining-Delegate-Stake", delegateResult.delegatedStake)
 		if result ~= nil then
 			msg.ioEvent:addField("Vault-Elapsed-Time", result.elapsedTime)
