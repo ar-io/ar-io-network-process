@@ -10,7 +10,7 @@ GatewayRegistrySettings = GatewayRegistrySettings
 		observers = {
 			maxPerEpoch = 50,
 			tenureWeightDays = 180,
-			tenureWeightPeriod = 180 * 24 * 60 * 60 * 1000, -- aproximately 2 years
+			tenureWeightPeriod = 180 * 24 * 60 * 60 * 1000, -- aproximately 180 days
 			maxTenureWeight = 4,
 		},
 		operators = {
@@ -306,11 +306,15 @@ function gar.updateGatewaySettings(from, updatedSettings, updatedServices, obser
 	return gar.getGateway(from)
 end
 
+--- Gets a gateway by address
+---@param address string The address to get the gateway for
+---@return table|nil The gateway object or nil if not found
 function gar.getGateway(address)
-	local gateway = utils.deepCopy(GatewayRegistry[address])
-	return gateway
+	return utils.deepCopy(GatewayRegistry[address])
 end
 
+--- Gets all gateways
+---@return table All gateway objects
 function gar.getGateways()
 	local gateways = utils.deepCopy(GatewayRegistry)
 	return gateways or {}
@@ -382,8 +386,12 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 	return gar.getGateway(target)
 end
 
-function gar.increaseExistingDelegateStake(gatewayAddress, delegateAddress, qty)
-	local gateway = gar.getGateway(gatewayAddress)
+--- Internal function to increase the stake of an existing delegate. This should only be called from epochs.lua
+---@param gatewayAddress string # The gateway address to increase stake for (required)
+---@param gateway table # The gateway object to increase stake for (required)
+---@param delegateAddress string # The address of the delegate to increase stake for (required)
+---@param qty number # The amount of stake to increase by - must be positive integer (required)
+function gar.increaseExistingDelegateStake(gatewayAddress, gateway, delegateAddress, qty)
 	if not gateway then
 		error("Gateway not found")
 	end
@@ -404,7 +412,7 @@ function gar.increaseExistingDelegateStake(gatewayAddress, delegateAddress, qty)
 	gateway.delegates[delegateAddress].delegatedStake = delegate.delegatedStake + qty
 	gateway.totalDelegatedStake = gateway.totalDelegatedStake + qty
 	GatewayRegistry[gatewayAddress] = gateway
-	return gar.getGateway(gatewayAddress)
+	return gateway
 end
 
 function gar.getSettings()
@@ -662,8 +670,11 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 	end
 end
 
-function gar.updateGatewayStats(address, stats)
-	local gateway = gar.getGateway(address)
+--- Updates the stats for a gateway
+---@param address string # The address of the gateway to update stats for
+---@param gateway table # The gateway object to update stats for
+---@param stats table # The stats to update the gateway with
+function gar.updateGatewayStats(address, gateway, stats)
 	if gateway == nil then
 		error("Gateway not found")
 	end
@@ -678,6 +689,7 @@ function gar.updateGatewayStats(address, stats)
 
 	gateway.stats = stats
 	GatewayRegistry[address] = gateway
+	return gateway
 end
 
 function gar.updateGatewayWeights(weightedGateway)

@@ -730,8 +730,8 @@ describe("epochs", function()
 			local expectedObserverReward = epoch.distributions.totalEligibleObserverReward
 
 			-- distribute rewards for the epoch
-			local status = pcall(epochs.distributeRewardsForEpoch, epoch.distributionTimestamp)
-			assert.is_true(status)
+			local result = epochs.distributeRewardsForEpoch(epoch.distributionTimestamp)
+			assert.is_not_nil(result)
 			-- gateway 1 should not get any rewards - failed observation and did not observe, should not get any rewards
 			assert.are.same({
 				prescribedEpochCount = 2, -- increment by one
