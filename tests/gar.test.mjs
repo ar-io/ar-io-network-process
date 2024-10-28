@@ -1,5 +1,5 @@
 import { createAosLoader } from './utils.mjs';
-import { describe, it, before, beforeEach } from 'node:test';
+import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import {
   AO_LOADER_HANDLER_ENV,
@@ -8,8 +8,7 @@ import {
   STUB_MESSAGE_ID,
   STUB_ADDRESS,
   PROCESS_OWNER,
-  MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE,
-  MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE,
+  EXPECTED_MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE,
   validGatewayTags,
 } from '../tools/constants.mjs';
 
@@ -488,7 +487,8 @@ describe('GatewayRegistry', async () => {
       const amountWithdrawn = Number(amountWithdrawnTag.value);
 
       // Define the expected values based on penalty rate
-      const expectedPenaltyRate = MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE;
+      const expectedPenaltyRate =
+        EXPECTED_MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE;
       assert.strictEqual(penaltyRate, expectedPenaltyRate);
 
       // Recalculate the expected values based on the penalty rate
@@ -589,7 +589,8 @@ describe('GatewayRegistry', async () => {
       const amountWithdrawn = Number(amountWithdrawnTag.value);
 
       // Define the expected values
-      const expectedPenaltyRate = MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE;
+      const expectedPenaltyRate =
+        EXPECTED_MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE;
       const expectedExpeditedWithdrawalFee = Math.floor(
         amountToWithdraw * expectedPenaltyRate,
       );

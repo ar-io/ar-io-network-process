@@ -1330,7 +1330,7 @@ describe("gar", function()
 
 		it("should decrease delegated stake with instant withdrawal and apply penalty and remove delegate", function()
 			Balances[ao.id] = 0
-			local expeditedWithdrawalFee = 1000 * 0.80
+			local expeditedWithdrawalFee = 1000 * 0.50
 			local withdrawalAmount = 1000 - expeditedWithdrawalFee
 			GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
@@ -1448,7 +1448,7 @@ describe("gar", function()
 				local currentTimestamp = 1000000
 				local startTimestamp = 1000000
 				local vaultBalance = 1000
-				local expectedPenaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
+				local expectedPenaltyRate = 0.50
 				local expectedexpeditedWithdrawalFee = vaultBalance * expectedPenaltyRate
 				local expectedWithdrawalAmount = vaultBalance - expectedexpeditedWithdrawalFee
 
@@ -1499,9 +1499,9 @@ describe("gar", function()
 					delegate = nil, -- Delegate should be removed after full withdrawal
 					elapsedTime = 0,
 					remainingTime = gar.getSettings().delegates.withdrawLengthMs,
-					penaltyRate = 0.8,
-					expeditedWithdrawalFee = 800,
-					amountWithdrawn = 200,
+					penaltyRate = 0.50,
+					expeditedWithdrawalFee = 500,
+					amountWithdrawn = 500,
 				}, result)
 				assert.are.equal(expectedWithdrawalAmount, Balances[stubRandomAddress])
 				assert.are.equal(expectedexpeditedWithdrawalFee, Balances[ao.id])
@@ -1580,9 +1580,9 @@ describe("gar", function()
 					},
 					elapsedTime = 1296000000,
 					remainingTime = 1296000000,
-					penaltyRate = "0.425",
-					expeditedWithdrawalFee = 425,
-					amountWithdrawn = 575,
+					penaltyRate = "0.300",
+					expeditedWithdrawalFee = 300,
+					amountWithdrawn = 700,
 				}, result)
 				assert.are.equal(expectedWithdrawalAmount, Balances[stubRandomAddress])
 				assert.are.equal(expectedExpeditedWithdrawalFee, Balances[ao.id])
@@ -1659,9 +1659,9 @@ describe("gar", function()
 					delegate = nil, -- Delegate should be removed after full withdrawal
 					elapsedTime = 2591999999,
 					remainingTime = 1,
-					penaltyRate = "0.050",
-					expeditedWithdrawalFee = 50,
-					amountWithdrawn = 950,
+					penaltyRate = "0.100",
+					expeditedWithdrawalFee = 100,
+					amountWithdrawn = 900,
 				}, result)
 				assert.are.equal(expectedWithdrawalAmount, Balances[stubRandomAddress])
 				assert.are.equal(expectedexpeditedWithdrawalFee, Balances[ao.id])
