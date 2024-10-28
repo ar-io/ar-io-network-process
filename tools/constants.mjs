@@ -13,8 +13,6 @@ export const INITIAL_OWNER_BALANCE = 950_000_000_000_000; // 950M IO
 export const STUB_TIMESTAMP = 21600000; // 01-01-1970 00:00:00
 export const STUB_MESSAGE_ID = ''.padEnd(43, 'm');
 export const STUB_HASH_CHAIN = 'NGU1fq_ssL9m6kRbRU1bqiIDBht79ckvAwRMGElkSOg';
-export const EXPECTED_MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.1;
-export const EXPECTED_MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.5;
 /* ao READ-ONLY Env Variables */
 export const AO_LOADER_HANDLER_ENV = {
   Process: {

@@ -8,7 +8,6 @@ import {
   STUB_MESSAGE_ID,
   STUB_ADDRESS,
   PROCESS_OWNER,
-  EXPECTED_MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE,
   validGatewayTags,
 } from '../tools/constants.mjs';
 
@@ -484,9 +483,7 @@ describe('GatewayRegistry', async () => {
       const expeditedWithdrawalFee = Number(expeditedWithdrawalFeeTag.value);
       const amountWithdrawn = Number(amountWithdrawnTag.value);
 
-      // Define the expected values based on penalty rate
-      const expectedPenaltyRate =
-        EXPECTED_MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE;
+      const expectedPenaltyRate = 0.5; // the maximum penalty rate for an expedited withdrawal
       assert.strictEqual(penaltyRate, expectedPenaltyRate);
 
       // Recalculate the expected values based on the penalty rate
@@ -584,9 +581,7 @@ describe('GatewayRegistry', async () => {
       const expeditedWithdrawalFee = Number(expeditedWithdrawalFeeTag.value);
       const amountWithdrawn = Number(amountWithdrawnTag.value);
 
-      // Define the expected values
-      const expectedPenaltyRate =
-        EXPECTED_MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE;
+      const expectedPenaltyRate = 0.5; // the maximum penalty rate for an expedited withdrawal
       const expectedExpeditedWithdrawalFee = Math.floor(
         amountToWithdraw * expectedPenaltyRate,
       );
