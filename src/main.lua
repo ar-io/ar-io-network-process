@@ -1517,11 +1517,11 @@ addEventingHandler(
 
 addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
 	local reportTxId = msg.Tags["Report-Tx-Id"]
-	local failedGateways = utils.splitString(msg.Tags["Failed-Gateways"], ",")
+	local failedGateways = msg.Tags["Failed-Gateways"] and utils.splitString(msg.Tags["Failed-Gateways"], ",") or {}
 	local checkAssertions = function()
-		assert(utils.isValidArweaveAddress(reportTxId), "Invalid report tx id")
+		assert(utils.isValidAOAddress(reportTxId), "Invalid report tx id")
 		for _, gateway in ipairs(failedGateways) do
-			assert(utils.isValidArweaveAddress(gateway), "Invalid gateway address")
+			assert(utils.isValidAOAddress(gateway), "Invalid failed gateway address: " .. gateway)
 		end
 	end
 

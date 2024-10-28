@@ -97,7 +97,7 @@ describe('GatewayRegistry', async () => {
           protocol: 'https',
           allowDelegatedStaking: true,
           minDelegatedStake: 500_000_000,
-          delegateRewardShareRatio: 0,
+          delegateRewardShareRatio: 25,
           properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
           autoStake: true,
         },
@@ -227,7 +227,7 @@ describe('GatewayRegistry', async () => {
           protocol: 'https',
           allowDelegatedStaking: true,
           minDelegatedStake: 500_000_000,
-          delegateRewardShareRatio: 0,
+          delegateRewardShareRatio: 25,
           properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
           autoStake: true,
         },
@@ -298,7 +298,7 @@ describe('GatewayRegistry', async () => {
           protocol: 'https',
           allowDelegatedStaking: true,
           minDelegatedStake: 500_000_000,
-          delegateRewardShareRatio: 0,
+          delegateRewardShareRatio: 25,
           properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
           autoStake: true,
         },
@@ -371,7 +371,7 @@ describe('GatewayRegistry', async () => {
           protocol: 'https',
           allowDelegatedStaking: true,
           minDelegatedStake: 500_000_000,
-          delegateRewardShareRatio: 0,
+          delegateRewardShareRatio: 25,
           properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
           autoStake: true,
         },
@@ -526,6 +526,12 @@ describe('GatewayRegistry', async () => {
       });
       assert.deepEqual(gatewayData.totalDelegatedStake, 1_000_000_000);
       sharedMemory = cancelWithdrawalResult.Memory;
+    });
+  });
+  // save observations
+  describe('Save-Observations', () => {
+    it('should save observations', async () => {
+      // Steps: add a gateway, create the first epoch to prescribe it, submit an observation from the gateway, tick to the epoch distribution timestamp, check the rewards were distributed correctly
     });
   });
 });
