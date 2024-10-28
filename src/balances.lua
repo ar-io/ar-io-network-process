@@ -5,6 +5,11 @@ Balances = Balances or {}
 local balances = {}
 local utils = require("utils")
 
+--- Transfers tokens from one address to another
+---@param recipient string The address to receive tokens
+---@param from string The address sending tokens
+---@param qty number The amount of tokens to transfer (must be integer)
+---@return table Updated balances for sender and recipient addresses
 function balances.transfer(recipient, from, qty)
 	assert(type(recipient) == "string", "Recipient is required!")
 	assert(type(from) == "string", "From is required!")
@@ -20,15 +25,24 @@ function balances.transfer(recipient, from, qty)
 	}
 end
 
+--- Gets the balance for a specific address
+---@param target string The address to get balance for
+---@return number The balance amount (0 if address has no balance)
 function balances.getBalance(target)
-	return utils.deepCopy(Balances[target] or 0)
+	return Balances[target] or 0
 end
 
+--- Gets all balances in the system
+---@return table All address:balance pairs
 function balances.getBalances()
-	local balances = utils.deepCopy(Balances)
-	return balances or {}
+	local balances = utils.deepCopy(Balances) or {}
+	return balances
 end
 
+--- Reduces the balance of an address
+---@param target string The address to reduce balance for
+---@param qty number The amount to reduce by (must be integer)
+---@throws error If target has insufficient balance
 function balances.reduceBalance(target, qty)
 	local prevBalance = balances.getBalance(target)
 	if prevBalance < qty then
@@ -38,12 +52,21 @@ function balances.reduceBalance(target, qty)
 	Balances[target] = prevBalance - qty
 end
 
+--- Increases the balance of an address
+---@param target string The address to increase balance for
+---@param qty number The amount to increase by (must be integer)
 function balances.increaseBalance(target, qty)
 	assert(utils.isInteger(qty), debug.traceback("Quantity must be an integer: " .. qty))
 	local prevBalance = balances.getBalance(target) or 0
 	Balances[target] = prevBalance + qty
 end
 
+--- Gets paginated list of all balances
+---@param cursor string|nil The address to start from
+---@param limit number|nil Max number of results to return
+---@param sortBy string|nil Field to sort by
+---@param sortOrder string|nil "asc" or "desc" sort direction
+---@return table Array of {address, balance} objects
 function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder)
 	local balances = balances.getBalances()
 	local balancesArray = {}
