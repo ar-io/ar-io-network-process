@@ -485,7 +485,10 @@ describe('setup', () => {
     it('should not have any arns records older than two weeks', async () => {
       // TODO: Remove this when we figure out whether do/while is causing test hanging
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Test timed out after 60 seconds')), 60000)
+        setTimeout(
+          () => reject(new Error('Test timed out after 60 seconds')),
+          60000,
+        ),
       );
 
       const testLogicPromise = (async () => {
