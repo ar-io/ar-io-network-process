@@ -14,6 +14,7 @@ import {
 } from '../tools/constants.mjs';
 
 const stubbedTimestamp = STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 30; // 30 days after stubbedTimestamp
+const initialOperatorStake = 100_000_000_000;
 describe('GatewayRegistry', async () => {
   const { handle: originalHandle, memory: startMemory } =
     await createAosLoader();
@@ -31,7 +32,7 @@ describe('GatewayRegistry', async () => {
 
   const transfer = async ({
     recipient = STUB_ADDRESS,
-    quantity = 100_000_000_000,
+    quantity = initialOperatorStake,
     memory = sharedMemory,
   } = {}) => {
     const transferResult = await handle(
@@ -67,6 +68,7 @@ describe('GatewayRegistry', async () => {
       },
       sharedMemory,
     );
+    // NOTE: all tests will start with this gateway joined to the network - use `sharedMemory` for the first interaction for each test to avoid having to join the network again
     sharedMemory = joinNetworkResult.Memory;
   });
 
@@ -85,7 +87,7 @@ describe('GatewayRegistry', async () => {
       const gatewayData = JSON.parse(gateway.Messages[0].Data);
       assert.deepEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
-        operatorStake: 100_000_000_000,
+        operatorStake: initialOperatorStake,
         totalDelegatedStake: 0,
         status: 'joined',
         delegates: [],
@@ -156,7 +158,7 @@ describe('GatewayRegistry', async () => {
 
       assert.deepEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
-        operatorStake: 100_000_000_000,
+        operatorStake: initialOperatorStake,
         totalDelegatedStake: 0,
         status: 'joined',
         delegates: [],
@@ -190,13 +192,14 @@ describe('GatewayRegistry', async () => {
   describe('Increase-Operator-Stake', () => {
     // join the network and then increase stake
     it('should allow increasing operator stake', async () => {
+      const increaseStakeQuantity = 10_000_000_000;
       const increaseStakeResult = await handle(
         {
           From: STUB_ADDRESS,
           Owner: STUB_ADDRESS,
           Tags: [
             { name: 'Action', value: 'Increase-Operator-Stake' },
-            { name: 'Quantity', value: '10000000000' }, // 10K IO
+            { name: 'Quantity', value: increaseStakeQuantity.toString() }, // 10K IO
           ],
         },
         sharedMemory,
@@ -215,7 +218,7 @@ describe('GatewayRegistry', async () => {
       const gatewayData = JSON.parse(gateway.Messages[0].Data);
       assert.deepEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
-        operatorStake: 110_000_000_000,
+        operatorStake: initialOperatorStake + increaseStakeQuantity,
         totalDelegatedStake: 0,
         status: 'joined',
         delegates: [],
@@ -249,13 +252,14 @@ describe('GatewayRegistry', async () => {
   describe('Decrease-Operator-Stake', () => {
     // join the network and then increase stake
     it('should allow decreasing the operator stake as long as it is above the minimum', async () => {
+      const decreaseStakeQuantity = 10_000_000_000;
       const decreaseStakeResult = await handle(
         {
           From: STUB_ADDRESS,
           Owner: STUB_ADDRESS,
           Tags: [
             { name: 'Action', value: 'Decrease-Operator-Stake' },
-            { name: 'Quantity', value: '5000000000' }, // 5K IO
+            { name: 'Quantity', value: decreaseStakeQuantity.toString() },
           ],
         },
         sharedMemory,
@@ -268,15 +272,15 @@ describe('GatewayRegistry', async () => {
       assert.strictEqual(errorTag, undefined);
 
       const gatewayData = JSON.parse(decreaseStakeResult.Messages[0].Data);
-      assert.deepEqual(gatewayData, {
+      assert.deepStrictEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
-        operatorStake: 95_000_000_000,
+        operatorStake: initialOperatorStake - decreaseStakeQuantity,
         totalDelegatedStake: 0,
         status: 'joined',
         delegates: [],
         vaults: {
           [STUB_MESSAGE_ID]: {
-            balance: 5_000_000_000,
+            balance: decreaseStakeQuantity,
             startTimestamp: STUB_TIMESTAMP,
             endTimestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 30, // thirty days
           },
@@ -290,7 +294,7 @@ describe('GatewayRegistry', async () => {
           protocol: 'https',
           allowDelegatedStaking: true,
           minDelegatedStake: 500_000_000,
-          delegateRewardShareRatio: 0,
+          delegateRewardShareRatio: 25,
           properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
           autoStake: true,
         },
@@ -318,14 +322,11 @@ describe('GatewayRegistry', async () => {
       assert.strictEqual(Number(amountWithdrawnTag?.value ?? '0'), 0);
       assert.strictEqual(Number(penaltyRateTag?.value ?? '0'), 0);
       assert.strictEqual(Number(expeditedWithdrawalFeeTag?.value ?? '0'), 0);
-
-      sharedMemory = decreaseStakeResult.Memory;
     });
 
     it('should allow decreasing the operator stake to the exact minimum stake value', async () => {
-      const currentStake = 95_000_000_000;
       const minStake = 50_000_000_000;
-      const amountToWithdraw = currentStake - minStake;
+      const amountToWithdraw = initialOperatorStake - minStake;
 
       // Execute the handler for decreasing operator stake to the minimum allowed stake
       const decreaseStakeResult = await handle(
@@ -349,7 +350,7 @@ describe('GatewayRegistry', async () => {
       // Parse and validate gateway data from the decreaseStakeResult message
       const gatewayData = JSON.parse(decreaseStakeResult.Messages[0].Data);
 
-      assert.deepEqual(gatewayData, {
+      assert.deepStrictEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
         operatorStake: minStake,
         totalDelegatedStake: 0,
@@ -371,7 +372,7 @@ describe('GatewayRegistry', async () => {
           protocol: 'https',
           allowDelegatedStaking: true,
           minDelegatedStake: 500_000_000,
-          delegateRewardShareRatio: 0,
+          delegateRewardShareRatio: 25,
           properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
           autoStake: true,
         },
@@ -410,14 +411,11 @@ describe('GatewayRegistry', async () => {
 
       assert(amountWithdrawnTag, 'Amount-Withdrawn tag should exist');
       assert.strictEqual(Number(amountWithdrawnTag.value), 0);
-
-      // Do not update shared memory so we can perform additional tests
     });
 
     it('should allow decreasing the operator stake with instant withdrawal to the exact minimum stake value', async () => {
-      const currentStake = 95_000_000_000; // Initial operator stake (95K IO)
       const minStake = 50_000_000_000; // Minimum operator stake allowed (50K IO)
-      const amountToWithdraw = currentStake - minStake;
+      const amountToWithdraw = initialOperatorStake - minStake;
 
       // Execute the handler for decreasing operator stake with instant withdrawal to the minimum allowed stake
       const decreaseStakeResult = await handle(
@@ -441,19 +439,13 @@ describe('GatewayRegistry', async () => {
 
       // Parse and validate gateway data from the decreaseStakeResult message
       const gatewayData = JSON.parse(decreaseStakeResult.Messages[0].Data);
-      assert.deepEqual(gatewayData, {
+      assert.deepStrictEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
         operatorStake: minStake,
         totalDelegatedStake: 0,
         status: 'joined',
         delegates: [],
-        vaults: {
-          [STUB_MESSAGE_ID]: {
-            balance: 5_000_000_000,
-            startTimestamp: STUB_TIMESTAMP,
-            endTimestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 30, // thirty days
-          },
-        },
+        vaults: [],
         startTimestamp: STUB_TIMESTAMP,
         settings: {
           label: 'test-gateway',
@@ -463,7 +455,7 @@ describe('GatewayRegistry', async () => {
           protocol: 'https',
           allowDelegatedStaking: true,
           minDelegatedStake: 500_000_000,
-          delegateRewardShareRatio: 0,
+          delegateRewardShareRatio: 25,
           properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
           autoStake: true,
         },
@@ -495,11 +487,6 @@ describe('GatewayRegistry', async () => {
       const expeditedWithdrawalFee = Number(expeditedWithdrawalFeeTag.value);
       const amountWithdrawn = Number(amountWithdrawnTag.value);
 
-      // Log values for easier debugging
-      console.log(`Penalty Rate: ${penaltyRate}`);
-      console.log(`Amount Withdrawn: ${amountWithdrawn}`);
-      console.log(`Expedited Withdrawal Fee: ${expeditedWithdrawalFee}`);
-
       // Define the expected values based on penalty rate
       const expectedPenaltyRate = MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE;
       assert.strictEqual(penaltyRate, expectedPenaltyRate);
@@ -521,7 +508,7 @@ describe('GatewayRegistry', async () => {
     });
 
     it('should allow decreasing the operator stake with instant withdrawal as long as it is above the minimum', async () => {
-      const amountToWithdraw = 5000000000;
+      const amountToWithdraw = 5_000_000_000;
 
       // Execute the handler for decreaseOperatorStake with instant withdrawal
       const decreaseStakeResult = await handle(
@@ -545,19 +532,13 @@ describe('GatewayRegistry', async () => {
 
       // Parse and validate gateway data from the decreaseStakeResult message
       const gatewayData = JSON.parse(decreaseStakeResult.Messages[0].Data);
-      assert.deepEqual(gatewayData, {
+      assert.deepStrictEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
-        operatorStake: 90_000_000_000,
+        operatorStake: initialOperatorStake - amountToWithdraw,
         totalDelegatedStake: 0,
         status: 'joined',
         delegates: [],
-        vaults: {
-          [STUB_MESSAGE_ID]: {
-            balance: 5_000_000_000,
-            startTimestamp: STUB_TIMESTAMP,
-            endTimestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 30, // thirty days
-          },
-        },
+        vaults: [],
         startTimestamp: STUB_TIMESTAMP,
         settings: {
           label: 'test-gateway',
@@ -567,7 +548,7 @@ describe('GatewayRegistry', async () => {
           protocol: 'https',
           allowDelegatedStaking: true,
           minDelegatedStake: 500_000_000,
-          delegateRewardShareRatio: 0,
+          delegateRewardShareRatio: 25,
           properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
           autoStake: true,
         },
@@ -622,10 +603,12 @@ describe('GatewayRegistry', async () => {
         expeditedWithdrawalFee,
         expectedExpeditedWithdrawalFee,
       );
+      // TODO: assert the penalty rate went to protocol and remainder went to wallet balance
     });
 
     it('should allow instantly withdrawing from an existing operator vault for a withdrawal fee', async () => {
       const decreaseStakeTimestamp = stubbedTimestamp + 1000 * 60 * 15; // 15 minutes after stubbedTimestamp
+      const decreaseStakeQuantity = 5_000_000_000;
       const decreaseStakeResult = await handle(
         {
           From: STUB_ADDRESS,
@@ -634,7 +617,7 @@ describe('GatewayRegistry', async () => {
           Id: ''.padEnd(43, 'x'),
           Tags: [
             { name: 'Action', value: 'Decrease-Operator-Stake' },
-            { name: 'Quantity', value: '5000000000' }, // 5K IO
+            { name: 'Quantity', value: decreaseStakeQuantity.toString() }, // 5K IO
           ],
         },
         sharedMemory,
@@ -672,9 +655,9 @@ describe('GatewayRegistry', async () => {
         instantOperatorWithdrawalResult.Memory,
       );
       const gatewayData = JSON.parse(gateway.Messages[0].Data);
-      assert.deepEqual(gatewayData, {
+      assert.deepStrictEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
-        operatorStake: 90_000_000_000,
+        operatorStake: initialOperatorStake - decreaseStakeQuantity,
         totalDelegatedStake: 0,
         status: 'joined',
         delegates: [],
@@ -702,12 +685,14 @@ describe('GatewayRegistry', async () => {
           observedEpochCount: 0,
         },
       });
+      // TODO: validate the instant withdrawal went to wallet balance
     });
   });
 
   // leave network
   describe('Leave-Network', () => {
     it('should allow leaving the network', async () => {
+      const minStake = 50_000_000_000;
       const leaveNetworkResult = await handle(
         {
           From: STUB_ADDRESS,
@@ -730,7 +715,7 @@ describe('GatewayRegistry', async () => {
         leaveNetworkResult.Memory,
       );
       const gatewayData = JSON.parse(gateway.Messages[0].Data);
-      assert.deepEqual(gatewayData, {
+      assert.deepStrictEqual(gatewayData, {
         observerAddress: STUB_ADDRESS,
         operatorStake: 0,
         totalDelegatedStake: 0,
@@ -740,13 +725,13 @@ describe('GatewayRegistry', async () => {
           leaveNetworkData.startTimestamp + 1000 * 60 * 60 * 24 * 90, // 90 days
         vaults: {
           [STUB_ADDRESS]: {
-            balance: 50_000_000_000,
+            balance: minStake,
             startTimestamp: leaveNetworkData.startTimestamp,
             endTimestamp:
               leaveNetworkData.startTimestamp + 1000 * 60 * 60 * 24 * 90, // 90 days
           },
           [STUB_MESSAGE_ID]: {
-            balance: 45_000_000_000,
+            balance: initialOperatorStake - minStake,
             startTimestamp: leaveNetworkData.startTimestamp,
             endTimestamp:
               leaveNetworkData.startTimestamp + 1000 * 60 * 60 * 24 * 30, // 30 days
