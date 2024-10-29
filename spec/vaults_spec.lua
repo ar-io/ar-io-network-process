@@ -255,8 +255,7 @@ describe("vaults", function()
 			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS - 1
 			local timestamp = 1000000
 			local msgId = "msgId"
-			local status =
-				pcall(vaults.vaultedTransfer, from, recipient, quantity, lockLengthMs, timestamp, msgId)
+			local status = pcall(vaults.vaultedTransfer, from, recipient, quantity, lockLengthMs, timestamp, msgId)
 			assert.is_false(status)
 		end)
 	end)
