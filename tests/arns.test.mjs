@@ -840,6 +840,7 @@ describe('ArNS', async () => {
       (tag) => tag.name === 'Error',
     );
     assert.equal(releaseNameErrorTag, undefined);
+    assert.equal(releaseNameResult.Messages?.[0]?.Target, processId);
 
     // fetch the auction
     const auctionResult = await handle(

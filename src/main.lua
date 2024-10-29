@@ -2483,6 +2483,7 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 		settings = auctionOrError.settings,
 	}
 	ao.send({
+		Target = msg.From,
 		Action = "Auction-Notice",
 		Name = name,
 		Data = json.encode(auction),
