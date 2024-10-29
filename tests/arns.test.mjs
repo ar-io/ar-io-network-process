@@ -418,6 +418,61 @@ describe('ArNS', async () => {
     );
   });
 
+  it('should properly handle upgrading a name', async () => {
+    const buyRecordTimestamp = STUB_TIMESTAMP + 1;
+    const buyRecordResult = await handle({
+      Tags: [
+        { name: 'Action', value: 'Buy-Record' },
+        { name: 'Name', value: 'test-name' },
+        { name: 'Purchase-Type', value: 'lease' },
+        { name: 'Years', value: '1' },
+        { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+      ],
+      Timestamp: buyRecordTimestamp,
+    });
+
+    // assert no error tag
+    const buyRecordErrorTag = buyRecordResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.equal(buyRecordErrorTag, undefined);
+
+    // now upgrade the name
+    const upgradeNameResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Upgrade-Name' },
+          { name: 'Name', value: 'test-name' },
+        ],
+        Timestamp: buyRecordTimestamp + 1,
+      },
+      buyRecordResult.Memory,
+    );
+
+    // assert no error tag
+    const upgradeNameErrorTag = upgradeNameResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.equal(upgradeNameErrorTag, undefined);
+
+    // assert the message includes the upgrade name notice
+    const upgradeNameNoticeTag = upgradeNameResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Action' && tag.value === 'Upgrade-Name-Notice',
+    );
+
+    assert.ok(upgradeNameNoticeTag);
+
+    const upgradedNameData = JSON.parse(upgradeNameResult.Messages?.[0]?.Data);
+    assert.deepStrictEqual(upgradedNameData, {
+      name: 'test-name',
+      type: 'permabuy',
+      startTimestamp: buyRecordTimestamp,
+      processId: ''.padEnd(43, 'a'),
+      undernameLimit: 10,
+      purchasePrice: 2500000000, // expected price for a permabuy of a 9 character name
+    });
+  });
+
   it('should create an auction for an existing permabuy record owned by a process id, accept a bid and add the new record to the registry', async () => {
     // buy the name first
     const processId = ''.padEnd(43, 'a');
