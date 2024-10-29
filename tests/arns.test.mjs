@@ -840,6 +840,7 @@ describe('ArNS', async () => {
       (tag) => tag.name === 'Error',
     );
     assert.equal(releaseNameErrorTag, undefined);
+    assert.equal(releaseNameResult.Messages?.[0]?.Target, processId);
 
     // fetch the auction
     const auctionResult = await handle(
@@ -923,6 +924,126 @@ describe('ArNS', async () => {
       auctionPricesData.currentPrice > 0,
       'Current price should be positive',
     );
+  });
+
+  it('should reassign an arns name to a new process id', async () => {
+    // buy the name first
+    const processId = ''.padEnd(43, 'a');
+    const { mem } = await runBuyRecord({
+      sender: STUB_ADDRESS,
+      processId,
+      type: 'permabuy',
+    });
+
+    const reassignNameResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Reassign-Name' },
+          { name: 'Name', value: 'test-name' },
+          { name: 'Process-Id', value: ''.padEnd(43, 'b') },
+        ],
+        From: processId,
+        Owner: processId,
+      },
+      mem,
+    );
+
+    // assert no error tag
+    const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.equal(releaseNameErrorTag, undefined);
+    assert.equal(reassignNameResult.Messages?.[0]?.Target, processId);
+  });
+
+  it('should reassign an arns name to a new process id with initiator', async () => {
+    // buy the name first
+    const processId = ''.padEnd(43, 'a');
+    const { mem } = await runBuyRecord({
+      sender: STUB_ADDRESS,
+      processId,
+      type: 'permabuy',
+    });
+
+    const reassignNameResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Reassign-Name' },
+          { name: 'Name', value: 'test-name' },
+          { name: 'Process-Id', value: ''.padEnd(43, 'b') },
+          { name: 'Initiator', value: STUB_MESSAGE_ID },
+        ],
+        From: processId,
+        Owner: processId,
+      },
+      mem,
+    );
+
+    // assert no error tag
+    const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.equal(releaseNameErrorTag, undefined);
+    assert.equal(reassignNameResult.Messages?.[0]?.Target, processId);
+    assert.equal(reassignNameResult.Messages?.[1]?.Target, STUB_MESSAGE_ID); // Check for the message sent to the initiator
+  });
+
+  it('should not reassign an arns name with invalid ownership', async () => {
+    // buy the name first
+    const processId = ''.padEnd(43, 'a');
+    const { mem } = await runBuyRecord({
+      sender: STUB_ADDRESS,
+      processId,
+      type: 'permabuy',
+    });
+
+    const reassignNameResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Reassign-Name' },
+          { name: 'Name', value: 'test-name' },
+          { name: 'Process-Id', value: ''.padEnd(43, 'b') },
+        ],
+        From: STUB_ADDRESS,
+        Owner: STUB_ADDRESS,
+      },
+      mem,
+    );
+
+    // assert error
+    const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.equal(releaseNameErrorTag.value, 'Reassign-Name-Error');
+  });
+
+  it('should not reassign an arns name with invalid new process id', async () => {
+    // buy the name first
+    const processId = ''.padEnd(43, 'a');
+    const { mem } = await runBuyRecord({
+      sender: STUB_ADDRESS,
+      processId,
+      type: 'permabuy',
+    });
+
+    const reassignNameResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Reassign-Name' },
+          { name: 'Name', value: 'test-name' },
+          { name: 'Process-Id', value: 'this is an invalid process id' },
+        ],
+        From: processId,
+        Owner: processId,
+      },
+      mem,
+    );
+
+    // assert error
+    const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.equal(releaseNameErrorTag.value, 'Bad-Input');
   });
 
   // TODO: add several error scenarios

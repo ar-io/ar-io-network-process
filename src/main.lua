@@ -1690,6 +1690,7 @@ addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", Action
 			Data = json.encode(reassignmentOrError),
 		})
 	end
+	return
 end)
 
 addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
@@ -2483,6 +2484,7 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 		settings = auctionOrError.settings,
 	}
 	ao.send({
+		Target = msg.From,
 		Action = "Auction-Notice",
 		Name = name,
 		Data = json.encode(auction),
