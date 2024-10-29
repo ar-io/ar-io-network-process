@@ -283,12 +283,14 @@ describe('setup', () => {
       const { items: gateways } = await io.getGateways({
         limit: 1000, // we will need to update this if the number of gateways grows
       });
-      const activeGatewayCount = gateways.filter(
-        (gateway) => gateway.status === 'joined',
+      const activeGatewayCountForEpoch = gateways.filter(
+        (gateway) =>
+          gateway.status === 'joined' &&
+          gateway.startTimestamp <= startTimestamp,
       ).length;
       assert(
-        activeGatewayCount === distributions.totalEligibleGateways,
-        `Active gateway count (${activeGatewayCount}) does not match total eligible gateways (${distributions.totalEligibleGateways}) for the current epoch`,
+        activeGatewayCountForEpoch === distributions.totalEligibleGateways,
+        `Active gateway count (${activeGatewayCountForEpoch}) does not match total eligible gateways (${distributions.totalEligibleGateways}) for the current epoch`,
       );
     });
 
