@@ -399,6 +399,48 @@ function arns.getTokenCost(intendedAction)
 	return tokenCost
 end
 
+--- Upgrades a leased record to a permabuy
+--- @param from string The address of the sender
+--- @param name string The name of the record
+--- @param currentTimestamp number The current timestamp
+--- @return table The upgraded record with name and record fields
+function arns.upgradeRecord(from, name, currentTimestamp)
+	local record = arns.getRecord(name)
+	if not record then
+		error("Name is not registered")
+	end
+
+	if record.type == "permabuy" then
+		error("Record is already a permabuy")
+	end
+
+	if record.endTimestamp and record.endTimestamp + constants.gracePeriodMs < currentTimestamp then
+		NameRegistry.records[name] = nil
+		error("Name is expired")
+	end
+
+	local baseFee = demand.getFees()[#name]
+	local demandFactor = demand.getDemandFactor()
+	local upgradeCost = arns.calculatePermabuyFee(baseFee, demandFactor)
+
+	if not utils.walletHasSufficientBalance(from, upgradeCost) then
+		error("Insufficient balance")
+	end
+
+	record.endTimestamp = nil
+	record.type = "permabuy"
+	record.purchasePrice = upgradeCost
+
+	balances.transfer(ao.id, from, upgradeCost)
+	demand.tallyNamePurchase(upgradeCost)
+
+	NameRegistry.records[name] = record
+	return {
+		name = name,
+		record = record,
+	}
+end
+
 function arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
 	if not record then
 		error("Name is not registered")

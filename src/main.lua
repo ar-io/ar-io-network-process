@@ -727,75 +727,50 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 	local name = string.lower(msg.Tags.Name)
 	local from = utils.formatAddress(msg.From)
 	local timestamp = tonumber(msg.Timestamp)
-	local record = arns.getRecord(name)
 
-	-- validate the record exists
-	if not record then
+	if not timestamp then
 		ao.send({
-			Target = msg.From,
+			Target = from,
+			Tags = { Action = "Invalid-" .. ActionMap.UpgradeName .. "-Notice", Error = "Bad-Input" },
+			Data = "Timestamp is required",
+		})
+		return
+	end
+
+	if not name then
+		ao.send({
+			Target = from,
+			Tags = { Action = "Invalid-" .. ActionMap.UpgradeName .. "-Notice", Error = "Bad-Input" },
+			Data = "Name is required",
+		})
+		return
+	end
+
+	local status, updatedRecordOrError = pcall(arns.upgradeRecord, from, name, timestamp)
+	if not status then
+		ao.send({
+			Target = from,
 			Tags = {
 				Action = "Invalid-" .. ActionMap.UpgradeName .. "-Notice",
 				Error = "Invalid-" .. ActionMap.UpgradeName,
 			},
-			Data = "Name not found",
+			Data = tostring(updatedRecordOrError),
 		})
 		return
 	end
-
-	-- if it is already a permabuy, send error
-	if record.type == "permabuy" then
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.UpgradeName .. "-Notice",
-				Error = "Already-" .. ActionMap.UpgradeName,
-			},
-			Data = "Name is already a " .. ActionMap.UpgradeName,
-		})
-		return
-	end
-
-	-- make sure the name should not already be pruned
-	if record.endTimestamp and record.endTimestamp + constants.gracePeriodMs < timestamp then
-		NameRegistry[name] = nil
-		ao.send({
-			Target = from,
-			Tags = { Action = "Invalid-" .. ActionMap.UpgradeName .. "-Notice", Error = "Already-Pruned" },
-			Data = "Name not found",
-		})
-		return
-	end
-
-	local baseFee = demand.getFees()[#name]
-	local demandFactor = demand.getDemandFactor()
-	local upgradeCost = arns.calculatePermabuyFee(baseFee, demandFactor)
-	local walletBalance = Balances[from]
-	if walletBalance < upgradeCost then
-		ao.send({
-			Target = from,
-			Tags = { Action = "Invalid-" .. ActionMap.UpgradeName .. "-Notice", Error = "Insufficient-Balance" },
-			Data = "Insufficient balance to upgrade name",
-		})
-		return
-	end
-
-	-- remove balance from the upgrader to the protocol
-	balances.transfer(ao.id, from, upgradeCost)
-	demand.tallyNamePurchase(upgradeCost)
-
-	-- update the name registry
-	NameRegistry.records[name].type = "permabuy"
-	NameRegistry.records[name].purchasePrice = upgradeCost
-	NameRegistry.records[name].endTimestamp = nil
-
-	-- get the updated record
-	local updatedRecord = arns.getRecord(name)
-	updatedRecord.name = name
 
 	ao.send({
 		Target = from,
 		Tags = { Action = ActionMap.UpgradeName .. "-Notice", Name = name },
-		Data = json.encode(updatedRecord),
+		Data = json.encode({
+			name = updatedRecordOrError.name,
+			startTimestamp = updatedRecordOrError.record.startTimestamp,
+			endTimestamp = updatedRecordOrError.record.endTimestamp,
+			undernameLimit = updatedRecordOrError.record.undernameLimit,
+			purchasePrice = updatedRecordOrError.record.purchasePrice,
+			processId = updatedRecordOrError.record.processId,
+			type = updatedRecordOrError.record.type,
+		}),
 	})
 end)
 
