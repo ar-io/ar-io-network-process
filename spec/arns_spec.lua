@@ -417,6 +417,76 @@ describe("arns", function()
 				assert.are.equal(expected, fee)
 			end)
 		end)
+
+		describe("reassignName [" .. addressType .. "]", function()
+			it("should successfully reassign a name to a new owner", function()
+				-- Setup initial record
+				_G.NameRegistry.records["test-name"] = {
+					endTimestamp = timestamp + constants.oneYearMs,
+					processId = testProcessId,
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}
+
+				-- Reassign the name
+				local newProcessId = "test-this-is-valid-arweave-wallet-address-2"
+				local status, result = pcall(arns.reassignName, "test-name", testProcessId, timestamp, newProcessId)
+
+				-- Assertions
+				assert.is_true(status)
+				assert.are.same(newProcessId, result.processId)
+			end)
+
+			it("should throw an error if the name is not registered", function()
+				local newProcessId = "test-this-is-valid-arweave-wallet-address-2"
+				local status, error =
+					pcall(arns.reassignName, "unregistered-name", testProcessId, timestamp, newProcessId)
+				assert.is_false(status)
+				assert.match("Name is not registered", error)
+			end)
+
+			it("should throw an error if the reassigner is not the current owner", function()
+				-- Setup initial record
+				_G.NameRegistry.records["test-name"] = {
+					endTimestamp = timestamp + constants.oneYearMs,
+					processId = testProcessId,
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}
+
+				-- Attempt to reassign
+				local newProcessId = "test-this-is-valid-arweave-wallet-address-2"
+				local status, error = pcall(arns.reassignName, "test-name", "invalid-owner", timestamp, newProcessId)
+
+				-- Assertions
+				assert.is_false(status)
+				assert.match("Not authorized to reassign this name", error)
+			end)
+
+			it("should throw an error if the name is expired", function()
+				-- Setup expired record
+				_G.NameRegistry.records["test-name"] = {
+					endTimestamp = timestamp - 1, -- expired
+					processId = testProcessId,
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}
+
+				-- Attempt to reassign
+				local newProcessId = "test-this-is-valid-arweave-wallet-address-2"
+				local status, error = pcall(arns.reassignName, "test-name", testProcessId, timestamp, newProcessId)
+
+				-- Assertions
+				assert.is_false(status)
+				assert.match("Name must be extended before it can be reassigned", error)
+			end)
+		end)
 	end
 
 	describe("getTokenCost", function()

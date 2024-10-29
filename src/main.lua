@@ -84,6 +84,7 @@ local ActionMap = {
 	CancelDelegateWithdrawal = "Cancel-Delegate-Withdrawal",
 	InstantDelegateWithdrawal = "Instant-Delegate-Withdrawal",
 	InstantOperatorWithdrawal = "Instant-Operator-Withdrawal",
+	ReassignName = "Reassign-Name",
 	-- auctions
 	Auctions = "Auctions",
 	ReleaseName = "Release-Name",
@@ -1629,6 +1630,67 @@ addEventingHandler(
 		end
 	end
 )
+
+addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", ActionMap.ReassignName), function(msg)
+	local newProcessId = utils.formatAddress(msg.Tags["Process-Id"])
+	local name = msg.Tags.Name
+	local initiator = msg.Tags.Initiator
+	local checkAssertions = function()
+		assert(name and #name > 0, "Name is required")
+		assert(newProcessId and utils.isValidAOAddress(newProcessId), "Invalid Process-Id")
+		if initiator ~= nil then
+			assert(utils.isValidAOAddress(initiator), "Invalid initiator address.")
+		end
+	end
+
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-Reassign-Name-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
+
+	local status, reassignmentOrError = pcall(arns.reassignName, name, msg.From, tonumber(msg.Timestamp), newProcessId)
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReassignName .. "-Notice",
+			Error = "Reassign-Name-Error",
+			Data = tostring(reassignmentOrError),
+		})
+
+		if initiator ~= nil then
+			ao.send({
+				Target = initiator,
+				Action = "Invalid-" .. ActionMap.ReassignName .. "-Notice",
+				Error = "Reassign-Name-Error",
+				Data = tostring(reassignmentOrError),
+			})
+		end
+
+		return
+	end
+
+	ao.send({
+		Target = msg.From,
+		Action = "Reassign-Name-Notice",
+		Name = name,
+		Data = json.encode(reassignmentOrError),
+	})
+
+	if initiator ~= nil then
+		ao.send({
+			Target = initiator,
+			Action = "Reassign-Name-Notice",
+			Name = name,
+			Data = json.encode(reassignmentOrError),
+		})
+	end
+end)
 
 addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
 	local reportTxId = msg.Tags["Report-Tx-Id"]

@@ -563,4 +563,40 @@ function arns.pruneReservedNames(currentTimestamp)
 	return prunedReserved
 end
 
+function arns.assertValidReassignName(record, currentTimestamp, from, newProcessId)
+	if not record then
+		error("Name is not registered")
+	end
+
+	assert(utils.isValidAOAddress(newProcessId), "Invalid Process-Id")
+
+	if record.processId ~= from then
+		error("Not authorized to reassign this name")
+	end
+
+	if record.endTimestamp then
+		local isWithinGracePeriod = record.endTimestamp < currentTimestamp
+			and record.endTimestamp + constants.gracePeriodMs > currentTimestamp
+		local isExpired = record.endTimestamp + constants.gracePeriodMs < currentTimestamp
+
+		if isWithinGracePeriod then
+			error("Name must be extended before it can be reassigned")
+		elseif isExpired then
+			error("Name is expired")
+		end
+	end
+
+	return true
+end
+
+function arns.reassignName(name, from, currentTimestamp, newProcessId)
+	local record = arns.getRecord(name)
+
+	arns.assertValidReassignName(record, currentTimestamp, from, newProcessId)
+
+	NameRegistry.records[name].processId = newProcessId
+
+	return arns.getRecord(name)
+end
+
 return arns
