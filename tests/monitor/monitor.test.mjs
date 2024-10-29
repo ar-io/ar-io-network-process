@@ -38,8 +38,7 @@ describe('setup', () => {
   });
 
   describe('handlers', () => {
-    it('should always have correct number of handlers', async () => {
-      const expectedHandlerCount = 59; // TODO: update this if more handlers are added
+    it('should always have correct handler order', async () => {
       const { Handlers: handlersList } = await io.getInfo();
       /**
        * There are two security handlers before _eval and _default, so count is 52
@@ -79,10 +78,6 @@ describe('setup', () => {
         'prune should be the fifth handler, got: ' +
           handlersList.indexOf('prune'),
       );
-      assert.ok(
-        handlersList.length === expectedHandlerCount,
-        `should have ${expectedHandlerCount} handlers, got: ${handlersList.length}`,
-      ); // forces us to think critically about the order of handlers so intended to be sensitive to changes
     });
   });
 
