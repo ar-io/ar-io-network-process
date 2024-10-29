@@ -23,7 +23,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		years = 1 -- set to 1 year by default
 	end
 
-	local baseRegistrationFee = demand.getFees()[#name]
+	local baseRegistrationFee = demand.baseFeeForNameLength(#name)
 
 	local totalRegistrationFee =
 		arns.calculateRegistrationFee(purchaseType, baseRegistrationFee, years, demand.getDemandFactor())
@@ -95,7 +95,7 @@ function arns.extendLease(from, name, years, currentTimestamp)
 	local record = arns.getRecord(name)
 	-- throw error if invalid
 	arns.assertValidExtendLease(record, currentTimestamp, years)
-	local baseRegistrationFee = demand.getFees()[#name]
+	local baseRegistrationFee = demand.baseFeeForNameLength(#name)
 	local totalExtensionFee = arns.calculateExtensionFee(baseRegistrationFee, years, demand.getDemandFactor())
 
 	if balances.getBalance(from) < totalExtensionFee then
@@ -135,7 +135,7 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
 		yearsRemaining = arns.calculateYearsBetweenTimestamps(currentTimestamp, record.endTimestamp)
 	end
 
-	local baseRegistrationFee = demand.getFees()[#name]
+	local baseRegistrationFee = demand.baseFeeForNameLength(#name)
 	local additionalUndernameCost =
 		arns.calculateUndernameCost(baseRegistrationFee, qty, record.type, yearsRemaining, demand.getDemandFactor())
 
@@ -304,7 +304,7 @@ function arns.assertValidExtendLease(record, currentTimestamp, years)
 		error("Name is permabought and cannot be extended")
 	end
 
-	if record.endTimestamp and record.endTimestamp + constants.gracePeriodMs < currentTimestamp then
+	if arns.recordExpired(record, currentTimestamp) then
 		error("Name is expired")
 	end
 
@@ -350,22 +350,22 @@ end
 
 function arns.getTokenCost(intendedAction)
 	local tokenCost = 0
-	if intendedAction.intent == "Buy-Record" then
-		local purchaseType = intendedAction.purchaseType
-		local years = intendedAction.years
-		local name = intendedAction.name
-		local baseFee = demand.getFees()[#name]
-		assert(type(name) == "string", "Name is required and must be a string.")
+	local purchaseType = intendedAction.purchaseType
+	local years = tonumber(intendedAction.years)
+	local name = intendedAction.name
+	local baseFee = demand.baseFeeForNameLength(#name)
+	local intent = intendedAction.intent
+	local qty = tonumber(intendedAction.quantity)
+
+	assert(type(intent) == "string", "Intent is required and must be a string.")
+	assert(type(name) == "string", "Name is required and must be a string.")
+	if intent == "Buy-Record" then
 		assert(purchaseType == "lease" or purchaseType == "permabuy", "PurchaseType is invalid.")
 		if purchaseType == "lease" then
 			assert(years >= 1 and years <= 5, "Years is invalid. Must be an integer between 1 and 5")
 		end
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
-	elseif intendedAction.intent == "Extend-Lease" then
-		local name = intendedAction.name
-		local years = intendedAction.years
-		local baseFee = demand.getFees()[#intendedAction.name]
-		assert(type(name) == "string", "Name is required and must be a string.")
+	elseif intent == "Extend-Lease" then
 		assert(years >= 1 and years <= 5, "Years is invalid. Must be an integer between 1 and 5")
 		local record = arns.getRecord(name)
 		if not record then
@@ -375,18 +375,14 @@ function arns.getTokenCost(intendedAction)
 			error("Name is permabought and cannot be extended")
 		end
 		tokenCost = arns.calculateExtensionFee(baseFee, years, demand.getDemandFactor())
-	elseif intendedAction.intent == "Increase-Undername-Limit" then
-		local name = intendedAction.name
-		local qty = tonumber(intendedAction.quantity)
-		local currentTimestamp = intendedAction.currentTimestamp
-		local baseFee = demand.getFees()[#intendedAction.name]
-		assert(type(name) == "string", "Name is required and must be a string.")
+	elseif intent == "Increase-Undername-Limit" then
 		assert(
 			qty >= 1 and qty <= 9990 and utils.isInteger(qty),
 			"Quantity is invalid, must be an integer between 1 and 9990"
 		)
+		local currentTimestamp = tonumber(intendedAction.currentTimestamp)
 		assert(type(currentTimestamp) == "number" and currentTimestamp > 0, "Timestamp is required")
-		local record = arns.getRecord(intendedAction.name)
+		local record = arns.getRecord(name)
 		if not record then
 			error("Name is not registered")
 		end
@@ -395,6 +391,17 @@ function arns.getTokenCost(intendedAction)
 			yearsRemaining = arns.calculateYearsBetweenTimestamps(currentTimestamp, record.endTimestamp)
 		end
 		tokenCost = arns.calculateUndernameCost(baseFee, qty, record.type, yearsRemaining, demand.getDemandFactor())
+	-- TODO: move action map to constants and use it here
+	elseif intent == "Upgrade-Name" then
+		local record = arns.getRecord(name)
+		if not record then
+			error("Name is not registered")
+		end
+
+		if record.type == "permabuy" then
+			error("Name is already a permabuy")
+		end
+		tokenCost = arns.calculatePermabuyFee(baseFee, demand.getDemandFactor())
 	end
 	return tokenCost
 end
@@ -413,13 +420,11 @@ function arns.upgradeRecord(from, name, currentTimestamp)
 	if record.type == "permabuy" then
 		error("Record is already a permabuy")
 	end
-
-	if record.endTimestamp and record.endTimestamp + constants.gracePeriodMs < currentTimestamp then
-		NameRegistry.records[name] = nil
+	if arns.recordExpired(record, currentTimestamp) then
 		error("Name is expired")
 	end
 
-	local baseFee = demand.getFees()[#name]
+	local baseFee = demand.baseFeeForNameLength(#name)
 	local demandFactor = demand.getDemandFactor()
 	local upgradeCost = arns.calculatePermabuyFee(baseFee, demandFactor)
 
@@ -441,20 +446,53 @@ function arns.upgradeRecord(from, name, currentTimestamp)
 	}
 end
 
+--- Checks if a record is in the grace period
+--- @param record table The record to check
+--- @param currentTimestamp number The current timestamp
+--- @return boolean True if the record is in the grace period, false otherwise (active or expired)
+function arns.recordInGracePeriod(record, currentTimestamp)
+	return record.endTimestamp
+		and record.endTimestamp < currentTimestamp
+		and record.endTimestamp + constants.gracePeriodMs > currentTimestamp
+end
+
+--- Checks if a record is expired
+--- @param record table The record to check
+--- @param currentTimestamp number The current timestamp
+--- @return boolean True if the record is expired, false otherwise (active or in grace period)
+function arns.recordExpired(record, currentTimestamp)
+	if record.type == "permabuy" then
+		return false
+	end
+	local isActive = arns.recordIsActive(record, currentTimestamp)
+	local inGracePeriod = arns.recordInGracePeriod(record, currentTimestamp)
+	local expired = not isActive and not inGracePeriod
+	return expired
+end
+
+--- Checks if a record is active
+--- @param record table The record to check
+--- @param currentTimestamp number The current timestamp
+--- @return boolean True if the record is active, false otherwise (expired or in grace period)
+function arns.recordIsActive(record, currentTimestamp)
+	if record.type == "permabuy" then
+		return true
+	end
+
+	return record.endTimestamp and record.endTimestamp >= currentTimestamp
+end
+
 function arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
 	if not record then
 		error("Name is not registered")
 	end
 
-	if
-		record.endTimestamp
-		and record.endTimestamp < currentTimestamp
-		and record.endTimestamp + constants.gracePeriodMs > currentTimestamp
-	then
+	-- only records active and not in grace period can increase undernames
+	if arns.recordInGracePeriod(record, currentTimestamp) then
 		error("Name must be extended before additional unernames can be purchased")
 	end
 
-	if record.endTimestamp and record.endTimestamp + constants.gracePeriodMs < currentTimestamp then
+	if arns.recordExpired(record, currentTimestamp) then
 		error("Name is expired")
 	end
 
@@ -480,7 +518,7 @@ function arns.createAuction(name, timestamp, initiator)
 		error("Auction already exists for name")
 	end
 
-	local baseFee = demand.getFees()[#name]
+	local baseFee = demand.baseFeeForNameLength(#name)
 	local demandFactor = demand.getDemandFactor()
 	local auction = Auction:new(name, timestamp, demandFactor, baseFee, initiator, arns.calculateRegistrationFee)
 	NameRegistry.auctions[name] = auction

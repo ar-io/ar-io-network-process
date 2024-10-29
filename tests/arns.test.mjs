@@ -316,7 +316,7 @@ describe('ArNS', async () => {
   });
 
   //Reference: https://ardriveio.sharepoint.com/:x:/s/AR.IOLaunch/Ec3L8aX0wuZOlG7yRtlQoJgB39wCOoKu02PE_Y4iBMyu7Q?e=ZG750l
-  it('should get the costs buy record correctly', async () => {
+  it('should get the costs buy a leased record correctly', async () => {
     const result = await handle({
       Tags: [
         { name: 'Action', value: 'Token-Cost' },
@@ -329,6 +329,38 @@ describe('ArNS', async () => {
     });
     const tokenCost = JSON.parse(result.Messages[0].Data);
     assert.equal(tokenCost, 600000000);
+  });
+
+  it('should get the cost of upgrading an existing leased record to a permabuy', async () => {
+    const buyRecordResult = await handle({
+      Tags: [
+        { name: 'Action', value: 'Buy-Record' },
+        { name: 'Name', value: 'test-name' },
+        { name: 'Purchase-Type', value: 'lease' },
+        { name: 'Years', value: '1' },
+        { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+      ],
+    });
+
+    // assert no error tag
+    const buyRecordErrorTag = buyRecordResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.equal(buyRecordErrorTag, undefined);
+
+    const upgradeNameResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Token-Cost' },
+          { name: 'Intent', value: 'Upgrade-Name' },
+          { name: 'Name', value: 'test-name' },
+        ],
+      },
+      buyRecordResult.Memory,
+    );
+
+    const tokenCost = JSON.parse(upgradeNameResult.Messages[0].Data);
+    assert.equal(tokenCost, 2500000000);
   });
 
   it('should get registration fees', async () => {
@@ -347,7 +379,7 @@ describe('ArNS', async () => {
   });
 
   it('should get the costs increase undername correctly', async () => {
-    const buyUndernameResult = await handle({
+    const buyRecordResult = await handle({
       Tags: [
         { name: 'Action', value: 'Buy-Record' },
         { name: 'Name', value: 'test-name' },
@@ -356,6 +388,13 @@ describe('ArNS', async () => {
         { name: 'Process-Id', value: ''.padEnd(43, 'a') },
       ],
     });
+
+    // assert no error tag
+    const buyRecordErrorTag = buyRecordResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.equal(buyRecordErrorTag, undefined);
+
     const result = await handle(
       {
         Tags: [
@@ -365,14 +404,46 @@ describe('ArNS', async () => {
           { name: 'Quantity', value: '1' },
         ],
       },
-      buyUndernameResult.Memory,
+      buyRecordResult.Memory,
     );
     const tokenCost = JSON.parse(result.Messages[0].Data);
     const expectedPrice = 500000000 * 0.001 * 1 * 1;
     assert.equal(tokenCost, expectedPrice);
   });
 
-  it('should get the cost of increasing a lease correctly', async () => {
+  it('should get the cost of extending a lease correctly', async () => {
+    const buyRecordResult = await handle({
+      Tags: [
+        { name: 'Action', value: 'Buy-Record' },
+        { name: 'Name', value: 'test-name' },
+        { name: 'Purchase-Type', value: 'lease' },
+        { name: 'Years', value: '1' },
+        { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+      ],
+    });
+
+    // assert no error tag
+    const buyRecordErrorTag = buyRecordResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.equal(buyRecordErrorTag, undefined);
+
+    const result = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Token-Cost' },
+          { name: 'Intent', value: 'Extend-Lease' },
+          { name: 'Name', value: 'test-name' },
+          { name: 'Years', value: '2' },
+        ],
+      },
+      buyRecordResult.Memory,
+    );
+    const tokenCost = JSON.parse(result.Messages[0].Data);
+    assert.equal(tokenCost, 200000000); // known cost for extending a 9 character name by 2 years (500 IO * 0.2 * 2)
+  });
+
+  it('should properly handle extending a leased record', async () => {
     const buyUndernameResult = await handle({
       Tags: [
         { name: 'Action', value: 'Buy-Record' },
