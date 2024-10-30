@@ -362,7 +362,10 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = ActionMap.Transfer .. "-Notice", Error = "Transfer-Error" },
+			Tags = {
+				Action = "Invalid-" .. ActionMap.Transfer .. "-Notice",
+				Error = "Bad-Input",
+			},
 			Data = tostring(error),
 		})
 	end, checkAssertions)
@@ -378,7 +381,7 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = ActionMap.Transfer .. "-Notice", Error = "Transfer-Error" },
+			Tags = { Action = "Invalid-" .. ActionMap.Transfer .. "-Notice", Error = "Transfer-Error" },
 			Data = tostring(error),
 		})
 	end, balances.transfer, recipient, from, quantity)
@@ -735,7 +738,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 		ao.send({
 			Target = msg.From,
 			Tags = {
-				Action = ActionMap.BuyRecord .. "-Notice",
+				Action = "Invalid-" .. ActionMap.BuyRecord .. "-Notice",
 				Error = "Invalid-" .. ActionMap.BuyRecord,
 			},
 			Data = tostring(error),

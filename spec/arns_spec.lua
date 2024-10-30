@@ -1,7 +1,6 @@
 local testProcessId = "NdZ3YRwMB2AMwwFYjKn1g88Y9nRybTo0qhS1ORq_E7g"
 local constants = require("constants")
 local arns = require("arns")
-local balances = require("balances")
 local demand = require("demand")
 local utils = require("utils")
 local Auction = require("auctions")
@@ -58,9 +57,9 @@ describe("arns", function()
 							startTimestamp = 0,
 							endTimestamp = timestamp + constants.oneYearMs * 1,
 						},
-					}, arns.getRecords())
-					assert.are.equal(_G.Balances[testAddress], startBalance - 600000000)
-					assert.are.equal(balances.getBalance(_G.ao.id), 600000000)
+					}, _G.NameRegistry.records)
+					assert.are.equal(startBalance - 600000000, _G.Balances[testAddress])
+					assert.are.equal(600000000, _G.Balances[_G.ao.id])
 					assert.are.equal(demandBefore + 600000000, demand.getCurrentPeriodRevenue())
 					assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 				end
@@ -147,7 +146,7 @@ describe("arns", function()
 					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
 				assert.is_false(status)
 				assert.match("Name is reserved", result)
-				assert.are.same({}, arns.getRecords())
+				assert.are.same({}, _G.NameRegistry.records)
 				assert.are.same(reservedName, _G.NameRegistry.reserved["test-name"])
 			end)
 
@@ -170,7 +169,7 @@ describe("arns", function()
 				}
 				assert.is_true(status)
 				assert.are.same(expectation, result.record)
-				assert.are.same({ ["test-name"] = expectation }, arns.getRecords())
+				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
 
 				assert.is.equal(
 					_G.Balances[testAddress],
@@ -194,7 +193,7 @@ describe("arns", function()
 					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
 				assert.is_false(status)
 				assert.match("Insufficient balance", result)
-				assert.are.same(arns.getRecords(), _G.NameRegistry.records)
+				assert.are.same({}, _G.NameRegistry.records)
 			end)
 
 			it("should throw an error if the name is in auction [" .. addressType .. "]", function()
@@ -205,7 +204,7 @@ describe("arns", function()
 					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
 				assert.is_false(status)
 				assert.match("Name is in auction", result)
-				assert.are.same(arns.getRecords(), _G.NameRegistry.records)
+				assert.are.same({}, _G.NameRegistry.records)
 			end)
 
 			it("should throw an error if the name looks like a wallet address [" .. addressType .. "]", function()
@@ -213,7 +212,7 @@ describe("arns", function()
 					pcall(arns.buyRecord, testAddress, "lease", 1, testAddress, timestamp, testProcessId)
 				assert.is_false(status)
 				assert.match("Name cannot be a wallet address", result)
-				assert.are.same(arns.getRecords(), _G.NameRegistry.records)
+				assert.are.same({}, _G.NameRegistry.records)
 			end)
 		end)
 
@@ -277,7 +276,7 @@ describe("arns", function()
 				}
 				assert.is_true(status)
 				assert.are.same(expectation, result.record)
-				assert.are.same({ ["test-name"] = expectation }, arns.getRecords())
+				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
 
 				assert.is.equal(
 					_G.Balances[testAddress],
@@ -387,7 +386,7 @@ describe("arns", function()
 						type = "lease",
 						undernameLimit = 10,
 					},
-				}, arns.getRecords())
+				}, _G.NameRegistry.records)
 
 				assert.is.equal(
 					_G.Balances[testAddress],
