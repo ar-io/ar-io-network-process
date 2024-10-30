@@ -2497,73 +2497,84 @@ end)
 -- AUCTION HANDLER
 addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.ReleaseName), function(msg)
 	-- validate the name and process id exist, then create the auction using the auction function
-	local name = msg.Tags.Name
-	local processId = msg.From
+	local name = string.lower(msg.Tags.Name)
+	local processId = utils.formatAddress(msg.From)
 	local record = arns.getRecord(name)
-	local initiator = msg.Tags.Initiator
+	local initiator = utils.formatAddress(msg.Tags.Initiator or msg.From)
+	local timestamp = tonumber(msg.Timestamp)
 
-	-- TODO: validate processId and initiator are valid addresses
-	if not record then
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
-			Error = "Record-Not-Found",
-		})
-		return
+	local checkAssertions = function()
+		assert(name and #name > 0, "Name is required")
+		assert(processId and utils.isValidAOAddress(processId), "Process-Id is required")
+		assert(initiator and utils.isValidAOAddress(initiator), "Initiator is required")
+		assert(record, "Record not found")
+		assert(record.type == "permabuy", "Only permabuy names can be released")
+		assert(record.processId == processId, "Process-Id mismatch")
 	end
 
-	if record.processId ~= processId then
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
-			Error = "Process-Id-Mismatch",
+			Error = "Bad-Input",
+			Data = tostring(error),
 		})
 		return
-	end
-
-	if record.type ~= "permabuy" then
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
-			Error = "Invalid-Record-Type",
-			-- only permabought names can be released by the process that owns the name
-		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
 	-- we should be able to create the auction here
-	local status, auctionOrError = pcall(arns.createAuction, name, tonumber(msg.Timestamp), initiator)
-	if not status then
+	local status, auctionData = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
 			Error = "Auction-Creation-Error",
-			Data = tostring(auctionOrError),
+			Data = tostring(error),
+		})
+		return
+	end, arns.createAuction, name, timestamp, initiator)
+
+	if not status or not auctionData then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
+			Error = "Auction-Creation-Error",
+			Data = tostring(auctionData),
 		})
 		return
 	end
 
-	if not auctionOrError or not auctionOrError.name then
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
-			Error = "Auction-Creation-Error",
-			Data = tostring(auctionOrError),
-		})
-		return
-	end
+	-- add the auction result fields
+	addAuctionResultFields(msg.ioEvent, {
+		name = name,
+		auction = auctionData,
+	})
+
+	-- note: no change to token supply here - only on auction bids
+	msg.ioEvent:addField("Auctions-Count", utils.lengthOfTable(NameRegistry.auctions))
+	msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
 
 	local auction = {
-		name = auctionOrError.name,
-		startTimestamp = auctionOrError.startTimestamp,
-		endTimestamp = auctionOrError.endTimestamp,
-		initiator = auctionOrError.initiator,
-		baseFee = auctionOrError.baseFee,
-		demandFactor = auctionOrError.demandFactor,
-		settings = auctionOrError.settings,
+		name = name,
+		startTimestamp = auctionData.startTimestamp,
+		endTimestamp = auctionData.endTimestamp,
+		initiator = auctionData.initiator,
+		baseFee = auctionData.baseFee,
+		demandFactor = auctionData.demandFactor,
+		settings = auctionData.settings,
 	}
+
+	-- send to the initiator and the process that released the name
 	ao.send({
-		Target = msg.From,
+		Target = initiator,
+		Action = "Auction-Notice",
+		Name = name,
+		Data = json.encode(auction),
+	})
+	ao.send({
+		Target = processId,
 		Action = "Auction-Notice",
 		Name = name,
 		Data = json.encode(auction),
