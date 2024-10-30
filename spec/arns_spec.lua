@@ -194,7 +194,26 @@ describe("arns", function()
 					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
 				assert.is_false(status)
 				assert.match("Insufficient balance", result)
-				assert.are.same({}, arns.getRecords())
+				assert.are.same(arns.getRecords(), _G.NameRegistry.records)
+			end)
+
+			it("should throw an error if the name is in auction [" .. addressType .. "]", function()
+				_G.NameRegistry.auctions["test-name"] = {
+					endTimestamp = timestamp + constants.oneYearMs,
+				}
+				local status, result =
+					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
+				assert.is_false(status)
+				assert.match("Name is in auction", result)
+				assert.are.same(arns.getRecords(), _G.NameRegistry.records)
+			end)
+
+			it("should throw an error if the name looks like a wallet address [" .. addressType .. "]", function()
+				local status, result =
+					pcall(arns.buyRecord, testAddress, "lease", 1, testAddress, timestamp, testProcessId)
+				assert.is_false(status)
+				assert.match("Name cannot be a wallet address", result)
+				assert.are.same(arns.getRecords(), _G.NameRegistry.records)
 			end)
 		end)
 
