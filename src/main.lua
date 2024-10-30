@@ -138,6 +138,25 @@ local function addRecordResultFields(ioEvent, result)
 	end
 end
 
+local function addAuctionResultFields(ioEvent, result)
+	ioEvent:addFieldsIfExist(result, {
+		"bidAmount",
+		"bidder",
+		"rewardForInitiator",
+		"rewardForProtocol",
+		-- TODO: we could return some computed values of the bid relative to start and end price
+	})
+	ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
+	ioEvent:addFieldsIfExist(result.auction, {
+		"name",
+		"initiator",
+		"startTimestamp",
+		"endTimestamp",
+		"baseFee",
+		"demandFactor",
+	})
+end
+
 local function addSupplyData(ioEvent, supplyData)
 	supplyData = supplyData or {}
 	ioEvent:addField("Circulating-Supply", supplyData.circulatingSupply or LastKnownCirculatingSupply)
@@ -2695,71 +2714,70 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 				years = years or 1
 			end
 		end
+
+		local auction = arns.getAuction(name)
+		assert(auction, "Auction not found")
 	end
 
-	local validateStatus, errorMessage = pcall(checkAssertions)
-	if not validateStatus then
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
-			Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice",
-			Error = "Bad-Input",
-			Data = tostring(errorMessage),
+			Tags = { Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
-	local auction = arns.getAuction(name)
-	if not auction then
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
-			Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice",
-			Error = "Auction-Not-Found",
+			Tags = { Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice", Error = "Auction-Bid-Error" },
+			Data = tostring(error),
 		})
+	end, arns.submitAuctionBid, name, bidAmount, bidder, timestamp, processId, type, years)
+	if not shouldContinue2 then
 		return
 	end
 
-	local status, auctionBidOrError =
-		pcall(arns.submitAuctionBid, name, bidAmount, bidder, timestamp, processId, type, years)
-	if not status then
+	if result ~= nil then
+		local record = result.record
+		addAuctionResultFields(msg.ioEvent, result)
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply - record.purchasePrice
+		addSupplyData(msg.ioEvent)
+
+		msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
+		msg.ioEvent:addField("Auctions-Count", utils.lengthOfTable(NameRegistry.auctions))
+		-- send buy record notice and auction close notice
 		ao.send({
-			Target = msg.From,
-			Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice",
-			Error = "Auction-Bid-Error",
-			Data = tostring(auctionBidOrError),
+			Target = result.bidder,
+			Action = ActionMap.BuyRecord .. "-Notice",
+			Data = json.encode({
+				name = name,
+				startTimestamp = record.startTimestamp,
+				endTimestamp = record.endTimestamp,
+				undernameLimit = record.undernameLimit,
+				purchasePrice = record.purchasePrice,
+				processId = record.processId,
+				type = record.type,
+			}),
 		})
-		return
+
+		ao.send({
+			Target = result.auction.initiator,
+			Action = "Debit-Notice",
+			Quantity = tostring(result.rewardForInitiator),
+			Data = json.encode({
+				name = name,
+				bidder = result.bidder,
+				bidAmount = result.bidAmount,
+				rewardForInitiator = result.rewardForInitiator,
+				rewardForProtocol = result.rewardForProtocol,
+				record = result.record,
+			}),
+		})
 	end
-
-	local record = auctionBidOrError.record
-
-	-- send buy record notice and auction close notice
-	ao.send({
-		Target = bidder,
-		Action = ActionMap.BuyRecord .. "-Notice",
-		Data = json.encode({
-			name = name,
-			startTimestamp = record.startTimestamp,
-			endTimestamp = record.endTimestamp,
-			undernameLimit = record.undernameLimit,
-			purchasePrice = record.purchasePrice,
-			processId = record.processId,
-			type = record.type,
-		}),
-	})
-
-	ao.send({
-		Target = auction.initiator,
-		Action = "Debit-Notice",
-		Quantity = tostring(auctionBidOrError.rewardForInitiator),
-		Data = json.encode({
-			name = name,
-			bidder = auctionBidOrError.bidder,
-			bidAmount = auctionBidOrError.bidAmount,
-			rewardForInitiator = auctionBidOrError.rewardForInitiator,
-			rewardForProtocol = auctionBidOrError.rewardForProtocol,
-			record = record,
-		}),
-	})
 end)
 
 return process

@@ -540,6 +540,15 @@ function arns.getAuctions()
 	return NameRegistry.auctions or {}
 end
 
+--- Submits a bid to an auction
+--- @param name string The name of the auction
+--- @param bidAmount number The amount of the bid
+--- @param bidder string The address of the bidder
+--- @param timestamp number The timestamp of the bid
+--- @param processId string The processId of the bid
+--- @param type string The type of the bid
+--- @param years number The number of years for the bid
+--- @return table The result of the bid including the auction, bidder, bid amount, reward for initiator, reward for protocol, and record
 function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, type, years)
 	local auction = arns.getAuction(name)
 	if not auction then
