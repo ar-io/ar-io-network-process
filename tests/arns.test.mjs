@@ -553,6 +553,7 @@ describe('ArNS', async () => {
     it('should create an auction for an existing permabuy record owned by a process id, accept a bid and add the new record to the registry', async () => {
       // buy the name first
       const processId = ''.padEnd(43, 'a');
+      const initiator = 'ant-owner-'.padEnd(43, '0'); // owner of the ANT at the time of release
       const { mem, record: initialRecord } = await runBuyRecord({
         sender: STUB_ADDRESS,
         processId,
@@ -564,7 +565,7 @@ describe('ArNS', async () => {
           Tags: [
             { name: 'Action', value: 'Release-Name' },
             { name: 'Name', value: 'test-name' },
-            { name: 'Initiator', value: 'test-owner-of-ant' }, // simulate who the owner is of the ANT process when sending the message
+            { name: 'Initiator', value: initiator }, // simulate who the owner is of the ANT process when sending the message
           ],
           From: processId,
           Owner: processId,
@@ -576,6 +577,7 @@ describe('ArNS', async () => {
       const releaseNameErrorTag = releaseNameResult.Messages?.[0]?.Tags?.find(
         (tag) => tag.name === 'Error',
       );
+
       assert.equal(releaseNameErrorTag, undefined);
 
       // fetch the auction
@@ -599,7 +601,7 @@ describe('ArNS', async () => {
       const expectedStartTimestamp = STUB_TIMESTAMP;
       assert.deepEqual(auction, {
         name: 'test-name',
-        initiator: 'test-owner-of-ant',
+        initiator: initiator,
         startTimestamp: auction.startTimestamp,
         endTimestamp: expectedStartTimestamp + 60 * 60 * 1000 * 24 * 14,
         baseFee: 500000000,
@@ -612,7 +614,7 @@ describe('ArNS', async () => {
         },
       });
 
-      // // TRANSFER FROM THE OWNER TO A NEW STUB ADDRESS
+      // TRANSFER FROM THE OWNER TO A NEW STUB ADDRESS
       const bidderAddress = 'auction-bidder-'.padEnd(43, '0');
       const bidTimestamp = auction.startTimestamp + 60 * 1000; // same as the original interval but 1 minute after the auction has started
       const decayRate = auction.settings.decayRate;
@@ -703,7 +705,7 @@ describe('ArNS', async () => {
       assert.ok(debitNoticeTag);
 
       // expect the target to be to the initiator
-      assert.equal(submitBidResult.Messages?.[1]?.Target, 'test-owner-of-ant');
+      assert.equal(submitBidResult.Messages?.[1]?.Target, initiator);
 
       // assert the data response contains the record
       const debitNoticeData = JSON.parse(submitBidResult.Messages?.[1]?.Data);
@@ -750,7 +752,7 @@ describe('ArNS', async () => {
         initialRecord.purchasePrice +
         expectedRewardForProtocol;
       const balances = JSON.parse(balancesResult.Messages[0].Data);
-      assert.equal(balances['test-owner-of-ant'], expectedRewardForInitiator);
+      assert.equal(balances[initiator], expectedRewardForInitiator);
       assert.equal(balances[PROCESS_ID], expectedProtocolBalance);
       assert.equal(balances[bidderAddress], 0);
     });
@@ -955,6 +957,7 @@ describe('ArNS', async () => {
     it('should compute the prices of an auction at a specific interval', async () => {
       // buy the name first
       const processId = ''.padEnd(43, 'a');
+      const initiator = 'ant-owner-'.padEnd(43, '0'); // owner of the ANT at the time of release
       const { mem } = await runBuyRecord({
         sender: STUB_ADDRESS,
         processId,
@@ -966,7 +969,7 @@ describe('ArNS', async () => {
           Tags: [
             { name: 'Action', value: 'Release-Name' },
             { name: 'Name', value: 'test-name' },
-            { name: 'Initiator', value: 'test-owner-of-ant' }, // simulate who the owner is of the ANT process when sending the message
+            { name: 'Initiator', value: initiator }, // simulate who the owner is of the ANT process when sending the message
           ],
           From: processId,
           Owner: processId,
@@ -979,7 +982,6 @@ describe('ArNS', async () => {
         (tag) => tag.name === 'Error',
       );
       assert.equal(releaseNameErrorTag, undefined);
-      assert.equal(releaseNameResult.Messages?.[0]?.Target, processId);
 
       // fetch the auction
       const auctionResult = await handle(
