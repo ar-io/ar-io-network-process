@@ -681,6 +681,95 @@ describe('GatewayRegistry', async () => {
     });
   });
 
+  describe('Cancel-Withdrawal', () => {
+    it('should allow canceling a gateway withdrawal', async () => {
+      const decreaseStakeTimestamp = stubbedTimestamp + 1000 * 60 * 15; // 15 minutes after stubbedTimestamp
+      const decreaseStakeQuantity = 5_000_000_000;
+      const decreaseStakeResult = await handle(
+        {
+          From: STUB_ADDRESS,
+          Owner: STUB_ADDRESS,
+          Timestamp: decreaseStakeTimestamp,
+          Id: ''.padEnd(43, 'x'),
+          Tags: [
+            { name: 'Action', value: 'Decrease-Operator-Stake' },
+            { name: 'Quantity', value: decreaseStakeQuantity.toString() }, // 5K IO
+          ],
+        },
+        sharedMemory,
+      );
+
+      // assert no error tag
+      const errorTag = decreaseStakeResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.Name === 'Error',
+      );
+      assert.strictEqual(errorTag, undefined);
+
+      const cancelWithdrawalTimestamp = decreaseStakeTimestamp + 1000 * 60 * 60; // 60 minutes after stubbedTimestamp
+      const cancelWithdrawalResult = await handle(
+        {
+          From: STUB_ADDRESS,
+          Owner: STUB_ADDRESS,
+          Timestamp: cancelWithdrawalTimestamp,
+          Tags: [
+            { name: 'Action', value: 'Cancel-Withdrawal' },
+            { name: 'Address', value: STUB_ADDRESS },
+            { name: 'Vault-Id', value: ''.padEnd(43, 'x') },
+          ],
+        },
+        decreaseStakeResult.Memory,
+      );
+
+      // assert no error tag
+      const cancelErrorTag = cancelWithdrawalResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.Name === 'Error',
+      );
+      assert.strictEqual(cancelErrorTag, undefined);
+
+      // check the gateway record from contract
+      const gateway = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Gateway' },
+            { name: 'Address', value: STUB_ADDRESS },
+          ],
+        },
+        cancelWithdrawalResult.Memory,
+      );
+      const gatewayData = JSON.parse(gateway.Messages[0].Data);
+      assert.deepStrictEqual(gatewayData, {
+        observerAddress: STUB_ADDRESS,
+        operatorStake: 100_000_000_000, // matches the initial operator stake from the test setup
+        totalDelegatedStake: 0,
+        status: 'joined',
+        delegates: [],
+        vaults: [],
+        startTimestamp: STUB_TIMESTAMP,
+        settings: {
+          label: 'test-gateway',
+          note: 'test-note',
+          fqdn: 'test-fqdn',
+          port: 443,
+          protocol: 'https',
+          allowDelegatedStaking: true,
+          minDelegatedStake: 500_000_000,
+          delegateRewardShareRatio: 25,
+          properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
+          autoStake: true,
+        },
+        stats: {
+          passedConsecutiveEpochs: 0,
+          failedConsecutiveEpochs: 0,
+          totalEpochCount: 0,
+          failedEpochCount: 0,
+          passedEpochCount: 0,
+          prescribedEpochCount: 0,
+          observedEpochCount: 0,
+        },
+      });
+    });
+  });
+
   // leave network
   describe('Leave-Network', () => {
     it('should allow leaving the network', async () => {
@@ -855,14 +944,14 @@ describe('GatewayRegistry', async () => {
       sharedMemory = decreaseStakeResult.Memory;
     });
 
-    it('should allow canceling a withdrawal', async () => {
+    it('should allow canceling a delegate withdrawal', async () => {
       const cancelWithdrawalTimestamp = STUB_TIMESTAMP + 1000 * 60 * 30; // 30 minutes after stubbedTimestamp
       const cancelWithdrawalResult = await handle(
         {
           From: newStubAddress,
           Owner: newStubAddress,
           Tags: [
-            { name: 'Action', value: 'Cancel-Delegate-Withdrawal' },
+            { name: 'Action', value: 'Cancel-Withdrawal' },
             { name: 'Address', value: STUB_ADDRESS },
             { name: 'Vault-Id', value: ''.padEnd(43, 'x') },
           ],

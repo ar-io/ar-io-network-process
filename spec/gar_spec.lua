@@ -1678,8 +1678,53 @@ describe("gar", function()
 		end)
 	end)
 
-	describe("cancelDelegateWithdrawal", function()
-		it("should cancel a withdrawal", function()
+	describe("cancelGatewayWithdrawal", function()
+		it("should cancel a gateway withdrawal", function()
+			_G.GatewayRegistry[stubGatewayAddress] = testGateway
+			_G.GatewayRegistry[stubGatewayAddress].vaults["some-previous-withdrawal-id"] = {
+				balance = 25000000000,
+				startTimestamp = 0,
+				endTimestamp = 1000,
+			}
+			local result =
+				gar.cancelGatewayWithdrawal(stubGatewayAddress, stubGatewayAddress, "some-previous-withdrawal-id")
+			assert.are.same({
+				totalDelegatedStake = testGateway.totalDelegatedStake,
+				totalOperatorStake = 75000000000,
+				previousTotalDelegatedStake = testGateway.totalDelegatedStake,
+				previousOperatorStake = 50000000000,
+				gateway = _G.GatewayRegistry[stubGatewayAddress],
+				vaultBalance = 25000000000,
+			}, result)
+			assert.are.equal(nil, _G.GatewayRegistry[stubGatewayAddress].vaults["some-previous-withdrawal-id"])
+		end)
+		it("should not cancel a gateway withdrawl if the gateway is leaving", function()
+			_G.GatewayRegistry[stubGatewayAddress] = testGateway
+			_G.GatewayRegistry[stubGatewayAddress].status = "leaving"
+			local status, err = pcall(
+				gar.cancelGatewayWithdrawal,
+				stubGatewayAddress,
+				stubGatewayAddress,
+				"some-previous-withdrawal-id"
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Gateway is leaving the network and cannot cancel withdrawals.", err)
+		end)
+		it("should not cancel a gateway withdrawl if the vault id is not found", function()
+			_G.GatewayRegistry[stubGatewayAddress] = testGateway
+			_G.GatewayRegistry[stubGatewayAddress].status = "joined"
+			local status, err = pcall(
+				gar.cancelGatewayWithdrawal,
+				stubGatewayAddress,
+				stubGatewayAddress,
+				"some-non-existent-withdrawal-id"
+			)
+			assert.is_false(status)
+			assert.is_not_nil(err)
+			assert.matches("Vault not found", err)
+		end)
+		it("should cancel a delegate withdrawal", function()
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
 			_G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake = 0
 			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = {
@@ -1692,21 +1737,17 @@ describe("gar", function()
 					},
 				},
 			}
-			local status, result = pcall(
-				gar.cancelDelegateWithdrawal,
-				stubRandomAddress,
-				stubGatewayAddress,
-				"some-previous-withdrawal-id"
-			)
-			assert.is_true(status)
-			assert.are.same(result, {
+			-- do not use pcall so test throws error if it fails
+			local result =
+				gar.cancelGatewayWithdrawal(stubRandomAddress, stubGatewayAddress, "some-previous-withdrawal-id")
+			assert.are.same({
 				totalDelegatedStake = 1000,
-				delegate = {
-					delegatedStake = 1000,
-					vaults = {},
-				},
+				totalOperatorStake = 50000000000,
+				previousTotalDelegatedStake = 0,
+				previousOperatorStake = 50000000000,
+				gateway = _G.GatewayRegistry[stubGatewayAddress],
 				vaultBalance = 1000,
-			})
+			}, result)
 			-- assert the vault is removed and the delegated stake is added back to the delegate
 			assert.are.equal(
 				1000, -- added back to the delegate
@@ -1718,7 +1759,7 @@ describe("gar", function()
 			)
 			assert.are.equal(1000, _G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
 		end)
-		it("should not cancel a withdrawal if the gateway does not allow staking", function()
+		it("should not cancel a delegate withdrawal if the gateway does not allow staking", function()
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
 			_G.GatewayRegistry[stubGatewayAddress].settings.allowDelegatedStaking = false
 			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = {
@@ -1731,12 +1772,8 @@ describe("gar", function()
 					},
 				},
 			}
-			local status, err = pcall(
-				gar.cancelDelegateWithdrawal,
-				stubRandomAddress,
-				stubGatewayAddress,
-				"some-previous-withdrawal-id"
-			)
+			local status, err =
+				pcall(gar.cancelGatewayWithdrawal, stubRandomAddress, stubGatewayAddress, "some-previous-withdrawal-id")
 			assert.is_false(status)
 			assert.is_not_nil(err)
 			assert.matches("Gateway does not allow staking", err)
@@ -1751,21 +1788,17 @@ describe("gar", function()
 				},
 			}, _G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress])
 		end)
-		it("should not cancel a withdrawal if the delegate not found", function()
+		it("should not cancel a delegate withdrawal if the delegate is not found", function()
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
 			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = nil
 			_G.GatewayRegistry[stubGatewayAddress].settings.allowDelegatedStaking = true
-			local status, err = pcall(
-				gar.cancelDelegateWithdrawal,
-				stubRandomAddress,
-				stubGatewayAddress,
-				"some-previous-withdrawal-id"
-			)
+			local status, err =
+				pcall(gar.cancelGatewayWithdrawal, stubRandomAddress, stubGatewayAddress, "some-previous-withdrawal-id")
 			assert.is_false(status)
 			assert.is_not_nil(err)
 			assert.matches("Delegate not found", err)
 		end)
-		it("should not cancel a withdrawal if the withdrawal not found", function()
+		it("should not cancel a delegate withdrawal if the withdrawal is not found", function()
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
 			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = {
 				delegatedStake = 0,
@@ -1773,17 +1806,13 @@ describe("gar", function()
 				startTimestamp = 0,
 			}
 			_G.GatewayRegistry[stubGatewayAddress].settings.allowDelegatedStaking = true
-			local status, err = pcall(
-				gar.cancelDelegateWithdrawal,
-				stubRandomAddress,
-				stubGatewayAddress,
-				"some-previous-withdrawal-id"
-			)
+			local status, err =
+				pcall(gar.cancelGatewayWithdrawal, stubRandomAddress, stubGatewayAddress, "some-previous-withdrawal-id")
 			assert.is_false(status)
 			assert.is_not_nil(err)
 			assert.matches("Vault not found", err)
 		end)
-		it("should not cancel a withdrawal if the gateway is leaving", function()
+		it("should not cancel a delegate withdrawal if the gateway is leaving", function()
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
 			_G.GatewayRegistry[stubGatewayAddress].settings.allowDelegatedStaking = true
 			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = {
@@ -1798,42 +1827,16 @@ describe("gar", function()
 				startTimestamp = 0,
 			}
 			_G.GatewayRegistry[stubGatewayAddress].status = "leaving"
-			local status, err = pcall(
-				gar.cancelDelegateWithdrawal,
-				stubRandomAddress,
-				stubGatewayAddress,
-				"some-previous-withdrawal-id"
-			)
+			local status, err =
+				pcall(gar.cancelGatewayWithdrawal, stubRandomAddress, stubGatewayAddress, "some-previous-withdrawal-id")
 			assert.is_false(status)
 			assert.is_not_nil(err)
 			assert.matches("Gateway is leaving the network and cannot cancel withdrawals.", err)
 		end)
-		it("should not cancel a withdrawal if the withdrawal is not found", function()
-			_G.GatewayRegistry[stubGatewayAddress] = testGateway
-			_G.GatewayRegistry[stubGatewayAddress].status = "joined"
-			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = {
-				delegatedStake = 0,
-				vaults = {},
-				startTimestamp = 0,
-			}
-			local status, err = pcall(
-				gar.cancelDelegateWithdrawal,
-				stubRandomAddress,
-				stubGatewayAddress,
-				"some-previous-withdrawal-id"
-			)
-			assert.is_false(status)
-			assert.is_not_nil(err)
-			assert.matches("Vault not found", err)
-		end)
-		it("should not cancel a withdrawal if the Gateway not found", function()
+		it("should not cancel a delegate withdrawal if the gateway is not found", function()
 			_G.GatewayRegistry[stubGatewayAddress] = nil
-			local status, err = pcall(
-				gar.cancelDelegateWithdrawal,
-				stubRandomAddress,
-				stubGatewayAddress,
-				"some-previous-withdrawal-id"
-			)
+			local status, err =
+				pcall(gar.cancelGatewayWithdrawal, stubRandomAddress, stubGatewayAddress, "some-previous-withdrawal-id")
 			assert.is_false(status)
 			assert.is_not_nil(err)
 			assert.matches("Gateway not found", err)
