@@ -403,15 +403,13 @@ describe("arns", function()
 
 		describe("calculateLeaseFee [" .. addressType .. "]", function()
 			it("should return the correct fee for a lease", function()
-				local name = "test-name" -- 9 character name
-				local baseFee = demand.getFees()[#name] -- base fee is 500 IO
+				local baseFee = 500000000 -- base fee is 500 IO
 				local fee = arns.calculateRegistrationFee("lease", baseFee, 1, 1)
 				assert.are.equal(600000000, fee)
 			end)
 
 			it("should return the correct fee for a permabuy [" .. addressType .. "]", function()
-				local name = "test-name" -- 9 character name
-				local baseFee = demand.getFees()[#name] -- base fee is 500 IO
+				local baseFee = 500000000 -- base fee is 500 IO
 				local fee = arns.calculateRegistrationFee("permabuy", baseFee, 1, 1)
 				local expected = (baseFee * 0.2 * 20) + baseFee
 				assert.are.equal(expected, fee)
@@ -843,6 +841,87 @@ describe("arns", function()
 						.. " Last provided: "
 						.. lastProvidedPrice
 				)
+			end)
+		end)
+
+		describe("upgradeRecord", function()
+			it("should upgrade a leased record to a permabuy", function()
+				_G.NameRegistry.records["upgrade-name"] = {
+					endTimestamp = 1000000,
+					processId = "test-process-id",
+					purchasePrice = 1000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}
+				_G.Balances[testAddressArweave] = 2500000000
+				local updatedRecord = arns.upgradeRecord(testAddressArweave, "upgrade-name", 1000000)
+				assert.are.same({
+					name = "upgrade-name",
+					record = {
+						endTimestamp = nil,
+						processId = "test-process-id",
+						purchasePrice = 2500000000,
+						startTimestamp = 0,
+						type = "permabuy",
+						undernameLimit = 10,
+					},
+					totalUpgradeFee = 2500000000,
+					baseRegistrationFee = 500000000,
+					remainingBalance = 0,
+					protocolBalance = 2500000000,
+					df = demand.getDemandFactorInfo(),
+				}, updatedRecord)
+			end)
+
+			it("should throw an error if the name is not registered", function()
+				local status, error = pcall(arns.upgradeRecord, testAddressArweave, "upgrade-name", 1000000)
+				assert.is_false(status)
+				assert.match("Name is not registered", error)
+			end)
+
+			it("should throw an error if the record is already a permabuy", function()
+				_G.NameRegistry.records["upgrade-name"] = {
+					endTimestamp = nil,
+					processId = "test-process-id",
+					purchasePrice = 1000000,
+					startTimestamp = 0,
+					type = "permabuy",
+					undernameLimit = 10,
+				}
+				local status, error = pcall(arns.upgradeRecord, testAddressArweave, "upgrade-name", 1000000)
+				assert.is_false(status)
+				assert.match("Record is already a permabuy", error)
+			end)
+
+			it("should throw an error if the record is expired", function()
+				local currentTimestamp = 1000000 + constants.gracePeriodMs + 1
+				_G.NameRegistry.records["upgrade-name"] = {
+					endTimestamp = 1000000,
+					processId = "test-process-id",
+					purchasePrice = 1000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}
+				local status, error = pcall(arns.upgradeRecord, testAddressArweave, "upgrade-name", currentTimestamp)
+				assert.is_false(status)
+				assert.match("Name is expired", error)
+			end)
+
+			it("should throw an error if the sender does not have enough balance", function()
+				_G.NameRegistry.records["upgrade-name"] = {
+					endTimestamp = 1000000,
+					processId = "test-process-id",
+					purchasePrice = 1000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}
+				_G.Balances[testAddressArweave] = 2500000000 - 1 -- 1 less than the upgrade cost
+				local status, error = pcall(arns.upgradeRecord, testAddressArweave, "upgrade-name", 1000000)
+				assert.is_false(status)
+				assert.match("Insufficient balance", error)
 			end)
 		end)
 

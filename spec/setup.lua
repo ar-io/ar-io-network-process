@@ -1,8 +1,8 @@
 package.path = "./contract/src/?.lua;" .. package.path
 
 _G.ao = {
-	send = function()
-		return true
+	send = function(val)
+		return val
 	end,
 	id = "test",
 }
