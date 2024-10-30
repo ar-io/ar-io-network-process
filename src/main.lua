@@ -82,7 +82,7 @@ local ActionMap = {
 	SaveObservations = "Save-Observations",
 	DelegateStake = "Delegate-Stake",
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
-	CancelDelegateWithdrawal = "Cancel-Delegate-Withdrawal",
+	CancelWithdrawal = "Cancel-Withdrawal",
 	InstantDelegateWithdrawal = "Instant-Delegate-Withdrawal",
 	InstantOperatorWithdrawal = "Instant-Operator-Withdrawal",
 	ReassignName = "Reassign-Name",
@@ -95,11 +95,11 @@ local ActionMap = {
 }
 
 -- Low fidelity trackers
-LastKnownCirculatingSupply = LastKnownCirculatingSupply or 0
-LastKnownLockedSupply = LastKnownLockedSupply or 0
-LastKnownStakedSupply = LastKnownStakedSupply or 0
-LastKnownDelegatedSupply = LastKnownDelegatedSupply or 0
-LastKnownWithdrawSupply = LastKnownWithdrawSupply or 0
+LastKnownCirculatingSupply = LastKnownCirculatingSupply or 0 -- total circulating supply (e.g. balances - protocol balance)
+LastKnownLockedSupply = LastKnownLockedSupply or 0 -- total vault balance across all vaults
+LastKnownStakedSupply = LastKnownStakedSupply or 0 -- total operator stake across all gateways
+LastKnownDelegatedSupply = LastKnownDelegatedSupply or 0 -- total delegated stake across all gateways
+LastKnownWithdrawSupply = LastKnownWithdrawSupply or 0 -- total withdraw supply across all gateways (gateways and delegates)
 local function lastKnownTotalTokenSupply()
 	return LastKnownCirculatingSupply
 		+ LastKnownLockedSupply
@@ -1370,72 +1370,73 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 	})
 end)
 
-addEventingHandler(
-	ActionMap.CancelDelegateWithdrawal,
-	utils.hasMatchingTag("Action", ActionMap.CancelDelegateWithdrawal),
-	function(msg)
-		local checkAssertions = function()
-			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
-			assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
-		end
+addEventingHandler(ActionMap.CancelWithdrawal, utils.hasMatchingTag("Action", ActionMap.CancelWithdrawal), function(msg)
+	local checkAssertions = function()
+		assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address or msg.From), "Invalid gateway address")
+		assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
+	end
 
-		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Invalid-Cancel-Delegate-Withdrawal-Notice", Error = "Bad-Input" },
-				Data = tostring(error),
-			})
-		end, checkAssertions)
-		if not shouldContinue then
-			return
-		end
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-Cancel-Delegate-Withdrawal-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
 
-		local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
-		local fromAddress = utils.formatAddress(msg.From)
-		local vaultId = msg.Tags["Vault-Id"]
-		msg.ioEvent:addField("Target-Formatted", gatewayAddress)
+	local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From)
+	local fromAddress = utils.formatAddress(msg.From)
+	local vaultId = msg.Tags["Vault-Id"]
+	msg.ioEvent:addField("Target-Formatted", gatewayAddress)
 
-		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Invalid-Cancel-Delegate-Withdrawal-Notice",
-					Error = "Invalid-Cancel-Delegate-Withdrawal",
-				},
-				Data = tostring(error),
-			})
-		end, gar.cancelDelegateWithdrawal, fromAddress, gatewayAddress, vaultId)
-		if not shouldContinue2 then
-			return
-		end
-
-		local delegateResult = {}
-		if result ~= nil then
-			if result.delegate ~= nil then
-				delegateResult = result.delegate
-				local newStake = delegateResult.delegatedStake
-				local vaultBalance = result.vaultBalance
-				msg.ioEvent:addField("Previous-Stake", newStake - vaultBalance)
-				msg.ioEvent:addField("New-Stake", newStake)
-				msg.ioEvent:addField("Gateway-Total-Delegated-Stake", result.totalDelegatedStake)
-
-				LastKnownDelegatedSupply = LastKnownDelegatedSupply + vaultBalance
-				LastKnownWithdrawSupply = LastKnownWithdrawSupply - vaultBalance
-				addSupplyData(msg.ioEvent)
-			end
-		end
-
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = {
-				Action = "Cancel-Delegate-Withdrawal-Notice",
-				Address = gatewayAddress,
-				["Vault-Id"] = msg.Tags["Vault-Id"],
+				Action = "Invalid-Cancel-Withdrawal-Notice",
+				Error = "Invalid-Cancel-Withdrawal",
 			},
-			Data = json.encode(delegateResult),
+			Data = tostring(error),
 		})
+	end, gar.cancelGatewayWithdrawal, fromAddress, gatewayAddress, vaultId)
+	if not shouldContinue2 then
+		return
 	end
-)
+
+	local updatedGateway = {}
+	if result ~= nil then
+		updatedGateway = result.gateway
+		local vaultBalance = result.vaultBalance
+		local previousOperatorStake = result.previousOperatorStake
+		local newOperatorStake = result.totalOperatorStake
+		local previousTotalDelegatedStake = result.previousTotalDelegatedStake
+		local newTotalDelegatedStake = result.totalDelegatedStake
+		local operatorStakeChange = newOperatorStake - previousOperatorStake
+		local delegatedStakeChange = newTotalDelegatedStake - previousTotalDelegatedStake
+		msg.ioEvent:addField("Previous-Operator-Stake", previousOperatorStake)
+		msg.ioEvent:addField("New-Operator-Stake", newOperatorStake)
+		msg.ioEvent:addField("Previous-Total-Delegated-Stake", previousTotalDelegatedStake)
+		msg.ioEvent:addField("New-Total-Delegated-Stake", newTotalDelegatedStake)
+		msg.ioEvent:addField("Stake-Amount-Withdrawn", vaultBalance)
+		LastKnownStakedSupply = LastKnownStakedSupply + operatorStakeChange
+		LastKnownDelegatedSupply = LastKnownDelegatedSupply + delegatedStakeChange
+		LastKnownWithdrawSupply = LastKnownWithdrawSupply - vaultBalance
+		addSupplyData(msg.ioEvent)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = {
+			Action = "Cancel-Withdrawal-Notice",
+			Address = gatewayAddress,
+			["Vault-Id"] = msg.Tags["Vault-Id"],
+		},
+		Data = json.encode(updatedGateway),
+	})
+end)
 
 addEventingHandler(
 	ActionMap.InstantDelegateWithdrawal,

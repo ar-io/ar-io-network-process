@@ -834,7 +834,7 @@ function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
 	return utils.paginateTableWithCursor(gatewaysArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
-function gar.cancelDelegateWithdrawal(from, gatewayAddress, vaultId)
+function gar.cancelGatewayWithdrawal(from, gatewayAddress, vaultId)
 	local gateway = gar.getGateway(gatewayAddress)
 	if gateway == nil then
 		error("Gateway not found")
@@ -844,30 +844,47 @@ function gar.cancelDelegateWithdrawal(from, gatewayAddress, vaultId)
 		error("Gateway is leaving the network and cannot cancel withdrawals.")
 	end
 
-	local delegate = gateway.delegates[from]
-	if delegate == nil then
-		error("Delegate not found")
+	local existingVault, delegate
+	local isGatewayWithdrawal = from == gatewayAddress
+	-- if the from matches the gateway address, we are cancelling the operator withdrawal
+	if isGatewayWithdrawal then
+		existingVault = gateway.vaults[vaultId]
+	else
+		delegate = gateway.delegates[from]
+		if delegate == nil then
+			error("Delegate not found")
+		end
+		existingVault = delegate.vaults[vaultId]
 	end
 
-	local vault = delegate.vaults[vaultId]
-	if vault == nil then
-		error("Vault not found")
+	if existingVault == nil then
+		error("Vault not found for " .. from .. " on " .. gatewayAddress)
 	end
 
 	-- confirm the gateway still allow staking
-	if not gateway.settings.allowDelegatedStaking then
+	if not isGatewayWithdrawal and not gateway.settings.allowDelegatedStaking then
 		error("Gateway does not allow staking")
 	end
 
-	local vaultBalance = vault.balance
-	delegate.vaults[vaultId] = nil
-	delegate.delegatedStake = delegate.delegatedStake + vaultBalance
-	gateway.totalDelegatedStake = gateway.totalDelegatedStake + vaultBalance
+	local previousOperatorStake = gateway.operatorStake
+	local previousTotalDelegatedStake = gateway.totalDelegatedStake
+	local vaultBalance = existingVault.balance
+	if isGatewayWithdrawal then
+		gateway.vaults[vaultId] = nil
+		gateway.operatorStake = gateway.operatorStake + vaultBalance
+	else
+		delegate.vaults[vaultId] = nil
+		delegate.delegatedStake = delegate.delegatedStake + vaultBalance
+		gateway.totalDelegatedStake = gateway.totalDelegatedStake + vaultBalance
+	end
 	GatewayRegistry[gatewayAddress] = gateway
 	return {
-		delegate = gar.getGateway(gatewayAddress).delegates[from],
+		previousOperatorStake = previousOperatorStake,
+		previousTotalDelegatedStake = previousTotalDelegatedStake,
+		totalOperatorStake = gateway.operatorStake,
 		totalDelegatedStake = gateway.totalDelegatedStake,
 		vaultBalance = vaultBalance,
+		gateway = gateway,
 	}
 end
 
