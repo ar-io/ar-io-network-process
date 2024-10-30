@@ -44,6 +44,10 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		error("Name is reserved")
 	end
 
+	if arns.getAuction(name) then
+		error("Name is in auction")
+	end
+
 	local newRecord = {
 		processId = processId,
 		startTimestamp = timestamp,
