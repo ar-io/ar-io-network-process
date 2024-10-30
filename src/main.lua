@@ -1408,6 +1408,7 @@ addEventingHandler(ActionMap.CancelWithdrawal, utils.hasMatchingTag("Action", Ac
 
 	local updatedGateway = {}
 	if result ~= nil then
+		updatedGateway = result.gateway
 		local vaultBalance = result.vaultBalance
 		local previousOperatorStake = result.previousOperatorStake
 		local newOperatorStake = result.totalOperatorStake

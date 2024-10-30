@@ -726,6 +726,14 @@ describe('GatewayRegistry', async () => {
       );
       assert.strictEqual(cancelErrorTag, undefined);
 
+      // ensure the result is not null
+      const updatedGateway = JSON.parse(
+        cancelWithdrawalResult.Messages[0].Data,
+      );
+      assert(updatedGateway, 'Cancel-Withdrawal result should not be null');
+      // assert the returned gateway total operator stake is the same as the initial operator stake
+      assert.strictEqual(updatedGateway.operatorStake, 100_000_000_000);
+
       // check the gateway record from contract
       const gateway = await handle(
         {
