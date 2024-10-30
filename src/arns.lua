@@ -443,6 +443,11 @@ function arns.upgradeRecord(from, name, currentTimestamp)
 	return {
 		name = name,
 		record = record,
+		totalUpgradeFee = upgradeCost,
+		baseRegistrationFee = baseFee,
+		remainingBalance = balances.getBalance(from),
+		protocolBalance = balances.getBalance(ao.id),
+		df = demand.getDemandFactorInfo(),
 	}
 end
 

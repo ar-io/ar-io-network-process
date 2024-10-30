@@ -723,53 +723,59 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 end)
 
 addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.UpgradeName), function(msg)
-	-- get the name
+	local checkAssertions = function()
+		assert(type(msg.Tags.Name) == "string", "Invalid name")
+		assert(msg.Timestamp, "Timestamp is required")
+	end
+
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.UpgradeName .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
+
 	local name = string.lower(msg.Tags.Name)
 	local from = utils.formatAddress(msg.From)
 	local timestamp = tonumber(msg.Timestamp)
 
-	if not timestamp then
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
-			Target = from,
-			Tags = { Action = "Invalid-" .. ActionMap.UpgradeName .. "-Notice", Error = "Bad-Input" },
-			Data = "Timestamp is required",
-		})
-		return
-	end
-
-	if not name then
-		ao.send({
-			Target = from,
-			Tags = { Action = "Invalid-" .. ActionMap.UpgradeName .. "-Notice", Error = "Bad-Input" },
-			Data = "Name is required",
-		})
-		return
-	end
-
-	local status, updatedRecordOrError = pcall(arns.upgradeRecord, from, name, timestamp)
-	if not status then
-		ao.send({
-			Target = from,
+			Target = msg.From,
 			Tags = {
 				Action = "Invalid-" .. ActionMap.UpgradeName .. "-Notice",
 				Error = "Invalid-" .. ActionMap.UpgradeName,
 			},
-			Data = tostring(updatedRecordOrError),
+			Data = tostring(error),
 		})
+	end, arns.upgradeRecord, from, name, timestamp)
+	if not shouldContinue2 then
 		return
+	end
+
+	local record = {}
+	if result ~= nil then
+		record = result.record
+		addRecordResultFields(msg.ioEvent, result)
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply - record.purchasePrice
+		addSupplyData(msg.ioEvent)
 	end
 
 	ao.send({
 		Target = from,
 		Tags = { Action = ActionMap.UpgradeName .. "-Notice", Name = name },
 		Data = json.encode({
-			name = updatedRecordOrError.name,
-			startTimestamp = updatedRecordOrError.record.startTimestamp,
-			endTimestamp = updatedRecordOrError.record.endTimestamp,
-			undernameLimit = updatedRecordOrError.record.undernameLimit,
-			purchasePrice = updatedRecordOrError.record.purchasePrice,
-			processId = updatedRecordOrError.record.processId,
-			type = updatedRecordOrError.record.type,
+			name = name,
+			startTimestamp = record.startTimestamp,
+			endTimestamp = record.endTimestamp,
+			undernameLimit = record.undernameLimit,
+			purchasePrice = record.purchasePrice,
+			processId = record.processId,
+			type = record.type,
 		}),
 	})
 end)

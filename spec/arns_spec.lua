@@ -866,6 +866,11 @@ describe("arns", function()
 						type = "permabuy",
 						undernameLimit = 10,
 					},
+					totalUpgradeFee = 2500000000,
+					baseRegistrationFee = 500000000,
+					remainingBalance = 0,
+					protocolBalance = 2500000000,
+					df = demand.getDemandFactorInfo(),
 				}, updatedRecord)
 			end)
 
