@@ -533,10 +533,15 @@ function arns.createAuction(name, timestamp, initiator)
 	return auction
 end
 
+--- Gets an auction by name
+--- @param name string The name of the auction
+--- @return Auction|nil The auction instance
 function arns.getAuction(name)
 	return NameRegistry.auctions[name]
 end
 
+--- Gets all auctions
+--- @return table The auctions
 function arns.getAuctions()
 	return NameRegistry.auctions or {}
 end

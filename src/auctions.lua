@@ -18,6 +18,10 @@ AuctionSettings = {
 --- @field startTimestamp number The starting timestamp for the auction
 --- @field endTimestamp number The ending timestamp for the auction
 --- @field registrationFeeCalculator function Function to calculate registration fee
+--- @field computePricesForAuction function Function to compute prices for the auction
+--- @field getPriceForAuctionAtTimestamp function Function to get the price for the auction at a given timestamp
+--- @field startPrice function Function to get the start price for the auction
+--- @field floorPrice function Function to get the floor price for the auction
 
 --- Creates a new Auction instance
 --- @param name string The name of the auction
