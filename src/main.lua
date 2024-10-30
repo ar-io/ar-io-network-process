@@ -146,6 +146,8 @@ local function addAuctionResultFields(ioEvent, result)
 		"rewardForProtocol",
 		"startPrice",
 		"floorPrice",
+		"type",
+		"years",
 	})
 	ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
 	ioEvent:addFieldsIfExist(result.auction, {

@@ -605,6 +605,8 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 		record = record,
 		floorPrice = floorPrice,
 		startPrice = startPrice,
+		type = type,
+		years = years,
 	}
 end
 
