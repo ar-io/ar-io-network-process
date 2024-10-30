@@ -433,7 +433,7 @@ function arns.upgradeRecord(from, name, currentTimestamp)
 	local demandFactor = demand.getDemandFactor()
 	local upgradeCost = arns.calculatePermabuyFee(baseFee, demandFactor)
 
-	if not utils.walletHasSufficientBalance(from, upgradeCost) then
+	if not balances.walletHasSufficientBalance(from, upgradeCost) then
 		error("Insufficient balance")
 	end
 
@@ -581,7 +581,7 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 	local finalBidAmount = math.min(requiredOrBidAmount, requiredBid)
 
 	-- check the balance of the bidder
-	if not utils.walletHasSufficientBalance(bidder, finalBidAmount) then
+	if not balances.walletHasSufficientBalance(bidder, finalBidAmount) then
 		error("Insufficient balance")
 	end
 

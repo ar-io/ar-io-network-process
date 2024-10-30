@@ -80,4 +80,8 @@ function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder)
 	return utils.paginateTableWithCursor(balancesArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
+function balances.walletHasSufficientBalance(wallet, quantity)
+	return Balances[wallet] ~= nil and Balances[wallet] >= quantity
+end
+
 return balances

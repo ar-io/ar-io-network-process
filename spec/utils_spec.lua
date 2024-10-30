@@ -290,4 +290,48 @@ describe("utils", function()
 			}, result)
 		end)
 	end)
+
+	describe("splitAndTrimString", function()
+		it("should split a comma-separated list and trim whitespace", function()
+			local input = "  apple, banana  , cherry ,   date  "
+			local result = utils.splitAndTrimString(input)
+			assert.are.same({ "apple", "banana", "cherry", "date" }, result)
+		end)
+
+		it("should split a pipe-separated list and trim whitespace", function()
+			local input = "  apple| banana  | cherry |   date  "
+			local result = utils.splitAndTrimString(input, "|")
+			assert.are.same({ "apple", "banana", "cherry", "date" }, result)
+		end)
+
+		it("should handle a single item without delimiter", function()
+			local input = "  apple  "
+			local result = utils.splitAndTrimString(input)
+			assert.are.same({ "apple" }, result)
+		end)
+
+		it("should return an empty table for an empty input string", function()
+			local input = ""
+			local result = utils.splitAndTrimString(input)
+			assert.are.same({}, result)
+		end)
+
+		it("should return an empty table for a whitespace input string", function()
+			local input = "   "
+			local result = utils.splitAndTrimString(input)
+			assert.are.same({}, result)
+		end)
+
+		it("should handle custom delimiter without trimming unexpected characters", function()
+			local input = "one two three"
+			local result = utils.splitAndTrimString(input, " ")
+			assert.are.same({ "one", "two", "three" }, result)
+		end)
+
+		it("should handle consecutive delimiters as separate items", function()
+			local input = "apple,,banana, ,cherry,"
+			local result = utils.splitAndTrimString(input)
+			assert.are.same({ "apple", "banana", "cherry" }, result)
+		end)
+	end)
 end)
