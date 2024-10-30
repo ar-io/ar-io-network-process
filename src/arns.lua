@@ -277,6 +277,7 @@ function arns.assertValidBuyRecord(name, years, purchaseType, processId)
 	assert(type(name) == "string", "Name is required and must be a string.")
 	assert(#name >= 1 and #name <= 51, "Name pattern is invalid.")
 	assert(name:match("^%w") and name:match("%w$") and name:match("^[%w-]+$"), "Name pattern is invalid.")
+	assert(not utils.isValidAOAddress(name), "Name cannot be a wallet address.")
 
 	-- assert purchase type if present is lease or permabuy
 	assert(purchaseType == nil or purchaseType == "lease" or purchaseType == "permabuy", "Purchase-Type is invalid.")
