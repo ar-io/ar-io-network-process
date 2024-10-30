@@ -142,10 +142,10 @@ end
 local function addAuctionResultFields(ioEvent, result)
 	ioEvent:addFieldsIfExist(result, {
 		"bidAmount",
-		"bidder",
 		"rewardForInitiator",
 		"rewardForProtocol",
-		-- TODO: we could return some computed values of the bid relative to start and end price
+		"startPrice",
+		"floorPrice",
 	})
 	ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
 	ioEvent:addFieldsIfExist(result.auction, {

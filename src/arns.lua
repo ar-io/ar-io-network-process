@@ -562,6 +562,8 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 		error("Bid timestamp is outside of auction start and end timestamps")
 	end
 	local requiredBid = auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
+	local floorPrice = auction:floorPrice(type, years) -- useful for analytics, used by getPriceForAuctionAtTimestamp
+	local startPrice = auction:startPrice(type, years) -- useful for analytics, used by getPriceForAuctionAtTimestamp
 	local requiredOrBidAmount = bidAmount or requiredBid
 	if requiredOrBidAmount < requiredBid then
 		error("Bid amount is less than the required bid of " .. requiredBid)
@@ -601,6 +603,8 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 		rewardForInitiator = rewardForInitiator,
 		rewardForProtocol = rewardForProtocol,
 		record = record,
+		floorPrice = floorPrice,
+		startPrice = startPrice,
 	}
 end
 
