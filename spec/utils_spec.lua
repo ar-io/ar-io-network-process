@@ -334,4 +334,50 @@ describe("utils", function()
 			assert.are.same({ "apple", "banana", "cherry" }, result)
 		end)
 	end)
+
+	describe("createLookupTable", function()
+		it("should create a lookup table from a list of strings", function()
+			local input = { "apple", "banana", "cherry", "date" }
+			local result = utils.createLookupTable(input)
+			assert.are.same({
+				apple = true,
+				banana = true,
+				cherry = true,
+				date = true,
+			}, result)
+		end)
+
+		it("should create a lookup table from a list of numbers", function()
+			local input = { 1, 2, 3, 4 }
+			local result = utils.createLookupTable(input)
+			assert.are.same({
+				[1] = true,
+				[2] = true,
+				[3] = true,
+				[4] = true,
+			}, result)
+		end)
+
+		it("should create a lookup table from a list of mixed types", function()
+			local input = { "apple", 2, "cherry", 4 }
+			local result = utils.createLookupTable(input)
+			assert.are.same({
+				apple = true,
+				[2] = true,
+				cherry = true,
+				[4] = true,
+			}, result)
+		end)
+
+		it("should create an empty lookup table from an empty list", function()
+			local input = {}
+			local result = utils.createLookupTable(input)
+			assert.are.same({}, result)
+		end)
+
+		it("should create an empty lookup table from a nil list", function()
+			local result = utils.createLookupTable(nil)
+			assert.are.same({}, result)
+		end)
+	end)
 end)

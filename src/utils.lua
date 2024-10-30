@@ -325,4 +325,12 @@ function utils.toTrainCase(str)
 	return str
 end
 
+function utils.createLookupTable(tbl)
+	local lookupTable = {}
+	for _, value in ipairs(tbl or {}) do
+		lookupTable[value] = true
+	end
+	return lookupTable
+end
+
 return utils

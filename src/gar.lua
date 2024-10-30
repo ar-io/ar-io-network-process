@@ -54,6 +54,8 @@ function gar.joinNetwork(from, stake, settings, services, observerAddress, timeS
 		},
 		settings = {
 			allowDelegatedStaking = settings.allowDelegatedStaking or false,
+			allowedDelegatesLookup = settings.allowedDelegates and utils.createLookupTable(settings.allowedDelegates)
+				or nil,
 			delegateRewardShareRatio = settings.delegateRewardShareRatio or 0,
 			autoStake = settings.autoStake or false,
 			minDelegatedStake = settings.minDelegatedStake,
@@ -346,11 +348,16 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 		error("This Gateway is in the process of leaving the network and cannot have more stake delegated to it.")
 	end
 
-	-- TODO: when allowedDelegates is supported, check if it's in the array of allowed delegates
 	if not gateway.settings.allowDelegatedStaking then
 		error(
 			"This Gateway does not allow delegated staking. Only allowed delegates can delegate stake to this Gateway."
 		)
+	end
+
+	if gateway.allowedDelegatesLookup then
+		if not gateway.allowedDelegatesLookup[from] then
+			error("This Gateway does not allow this delegate to stake.")
+		end
 	end
 
 	-- Assuming `gateway` is a table and `fromAddress` is defined
@@ -383,6 +390,12 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 	-- Decrement the user's balance
 	balances.reduceBalance(from, qty)
 	gateway.totalDelegatedStake = gateway.totalDelegatedStake + qty
+
+	-- prune user from allow list, if necessary, to save memory
+	if gateway.allowedDelegatesLookup then
+		gateway.allowedDelegatesLookup[from] = nil
+	end
+
 	-- update the gateway
 	GatewayRegistry[target] = gateway
 	return gar.getGateway(target)
@@ -462,6 +475,11 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 		-- Remove the delegate if no stake is left
 		if gateway.delegates[delegator].delegatedStake == 0 and next(gateway.delegates[delegator].vaults) == nil then
 			gateway.delegates[delegator] = nil
+
+			-- replace the delegate in the allowedDelegatesLookup table if necessary
+			if gateway.settings.allowedDelegatesLookup then
+				gateway.settings.allowedDelegatesLookup[delegator] = true
+			end
 		end
 	else
 		-- Withdraw the delegate's stake
@@ -591,6 +609,17 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 		"Observer-Address is required and must be a a valid arweave address"
 	)
 	assert(type(settings.allowDelegatedStaking) == "boolean", "allowDelegatedStaking must be a boolean")
+	if type(settings.allowedDelegates) == "table" then
+		for _, delegate in ipairs(settings.allowedDelegates) do
+			assert(utils.isValidAOAddress(delegate), "delegates in allowedDelegates must be valid AO addresses")
+		end
+	else
+		assert(
+			settings.allowedDelegates == nil,
+			"allowedDelegates must be a table parsed from a comma-separated string or nil"
+		)
+	end
+
 	assert(type(settings.label) == "string", "label is required and must be a string")
 	assert(type(settings.fqdn) == "string", "fqdn is required and must be a string")
 	assert(

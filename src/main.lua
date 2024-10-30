@@ -1046,7 +1046,10 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 		fqdn = msg.Tags.FQDN,
 		port = tonumber(msg.Tags.Port) or 443,
 		protocol = msg.Tags.Protocol or "https",
-		allowDelegatedStaking = msg.Tags["Allow-Delegated-Staking"] == "true",
+		allowDelegatedStaking = msg.Tags["Allow-Delegated-Staking"] == "true"
+			or msg.Tags["Allow-Delegated-Staking"] == "allowlist",
+		allowedDelegates = (msg.Tags["Allowed-Delegates"] and utils.splitAndTrimString(msg.Tags["Allowed-Delegates"]))
+			or (msg.Tags["Allow-Delegated-Staking"] == "allowlist" and {} or nil), -- start with an empty list if necessary
 		minDelegatedStake = tonumber(msg.Tags["Min-Delegated-Stake"]),
 		delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"]) or 0,
 		properties = msg.Tags.Properties or "FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44",
@@ -1874,7 +1877,8 @@ end)
 
 addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
 	local reportTxId = msg.Tags["Report-Tx-Id"]
-	local failedGateways = msg.Tags["Failed-Gateways"] and utils.splitString(msg.Tags["Failed-Gateways"], ",") or {}
+	local failedGateways = msg.Tags["Failed-Gateways"] and utils.splitAndTrimString(msg.Tags["Failed-Gateways"], ",")
+		or {}
 	local checkAssertions = function()
 		assert(utils.isValidAOAddress(reportTxId), "Invalid report tx id")
 		for _, gateway in ipairs(failedGateways) do
