@@ -474,12 +474,7 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 
 		-- Remove the delegate if no stake is left
 		if gateway.delegates[delegator].delegatedStake == 0 and next(gateway.delegates[delegator].vaults) == nil then
-			gateway.delegates[delegator] = nil
-
-			-- replace the delegate in the allowedDelegatesLookup table if necessary
-			if gateway.settings.allowedDelegatesLookup then
-				gateway.settings.allowedDelegatesLookup[delegator] = true
-			end
+			gar.removeDelegateFromGateway(delegator, gateway)
 		end
 	else
 		-- Withdraw the delegate's stake
@@ -798,7 +793,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 			-- remove the delegate if all vaults are empty and the delegated stake is 0
 			for delegateAddress, delegate in pairs(gateway.delegates) do
 				if delegate.delegatedStake == 0 and next(delegate.vaults) == nil then
-					gateway.delegates[delegateAddress] = nil
+					gar.removeDelegateFromGateway(delegateAddress, gateway)
 				end
 			end
 			-- update the gateway before we do anything else
@@ -951,7 +946,7 @@ function gar.instantDelegateWithdrawal(from, gatewayAddress, vaultId, currentTim
 
 	-- Remove the delegate if no stake is left
 	if delegate.delegatedStake == 0 and next(delegate.vaults) == nil then
-		gateway.delegates[from] = nil
+		gar.removeDelegateFromGateway(from, gateway)
 	end
 
 	-- Update the gateway
@@ -1008,6 +1003,18 @@ function gar.instantOperatorWithdrawal(from, vaultId, currentTimestamp)
 		expeditedWithdrawalFee = expeditedWithdrawalFee,
 		amountWithdrawn = amountToWithdraw,
 	}
+end
+
+--- Preserves delegate's position in allow list upon removal from gateway
+--- @param delegateAddress string The address of the delegator
+--- @param gateway table The gateway from which the delegate is being removed
+function gar.removeDelegateFromGateway(delegateAddress, gateway)
+	gateway.delegates[delegateAddress] = nil
+
+	-- replace the delegate in the allowedDelegatesLookup table if necessary
+	if gateway.settings.allowedDelegatesLookup then
+		gateway.settings.allowedDelegatesLookup[delegateAddress] = true
+	end
 end
 
 return gar
