@@ -581,26 +581,29 @@ describe("arns", function()
 			_G.DemandFactor.currentDemandFactor = demandFactor
 			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
 		end)
-		it("should throw an error if trying to increase undername limit an a record in the grace period", function()
-			_G.NameRegistry.records["test-name"] = {
-				endTimestamp = 10000000,
-				processId = testProcessId,
-				purchasePrice = 600000000,
-				startTimestamp = 0,
-				type = "lease",
-				undernameLimit = 10,
-			}
-			local status, error = pcall(arns.getTokenCost, {
-				intent = "Increase-Undername-Limit",
-				quantity = 5,
-				name = "test-name",
-				currentTimestamp = 10000000 + 1, -- in the grace period
-			})
-			assert.is_false(status)
-			assert.match("Name must be active to increase undername limit", error)
-		end)
 		it(
-			"should throw an error if trying to increase undername limit on a record that is expired beyond its grace period",
+			"should throw an error if trying to increase undername limit of a leased record in the grace period",
+			function()
+				_G.NameRegistry.records["test-name"] = {
+					endTimestamp = 10000000,
+					processId = testProcessId,
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}
+				local status, error = pcall(arns.getTokenCost, {
+					intent = "Increase-Undername-Limit",
+					quantity = 5,
+					name = "test-name",
+					currentTimestamp = 10000000 + 1, -- in the grace period
+				})
+				assert.is_false(status)
+				assert.match("Name must be active to increase undername limit", error)
+			end
+		)
+		it(
+			"should throw an error if trying to increase undername limit of a leased record that is expired beyond its grace period",
 			function()
 				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = timestamp - 1, -- expired
@@ -620,7 +623,7 @@ describe("arns", function()
 				assert.match("Name must be active to increase undername limit", error)
 			end
 		)
-		it("should throw an error if trying to extend a lease on permanently owned", function()
+		it("should throw an error if trying to extend a lease of a permanently owned name", function()
 			_G.NameRegistry.records["test-name"] = {
 				endTimestamp = nil,
 				processId = testProcessId,
