@@ -131,6 +131,10 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
 	-- validate record can increase undernames
 	local record = arns.getRecord(name)
 
+	if not record then
+		error("Name is not registered")
+	end
+
 	-- throws errors on invalid requests
 	arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
 
@@ -353,6 +357,9 @@ function arns.getRegistrationFees()
 	return fees
 end
 
+--- Gets the token cost for an intended action
+--- @param intendedAction table The intended action
+--- @return number The token cost in mIO of the intended action
 function arns.getTokenCost(intendedAction)
 	local tokenCost = 0
 	local purchaseType = intendedAction.purchaseType
@@ -361,6 +368,8 @@ function arns.getTokenCost(intendedAction)
 	local baseFee = demand.baseFeeForNameLength(#name)
 	local intent = intendedAction.intent
 	local qty = tonumber(intendedAction.quantity)
+	local record = arns.getRecord(name)
+	local currentTimestamp = tonumber(intendedAction.currentTimestamp)
 
 	assert(type(intent) == "string", "Intent is required and must be a string.")
 	assert(type(name) == "string", "Name is required and must be a string.")
@@ -371,42 +380,34 @@ function arns.getTokenCost(intendedAction)
 		end
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
 	elseif intent == "Extend-Lease" then
+		assert(record, "Name is not registered")
 		assert(years >= 1 and years <= 5, "Years is invalid. Must be an integer between 1 and 5")
-		local record = arns.getRecord(name)
-		if not record then
-			error("Name is not registered")
-		end
-		if record.type == "permabuy" then
-			error("Name is permabought and cannot be extended")
-		end
+		assert(record.type ~= "permabuy", "Name is permabought and cannot be extended")
 		tokenCost = arns.calculateExtensionFee(baseFee, years, demand.getDemandFactor())
 	elseif intent == "Increase-Undername-Limit" then
+		assert(record, "Name is not registered")
 		assert(
 			qty >= 1 and qty <= 9990 and utils.isInteger(qty),
 			"Quantity is invalid, must be an integer between 1 and 9990"
 		)
-		local currentTimestamp = tonumber(intendedAction.currentTimestamp)
 		assert(type(currentTimestamp) == "number" and currentTimestamp > 0, "Timestamp is required")
-		local record = arns.getRecord(name)
-		if not record then
-			error("Name is not registered")
-		end
+		assert(
+			arns.recordIsActive(record, currentTimestamp),
+			"Name is expired or in grace period and must be extended before additional undernames can be purchased"
+		)
 		local yearsRemaining = constants.PERMABUY_LEASE_FEE_LENGTH
 		if record.type == "lease" then
 			yearsRemaining = arns.calculateYearsBetweenTimestamps(currentTimestamp, record.endTimestamp)
 		end
 		tokenCost = arns.calculateUndernameCost(baseFee, qty, record.type, yearsRemaining, demand.getDemandFactor())
-	-- TODO: move action map to constants and use it here
 	elseif intent == "Upgrade-Name" then
-		local record = arns.getRecord(name)
-		if not record then
-			error("Name is not registered")
-		end
-
-		if record.type == "permabuy" then
-			error("Name is already a permabuy")
-		end
+		assert(record, "Name is not registered")
+		assert(record.type ~= "permabuy", "Name is already a permabuy")
 		tokenCost = arns.calculatePermabuyFee(baseFee, demand.getDemandFactor())
+	end
+	-- if token Cost is less than 0, throw an error
+	if tokenCost < 0 then
+		error("Invalid token cost for " .. intendedAction.intent)
 	end
 	return tokenCost
 end

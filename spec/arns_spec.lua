@@ -506,7 +506,7 @@ describe("arns", function()
 	end
 
 	describe("getTokenCost", function()
-		it("should return the correct token cost for a lease", function()
+		it("should return the correct token cost for a buying a lease", function()
 			local baseFee = 500000000
 			local years = 2
 			local demandFactor = 0.974
@@ -520,7 +520,7 @@ describe("arns", function()
 			_G.DemandFactor.currentDemandFactor = demandFactor
 			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
 		end)
-		it("should return the correct token cost for a permabuy", function()
+		it("should return the correct token cost for a buying a permabuy", function()
 			local baseFee = 500000000
 			local demandFactor = 1.052
 			local expectedCost = math.floor((baseFee * 0.2 * 20) + baseFee) * demandFactor
@@ -532,7 +532,7 @@ describe("arns", function()
 			_G.DemandFactor.currentDemandFactor = demandFactor
 			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
 		end)
-		it("should return the correct token cost for an undername", function()
+		it("should return the correct token cost for increasing unername limit", function()
 			_G.NameRegistry.records["test-name"] = {
 				endTimestamp = constants.oneYearMs,
 				processId = testProcessId,
@@ -557,7 +557,7 @@ describe("arns", function()
 			_G.DemandFactor.currentDemandFactor = demandFactor
 			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
 		end)
-		it("should return the token cost for extending a name", function()
+		it("should return the token cost for extending a lease", function()
 			_G.NameRegistry.records["test-name"] = {
 				endTimestamp = timestamp + constants.oneYearMs,
 				processId = testProcessId,
@@ -577,6 +577,68 @@ describe("arns", function()
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
 			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+		end)
+		it("should throw an error if trying to increase unername limit an a record in the grace period", function()
+			_G.NameRegistry.records["test-name"] = {
+				endTimestamp = 10000000,
+				processId = testProcessId,
+				purchasePrice = 600000000,
+				startTimestamp = 0,
+				type = "lease",
+				undernameLimit = 10,
+			}
+			local status, error = pcall(arns.getTokenCost, {
+				intent = "Increase-Undername-Limit",
+				quantity = 5,
+				name = "test-name",
+				currentTimestamp = 10000000 + 1, -- in the grace period
+			})
+			assert.is_false(status)
+			assert.match(
+				"Name is expired or in grace period and must be extended before additional undernames can be purchased",
+				error
+			)
+		end)
+		it(
+			"should throw an error if trying to increase undername limit on a record that is expired beyond its grace period",
+			function()
+				_G.NameRegistry.records["test-name"] = {
+					endTimestamp = timestamp - 1, -- expired
+					processId = testProcessId,
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}
+				local status, error = pcall(arns.getTokenCost, {
+					intent = "Increase-Undername-Limit",
+					quantity = 5,
+					name = "test-name",
+					currentTimestamp = timestamp + constants.gracePeriodMs + 1, -- expired beyond grace period
+				})
+				assert.is_false(status)
+				assert.match(
+					"Name is expired or in grace period and must be extended before additional undernames can be purchased",
+					error
+				)
+			end
+		)
+		it("should throw an error if trying to extend a lease on a permabuy", function()
+			_G.NameRegistry.records["test-name"] = {
+				endTimestamp = nil,
+				processId = testProcessId,
+				purchasePrice = 600000000,
+				startTimestamp = 0,
+				type = "permabuy",
+				undernameLimit = 10,
+			}
+			local status, error = pcall(arns.getTokenCost, {
+				intent = "Extend-Lease",
+				years = 2,
+				name = "test-name",
+			})
+			assert.is_false(status)
+			assert.match("Name is permabought and cannot be extended", error)
 		end)
 	end)
 
