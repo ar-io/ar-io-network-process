@@ -7,17 +7,6 @@ function utils.hasMatchingTag(tag, value)
 	return Handlers.utils.hasMatchingTag(tag, value)
 end
 
--- Then, check for a 43-character base64url pattern.
--- The pattern checks for a string of length 43 containing alphanumeric characters, hyphens, or underscores.
-function utils.isValidBase64Url(url)
-	local isValidBase64Url = #url == 43 and string.match(url, "^[%w-_]+$") ~= nil
-
-	if not isValidBase64Url then
-		error("String pattern is invalid.")
-	end
-	return url
-end
-
 function utils.isInteger(value)
 	if type(value) == "string" then
 		value = tonumber(value)
@@ -146,8 +135,11 @@ function utils.isValidEthAddress(address)
 	return type(address) == "string" and #address == 42 and string.match(address, "^0x[%x]+$") ~= nil
 end
 
+--- Checks if an address is a valid base64url
+--- @param url string|nil The address to check
+--- @return boolean Whether the address is a valid base64url
 function utils.isValidAOAddress(url)
-	return utils.isValidArweaveAddress(url) or utils.isValidEthAddress(url)
+	return url and (utils.isValidArweaveAddress(url) or utils.isValidEthAddress(url)) or false
 end
 
 -- Convert address to EIP-55 checksum format
