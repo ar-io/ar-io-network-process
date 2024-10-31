@@ -544,7 +544,7 @@ describe('ArNS', async () => {
         startTimestamp: buyRecordTimestamp,
         processId: ''.padEnd(43, 'a'),
         undernameLimit: 10,
-        purchasePrice: 2500000000, // expected price for permanently owned of a 9 character name
+        purchasePrice: 2500000000, // expected price for a permanent 9 character name
       });
     });
   });

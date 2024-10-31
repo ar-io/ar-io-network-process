@@ -426,7 +426,7 @@ describe("arns", function()
 				assert.are.equal(600000000, fee)
 			end)
 
-			it("should return the correct fee for permanently owned [" .. addressType .. "]", function()
+			it("should return the correct fee for registring a name permanently [" .. addressType .. "]", function()
 				local baseFee = 500000000 -- base fee is 500 IO
 				local fee = arns.calculateRegistrationFee("permabuy", baseFee, 1, 1)
 				local expected = (baseFee * 0.2 * 20) + baseFee
@@ -521,7 +521,7 @@ describe("arns", function()
 			_G.DemandFactor.currentDemandFactor = demandFactor
 			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
 		end)
-		it("should return the correct token cost for a buying permanently owned", function()
+		it("should return the correct token cost for a buying name permanently", function()
 			local baseFee = 500000000
 			local demandFactor = 1.052
 			local expectedCost = math.floor((baseFee * 0.2 * 20) + baseFee) * demandFactor
@@ -862,7 +862,7 @@ describe("arns", function()
 		end)
 
 		describe("getPriceForAuctionAtTimestamp", function()
-			it("should return the correct price for an auction at a given timestamp for permanently owned", function()
+			it("should return the correct price for an auction at a given timestamp permanently", function()
 				local startTimestamp = 1000000
 				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
 				local currentTimestamp = startTimestamp + 1000 * 60 * 60 * 24 * 7 -- 1 week into the auction
