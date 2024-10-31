@@ -57,7 +57,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		endTimestamp = purchaseType == "lease" and timestamp + constants.oneYearMs * years or nil,
 	}
 
-	-- Register the leased or permabought name
+	-- Register the leased or permanently owned name
 	-- Transfer tokens to the protocol balance
 	balances.transfer(ao.id, from, totalRegistrationFee)
 	arns.addRecord(name, newRecord)
@@ -280,6 +280,11 @@ function arns.calculateYearsBetweenTimestamps(startTimestamp, endTimestamp)
 	return yearsRemainingFloat
 end
 
+--- Asserts that a buy record is valid
+--- @param name string The name of the record
+--- @param years number|nil The number of years to check
+--- @param purchaseType string|nil The purchase type to check
+--- @param processId string|nil The processId of the record
 function arns.assertValidBuyRecord(name, years, purchaseType, processId)
 	-- assert name is valid pattern
 	assert(type(name) == "string", "Name is required and must be a string.")
@@ -300,27 +305,24 @@ function arns.assertValidBuyRecord(name, years, purchaseType, processId)
 	end
 
 	-- assert processId is valid pattern
-	assert(type(processId) == "string", "ProcessId is required and must be a string.")
-	assert(utils.isValidBase64Url(processId), "ProcessId pattern is invalid.")
+	assert(type(processId) == "string", "Process id is required and must be a string.")
+	assert(utils.isValidAOAddress(processId), "Process id must be a valid base64url.")
 end
 
+--- Asserts that a record is valid for extending the lease
+--- @param record table|nil The record to check
+--- @param currentTimestamp number|nil The current timestamp
+--- @param years number|nil The number of years to check
 function arns.assertValidExtendLease(record, currentTimestamp, years)
-	if not record then
-		error("Name is not registered")
-	end
+	assert(record, "Name is not registered")
+	assert(currentTimestamp, "Timestamp is required")
+	assert(years, "Years is required")
 
-	if record.type == "permabuy" then
-		error("Name is permabought and cannot be extended")
-	end
-
-	if arns.recordExpired(record, currentTimestamp) then
-		error("Name is expired")
-	end
+	assert(record.type ~= "permabuy", "Name is permanently owned and cannot be extended")
+	assert(not arns.recordExpired(record, currentTimestamp), "Name is expired")
 
 	local maxAllowedYears = arns.getMaxAllowedYearsExtensionForRecord(record, currentTimestamp)
-	if years > maxAllowedYears then
-		error("Cannot extend lease beyond 5 years")
-	end
+	assert(years <= maxAllowedYears, "Cannot extend lease beyond 5 years")
 end
 
 function arns.getMaxAllowedYearsExtensionForRecord(record, currentTimestamp)
@@ -374,35 +376,23 @@ function arns.getTokenCost(intendedAction)
 	assert(type(intent) == "string", "Intent is required and must be a string.")
 	assert(type(name) == "string", "Name is required and must be a string.")
 	if intent == "Buy-Record" then
-		assert(purchaseType == "lease" or purchaseType == "permabuy", "PurchaseType is invalid.")
-		if purchaseType == "lease" then
-			assert(years >= 1 and years <= 5, "Years is invalid. Must be an integer between 1 and 5")
-		end
+		-- stub the process id as it is not required for this intent
+		local processId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+		arns.assertValidBuyRecord(name, years, purchaseType, processId)
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
 	elseif intent == "Extend-Lease" then
-		assert(record, "Name is not registered")
-		assert(years >= 1 and years <= 5, "Years is invalid. Must be an integer between 1 and 5")
-		assert(record.type ~= "permabuy", "Name is permabought and cannot be extended")
+		arns.assertValidExtendLease(record, currentTimestamp, years)
 		tokenCost = arns.calculateExtensionFee(baseFee, years, demand.getDemandFactor())
 	elseif intent == "Increase-Undername-Limit" then
+		arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
 		assert(record, "Name is not registered")
-		assert(
-			qty >= 1 and qty <= 9990 and utils.isInteger(qty),
-			"Quantity is invalid, must be an integer between 1 and 9990"
-		)
-		assert(type(currentTimestamp) == "number" and currentTimestamp > 0, "Timestamp is required")
-		assert(
-			arns.recordIsActive(record, currentTimestamp),
-			"Name is expired or in grace period and must be extended before additional undernames can be purchased"
-		)
 		local yearsRemaining = constants.PERMABUY_LEASE_FEE_LENGTH
 		if record.type == "lease" then
 			yearsRemaining = arns.calculateYearsBetweenTimestamps(currentTimestamp, record.endTimestamp)
 		end
 		tokenCost = arns.calculateUndernameCost(baseFee, qty, record.type, yearsRemaining, demand.getDemandFactor())
 	elseif intent == "Upgrade-Name" then
-		assert(record, "Name is not registered")
-		assert(record.type ~= "permabuy", "Name is already a permabuy")
+		arns.assertValidUpgradeName(record, currentTimestamp)
 		tokenCost = arns.calculatePermabuyFee(baseFee, demand.getDemandFactor())
 	end
 	-- if token Cost is less than 0, throw an error
@@ -412,23 +402,27 @@ function arns.getTokenCost(intendedAction)
 	return tokenCost
 end
 
---- Upgrades a leased record to a permabuy
+--- Asserts that a name is valid for upgrading
+--- @param record table|nil The record to check
+--- @param currentTimestamp number|nil The current timestamp
+function arns.assertValidUpgradeName(record, currentTimestamp)
+	assert(record, "Name is not registered")
+	assert(currentTimestamp, "Timestamp is required")
+	assert(record.type ~= "permabuy", "Name is permanently owned")
+	assert(
+		arns.recordIsActive(record, currentTimestamp) or arns.recordInGracePeriod(record, currentTimestamp),
+		"Name is expired"
+	)
+end
+
+--- Upgrades a leased record to permanently owned
 --- @param from string The address of the sender
 --- @param name string The name of the record
 --- @param currentTimestamp number The current timestamp
 --- @return table The upgraded record with name and record fields
 function arns.upgradeRecord(from, name, currentTimestamp)
 	local record = arns.getRecord(name)
-	if not record then
-		error("Name is not registered")
-	end
-
-	if record.type == "permabuy" then
-		error("Record is already a permabuy")
-	end
-	if arns.recordExpired(record, currentTimestamp) then
-		error("Name is expired")
-	end
+	arns.assertValidUpgradeName(record, currentTimestamp)
 
 	local baseFee = demand.baseFeeForNameLength(#name)
 	local demandFactor = demand.getDemandFactor()
@@ -493,25 +487,15 @@ function arns.recordIsActive(record, currentTimestamp)
 	return record.endTimestamp and record.endTimestamp >= currentTimestamp
 end
 
+--- Asserts that a record is valid for increasing the undername limit
+--- @param record table|nil The record to check
+--- @param qty number|nil The quantity to check
+--- @param currentTimestamp number|nil The current timestamp
 function arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
-	if not record then
-		error("Name is not registered")
-	end
-
-	-- only records active and not in grace period can increase undernames
-	if arns.recordInGracePeriod(record, currentTimestamp) then
-		error("Name must be extended before additional unernames can be purchased")
-	end
-
-	if arns.recordExpired(record, currentTimestamp) then
-		error("Name is expired")
-	end
-
-	if qty < 1 or not utils.isInteger(qty) then
-		error("Qty is invalid")
-	end
-
-	return true
+	assert(record, "Name is not registered")
+	assert(currentTimestamp, "Timestamp is required")
+	assert(arns.recordIsActive(record, currentTimestamp), "Name must be active to increase undername limit")
+	assert(qty > 0 and utils.isInteger(qty), "Qty is invalid")
 end
 
 -- AUCTIONS

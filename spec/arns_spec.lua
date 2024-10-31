@@ -251,7 +251,7 @@ describe("arns", function()
 				local status, error =
 					pcall(arns.increaseundernameLimit, testAddress, "test-name", 1, timestamp + constants.oneYearMs + 1)
 				assert.is_false(status)
-				assert.match("Name must be extended before additional unernames can be purchase", error)
+				assert.match("Name must be active to increase undername limit", error)
 			end)
 
 			it("should increase the undername count and properly deduct balance [" .. addressType .. "]", function()
@@ -325,7 +325,7 @@ describe("arns", function()
 				end
 			)
 
-			it("should throw an error if the lease is permabought [" .. addressType .. "]", function()
+			it("should throw an error if the lease is permanently owned [" .. addressType .. "]", function()
 				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = nil,
 					processId = testProcessId,
@@ -336,7 +336,7 @@ describe("arns", function()
 				}
 				local status, error = pcall(arns.extendLease, testAddress, "test-name", 1, timestamp)
 				assert.is_false(status)
-				assert.match("Name is permabought and cannot be extended", error)
+				assert.match("Name is permanently owned and cannot be extended", error)
 			end)
 
 			-- throw an error of insufficient balance
@@ -426,7 +426,7 @@ describe("arns", function()
 				assert.are.equal(600000000, fee)
 			end)
 
-			it("should return the correct fee for a permabuy [" .. addressType .. "]", function()
+			it("should return the correct fee for permanently owned [" .. addressType .. "]", function()
 				local baseFee = 500000000 -- base fee is 500 IO
 				local fee = arns.calculateRegistrationFee("permabuy", baseFee, 1, 1)
 				local expected = (baseFee * 0.2 * 20) + baseFee
@@ -516,11 +516,12 @@ describe("arns", function()
 				purchaseType = "lease",
 				years = 2,
 				name = "test-name",
+				currentTimestamp = timestamp,
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
 			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
 		end)
-		it("should return the correct token cost for a buying a permabuy", function()
+		it("should return the correct token cost for a buying permanently owned", function()
 			local baseFee = 500000000
 			local demandFactor = 1.052
 			local expectedCost = math.floor((baseFee * 0.2 * 20) + baseFee) * demandFactor
@@ -528,11 +529,12 @@ describe("arns", function()
 				intent = "Buy-Record",
 				purchaseType = "permabuy",
 				name = "test-name",
+				currentTimestamp = timestamp,
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
 			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
 		end)
-		it("should return the correct token cost for increasing unername limit", function()
+		it("should return the correct token cost for increasing undername limit", function()
 			_G.NameRegistry.records["test-name"] = {
 				endTimestamp = constants.oneYearMs,
 				processId = testProcessId,
@@ -574,11 +576,12 @@ describe("arns", function()
 				intent = "Extend-Lease",
 				years = 2,
 				name = "test-name",
+				currentTimestamp = timestamp + constants.oneYearMs,
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
 			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
 		end)
-		it("should throw an error if trying to increase unername limit an a record in the grace period", function()
+		it("should throw an error if trying to increase undername limit an a record in the grace period", function()
 			_G.NameRegistry.records["test-name"] = {
 				endTimestamp = 10000000,
 				processId = testProcessId,
@@ -594,10 +597,7 @@ describe("arns", function()
 				currentTimestamp = 10000000 + 1, -- in the grace period
 			})
 			assert.is_false(status)
-			assert.match(
-				"Name is expired or in grace period and must be extended before additional undernames can be purchased",
-				error
-			)
+			assert.match("Name must be active to increase undername limit", error)
 		end)
 		it(
 			"should throw an error if trying to increase undername limit on a record that is expired beyond its grace period",
@@ -617,13 +617,10 @@ describe("arns", function()
 					currentTimestamp = timestamp + constants.gracePeriodMs + 1, -- expired beyond grace period
 				})
 				assert.is_false(status)
-				assert.match(
-					"Name is expired or in grace period and must be extended before additional undernames can be purchased",
-					error
-				)
+				assert.match("Name must be active to increase undername limit", error)
 			end
 		)
-		it("should throw an error if trying to extend a lease on a permabuy", function()
+		it("should throw an error if trying to extend a lease on permanently owned", function()
 			_G.NameRegistry.records["test-name"] = {
 				endTimestamp = nil,
 				processId = testProcessId,
@@ -636,9 +633,10 @@ describe("arns", function()
 				intent = "Extend-Lease",
 				years = 2,
 				name = "test-name",
+				currentTimestamp = timestamp + constants.oneYearMs,
 			})
 			assert.is_false(status)
-			assert.match("Name is permabought and cannot be extended", error)
+			assert.match("Name is permanently owned and cannot be extended", error)
 		end)
 	end)
 
@@ -864,7 +862,7 @@ describe("arns", function()
 		end)
 
 		describe("getPriceForAuctionAtTimestamp", function()
-			it("should return the correct price for an auction at a given timestamp for a permabuy", function()
+			it("should return the correct price for an auction at a given timestamp for permanently owned", function()
 				local startTimestamp = 1000000
 				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
 				local currentTimestamp = startTimestamp + 1000 * 60 * 60 * 24 * 7 -- 1 week into the auction
@@ -925,7 +923,7 @@ describe("arns", function()
 		end)
 
 		describe("upgradeRecord", function()
-			it("should upgrade a leased record to a permabuy", function()
+			it("should upgrade a leased record to permanently owned", function()
 				_G.NameRegistry.records["upgrade-name"] = {
 					endTimestamp = 1000000,
 					processId = "test-process-id",
@@ -960,7 +958,7 @@ describe("arns", function()
 				assert.match("Name is not registered", error)
 			end)
 
-			it("should throw an error if the record is already a permabuy", function()
+			it("should throw an error if the record is permanently owned", function()
 				_G.NameRegistry.records["upgrade-name"] = {
 					endTimestamp = nil,
 					processId = "test-process-id",
@@ -971,7 +969,7 @@ describe("arns", function()
 				}
 				local status, error = pcall(arns.upgradeRecord, testAddressArweave, "upgrade-name", 1000000)
 				assert.is_false(status)
-				assert.match("Record is already a permabuy", error)
+				assert.match("Name is permanently owned", error)
 			end)
 
 			it("should throw an error if the record is expired", function()

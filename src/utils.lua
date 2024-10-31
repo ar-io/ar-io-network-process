@@ -13,7 +13,7 @@ function utils.isValidBase64Url(url)
 	local isValidBase64Url = #url == 43 and string.match(url, "^[%w-_]+$") ~= nil
 
 	if not isValidBase64Url then
-		error("String pattern is invalid.")
+		error("Invalid base64url string.")
 	end
 	return url
 end

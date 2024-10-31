@@ -712,7 +712,9 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 			type(name) == "string" and #name > 0 and #name <= 51 and not utils.isValidAOAddress(name),
 			"Invalid name"
 		) -- make sure it's a string, not empty, not longer than 51 characters, and not an arweave address
-		assert(utils.isValidBase64Url(processId), "Invalid process id")
+		-- assert processId is valid pattern
+		assert(type(processId) == "string", "Process id is required and must be a string.")
+		assert(utils.isValidAOAddress(processId), "Process id must be a valid base64url.")
 		if years then
 			assert(
 				years >= 1 and years <= 5 and utils.isInteger(years),

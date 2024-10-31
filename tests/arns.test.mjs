@@ -409,7 +409,7 @@ describe('ArNS', async () => {
       assert.equal(tokenCost, 200000000); // known cost for extending a 9 character name by 2 years (500 IO * 0.2 * 2)
     });
 
-    it('should get the cost of upgrading an existing leased record to a permabuy', async () => {
+    it('should get the cost of upgrading an existing leased record to permanently owned', async () => {
       const buyRecordResult = await handle({
         Tags: [
           { name: 'Action', value: 'Buy-Record' },
@@ -544,7 +544,7 @@ describe('ArNS', async () => {
         startTimestamp: buyRecordTimestamp,
         processId: ''.padEnd(43, 'a'),
         undernameLimit: 10,
-        purchasePrice: 2500000000, // expected price for a permabuy of a 9 character name
+        purchasePrice: 2500000000, // expected price for permanently owned of a 9 character name
       });
     });
   });
