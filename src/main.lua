@@ -1815,7 +1815,7 @@ addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", Action
 	local initiator = utils.formatAddress(msg.Tags.Initiator)
 	local checkAssertions = function()
 		assert(name and #name > 0, "Name is required")
-		assert(newProcessId and utils.isValidBase64Url(newProcessId), "Invalid Process-Id")
+		assert(utils.isValidAOAddress(newProcessId), "Process id must be a valid base64url.")
 		if initiator ~= nil then
 			assert(utils.isValidAOAddress(initiator), "Invalid initiator address.")
 		end
