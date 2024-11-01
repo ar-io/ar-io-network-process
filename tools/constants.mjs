@@ -58,22 +58,3 @@ export const DEFAULT_HANDLE_OPTIONS = {
   Timestamp: STUB_TIMESTAMP,
   'Hash-Chain': STUB_HASH_CHAIN,
 };
-
-export const validGatewayTags = [
-  { name: 'Action', value: 'Join-Network' },
-  { name: 'Label', value: 'test-gateway' },
-  { name: 'Note', value: 'test-note' },
-  { name: 'FQDN', value: 'test-fqdn' },
-  { name: 'Operator-Stake', value: `${100_000_000_000}` }, // 100K IO
-  { name: 'Port', value: '443' },
-  { name: 'Protocol', value: 'https' },
-  { name: 'Allow-Delegated-Staking', value: 'true' },
-  { name: 'Min-Delegated-Stake', value: '500000000' }, // 500 IO
-  { name: 'Delegate-Reward-Share-Ratio', value: '25' }, // 25% go to the delegates
-  { name: 'Observer-Address', value: STUB_ADDRESS },
-  {
-    name: 'Properties',
-    value: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
-  },
-  { name: 'Auto-Stake', value: 'true' },
-];

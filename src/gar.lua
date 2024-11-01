@@ -165,6 +165,13 @@ function gar.increaseOperatorStake(from, qty)
 end
 
 -- Utility function to calculate withdrawal details and handle balance adjustments
+---@param qty number # The amount of stake to withdraw
+---@param elapsedTime number # The amount of time that has elapsed since the withdrawal started
+---@param totalWithdrawalTime number # The total amount of time the withdrawal will take
+---@param from string # The address of the operator or delegate
+---@return number # The penalty rate
+---@return number # The expedited withdrawal fee
+---@return number # The amount withdrawn
 local function processInstantWithdrawal(qty, elapsedTime, totalWithdrawalTime, from)
 	-- Calculate the withdrawal fee and the amount to withdraw
 	local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
@@ -175,7 +182,7 @@ local function processInstantWithdrawal(qty, elapsedTime, totalWithdrawalTime, f
 	penaltyRate = math.max(
 		constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE,
 		math.min(constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE, penaltyRate)
-	) -- Ensure penalty is within bounds
+	)
 
 	local expeditedWithdrawalFee = math.floor(qty * penaltyRate)
 	local amountToWithdraw = qty - expeditedWithdrawalFee
@@ -456,7 +463,7 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 		gateway.delegates[delegator].delegatedStake = gateway.delegates[delegator].delegatedStake - qty
 		gateway.totalDelegatedStake = gateway.totalDelegatedStake - qty
 
-		-- Calculate the penalty and withdraw using the utility function
+		-- Calculate the penalty and withdraw using the utility function and move the balances
 		expeditedWithdrawalFee, amountToWithdraw, penaltyRate = processInstantWithdrawal(qty, 0, 0, delegator)
 
 		-- Remove the delegate if no stake is left
@@ -476,10 +483,11 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 		gateway.delegates[delegator].delegatedStake = gateway.delegates[delegator].delegatedStake - qty
 		gateway.totalDelegatedStake = gateway.totalDelegatedStake - qty
 	end
+
 	-- update the gateway
 	GatewayRegistry[gatewayAddress] = gateway
 	return {
-		gateway = gar.getGateway(gatewayAddress),
+		gateway = gateway,
 		penaltyRate = penaltyRate,
 		expeditedWithdrawalFee = expeditedWithdrawalFee,
 		amountWithdrawn = amountToWithdraw,
@@ -888,24 +896,41 @@ function gar.cancelGatewayWithdrawal(from, gatewayAddress, vaultId)
 	}
 end
 
-function gar.instantDelegateWithdrawal(from, gatewayAddress, vaultId, currentTimestamp)
+---@param from string # The address of the operator or delegate
+---@param gatewayAddress string # The address of the gateway
+---@param vaultId string # The id of the vault
+---@param currentTimestamp number # The current timestamp
+---@return table # A table containing the gateway, elapsed time, remaining time, penalty rate, expedited withdrawal fee, and amount withdrawn
+function gar.instantGatewayWithdrawal(from, gatewayAddress, vaultId, currentTimestamp)
 	local gateway = gar.getGateway(gatewayAddress)
 	if gateway == nil then
 		error("Gateway not found")
 	end
 
-	local delegate = gateway.delegates[from]
-	if delegate == nil then
-		error("Delegate not found")
+	local isGatewayWithdrawal = from == gatewayAddress
+
+	if isGatewayWithdrawal and gateway.status == "leaving" then
+		error("This gateway is leaving and this vault cannot be instantly withdrawn.")
 	end
 
-	local vault = delegate.vaults[vaultId]
+	local vault
+	local delegate
+	if isGatewayWithdrawal then
+		vault = gateway.vaults[vaultId]
+	else
+		delegate = gateway.delegates[from]
+		if delegate == nil then
+			error("Delegate not found")
+		end
+		vault = delegate.vaults[vaultId]
+	end
 	if vault == nil then
 		error("Vault not found")
 	end
 
-	-- Calculate elapsed time since the withdrawal started
+	---@type number
 	local elapsedTime = currentTimestamp - vault.startTimestamp
+	---@type number
 	local totalWithdrawalTime = vault.endTimestamp - vault.startTimestamp
 
 	-- Ensure the elapsed time is not negative
@@ -918,61 +943,25 @@ function gar.instantDelegateWithdrawal(from, gatewayAddress, vaultId, currentTim
 		processInstantWithdrawal(vault.balance, elapsedTime, totalWithdrawalTime, from)
 
 	-- Remove the vault after withdrawal
-	delegate.vaults[vaultId] = nil
-
-	-- Remove the delegate if no stake is left
-	if delegate.delegatedStake == 0 and next(delegate.vaults) == nil then
-		gateway.delegates[from] = nil
+	if isGatewayWithdrawal then
+		gateway.vaults[vaultId] = nil
+	else
+		if delegate == nil then
+			error("Delegate not found")
+		end
+		delegate.vaults[vaultId] = nil
+		print("delegated stake remaining: " .. require("json").encode(gateway.delegates))
+		print("Delegates remaining vaults: " .. utils.lengthOfTable(delegate.vaults))
+		-- Remove the delegate if no stake is left
+		if delegate.delegatedStake == 0 and next(delegate.vaults) == nil then
+			gateway.delegates[from] = nil
+		end
 	end
 
 	-- Update the gateway
 	GatewayRegistry[gatewayAddress] = gateway
 	return {
-		delegate = gar.getGateway(gatewayAddress).delegates[from],
-		elapsedTime = elapsedTime,
-		remainingTime = totalWithdrawalTime - elapsedTime,
-		penaltyRate = penaltyRate,
-		expeditedWithdrawalFee = expeditedWithdrawalFee,
-		amountWithdrawn = amountToWithdraw,
-	}
-end
-
-function gar.instantOperatorWithdrawal(from, vaultId, currentTimestamp)
-	local gateway = gar.getGateway(from)
-
-	if gateway == nil then
-		error("Gateway not found")
-	end
-
-	local vault = gateway.vaults[vaultId]
-	if vault == nil then
-		error("Vault not found")
-	end
-
-	if vaultId == from then
-		error("This gateway is leaving and this vault cannot be instantly withdrawn.")
-	end
-
-	-- Calculate elapsed time since the withdrawal started
-	local elapsedTime = currentTimestamp - vault.startTimestamp
-	local totalWithdrawalTime = gar.getSettings().operators.withdrawLengthMs
-
-	-- Ensure the elapsed time is not negative
-	if elapsedTime < 0 then
-		error("Invalid elapsed time")
-	end
-
-	-- Process the instant withdrawal
-	local expeditedWithdrawalFee, amountToWithdraw, penaltyRate =
-		processInstantWithdrawal(vault.balance, elapsedTime, totalWithdrawalTime, from)
-
-	-- Remove the vault after withdrawal
-	gateway.vaults[vaultId] = nil
-
-	-- Update the gateway
-	GatewayRegistry[from] = gateway
-	return {
-		gateway = gar.getGateway(from),
+		gateway = gateway,
 		elapsedTime = elapsedTime,
 		remainingTime = totalWithdrawalTime - elapsedTime,
 		penaltyRate = penaltyRate,
