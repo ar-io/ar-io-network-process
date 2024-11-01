@@ -243,7 +243,7 @@ end
 function utils.splitString(input, delimiter)
 	delimiter = delimiter or ","
 	local result = {}
-	for token in input:gmatch(string.format("([^%s]+)", delimiter)) do
+	for token in (input or ""):gmatch(string.format("([^%s]+)", delimiter)) do
 		table.insert(result, token)
 	end
 	return result

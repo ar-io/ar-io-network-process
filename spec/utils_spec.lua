@@ -322,6 +322,11 @@ describe("utils", function()
 			assert.are.same({}, result)
 		end)
 
+		it("should return an empty table for a nil input string", function()
+			local result = utils.splitAndTrimString(nil)
+			assert.are.same({}, result)
+		end)
+
 		it("should handle custom delimiter without trimming unexpected characters", function()
 			local input = "one two three"
 			local result = utils.splitAndTrimString(input, " ")
