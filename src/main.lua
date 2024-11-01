@@ -93,6 +93,8 @@ local ActionMap = {
 	AuctionInfo = "Auction-Info",
 	AuctionBid = "Auction-Bid",
 	AuctionPrices = "Auction-Prices",
+	AllowDelegates = "Allow-Delegates",
+	DisallowDelegates = "Disallow-Delegates",
 }
 
 -- Low fidelity trackers
@@ -1730,6 +1732,7 @@ addEventingHandler(
 	end
 )
 
+-- TODO: Update the UpdateGatewaySettings handler to consider replacing the allowedDelegates list
 addEventingHandler(
 	ActionMap.UpdateGatewaySettings,
 	utils.hasMatchingTag("Action", ActionMap.UpdateGatewaySettings),
@@ -2900,6 +2903,108 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 			}),
 		})
 	end
+end)
+
+addEventingHandler("allowDelegates", utils.hasMatchingTag("Action", ActionMap.AllowDelegates), function(msg)
+	local function checkAssertions()
+		assert(
+			#(msg.Tags["Allowed-Delegates"] or ""),
+			"Allowed-Delegates, a comma-separated list string of delegate addresses, is required"
+		)
+	end
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.AllowDelegates .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
+
+	local newAllowedDelegates = (
+		msg.Tags["Allowed-Delegates"] and utils.splitAndTrimString(msg.Tags["Allowed-Delegates"] or "")
+	)
+	msg.ioEvent:addField("Input-New-Delegates-Count", utils.lengthOfTable(newAllowedDelegates))
+
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.AllowDelegates .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, gar.allowDelegates, newAllowedDelegates, msg.From)
+	if not shouldContinue2 then
+		return
+	end
+
+	if result ~= nil then
+		msg.ioEvent:addField("New-Allowed-Delegates", result.newAllowedDelegates or {})
+		msg.ioEvent:addField("New-Allowed-Delegates-Count", utils.lengthOfTable(result.newAllowedDelegates))
+		msg.ioEvent:addField(
+			"Gateway-Total-Allowed-Delegates",
+			utils.lengthOfTable(result.gateway and result.gateway.allowedDelegatesLookup or {})
+				+ utils.lengthOfTable(result.gateway and result.gateway.delegates or {})
+		)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = ActionMap.AllowDelegates .. "-Notice" },
+		Data = json.encode(result and result.newAllowedDelegates or {}),
+	})
+end)
+
+addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap.DisallowDelegates), function(msg)
+	local function checkAssertions()
+		assert(
+			#(msg.Tags["Disallowed-Delegates"] or ""),
+			"Disallowed-Delegates, a comma-separated list string of delegate addresses, is required"
+		)
+	end
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.DisallowDelegates .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
+
+	local disallowedDelegates = (
+		msg.Tags["Disallowed-Delegates"] and utils.splitAndTrimString(msg.Tags["Disallowed-Delegates"] or "")
+	)
+	msg.ioEvent:addField("Input-Disallowed-Delegates-Count", utils.lengthOfTable(disallowedDelegates))
+
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.DisallowDelegates .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, gar.disallowDelegates, disallowedDelegates, msg.From)
+	if not shouldContinue2 then
+		return
+	end
+
+	if result ~= nil then
+		msg.ioEvent:addField("New-Disallowed-Delegates", result.removedDelegates or {})
+		msg.ioEvent:addField("New-Disallowed-Delegates-Count", utils.lengthOfTable(result.removedDelegates))
+		msg.ioEvent:addField(
+			"Gateway-Total-Allowed-Delegates",
+			utils.lengthOfTable(result.gateway and result.gateway.allowedDelegatesLookup or {})
+				+ utils.lengthOfTable(result.gateway and result.gateway.delegates or {})
+		)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = ActionMap.DisallowDelegates .. "-Notice" },
+		Data = json.encode(result and result.removedDelegates or {}),
+	})
 end)
 
 return process
