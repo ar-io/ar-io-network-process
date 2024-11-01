@@ -1815,6 +1815,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 				acc.gatewayStakeWithdrawing = acc.gatewayStakeWithdrawing + pruneGatewaysResult.gatewayStakeWithdrawing
 				acc.delegateStakeWithdrawing = acc.delegateStakeWithdrawing
 					+ pruneGatewaysResult.delegateStakeWithdrawing
+				acc.stakeSlashed = acc.stakeSlashed + pruneGatewaysResult.stakeSlashed
 				return acc
 			end,
 			{
