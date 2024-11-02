@@ -1243,7 +1243,10 @@ addEventingHandler(
 	function(msg)
 		local checkAssertions = function()
 			assert(
-				utils.isInteger(tonumber(msg.Tags.Quantity)) and tonumber(msg.Tags.Quantity) > 0,
+				msg.Tags.Quantity
+					and tonumber(msg.Tags.Quantity)
+					and utils.isInteger(tonumber(msg.Tags.Quantity))
+					and tonumber(msg.Tags.Quantity) > 0,
 				"Invalid quantity. Must be integer greater than 0"
 			)
 			if msg.Tags.Instant ~= nil then
@@ -1336,9 +1339,9 @@ addEventingHandler(
 
 addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.DelegateStake), function(msg)
 	local checkAssertions = function()
-		assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid target address")
+		assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
 		assert(
-			tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+			msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
 			"Invalid quantity. Must be integer greater than 0"
 		)
 	end
@@ -1543,9 +1546,9 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", ActionMap.DecreaseDelegateStake),
 	function(msg)
 		local checkAssertions = function()
-			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid target address")
+			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
 			assert(
-				tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+				msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(msg.Tags.Quantity),
 				"Invalid quantity. Must be integer greater than 0"
 			)
 			if msg.Tags.Instant ~= nil then

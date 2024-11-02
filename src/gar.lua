@@ -345,7 +345,7 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 		error("Cannot delegate to your own gateway, use increaseOperatorStake instead.")
 	end
 
-	if balances.getBalance(from) < qty then
+	if not utils.walletHasSufficientBalance(from, qty) then
 		error("Insufficient balance")
 	end
 
@@ -388,6 +388,7 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 		gateway.delegates[from].delegatedStake = gateway.delegates[from].delegatedStake + qty
 	end
 	-- Decrement the user's balance
+	print("decreasing balance for " .. from .. " which is currently " .. balances.getBalance(from))
 	balances.reduceBalance(from, qty)
 	gateway.totalDelegatedStake = gateway.totalDelegatedStake + qty
 	-- update the gateway
