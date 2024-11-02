@@ -184,6 +184,9 @@ local function processInstantWithdrawal(qty, elapsedTime, totalWithdrawalTime, f
 		math.min(constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE, penaltyRate)
 	)
 
+	-- round to three decimal places
+	penaltyRate = math.floor(penaltyRate * 1000) / 1000
+
 	local expeditedWithdrawalFee = math.floor(qty * penaltyRate)
 	local amountToWithdraw = qty - expeditedWithdrawalFee
 
@@ -950,8 +953,6 @@ function gar.instantGatewayWithdrawal(from, gatewayAddress, vaultId, currentTime
 			error("Delegate not found")
 		end
 		delegate.vaults[vaultId] = nil
-		print("delegated stake remaining: " .. require("json").encode(gateway.delegates))
-		print("Delegates remaining vaults: " .. utils.lengthOfTable(delegate.vaults))
 		-- Remove the delegate if no stake is left
 		if delegate.delegatedStake == 0 and next(delegate.vaults) == nil then
 			gateway.delegates[from] = nil
