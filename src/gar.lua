@@ -388,7 +388,6 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 		gateway.delegates[from].delegatedStake = gateway.delegates[from].delegatedStake + qty
 	end
 	-- Decrement the user's balance
-	print("decreasing balance for " .. from .. " which is currently " .. balances.getBalance(from))
 	balances.reduceBalance(from, qty)
 	gateway.totalDelegatedStake = gateway.totalDelegatedStake + qty
 	-- update the gateway

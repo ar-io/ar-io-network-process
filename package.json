@@ -2,7 +2,7 @@
   "type": "module",
   "scripts": {
     "build": "node tools/bundle-aos.mjs",
-    "test:integration": "yarn build && node --test --experimental-wasm-memory64 **/gar.test.mjs",
+    "test:integration": "yarn build && node --test --experimental-wasm-memory64 **/*.test.mjs",
     "format:fix": "prettier --write .",
     "lint": "luacheck src spec",
     "test:unit": "busted . && luacov",
