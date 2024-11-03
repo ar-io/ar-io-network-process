@@ -256,34 +256,36 @@ function gar.updateGatewaySettings(from, updatedSettings, updatedServices, obser
 		end
 	end
 
-	-- vault all delegated stakes if it is disabled, we'll return stake at the proper end heights of the vault
-	if
-		(not updatedSettings.allowDelegatedStaking and next(gateway.delegates) ~= nil) -- staking disabled and delegates must go
-		or (updatedSettings.allowedDelegates and utils.lengthOfTable(updatedSettings.allowedDelegates) == 0) -- all delegates must go
-	then
-		-- Add tokens from each delegate to a vault that unlocks after the delegate withdrawal period ends
-		for address, _ in pairs(gateway.delegates) do
-			gar.kickDelegateFromGateway(address, gateway, msgId, currentTimestamp)
-		end
-	end
-
-	if updatedSettings.allowedDelegates then
+	-- update the allow list first if necessary since we may need it for accounting in any subsequent delegate kicks
+	if updatedSettings.allowDelegatedStaking and updatedSettings.allowedDelegates then
 		-- Replace the existing lookup table
 		updatedSettings.allowedDelegatesLookup = utils.createLookupTable(updatedSettings.allowedDelegates)
 		updatedSettings.allowedDelegates = nil -- no longer need the list now that lookup is built
 
 		-- remove any delegates that are not in the allowlist
-		for address, delegate in pairs(gateway.delegates) do
-			if updatedSettings.allowedDelegatesLookup[address] then
+		for delegateAddress, delegate in pairs(gateway.delegates) do
+			if updatedSettings.allowedDelegatesLookup[delegateAddress] then
 				if delegate.delegatedStake > 0 then
 					-- remove the delegate from the lookup since it's adequately tracked as a delegate already
-					updatedSettings.allowedDelegatesLookup[address] = nil
+					updatedSettings.allowedDelegatesLookup[delegateAddress] = nil
 				end
 			elseif delegate.delegatedStake > 0 then
-				gar.kickDelegateFromGateway(address, gateway, msgId, currentTimestamp)
+				gar.kickDelegateFromGateway(delegateAddress, gateway, msgId, currentTimestamp)
 			end
 			-- else: the delegate was exiting already with 0-balance and will no longer be on the allowlist
 		end
+	end
+
+	if not updatedSettings.allowDelegatedStaking then
+		-- Add tokens from each delegate to a vault that unlocks after the delegate withdrawal period ends
+		if next(gateway.delegates) ~= nil then -- staking disabled and delegates must go
+			for address, _ in pairs(gateway.delegates) do
+				gar.kickDelegateFromGateway(address, gateway, msgId, currentTimestamp)
+			end
+		end
+
+		-- clear the allowedDelegatesLookup since we no longer need it
+		updatedSettings.allowedDelegatesLookup = nil
 	end
 
 	-- if allowDelegateStaking is currently false, and you want to set it to true - you have to wait until all the vaults have been returned
@@ -1112,14 +1114,16 @@ function gar.kickDelegateFromGateway(delegateAddress, gateway, msgId, currentTim
 		delegate.vaults = {}
 	end
 
-	delegate.vaults[msgId] = {
-		balance = delegate.delegatedStake,
-		startTimestamp = currentTimestamp,
-		endTimestamp = currentTimestamp + gar.getSettings().delegates.withdrawLengthMs,
-	}
-	-- reduce gateway stake and set this delegate stake to 0
-	gateway.totalDelegatedStake = gateway.totalDelegatedStake - delegate.delegatedStake
-	delegate.delegatedStake = 0
+	if delegate.delegatedStake > 0 then
+		delegate.vaults[msgId] = {
+			balance = delegate.delegatedStake,
+			startTimestamp = currentTimestamp,
+			endTimestamp = currentTimestamp + gar.getSettings().delegates.withdrawLengthMs,
+		}
+		-- reduce gateway stake and set this delegate stake to 0
+		gateway.totalDelegatedStake = gateway.totalDelegatedStake - delegate.delegatedStake
+		delegate.delegatedStake = 0
+	end
 
 	if not ban and gar.delegationAllowlistedOnGateway(gateway) then
 		gateway.settings.allowedDelegatesLookup[delegateAddress] = true

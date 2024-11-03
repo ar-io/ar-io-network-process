@@ -1768,11 +1768,10 @@ addEventingHandler(
 
 		-- If delegated staking is being fully enabled or disabled, clear the allowlist
 		local allowDelegatedStakingOverride = msg.Tags["Allow-Delegated-Staking"]
-		local enableOpenDelegatedStaking = allowDelegatedStakingOverride == true
+		local enableOpenDelegatedStaking = allowDelegatedStakingOverride == "true"
 		local enableLimitedDelegatedStaking = allowDelegatedStakingOverride == "allowlist"
-		local disableDelegatedStaking = allowDelegatedStakingOverride == false
+		local disableDelegatedStaking = allowDelegatedStakingOverride == "false"
 		local shouldClearAllowlist = enableOpenDelegatedStaking or disableDelegatedStaking
-		local allowlistingActive = enableLimitedDelegatedStaking or gateway.settings.allowedDelegatesLookup ~= nil
 
 		local updatedSettings = {
 			label = msg.Tags.Label or gateway.settings.label,
@@ -1785,8 +1784,7 @@ addEventingHandler(
 				or not disableDelegatedStaking -- NOT clear directive to DISABLE
 					and gateway.settings.allowDelegatedStaking, -- otherwise unspecified, so use previous setting
 
-			allowedDelegates = (shouldClearAllowlist and {}) -- clear the lookup
-				or allowlistingActive
+			allowedDelegates = not shouldClearAllowlist
 					and msg.Tags["Allowed-Delegates"]
 					and utils.splitAndTrimString(msg.Tags["Allowed-Delegates"]) -- replace the lookup list - TODO: REMOVE EXISTING DELEGATES
 				or nil, -- change nothing
