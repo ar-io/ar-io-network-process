@@ -257,11 +257,32 @@ function gar.updateGatewaySettings(from, updatedSettings, updatedServices, obser
 	end
 
 	-- vault all delegated stakes if it is disabled, we'll return stake at the proper end heights of the vault
-	-- TODO: allow listing implications
-	if not updatedSettings.allowDelegatedStaking and next(gateway.delegates) ~= nil then
+	if
+		(not updatedSettings.allowDelegatedStaking and next(gateway.delegates) ~= nil) -- staking disabled and delegates must go
+		or (updatedSettings.allowedDelegates and utils.lengthOfTable(updatedSettings.allowedDelegates) == 0) -- all delegates must go
+	then
 		-- Add tokens from each delegate to a vault that unlocks after the delegate withdrawal period ends
 		for address, _ in pairs(gateway.delegates) do
 			gar.kickDelegateFromGateway(address, gateway, msgId, currentTimestamp)
+		end
+	end
+
+	if updatedSettings.allowedDelegates then
+		-- Replace the existing lookup table
+		updatedSettings.allowedDelegatesLookup = utils.createLookupTable(updatedSettings.allowedDelegates)
+		updatedSettings.allowedDelegates = nil -- no longer need the list now that lookup is built
+
+		-- remove any delegates that are not in the allowlist
+		for address, delegate in pairs(gateway.delegates) do
+			if updatedSettings.allowedDelegatesLookup[address] then
+				if delegate.delegatedStake > 0 then
+					-- remove the delegate from the lookup since it's adequately tracked as a delegate already
+					updatedSettings.allowedDelegatesLookup[address] = nil
+				end
+			elseif delegate.delegatedStake > 0 then
+				gar.kickDelegateFromGateway(address, gateway, msgId, currentTimestamp)
+			end
+			-- else: the delegate was exiting already with 0-balance and will no longer be on the allowlist
 		end
 	end
 
@@ -366,8 +387,8 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 	gateway.totalDelegatedStake = gateway.totalDelegatedStake + qty
 
 	-- prune user from allow list, if necessary, to save memory
-	if gateway.allowedDelegatesLookup then
-		gateway.allowedDelegatesLookup[from] = nil
+	if gateway.settings.allowedDelegatesLookup then
+		gateway.settings.allowedDelegatesLookup[from] = nil
 	end
 
 	-- update the gateway
@@ -450,6 +471,11 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 
 		-- Calculate the penalty and withdraw using the utility function
 		expeditedWithdrawalFee, amountToWithdraw, penaltyRate = processInstantWithdrawal(qty, 0, 0, delegator)
+
+		-- Remove the delegate if no stake is left in its balance or vaults
+		if gateway.delegates[delegator].delegatedStake == 0 and next(gateway.delegates[delegator].vaults) == nil then
+			gar.pruneDelegateFromGateway(delegator, gateway)
+		end
 	else
 		-- Withdraw the delegate's stake
 		local newDelegateVault = {
@@ -462,11 +488,6 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 		gateway.delegates[delegator].vaults[messageId] = newDelegateVault
 		gateway.delegates[delegator].delegatedStake = gateway.delegates[delegator].delegatedStake - qty
 		gateway.totalDelegatedStake = gateway.totalDelegatedStake - qty
-	end
-
-	-- Remove the delegate if no stake is left in its balance or vaults
-	if gateway.delegates[delegator].delegatedStake == 0 and next(gateway.delegates[delegator].vaults) == nil then
-		gar.pruneDelegateFromGateway(delegator, gateway)
 	end
 
 	-- update the gateway
@@ -773,7 +794,8 @@ function gar.pruneGateways(currentTimestamp, msgId)
 			-- remove the delegate if all vaults are empty and the delegated stake is 0
 			for delegateAddress, delegate in pairs(gateway.delegates) do
 				if delegate.delegatedStake == 0 and next(delegate.vaults) == nil then
-					gar.pruneDelegateFromGateway(delegateAddress, gateway)
+					-- any allowlist reassignment would have already taken place by now
+					gateway.delegates[delegateAddress] = nil
 				end
 			end
 			-- update the gateway before we do anything else
@@ -1100,7 +1122,7 @@ function gar.kickDelegateFromGateway(delegateAddress, gateway, msgId, currentTim
 	delegate.delegatedStake = 0
 
 	if not ban and gar.delegationAllowlistedOnGateway(gateway) then
-		gateway.allowedDelegatesLookup[delegateAddress] = true
+		gateway.settings.allowedDelegatesLookup[delegateAddress] = true
 	end
 end
 

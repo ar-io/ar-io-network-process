@@ -1765,14 +1765,32 @@ addEventingHandler(
 		end
 
 		-- keep defaults, but update any new ones
+
+		-- If delegated staking is being fully enabled or disabled, clear the allowlist
+		local allowDelegatedStakingOverride = msg.Tags["Allow-Delegated-Staking"]
+		local enableOpenDelegatedStaking = allowDelegatedStakingOverride == true
+		local enableLimitedDelegatedStaking = allowDelegatedStakingOverride == "allowlist"
+		local disableDelegatedStaking = allowDelegatedStakingOverride == false
+		local shouldClearAllowlist = enableOpenDelegatedStaking or disableDelegatedStaking
+		local allowlistingActive = enableLimitedDelegatedStaking or gateway.settings.allowedDelegatesLookup ~= nil
+
 		local updatedSettings = {
 			label = msg.Tags.Label or gateway.settings.label,
 			note = msg.Tags.Note or gateway.settings.note,
 			fqdn = msg.Tags.FQDN or gateway.settings.fqdn,
 			port = tonumber(msg.Tags.Port) or gateway.settings.port,
 			protocol = msg.Tags.Protocol or gateway.settings.protocol,
-			allowDelegatedStaking = not msg.Tags["Allow-Delegated-Staking"] and gateway.settings.allowDelegatedStaking
-				or msg.Tags["Allow-Delegated-Staking"] == "true",
+			allowDelegatedStaking = enableOpenDelegatedStaking -- clear directive to enable
+				or enableLimitedDelegatedStaking -- clear directive to enable
+				or not disableDelegatedStaking -- NOT clear directive to DISABLE
+					and gateway.settings.allowDelegatedStaking, -- otherwise unspecified, so use previous setting
+
+			allowedDelegates = (shouldClearAllowlist and {}) -- clear the lookup
+				or allowlistingActive
+					and msg.Tags["Allowed-Delegates"]
+					and utils.splitAndTrimString(msg.Tags["Allowed-Delegates"]) -- replace the lookup list - TODO: REMOVE EXISTING DELEGATES
+				or nil, -- change nothing
+
 			minDelegatedStake = tonumber(msg.Tags["Min-Delegated-Stake"]) or gateway.settings.minDelegatedStake,
 			delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"])
 				or gateway.settings.delegateRewardShareRatio,
@@ -1880,8 +1898,7 @@ end)
 
 addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
 	local reportTxId = msg.Tags["Report-Tx-Id"]
-	local failedGateways = msg.Tags["Failed-Gateways"] and utils.splitAndTrimString(msg.Tags["Failed-Gateways"], ",")
-		or {}
+	local failedGateways = utils.splitAndTrimString(msg.Tags["Failed-Gateways"], ",")
 	local checkAssertions = function()
 		assert(utils.isValidAOAddress(reportTxId), "Invalid report tx id")
 		for _, gateway in ipairs(failedGateways) do
@@ -2923,9 +2940,7 @@ addEventingHandler("allowDelegates", utils.hasMatchingTag("Action", ActionMap.Al
 		return
 	end
 
-	local newAllowedDelegates = (
-		msg.Tags["Allowed-Delegates"] and utils.splitAndTrimString(msg.Tags["Allowed-Delegates"] or "")
-	)
+	local newAllowedDelegates = utils.splitAndTrimString(msg.Tags["Allowed-Delegates"])
 	msg.ioEvent:addField("Input-New-Delegates-Count", utils.lengthOfTable(newAllowedDelegates))
 
 	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
@@ -2944,7 +2959,7 @@ addEventingHandler("allowDelegates", utils.hasMatchingTag("Action", ActionMap.Al
 		msg.ioEvent:addField("New-Allowed-Delegates-Count", utils.lengthOfTable(result.newAllowedDelegates))
 		msg.ioEvent:addField(
 			"Gateway-Total-Allowed-Delegates",
-			utils.lengthOfTable(result.gateway and result.gateway.allowedDelegatesLookup or {})
+			utils.lengthOfTable(result.gateway and result.gateway.settings.allowedDelegatesLookup or {})
 				+ utils.lengthOfTable(result.gateway and result.gateway.delegates or {})
 		)
 	end
@@ -2974,9 +2989,7 @@ addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap
 		return
 	end
 
-	local disallowedDelegates = (
-		msg.Tags["Disallowed-Delegates"] and utils.splitAndTrimString(msg.Tags["Disallowed-Delegates"] or "")
-	)
+	local disallowedDelegates = utils.splitAndTrimString(msg.Tags["Disallowed-Delegates"])
 	msg.ioEvent:addField("Input-Disallowed-Delegates-Count", utils.lengthOfTable(disallowedDelegates))
 
 	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
@@ -2995,7 +3008,7 @@ addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap
 		msg.ioEvent:addField("New-Disallowed-Delegates-Count", utils.lengthOfTable(result.removedDelegates))
 		msg.ioEvent:addField(
 			"Gateway-Total-Allowed-Delegates",
-			utils.lengthOfTable(result.gateway and result.gateway.allowedDelegatesLookup or {})
+			utils.lengthOfTable(result.gateway and result.gateway.settings.allowedDelegatesLookup or {})
 				+ utils.lengthOfTable(result.gateway and result.gateway.delegates or {})
 		)
 	end
