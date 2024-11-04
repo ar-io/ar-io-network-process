@@ -92,6 +92,8 @@ local ActionMap = {
 	AuctionInfo = "Auction-Info",
 	AuctionBid = "Auction-Bid",
 	AuctionPrices = "Auction-Prices",
+	AllowDelegates = "Allow-Delegates",
+	DisallowDelegates = "Disallow-Delegates",
 }
 
 -- Low fidelity trackers
@@ -1047,7 +1049,10 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 		fqdn = msg.Tags.FQDN,
 		port = tonumber(msg.Tags.Port) or 443,
 		protocol = msg.Tags.Protocol or "https",
-		allowDelegatedStaking = msg.Tags["Allow-Delegated-Staking"] == "true",
+		allowDelegatedStaking = msg.Tags["Allow-Delegated-Staking"] == "true"
+			or msg.Tags["Allow-Delegated-Staking"] == "allowlist",
+		allowedDelegates = (msg.Tags["Allowed-Delegates"] and utils.splitAndTrimString(msg.Tags["Allowed-Delegates"]))
+			or (msg.Tags["Allow-Delegated-Staking"] == "allowlist" and {} or nil), -- start with an empty list if necessary
 		minDelegatedStake = tonumber(msg.Tags["Min-Delegated-Stake"]),
 		delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"]) or 0,
 		properties = msg.Tags.Properties or "FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44",
@@ -1653,6 +1658,7 @@ addEventingHandler(
 	end
 )
 
+-- TODO: Update the UpdateGatewaySettings handler to consider replacing the allowedDelegates list
 addEventingHandler(
 	ActionMap.UpdateGatewaySettings,
 	utils.hasMatchingTag("Action", ActionMap.UpdateGatewaySettings),
@@ -1685,14 +1691,30 @@ addEventingHandler(
 		end
 
 		-- keep defaults, but update any new ones
+
+		-- If delegated staking is being fully enabled or disabled, clear the allowlist
+		local allowDelegatedStakingOverride = msg.Tags["Allow-Delegated-Staking"]
+		local enableOpenDelegatedStaking = allowDelegatedStakingOverride == "true"
+		local enableLimitedDelegatedStaking = allowDelegatedStakingOverride == "allowlist"
+		local disableDelegatedStaking = allowDelegatedStakingOverride == "false"
+		local shouldClearAllowlist = enableOpenDelegatedStaking or disableDelegatedStaking
+
 		local updatedSettings = {
 			label = msg.Tags.Label or gateway.settings.label,
 			note = msg.Tags.Note or gateway.settings.note,
 			fqdn = msg.Tags.FQDN or gateway.settings.fqdn,
 			port = tonumber(msg.Tags.Port) or gateway.settings.port,
 			protocol = msg.Tags.Protocol or gateway.settings.protocol,
-			allowDelegatedStaking = not msg.Tags["Allow-Delegated-Staking"] and gateway.settings.allowDelegatedStaking
-				or msg.Tags["Allow-Delegated-Staking"] == "true",
+			allowDelegatedStaking = enableOpenDelegatedStaking -- clear directive to enable
+				or enableLimitedDelegatedStaking -- clear directive to enable
+				or not disableDelegatedStaking -- NOT clear directive to DISABLE
+					and gateway.settings.allowDelegatedStaking, -- otherwise unspecified, so use previous setting
+
+			allowedDelegates = not shouldClearAllowlist
+					and msg.Tags["Allowed-Delegates"]
+					and utils.splitAndTrimString(msg.Tags["Allowed-Delegates"]) -- replace the lookup list - TODO: REMOVE EXISTING DELEGATES
+				or nil, -- change nothing
+
 			minDelegatedStake = tonumber(msg.Tags["Min-Delegated-Stake"]) or gateway.settings.minDelegatedStake,
 			delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"])
 				or gateway.settings.delegateRewardShareRatio,
@@ -1800,7 +1822,7 @@ end)
 
 addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
 	local reportTxId = msg.Tags["Report-Tx-Id"]
-	local failedGateways = msg.Tags["Failed-Gateways"] and utils.splitString(msg.Tags["Failed-Gateways"], ",") or {}
+	local failedGateways = utils.splitAndTrimString(msg.Tags["Failed-Gateways"], ",")
 	local checkAssertions = function()
 		assert(utils.isValidAOAddress(reportTxId), "Invalid report tx id")
 		for _, gateway in ipairs(failedGateways) do
@@ -2822,6 +2844,104 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 			}),
 		})
 	end
+end)
+
+addEventingHandler("allowDelegates", utils.hasMatchingTag("Action", ActionMap.AllowDelegates), function(msg)
+	local function checkAssertions()
+		assert(
+			#(msg.Tags["Allowed-Delegates"] or ""),
+			"Allowed-Delegates, a comma-separated list string of delegate addresses, is required"
+		)
+	end
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.AllowDelegates .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
+
+	local newAllowedDelegates = utils.splitAndTrimString(msg.Tags["Allowed-Delegates"])
+	msg.ioEvent:addField("Input-New-Delegates-Count", utils.lengthOfTable(newAllowedDelegates))
+
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.AllowDelegates .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, gar.allowDelegates, newAllowedDelegates, msg.From)
+	if not shouldContinue2 then
+		return
+	end
+
+	if result ~= nil then
+		msg.ioEvent:addField("New-Allowed-Delegates", result.newAllowedDelegates or {})
+		msg.ioEvent:addField("New-Allowed-Delegates-Count", utils.lengthOfTable(result.newAllowedDelegates))
+		msg.ioEvent:addField(
+			"Gateway-Total-Allowed-Delegates",
+			utils.lengthOfTable(result.gateway and result.gateway.settings.allowedDelegatesLookup or {})
+				+ utils.lengthOfTable(result.gateway and result.gateway.delegates or {})
+		)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = ActionMap.AllowDelegates .. "-Notice" },
+		Data = json.encode(result and result.newAllowedDelegates or {}),
+	})
+end)
+
+addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap.DisallowDelegates), function(msg)
+	local function checkAssertions()
+		assert(
+			#(msg.Tags["Disallowed-Delegates"] or ""),
+			"Disallowed-Delegates, a comma-separated list string of delegate addresses, is required"
+		)
+	end
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.DisallowDelegates .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
+
+	local disallowedDelegates = utils.splitAndTrimString(msg.Tags["Disallowed-Delegates"])
+	msg.ioEvent:addField("Input-Disallowed-Delegates-Count", utils.lengthOfTable(disallowedDelegates))
+
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.DisallowDelegates .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, gar.disallowDelegates, disallowedDelegates, msg.From)
+	if not shouldContinue2 then
+		return
+	end
+
+	if result ~= nil then
+		msg.ioEvent:addField("New-Disallowed-Delegates", result.removedDelegates or {})
+		msg.ioEvent:addField("New-Disallowed-Delegates-Count", utils.lengthOfTable(result.removedDelegates))
+		msg.ioEvent:addField(
+			"Gateway-Total-Allowed-Delegates",
+			utils.lengthOfTable(result.gateway and result.gateway.settings.allowedDelegatesLookup or {})
+				+ utils.lengthOfTable(result.gateway and result.gateway.delegates or {})
+		)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = ActionMap.DisallowDelegates .. "-Notice" },
+		Data = json.encode(result and result.removedDelegates or {}),
+	})
 end)
 
 return process

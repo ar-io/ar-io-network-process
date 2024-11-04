@@ -20,6 +20,10 @@
     "**/dist": true,
     "**/coverage": true
   },
+  "Lua.codeLens.enable": true,
+  "Lua.workspace.library": ["${workspaceFolderBasename}/**"],
+  "Lua.completion.callSnippet": "Both",
+  "Lua.signatureHelp.enable": true,
   "Lua.workspace.checkThirdParty": true,
   "Lua.diagnostics.enable": true,
   "Lua.diagnostics.disable": ["lowercase-global", "undefined-global"],

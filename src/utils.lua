@@ -194,10 +194,6 @@ function utils.findInArray(array, predicate)
 	return nil -- Return nil if the element is not found
 end
 
-function utils.walletHasSufficientBalance(wallet, quantity)
-	return Balances[wallet] ~= nil and Balances[wallet] >= quantity
-end
-
 --- Deep copies a table
 ---@param original table The table to copy
 ---@return table|nil The deep copy of the table or nil if the original is nil
@@ -236,12 +232,28 @@ function utils.getHashFromBase64URL(str)
 	return crypto.digest.sha2_256(hashStream).asBytes()
 end
 
-function utils.splitString(str, delimiter)
+function utils.splitString(input, delimiter)
+	delimiter = delimiter or ","
 	local result = {}
-	for match in (str .. delimiter):gmatch("(.-)" .. delimiter) do
-		result[#result + 1] = match
+	for token in (input or ""):gmatch(string.format("([^%s]+)", delimiter)) do
+		table.insert(result, token)
 	end
 	return result
+end
+
+function utils.trimString(input)
+	return input:match("^%s*(.-)%s*$")
+end
+
+function utils.splitAndTrimString(input, delimiter)
+	local tokens = {}
+	for _, token in ipairs(utils.splitString(input, delimiter)) do
+		local trimmed = utils.trimString(token)
+		if #trimmed > 0 then
+			table.insert(tokens, trimmed)
+		end
+	end
+	return tokens
 end
 
 function utils.checkAndConvertTimestamptoMs(timestamp)
@@ -303,6 +315,14 @@ function utils.toTrainCase(str)
 		end
 	end)
 	return str
+end
+
+function utils.createLookupTable(tbl)
+	local lookupTable = {}
+	for _, value in ipairs(tbl or {}) do
+		lookupTable[value] = true
+	end
+	return lookupTable
 end
 
 return utils

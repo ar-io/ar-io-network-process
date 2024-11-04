@@ -920,9 +920,7 @@ describe("gar", function()
 			local stakeAmount = 500000000
 			_G.Balances[stubRandomAddress] = stakeAmount
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
-			local status, result =
-				pcall(gar.delegateStake, stubRandomAddress, stubGatewayAddress, stakeAmount, startTimestamp)
-			assert.is_true(status)
+			local result = gar.delegateStake(stubRandomAddress, stubGatewayAddress, stakeAmount, startTimestamp)
 			assert.are.equal(0, _G.Balances[stubRandomAddress])
 			assert.are.same({
 				operatorStake = testGateway.operatorStake,

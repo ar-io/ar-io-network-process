@@ -54,6 +54,8 @@ function gar.joinNetwork(from, stake, settings, services, observerAddress, timeS
 		},
 		settings = {
 			allowDelegatedStaking = settings.allowDelegatedStaking or false,
+			allowedDelegatesLookup = settings.allowedDelegates and utils.createLookupTable(settings.allowedDelegates)
+				or nil,
 			delegateRewardShareRatio = settings.delegateRewardShareRatio or 0,
 			autoStake = settings.autoStake or false,
 			minDelegatedStake = settings.minDelegatedStake,
@@ -87,7 +89,6 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 
 	local gatewayEndTimestamp = currentTimestamp + gar.getSettings().operators.leaveLengthMs
 	local gatewayStakeWithdrawTimestamp = currentTimestamp + gar.getSettings().operators.withdrawLengthMs
-	local delegateEndTimestamp = currentTimestamp + gar.getSettings().delegates.withdrawLengthMs
 
 	local minimumStakedTokens = math.min(gar.getSettings().operators.minStake, gateway.operatorStake)
 
@@ -116,18 +117,8 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 	gateway.operatorStake = 0
 
 	-- Add tokens from each delegate to a vault that unlocks after the delegate withdrawal period ends
-	for address, delegate in pairs(gateway.delegates) do
-		-- Assuming SmartWeave and interactionHeight are previously defined in your Lua environment
-		gateway.delegates[address].vaults[msgId] = {
-			balance = delegate.delegatedStake,
-			startTimestamp = currentTimestamp,
-			endTimestamp = delegateEndTimestamp,
-		}
-
-		-- Reduce gateway stake and set this delegate stake to 0
-		-- TODO: It's an invariant if totalDelegatedStake isn't 0 at the end of this loop
-		gateway.totalDelegatedStake = gateway.totalDelegatedStake - delegate.delegatedStake
-		gateway.delegates[address].delegatedStake = 0
+	for address, _ in pairs(gateway.delegates) do
+		gar.kickDelegateFromGateway(address, gateway, msgId, currentTimestamp)
 	end
 
 	-- update global state
@@ -275,26 +266,36 @@ function gar.updateGatewaySettings(from, updatedSettings, updatedServices, obser
 		end
 	end
 
-	-- vault all delegated stakes if it is disabled, we'll return stake at the proper end heights of the vault
-	if not updatedSettings.allowDelegatedStaking and next(gateway.delegates) ~= nil then
-		-- Add tokens from each delegate to a vault that unlocks after the delegate withdrawal period ends
-		local delegateEndTimestamp = currentTimestamp + gar.getSettings().delegates.withdrawLengthMs
+	-- update the allow list first if necessary since we may need it for accounting in any subsequent delegate kicks
+	if updatedSettings.allowDelegatedStaking and updatedSettings.allowedDelegates then
+		-- Replace the existing lookup table
+		updatedSettings.allowedDelegatesLookup = utils.createLookupTable(updatedSettings.allowedDelegates)
+		updatedSettings.allowedDelegates = nil -- no longer need the list now that lookup is built
 
-		for address, delegate in pairs(gateway.delegates) do
-			if not gateway.delegates[address].vaults then
-				gateway.delegates[address].vaults = {}
+		-- remove any delegates that are not in the allowlist
+		for delegateAddress, delegate in pairs(gateway.delegates) do
+			if updatedSettings.allowedDelegatesLookup[delegateAddress] then
+				if delegate.delegatedStake > 0 then
+					-- remove the delegate from the lookup since it's adequately tracked as a delegate already
+					updatedSettings.allowedDelegatesLookup[delegateAddress] = nil
+				end
+			elseif delegate.delegatedStake > 0 then
+				gar.kickDelegateFromGateway(delegateAddress, gateway, msgId, currentTimestamp)
 			end
-
-			local newDelegateVault = {
-				balance = delegate.delegatedStake,
-				startTimestamp = currentTimestamp,
-				endTimestamp = delegateEndTimestamp,
-			}
-			gateway.delegates[address].vaults[msgId] = newDelegateVault
-			-- reduce gateway stake and set this delegate stake to 0
-			gateway.totalDelegatedStake = gateway.totalDelegatedStake - delegate.delegatedStake
-			gateway.delegates[address].delegatedStake = 0
+			-- else: the delegate was exiting already with 0-balance and will no longer be on the allowlist
 		end
+	end
+
+	if not updatedSettings.allowDelegatedStaking then
+		-- Add tokens from each delegate to a vault that unlocks after the delegate withdrawal period ends
+		if next(gateway.delegates) ~= nil then -- staking disabled and delegates must go
+			for address, _ in pairs(gateway.delegates) do
+				gar.kickDelegateFromGateway(address, gateway, msgId, currentTimestamp)
+			end
+		end
+
+		-- clear the allowedDelegatesLookup since we no longer need it
+		updatedSettings.allowedDelegatesLookup = nil
 	end
 
 	-- if allowDelegateStaking is currently false, and you want to set it to true - you have to wait until all the vaults have been returned
@@ -348,7 +349,7 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 		error("Cannot delegate to your own gateway, use increaseOperatorStake instead.")
 	end
 
-	if not utils.walletHasSufficientBalance(from, qty) then
+	if not balances.walletHasSufficientBalance(from, qty) then
 		error("Insufficient balance")
 	end
 
@@ -356,11 +357,14 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 		error("This Gateway is in the process of leaving the network and cannot have more stake delegated to it.")
 	end
 
-	-- TODO: when allowedDelegates is supported, check if it's in the array of allowed delegates
 	if not gateway.settings.allowDelegatedStaking then
 		error(
 			"This Gateway does not allow delegated staking. Only allowed delegates can delegate stake to this Gateway."
 		)
+	end
+
+	if not gar.delegateAllowedToStake(from, gateway) then
+		error("This Gateway does not allow this delegate to stake.")
 	end
 
 	-- Assuming `gateway` is a table and `fromAddress` is defined
@@ -393,6 +397,12 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 	-- Decrement the user's balance
 	balances.reduceBalance(from, qty)
 	gateway.totalDelegatedStake = gateway.totalDelegatedStake + qty
+
+	-- prune user from allow list, if necessary, to save memory
+	if gateway.settings.allowedDelegatesLookup then
+		gateway.settings.allowedDelegatesLookup[from] = nil
+	end
+
 	-- update the gateway
 	GatewayRegistry[target] = gateway
 	return gar.getGateway(target)
@@ -419,6 +429,11 @@ function gar.increaseExistingDelegateStake(gatewayAddress, gateway, delegateAddr
 	local delegate = gateway.delegates[delegateAddress]
 	if not delegate then
 		error("Delegate not found")
+	end
+
+	-- consider case where delegate has been kicked from the gateway and has vaulted stake
+	if not gar.delegateAllowedToStake(delegateAddress, gateway) then
+		error("This Gateway does not allow this delegate to stake.")
 	end
 
 	gateway.delegates[delegateAddress].delegatedStake = delegate.delegatedStake + qty
@@ -469,9 +484,9 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 		-- Calculate the penalty and withdraw using the utility function and move the balances
 		expeditedWithdrawalFee, amountToWithdraw, penaltyRate = processInstantWithdrawal(qty, 0, 0, delegator)
 
-		-- Remove the delegate if no stake is left
+		-- Remove the delegate if no stake is left in its balance or vaults
 		if gateway.delegates[delegator].delegatedStake == 0 and next(gateway.delegates[delegator].vaults) == nil then
-			gateway.delegates[delegator] = nil
+			gar.pruneDelegateFromGateway(delegator, gateway)
 		end
 	else
 		-- Withdraw the delegate's stake
@@ -602,6 +617,17 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 		"Observer-Address is required and must be a a valid arweave address"
 	)
 	assert(type(settings.allowDelegatedStaking) == "boolean", "allowDelegatedStaking must be a boolean")
+	if type(settings.allowedDelegates) == "table" then
+		for _, delegate in ipairs(settings.allowedDelegates) do
+			assert(utils.isValidAOAddress(delegate), "delegates in allowedDelegates must be valid AO addresses")
+		end
+	else
+		assert(
+			settings.allowedDelegates == nil,
+			"allowedDelegates must be a table parsed from a comma-separated string or nil"
+		)
+	end
+
 	assert(type(settings.label) == "string", "label is required and must be a string")
 	assert(type(settings.fqdn) == "string", "fqdn is required and must be a string")
 	assert(
@@ -780,6 +806,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 			-- remove the delegate if all vaults are empty and the delegated stake is 0
 			for delegateAddress, delegate in pairs(gateway.delegates) do
 				if delegate.delegatedStake == 0 and next(delegate.vaults) == nil then
+					-- any allowlist reassignment would have already taken place by now
 					gateway.delegates[delegateAddress] = nil
 				end
 			end
@@ -884,6 +911,9 @@ function gar.cancelGatewayWithdrawal(from, gatewayAddress, vaultId)
 		gateway.vaults[vaultId] = nil
 		gateway.operatorStake = gateway.operatorStake + vaultBalance
 	else
+		if not gar.delegateAllowedToStake(from, gateway) then
+			error("This Gateway does not allow this delegate to stake.")
+		end
 		delegate.vaults[vaultId] = nil
 		delegate.delegatedStake = delegate.delegatedStake + vaultBalance
 		gateway.totalDelegatedStake = gateway.totalDelegatedStake + vaultBalance
@@ -969,6 +999,137 @@ function gar.instantGatewayWithdrawal(from, gatewayAddress, vaultId, currentTime
 		expeditedWithdrawalFee = expeditedWithdrawalFee,
 		amountWithdrawn = amountToWithdraw,
 	}
+end
+
+--- Preserves delegate's position in allow list upon removal from gateway
+--- @param delegateAddress string The address of the delegator
+--- @param gateway table The gateway from which the delegate is being removed
+function gar.pruneDelegateFromGateway(delegateAddress, gateway)
+	gateway.delegates[delegateAddress] = nil
+
+	-- replace the delegate in the allowedDelegatesLookup table if necessary
+	if gateway.settings.allowedDelegatesLookup then
+		gateway.settings.allowedDelegatesLookup[delegateAddress] = true
+	end
+end
+
+--- Add delegate addresses to the allowedDelegatesLookup table in the gateway's settings
+--- @param delegates table The list of delegate addresses to add
+--- @param gatewayAddress string The address of the gateway
+--- @return table result Result table containing updated gateway object and the delegates that were actually added
+function gar.allowDelegates(delegates, gatewayAddress)
+	local gateway = gar.getGateway(gatewayAddress)
+	if gateway == nil then
+		error("Gateway not found")
+	end
+
+	-- Only allow modification of the allow list when allowDelegatedStaking is set to false or a current allow list is in place
+	if gateway.settings.allowDelegatedStaking == true and not gateway.settings.allowedDelegatesLookup then
+		error("Allow listing only possible when allowDelegatedStaking is set to 'allowlist'")
+	end
+
+	assert(gateway.settings.allowedDelegatesLookup, "allowedDelegatesLookup should not be nil")
+
+	local addedDelegates = {}
+	for _, delegateAddress in ipairs(delegates) do
+		if not utils.isValidAOAddress(delegateAddress) then
+			error("Invalid delegate address: " .. delegateAddress)
+		end
+
+		-- Skip over delegates that are already in the allow list or that have a stake balance
+		if not gar.delegateAllowedToStake(delegateAddress, gateway) then
+			gateway.settings.allowedDelegatesLookup[delegateAddress] = true
+			table.insert(addedDelegates, delegateAddress)
+		end
+	end
+
+	GatewayRegistry[gatewayAddress] = gateway
+	return {
+		gateway = gateway,
+		addedDelegates = addedDelegates,
+	}
+end
+
+--- Remove delegate addresses from the allowedDelegatesLookup table in the gateway's settings
+--- @param delegates table The list of delegate addresses to remove
+--- @param gatewayAddress string The address of the gateway
+--- @param msgId string The associated message ID
+--- @param currentTimestamp number The current timestamp
+--- @return table result Result table containing updated gateway object and the delegates that were actually removed
+function gar.disallowDelegates(delegates, gatewayAddress, msgId, currentTimestamp)
+	local gateway = gar.getGateway(gatewayAddress)
+	if gateway == nil then
+		error("Gateway not found")
+	end
+
+	-- Only allow modification of the allow list when allowDelegatedStaking is set to false or a current allow list is in place
+	if gateway.settings.allowDelegatedStaking == true or not gateway.settings.allowedDelegatesLookup then
+		error("Allow listing only possible when allowDelegatedStaking is set to 'allowlist'")
+	end
+
+	assert(gateway.settings.allowedDelegatesLookup, "allowedDelegatesLookup should not be nil")
+
+	local removedDelegates = {}
+	for _, delegateToDisallow in ipairs(delegates) do
+		if not utils.isValidAOAddress(delegateToDisallow) then
+			error("Invalid delegate address: " .. delegateToDisallow)
+		end
+
+		-- Skip over delegates that are not in the allow list
+		if gateway.settings.allowedDelegatesLookup[delegateToDisallow] then
+			gateway.settings.allowedDelegatesLookup[delegateToDisallow] = nil
+			table.insert(removedDelegates, delegateToDisallow)
+		end
+		-- Kick the delegate off the gateway if necessary
+		local ban = true
+		gar.kickDelegateFromGateway(delegateToDisallow, gateway, msgId, currentTimestamp, ban)
+	end
+
+	GatewayRegistry[gatewayAddress] = gateway
+	return {
+		gateway = gateway,
+		removedDelegates = removedDelegates,
+	}
+end
+
+--- Vaults delegate's tokens and updates delegate and gateway staking balances
+function gar.kickDelegateFromGateway(delegateAddress, gateway, msgId, currentTimestamp, ban)
+	local delegate = gateway.delegates[delegateAddress]
+	if not delegate then
+		return
+	end
+
+	if not delegate.vaults then
+		delegate.vaults = {}
+	end
+
+	if delegate.delegatedStake > 0 then
+		delegate.vaults[msgId] = {
+			balance = delegate.delegatedStake,
+			startTimestamp = currentTimestamp,
+			endTimestamp = currentTimestamp + gar.getSettings().delegates.withdrawLengthMs,
+		}
+		-- reduce gateway stake and set this delegate stake to 0
+		gateway.totalDelegatedStake = gateway.totalDelegatedStake - delegate.delegatedStake
+		delegate.delegatedStake = 0
+	end
+
+	if not ban and gar.delegationAllowlistedOnGateway(gateway) then
+		gateway.settings.allowedDelegatesLookup[delegateAddress] = true
+	end
+end
+
+function gar.delegationAllowlistedOnGateway(gateway)
+	return gateway.settings.allowedDelegatesLookup ~= nil
+end
+
+function gar.delegateAllowedToStake(delegateAddress, gateway)
+	if not gar.delegationAllowlistedOnGateway(gateway) then
+		return true
+	end
+	-- Delegate must either be in the allow list or have a balance greater than 0
+	return gateway.settings.allowedDelegatesLookup[delegateAddress]
+		or (gateway.delegates[delegateAddress] and gateway.delegates[delegateAddress].delegatedStake or 0) > 0
 end
 
 return gar
