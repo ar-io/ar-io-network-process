@@ -71,9 +71,9 @@ function gar.joinNetwork(from, stake, settings, services, observerAddress, timeS
 		observerAddress = observerAddress or from,
 	}
 
-	gar.addGateway(from, newGateway)
+	local gateway = gar.addGateway(from, newGateway)
 	balances.reduceBalance(from, stake)
-	return gar.getGateway(from)
+	return gateway
 end
 
 function gar.leaveNetwork(from, currentTimestamp, msgId)
@@ -156,30 +156,30 @@ function gar.increaseOperatorStake(from, qty)
 end
 
 -- Utility function to calculate withdrawal details and handle balance adjustments
----@param qty number # The amount of stake to withdraw
----@param elapsedTime number # The amount of time that has elapsed since the withdrawal started
----@param totalWithdrawalTime number # The total amount of time the withdrawal will take
+---@param stake number # The amount of stake to withdraw in mIO
+---@param elapsedTimeMs number # The amount of time that has elapsed since the withdrawal started
+---@param totalWithdrawalTimeMs number # The total amount of time the withdrawal will take
 ---@param from string # The address of the operator or delegate
----@return number # The penalty rate
----@return number # The expedited withdrawal fee
----@return number # The amount withdrawn
-local function processInstantWithdrawal(qty, elapsedTime, totalWithdrawalTime, from)
+---@return number # The penalty rate as a percentage
+---@return number # The expedited withdrawal fee in mIO, given to the protocol balance
+---@return number # The final amount withdrawn, after the penalty fee is subtracted and moved to the from balance
+local function processInstantWithdrawal(stake, elapsedTimeMs, totalWithdrawalTimeMs, from)
 	-- Calculate the withdrawal fee and the amount to withdraw
 	local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
 		- (
 			(constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE - constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE)
-			* (elapsedTime / totalWithdrawalTime)
+			* (elapsedTimeMs / totalWithdrawalTimeMs)
 		)
 	penaltyRate = math.max(
 		constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE,
 		math.min(constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE, penaltyRate)
 	)
 
-	-- round to three decimal places
-	penaltyRate = math.floor(penaltyRate * 1000) / 1000
+	-- round to three decimal places to avoid floating point precision loss with small numbers
+	penaltyRate = utils.roundToPrecision(penaltyRate, 3)
 
-	local expeditedWithdrawalFee = math.floor(qty * penaltyRate)
-	local amountToWithdraw = qty - expeditedWithdrawalFee
+	local expeditedWithdrawalFee = math.floor(stake * penaltyRate)
+	local amountToWithdraw = stake - expeditedWithdrawalFee
 
 	-- Withdraw the tokens to the delegate and the protocol balance
 	balances.increaseBalance(ao.id, expeditedWithdrawalFee)
@@ -405,7 +405,7 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 
 	-- update the gateway
 	GatewayRegistry[target] = gateway
-	return gar.getGateway(target)
+	return gateway
 end
 
 --- Internal function to increase the stake of an existing delegate. This should only be called from epochs.lua
@@ -758,6 +758,7 @@ end
 
 function gar.addGateway(address, gateway)
 	GatewayRegistry[address] = gateway
+	return gateway
 end
 
 -- for test purposes

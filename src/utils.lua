@@ -7,11 +7,22 @@ function utils.hasMatchingTag(tag, value)
 	return Handlers.utils.hasMatchingTag(tag, value)
 end
 
+--- Checks if a value is an integer
+--- @param value any The value to check
+--- @return boolean Whether the value is an integer
 function utils.isInteger(value)
 	if type(value) == "string" then
 		value = tonumber(value)
 	end
 	return value % 1 == 0
+end
+
+--- Rounds a number to a given precision
+--- @param number number The number to round
+--- @param precision number The precision to round to
+--- @return number The rounded number to the precision provided
+function utils.roundToPrecision(number, precision)
+	return math.floor(number * (10 ^ precision)) / (10 ^ precision)
 end
 
 function utils.sumTableValues(tbl)
