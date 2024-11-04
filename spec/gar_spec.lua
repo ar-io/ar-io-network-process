@@ -17,6 +17,10 @@ local testSettings = {
 	label = "test",
 	delegateRewardShareRatio = 0,
 	properties = stubGatewayAddress,
+	allowedDelegatesLookup = {
+		["test-allowlisted-delegator-address-number-1"] = true,
+		["test-allowlisted-delegator-address-number-2"] = true,
+	},
 }
 local testServices = {
 	bundlers = {
@@ -88,11 +92,17 @@ describe("gar", function()
 		end)
 		it("should join the network", function()
 			local expectation = testGateway
+			local inputSettings = utils.deepCopy(testSettings)
+			inputSettings.allowedDelegatesLookup = nil
+			inputSettings.allowedDelegates = {
+				"test-allowlisted-delegator-address-number-1",
+				"test-allowlisted-delegator-address-number-2",
+			}
 			local status, result = pcall(
 				gar.joinNetwork,
 				stubGatewayAddress,
 				gar.getSettings().operators.minStake,
-				testSettings,
+				inputSettings,
 				nil, -- no additional services on this gateway
 				stubObserverAddress,
 				startTimestamp
@@ -105,11 +115,17 @@ describe("gar", function()
 		it("should join the network with services and bundlers", function()
 			local expectation = testGateway
 			expectation.services = testServices
+			local inputSettings = utils.deepCopy(testSettings)
+			inputSettings.allowedDelegatesLookup = nil
+			inputSettings.allowedDelegates = {
+				"test-allowlisted-delegator-address-number-1",
+				"test-allowlisted-delegator-address-number-2",
+			}
 			local status, result = pcall(
 				gar.joinNetwork,
 				stubGatewayAddress,
 				gar.getSettings().operators.minStake,
-				testSettings,
+				inputSettings,
 				testServices,
 				stubObserverAddress,
 				startTimestamp
@@ -516,6 +532,12 @@ describe("gar", function()
 					},
 				},
 			}
+			local expectedSettings = utils.deepCopy(testSettings)
+			expectedSettings.allowedDelegatesLookup = {
+				["test-allowlisted-delegator-address-number-1"] = true,
+				["test-allowlisted-delegator-address-number-2"] = true,
+				[stubRandomAddress] = true,
+			}
 
 			local status, result = pcall(gar.leaveNetwork, stubGatewayAddress, startTimestamp, stubMessageId)
 			assert.is_true(status)
@@ -558,7 +580,7 @@ describe("gar", function()
 					failedConsecutiveEpochs = 0,
 					passedConsecutiveEpochs = 0,
 				},
-				settings = testSettings,
+				settings = expectedSettings,
 				status = "leaving",
 				observerAddress = stubObserverAddress,
 			})
@@ -812,6 +834,66 @@ describe("gar", function()
 			assert.are.same(expectation, _G.GatewayRegistry[stubGatewayAddress])
 		end)
 
+		it("should update delegator allow list settings correctly", function()
+			_G.GatewayRegistry[stubGatewayAddress] = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+				startTimestamp = startTimestamp,
+				stats = testGateway.stats,
+				settings = testGateway.settings,
+				status = testGateway.status,
+				observerAddress = testGateway.observerAddress,
+			}
+			local newObserverWallet = stubGatewayAddress
+			local inputUpdatedSettings = {
+				fqdn = "example.com",
+				port = 80,
+				protocol = "https",
+				properties = "NdZ3YRwMB2AMwwFYjKn1g88Y9nRybTo0qhS1ORq_E7g",
+				note = "This is a test update.",
+				label = "Test Label Update",
+				autoStake = true,
+				allowDelegatedStaking = true,
+				allowedDelegates = {
+					"test-allowlisted-delegator-address-number-1",
+					"test-allowlisted-delegator-address-number-2",
+				},
+				delegateRewardShareRatio = 15,
+				minDelegatedStake = gar.getSettings().delegates.minStake + 5,
+			}
+			local expectedSettings = utils.deepCopy(inputUpdatedSettings)
+			expectedSettings.allowedDelegates = nil
+			expectedSettings.allowedDelegatesLookup = {
+				["test-allowlisted-delegator-address-number-1"] = true,
+				["test-allowlisted-delegator-address-number-2"] = true,
+			}
+			local expectation = {
+				operatorStake = gar.getSettings().operators.minStake,
+				observerAddress = newObserverWallet,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+				startTimestamp = testGateway.startTimestamp,
+				stats = testGateway.stats,
+				settings = expectedSettings,
+				status = testGateway.status,
+			}
+			local status, result = pcall(
+				gar.updateGatewaySettings,
+				stubGatewayAddress,
+				inputUpdatedSettings,
+				nil, -- no additional services on this gateway
+				newObserverWallet,
+				startTimestamp,
+				stubMessageId
+			)
+			assert.is_true(status)
+			assert.are.same(expectation, result)
+			assert.are.same(expectation, _G.GatewayRegistry[stubGatewayAddress])
+		end)
+
 		it("should allow updating gateway services", function()
 			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
@@ -919,8 +1001,13 @@ describe("gar", function()
 		it("should delegate stake to a gateway", function()
 			local stakeAmount = 500000000
 			_G.Balances[stubRandomAddress] = stakeAmount
-			_G.GatewayRegistry[stubGatewayAddress] = testGateway
+			_G.GatewayRegistry[stubGatewayAddress] = utils.deepCopy(testGateway)
+			_G.GatewayRegistry[stubGatewayAddress].settings.allowedDelegatesLookup = {
+				[stubRandomAddress] = true,
+			}
 			local result = gar.delegateStake(stubRandomAddress, stubGatewayAddress, stakeAmount, startTimestamp)
+			local expectedSettings = utils.deepCopy(testGateway.settings)
+			expectedSettings.allowedDelegatesLookup = {}
 			assert.are.equal(0, _G.Balances[stubRandomAddress])
 			assert.are.same({
 				operatorStake = testGateway.operatorStake,
@@ -936,7 +1023,7 @@ describe("gar", function()
 				startTimestamp = startTimestamp,
 				stats = testGateway.stats,
 				services = testGateway.services,
-				settings = testGateway.settings,
+				settings = expectedSettings,
 				status = testGateway.status,
 				observerAddress = testGateway.observerAddress,
 			}, result)
@@ -1651,7 +1738,7 @@ describe("gar", function()
 					startTimestamp = currentTimestamp,
 					endTimestamp = currentTimestamp + gar.getSettings().operators.leaveLengthMs,
 				}, _G.GatewayRegistry["address3"].vaults["address3"])
-				assert.are.equal(protocolBalanceBefore + expectedSlashedStake, Balances[ao.id])
+				assert.are.equal(protocolBalanceBefore + expectedSlashedStake, _G.Balances[ao.id])
 			end
 		)
 
@@ -1717,7 +1804,8 @@ describe("gar", function()
 			assert.matches("Vault not found", err)
 		end)
 		it("should cancel a delegate withdrawal", function()
-			_G.GatewayRegistry[stubGatewayAddress] = testGateway
+			_G.GatewayRegistry[stubGatewayAddress] = utils.deepCopy(testGateway)
+			_G.GatewayRegistry[stubGatewayAddress].settings.allowedDelegatesLookup = { [stubRandomAddress] = true }
 			_G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake = 0
 			_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = {
 				delegatedStake = 0,
