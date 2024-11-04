@@ -306,7 +306,7 @@ function arns.assertValidBuyRecord(name, years, purchaseType, processId)
 
 	-- assert processId is valid pattern
 	assert(type(processId) == "string", "Process id is required and must be a string.")
-	assert(utils.isValidAOAddress(processId), "Process id must be a valid base64url.")
+	assert(utils.isValidAOAddress(processId), "Process Id must be a valid AO signer address..")
 end
 
 --- Asserts that a record is valid for extending the lease

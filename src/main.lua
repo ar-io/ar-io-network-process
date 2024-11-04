@@ -715,7 +715,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 		) -- make sure it's a string, not empty, not longer than 51 characters, and not an arweave address
 		-- assert processId is valid pattern
 		assert(type(processId) == "string", "Process id is required and must be a string.")
-		assert(utils.isValidAOAddress(processId), "Process id must be a valid base64url.")
+		assert(utils.isValidAOAddress(processId), "Process Id must be a valid AO signer address..")
 		if years then
 			assert(
 				years >= 1 and years <= 5 and utils.isInteger(years),
@@ -1761,7 +1761,7 @@ addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", Action
 	local initiator = utils.formatAddress(msg.Tags.Initiator)
 	local checkAssertions = function()
 		assert(name and #name > 0, "Name is required")
-		assert(utils.isValidAOAddress(newProcessId), "Process id must be a valid base64url.")
+		assert(utils.isValidAOAddress(newProcessId), "Process Id must be a valid AO signer address..")
 		if initiator ~= nil then
 			assert(utils.isValidAOAddress(initiator), "Invalid initiator address.")
 		end
