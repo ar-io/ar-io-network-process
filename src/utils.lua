@@ -22,7 +22,7 @@ end
 --- @param precision number The precision to round to
 --- @return number The rounded number to the precision provided
 function utils.roundToPrecision(number, precision)
-	return math.floor(number * (10 ^ precision)) / (10 ^ precision)
+	return math.floor(number * (10 ^ precision) + 0.5) / (10 ^ precision)
 end
 
 function utils.sumTableValues(tbl)
