@@ -14,7 +14,7 @@ local function AOEvent(initialData)
 		event.data = initialData
 	end
 
-	local function isValidTableValueType(table)
+	local function isValidTableValueType(value)
 		local valueType = type(value)
 		return valueType == "string" or valueType == "number" or valueType == "boolean" or value == nil
 	end
@@ -87,19 +87,6 @@ local function AOEvent(initialData)
 			end
 		end
 		return self
-	end
-
-	-- Helper function to escape JSON control characters in strings
-	local function escapeString(s)
-		-- Escape backslashes first
-		s = string.gsub(s, "\\", "\\\\")
-		-- Escape double quotes
-		s = string.gsub(s, '"', '\\"')
-		-- Escape other control characters (optional for full JSON compliance)
-		s = string.gsub(s, "\n", "\\n")
-		s = string.gsub(s, "\r", "\\r")
-		s = string.gsub(s, "\t", "\\t")
-		return s
 	end
 
 	function event:printEvent()

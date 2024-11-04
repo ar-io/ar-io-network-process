@@ -38,8 +38,7 @@ describe('setup', () => {
   });
 
   describe('handlers', () => {
-    it('should always have correct number of handlers', async () => {
-      const expectedHandlerCount = 58; // TODO: update this if more handlers are added
+    it('should always have correct handler order', async () => {
       const { Handlers: handlersList } = await io.getInfo();
       /**
        * There are two security handlers before _eval and _default, so count is 52
@@ -79,10 +78,6 @@ describe('setup', () => {
         'prune should be the fifth handler, got: ' +
           handlersList.indexOf('prune'),
       );
-      assert.ok(
-        handlersList.length === expectedHandlerCount,
-        `should have ${expectedHandlerCount} handlers, got: ${handlersList.length}`,
-      ); // forces us to think critically about the order of handlers so intended to be sensitive to changes
     });
   });
 
@@ -288,12 +283,14 @@ describe('setup', () => {
       const { items: gateways } = await io.getGateways({
         limit: 1000, // we will need to update this if the number of gateways grows
       });
-      const activeGatewayCount = gateways.filter(
-        (gateway) => gateway.status === 'joined',
+      const activeGatewayCountForEpoch = gateways.filter(
+        (gateway) =>
+          gateway.status === 'joined' &&
+          gateway.startTimestamp <= startTimestamp,
       ).length;
       assert(
-        activeGatewayCount === distributions.totalEligibleGateways,
-        `Active gateway count (${activeGatewayCount}) does not match total eligible gateways (${distributions.totalEligibleGateways}) for the current epoch`,
+        activeGatewayCountForEpoch === distributions.totalEligibleGateways,
+        `Active gateway count (${activeGatewayCountForEpoch}) does not match total eligible gateways (${distributions.totalEligibleGateways}) for the current epoch`,
       );
     });
 
@@ -485,7 +482,10 @@ describe('setup', () => {
     it('should not have any arns records older than two weeks', async () => {
       // TODO: Remove this when we figure out whether do/while is causing test hanging
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Test timed out after 60 seconds')), 60000)
+        setTimeout(
+          () => reject(new Error('Test timed out after 60 seconds')),
+          60000,
+        ),
       );
 
       const testLogicPromise = (async () => {

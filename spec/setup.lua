@@ -1,8 +1,8 @@
 package.path = "./contract/src/?.lua;" .. package.path
 
 _G.ao = {
-	send = function(obj)
-		return true
+	send = function(val)
+		return val
 	end,
 	id = "test",
 }
@@ -14,9 +14,5 @@ _G.Handlers = {
 		end,
 	},
 }
-
-os.clock = function()
-	return 0
-end
 
 print("Setup global ao mocks successfully...")

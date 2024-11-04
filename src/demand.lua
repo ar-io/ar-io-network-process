@@ -32,6 +32,13 @@ function demand.tallyNamePurchase(qty)
 	demand.incrementRevenueThisPeriod(qty)
 end
 
+--- Gets the base fee for a given name length
+--- @param nameLength number The length of the name
+--- @return number The base fee for the name length
+function demand.baseFeeForNameLength(nameLength)
+	return demand.getFees()[nameLength]
+end
+
 function demand.mvgAvgTrailingPurchaseCounts()
 	local sum = 0
 	local trailingPeriodPurchases = demand.getTrailingPeriodPurchases()

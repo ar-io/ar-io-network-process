@@ -11,44 +11,48 @@ describe("balances", function()
 		}
 	end)
 
+	it("should return the balance with getBalance", function()
+		assert.are.equal(100, balances.getBalance(testAddress1))
+	end)
+
 	it("should transfer tokens", function()
 		local status, result = pcall(balances.transfer, testAddress2, testAddress1, 100)
 		assert.is_true(status)
-		assert.are.same(result[testAddress2], balances.getBalance(testAddress2))
-		assert.are.same(result[testAddress1], balances.getBalance(testAddress1))
-		assert.are.equal(100, balances.getBalance(testAddress2))
-		assert.are.equal(0, balances.getBalance(testAddress1))
+		assert.are.same(result[testAddress2], _G.Balances[testAddress2])
+		assert.are.same(result[testAddress1], _G.Balances[testAddress1])
+		assert.are.equal(100, _G.Balances[testAddress2])
+		assert.are.equal(0, _G.Balances[testAddress1])
 	end)
 
 	it("should transfer tokens between Arweave and ETH addresses", function()
 		local status, result = pcall(balances.transfer, testAddressEth, testAddress1, 100)
 		assert.is_true(status)
-		assert.are.same(result[testAddressEth], balances.getBalance(testAddressEth))
-		assert.are.same(result[testAddress1], balances.getBalance(testAddress1))
-		assert.are.equal(100, balances.getBalance(testAddressEth))
-		assert.are.equal(0, balances.getBalance(testAddress1))
+		assert.are.same(result[testAddressEth], _G.Balances[testAddressEth])
+		assert.are.same(result[testAddress1], _G.Balances[testAddress1])
+		assert.are.equal(100, _G.Balances[testAddressEth])
+		assert.are.equal(0, _G.Balances[testAddress1])
 	end)
 
 	it("should error on insufficient balance", function()
 		local status, result = pcall(balances.transfer, testAddress2, testAddress1, 101)
 		assert.is_false(status)
 		assert.match("Insufficient balance", result)
-		assert.are.equal(0, balances.getBalance(testAddress2))
-		assert.are.equal(100, balances.getBalance(testAddress1))
+		assert.are.equal(nil, _G.Balances[testAddress2])
+		assert.are.equal(100, _G.Balances[testAddress1])
 	end)
 
 	it("should error on insufficient balance (ETH)", function()
 		local status, result = pcall(balances.transfer, testAddressEth, testAddress1, 101)
 		assert.is_false(status)
 		assert.match("Insufficient balance", result)
-		assert.are.equal(0, balances.getBalance(testAddress2))
-		assert.are.equal(100, balances.getBalance(testAddress1))
+		assert.are.equal(nil, _G.Balances[testAddress2])
+		assert.are.equal(100, _G.Balances[testAddress1])
 	end)
 
 	describe("getPaginatedBalances", function()
 		it("should return paginated balances", function()
-			local balances = balances.getPaginatedBalances(nil, 10, "balance", "desc")
-			assert.are.same(balances, {
+			local returnedBalances = balances.getPaginatedBalances(nil, 10, "balance", "desc")
+			assert.are.same({
 				limit = 10,
 				sortBy = "balance",
 				sortOrder = "desc",
@@ -60,7 +64,7 @@ describe("balances", function()
 						balance = 100,
 					},
 				},
-			})
+			}, returnedBalances)
 		end)
 	end)
 end)
