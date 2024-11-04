@@ -986,7 +986,7 @@ function gar.instantGatewayWithdrawal(from, gatewayAddress, vaultId, currentTime
 		delegate.vaults[vaultId] = nil
 		-- Remove the delegate if no stake is left
 		if delegate.delegatedStake == 0 and next(delegate.vaults) == nil then
-			gateway.delegates[from] = nil
+			gar.pruneDelegateFromGateway(from, gateway)
 		end
 	end
 
