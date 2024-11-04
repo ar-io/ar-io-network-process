@@ -84,8 +84,7 @@ local ActionMap = {
 	DelegateStake = "Delegate-Stake",
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
 	CancelWithdrawal = "Cancel-Withdrawal",
-	InstantDelegateWithdrawal = "Instant-Delegate-Withdrawal",
-	InstantOperatorWithdrawal = "Instant-Operator-Withdrawal",
+	InstantWithdrawal = "Instant-Withdrawal",
 	ReassignName = "Reassign-Name",
 	-- auctions
 	Auctions = "Auctions",
@@ -714,7 +713,9 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 			type(name) == "string" and #name > 0 and #name <= 51 and not utils.isValidAOAddress(name),
 			"Invalid name"
 		) -- make sure it's a string, not empty, not longer than 51 characters, and not an arweave address
-		assert(utils.isValidBase64Url(processId), "Invalid process id")
+		-- assert processId is valid pattern
+		assert(type(processId) == "string", "Process id is required and must be a string.")
+		assert(utils.isValidAOAddress(processId), "Process Id must be a valid AO signer address..")
 		if years then
 			assert(
 				years >= 1 and years <= 5 and utils.isInteger(years),
@@ -1248,7 +1249,10 @@ addEventingHandler(
 	function(msg)
 		local checkAssertions = function()
 			assert(
-				utils.isInteger(tonumber(msg.Tags.Quantity)) and tonumber(msg.Tags.Quantity) > 0,
+				msg.Tags.Quantity
+					and tonumber(msg.Tags.Quantity)
+					and utils.isInteger(tonumber(msg.Tags.Quantity))
+					and tonumber(msg.Tags.Quantity) > 0,
 				"Invalid quantity. Must be integer greater than 0"
 			)
 			if msg.Tags.Instant ~= nil then
@@ -1339,84 +1343,11 @@ addEventingHandler(
 	end
 )
 
-addEventingHandler(
-	ActionMap.InstantOperatorWithdrawal,
-	utils.hasMatchingTag("Action", ActionMap.InstantOperatorWithdrawal),
-	function(msg)
-		local checkAssertions = function()
-			assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
-		end
-
-		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Invalid-" .. ActionMap.InstantOperatorWithdrawal .. "-Notice",
-					Error = "Bad-Input",
-				},
-				Data = tostring(error),
-			})
-		end, checkAssertions)
-		if not shouldContinue then
-			return
-		end
-
-		local fromAddress = utils.formatAddress(msg.From)
-		local vaultId = msg.Tags["Vault-Id"]
-		msg.ioEvent:addField("Target-Formatted", fromAddress)
-
-		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Invalid-" .. ActionMap.InstantOperatorWithdrawal .. "-Notice",
-					Error = "Invalid-" .. ActionMap.InstantOperatorWithdrawal,
-				},
-				Data = tostring(error),
-			})
-		end, gar.instantOperatorWithdrawal, fromAddress, vaultId, msg.Timestamp)
-		if not shouldContinue2 then
-			return
-		end
-
-		local gatewayResult = result and result.gateway or {
-			operatorStake = 0,
-			vaults = {},
-		}
-
-		local amountWithdrawn = 0
-		msg.ioEvent:addField("Remaining-Operator-Stake", gatewayResult.operatorStake)
-		if result ~= nil then
-			msg.ioEvent:addField("Vault-Elapsed-Time", result.elapsedTime)
-			msg.ioEvent:addField("Vault-Remaining-Time", result.remainingTime)
-			msg.ioEvent:addField("Penalty-Rate", result.penaltyRate)
-			msg.ioEvent:addField("Instant-Withdrawal-Fee", result.expeditedWithdrawalFee)
-			msg.ioEvent:addField("Amount-Withdrawn", result.amountWithdrawn)
-			msg.ioEvent:addField("Previous-Vault-Balance", result.amountWithdrawn + result.expeditedWithdrawalFee)
-			LastKnownCirculatingSupply = LastKnownCirculatingSupply + result.amountWithdrawn
-			LastKnownWithdrawSupply = LastKnownWithdrawSupply - result.amountWithdrawn - result.expeditedWithdrawalFee
-			amountWithdrawn = result.amountWithdrawn
-		end
-
-		addSupplyData(msg.ioEvent)
-
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = ActionMap.InstantOperatorWithdrawal .. "-Notice",
-				["Vault-Id"] = msg.Tags["Vault-Id"],
-				["Amount-Withdrawn"] = amountWithdrawn,
-			},
-			Data = json.encode(gatewayResult),
-		})
-	end
-)
-
 addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.DelegateStake), function(msg)
 	local checkAssertions = function()
-		assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid target address")
+		assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
 		assert(
-			tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+			msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
 			"Invalid quantity. Must be integer greater than 0"
 		)
 	end
@@ -1546,19 +1477,25 @@ addEventingHandler(ActionMap.CancelWithdrawal, utils.hasMatchingTag("Action", Ac
 end)
 
 addEventingHandler(
-	ActionMap.InstantDelegateWithdrawal,
-	utils.hasMatchingTag("Action", ActionMap.InstantDelegateWithdrawal),
+	ActionMap.InstantWithdrawal,
+	utils.hasMatchingTag("Action", ActionMap.InstantWithdrawal),
 	function(msg)
+		local from = utils.formatAddress(msg.From)
+		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From) -- if not provided, use sender
+		local vaultId = utils.formatAddress(msg.Tags["Vault-Id"])
+		local timestamp = tonumber(msg.Timestamp)
+		msg.ioEvent:addField("Target-Formatted", target)
+
 		local checkAssertions = function()
-			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
-			assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
+			assert(utils.isValidAOAddress(target), "Invalid gateway address")
+			assert(utils.isValidAOAddress(vaultId), "Invalid vault id")
 		end
 
 		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = {
-					Action = "Invalid-" .. ActionMap.InstantDelegateWithdrawal .. "-Notice",
+					Action = "Invalid-" .. ActionMap.InstantWithdrawal .. "-Notice",
 					Error = "Bad-Input",
 				},
 				Data = tostring(error),
@@ -1568,33 +1505,23 @@ addEventingHandler(
 			return
 		end
 
-		local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
-		local fromAddress = utils.formatAddress(msg.From)
-		local vaultId = msg.Tags["Vault-Id"]
-		msg.ioEvent:addField("Target-Formatted", gatewayAddress)
-
 		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = {
-					Action = "Invalid-" .. ActionMap.InstantDelegateWithdrawal .. "-Notice",
-					Error = "Invalid-" .. ActionMap.InstantDelegateWithdrawal,
+					Action = "Invalid-" .. ActionMap.InstantWithdrawal .. "-Notice",
+					Error = "Invalid-" .. ActionMap.InstantWithdrawal,
 				},
 				Data = tostring(error),
 			})
-		end, gar.instantDelegateWithdrawal, fromAddress, gatewayAddress, vaultId, msg.Timestamp)
+		end, gar.instantGatewayWithdrawal, from, target, vaultId, timestamp)
 		if not shouldContinue2 then
 			return
 		end
 
-		local delegateResult = result and result.delegate or {
-			delegatedStake = 0,
-			vaults = {},
-		}
-
-		local amountWithdrawn = 0
-		msg.ioEvent:addField("Remaining-Delegate-Stake", delegateResult.delegatedStake)
 		if result ~= nil then
+			local vaultBalance = result.vaultBalance
+			msg.ioEvent:addField("Stake-Amount-Withdrawn", vaultBalance)
 			msg.ioEvent:addField("Vault-Elapsed-Time", result.elapsedTime)
 			msg.ioEvent:addField("Vault-Remaining-Time", result.remainingTime)
 			msg.ioEvent:addField("Penalty-Rate", result.penaltyRate)
@@ -1603,21 +1530,20 @@ addEventingHandler(
 			msg.ioEvent:addField("Previous-Vault-Balance", result.amountWithdrawn + result.expeditedWithdrawalFee)
 			LastKnownCirculatingSupply = LastKnownCirculatingSupply + result.amountWithdrawn
 			LastKnownWithdrawSupply = LastKnownWithdrawSupply - result.amountWithdrawn - result.expeditedWithdrawalFee
-			amountWithdrawn = result.amountWithdrawn
+			addSupplyData(msg.ioEvent)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = ActionMap.InstantWithdrawal .. "-Notice",
+					Address = target,
+					["Vault-Id"] = vaultId,
+					["Amount-Withdrawn"] = result.amountWithdrawn,
+					["Penalty-Rate"] = result.penaltyRate,
+					["Expedited-Withdrawal-Fee"] = result.expeditedWithdrawalFee,
+				},
+				Data = json.encode(result),
+			})
 		end
-
-		addSupplyData(msg.ioEvent)
-
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = ActionMap.InstantDelegateWithdrawal .. "-Notice",
-				Address = gatewayAddress,
-				["Vault-Id"] = msg.Tags["Vault-Id"],
-				["Amount-Withdrawn"] = amountWithdrawn,
-			},
-			Data = json.encode(delegateResult),
-		})
 	end
 )
 
@@ -1626,9 +1552,9 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", ActionMap.DecreaseDelegateStake),
 	function(msg)
 		local checkAssertions = function()
-			assert(utils.isValidArweaveAddress(msg.Tags.Target or msg.Tags.Address), "Invalid target address")
+			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
 			assert(
-				tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+				msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(msg.Tags.Quantity),
 				"Invalid quantity. Must be integer greater than 0"
 			)
 			if msg.Tags.Instant ~= nil then
@@ -1836,7 +1762,7 @@ addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", Action
 	local initiator = utils.formatAddress(msg.Tags.Initiator)
 	local checkAssertions = function()
 		assert(name and #name > 0, "Name is required")
-		assert(newProcessId and utils.isValidBase64Url(newProcessId), "Invalid Process-Id")
+		assert(utils.isValidAOAddress(newProcessId), "Process Id must be a valid AO signer address..")
 		if initiator ~= nil then
 			assert(utils.isValidAOAddress(initiator), "Invalid initiator address.")
 		end
