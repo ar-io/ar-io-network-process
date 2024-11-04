@@ -1050,8 +1050,9 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 		protocol = msg.Tags.Protocol or "https",
 		allowDelegatedStaking = msg.Tags["Allow-Delegated-Staking"] == "true"
 			or msg.Tags["Allow-Delegated-Staking"] == "allowlist",
-		allowedDelegates = (msg.Tags["Allowed-Delegates"] and utils.splitAndTrimString(msg.Tags["Allowed-Delegates"]))
-			or (msg.Tags["Allow-Delegated-Staking"] == "allowlist" and {} or nil), -- start with an empty list if necessary
+		allowedDelegates = msg.Tags["Allow-Delegated-Staking"] == "allowlist" and utils.splitAndTrimString(
+			msg.Tags["Allowed-Delegates"] or ""
+		) or nil,
 		minDelegatedStake = tonumber(msg.Tags["Min-Delegated-Stake"]),
 		delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"]) or 0,
 		properties = msg.Tags.Properties or "FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44",
