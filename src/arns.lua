@@ -5,6 +5,7 @@ local balances = require("balances")
 local demand = require("demand")
 local arns = {}
 local Auction = require("auctions")
+local gar = require("gar")
 
 NameRegistry = NameRegistry or {
 	reserved = {},
@@ -25,8 +26,15 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 
 	local baseRegistrationFee = demand.baseFeeForNameLength(#name)
 
-	local totalRegistrationFee =
-		arns.calculateRegistrationFee(purchaseType, baseRegistrationFee, years, demand.getDemandFactor())
+	local eligibleForArNSDiscount = gar.isEligibleForArNSDiscount(from)
+
+	local totalRegistrationFee = arns.calculateRegistrationFee(
+		purchaseType,
+		baseRegistrationFee,
+		years,
+		demand.getDemandFactor(),
+		eligibleForArNSDiscount
+	)
 
 	if balances.getBalance(from) < totalRegistrationFee then
 		error("Insufficient balance")
@@ -252,12 +260,20 @@ function arns.calculatePermabuyFee(baseFee, demandFactor)
 	return math.floor(demandFactor * permabuyPrice)
 end
 
-function arns.calculateRegistrationFee(purchaseType, baseFee, years, demandFactor)
+function arns.calculateRegistrationFee(purchaseType, baseFee, years, demandFactor, isEligibleForArNSDiscount)
+	local fee = 0
 	if purchaseType == "lease" then
-		return arns.calculateLeaseFee(baseFee, years, demandFactor)
+		fee = arns.calculateLeaseFee(baseFee, years, demandFactor)
 	elseif purchaseType == "permabuy" then
-		return arns.calculatePermabuyFee(baseFee, demandFactor)
+		fee = arns.calculatePermabuyFee(baseFee, demandFactor)
 	end
+
+	if isEligibleForArNSDiscount then
+		local discount = math.floor(fee * constants.ARNS_DISCOUNT_PERCENTAGE)
+		fee = fee - discount
+	end
+
+	return fee
 end
 
 function arns.calculateUndernameCost(baseFee, increaseQty, registrationType, years, demandFactor)

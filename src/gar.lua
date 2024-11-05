@@ -503,6 +503,7 @@ function gar.isGatewayActiveBeforeTimestamp(startTimestamp, gateway)
 	local isNotLeaving = not gar.isGatewayLeaving(gateway)
 	return didStartBeforeEpoch and isNotLeaving
 end
+
 function gar.getActiveGatewaysBeforeTimestamp(startTimestamp)
 	local gateways = gar.getGateways()
 	local activeGatewayAddresses = {}
@@ -979,6 +980,23 @@ function gar.instantOperatorWithdrawal(from, vaultId, currentTimestamp)
 		expeditedWithdrawalFee = expeditedWithdrawalFee,
 		amountWithdrawn = amountToWithdraw,
 	}
+end
+
+function gar.isEligibleForArNSDiscount(from)
+	local gateway = gar.getGateway(from)
+	if gateway == nil then
+		return false
+	end
+
+	if gateway.weights == nil then
+		return false
+	end
+
+	local tenureWeight = gateway.weights.tenureWeight
+	local gatewayPerformanceRatio = gateway.weights.gatewayRewardRatioWeight
+
+	return tenureWeight >= constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR
+		and gatewayPerformanceRatio >= constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR
 end
 
 return gar

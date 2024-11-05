@@ -21,6 +21,9 @@ constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE = 0.005
 constants.oneYearMs = 31536000 * 1000
 constants.gracePeriodMs = 14 * 24 * 60 * 60 * 1000 -- 2 weeks
 constants.maxLeaseLengthYears = 5
+constants.ARNS_DISCOUNT_PERCENTAGE = 0.2
+constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR = 1
+constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR = 0.85
 
 -- DEMAND
 constants.demandSettings = {
