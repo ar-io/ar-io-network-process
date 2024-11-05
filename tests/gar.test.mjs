@@ -441,6 +441,71 @@ describe('GatewayRegistry', async () => {
         },
       });
     });
+
+    it('should allow joining of the network with an allow list', async () => {
+      const otherGatewayAddress = ''.padEnd(43, '3');
+
+      // give the wallet the joining tokens
+      const transferMemory = await transfer({
+        recipient: otherGatewayAddress,
+        quantity: 100_000_000_000,
+        sharedMemory,
+      });
+
+      const joinNetworkTags = validGatewayTags.filter(
+        (tag) =>
+          !['Allow-Delegated-Staking', 'Observer-Address'].includes(tag.name),
+      );
+      const { memory: joinNetworkMemory } = await joinNetwork({
+        address: otherGatewayAddress,
+        memory: transferMemory,
+        tags: [
+          ...joinNetworkTags,
+          { name: 'Observer-Address', value: otherGatewayAddress },
+          { name: 'Allow-Delegated-Staking', value: 'allowlist' },
+          { name: 'Allowed-Delegates', value: STUB_ADDRESS },
+        ],
+      });
+
+      // check the gateway record from contract
+      const gateway = await getGateway({
+        address: otherGatewayAddress,
+        memory: joinNetworkMemory,
+      });
+      assert.deepEqual(gateway, {
+        observerAddress: otherGatewayAddress,
+        operatorStake: 100_000_000_000,
+        totalDelegatedStake: 0,
+        status: 'joined',
+        delegates: [],
+        vaults: [],
+        startTimestamp: STUB_TIMESTAMP,
+        settings: {
+          label: 'test-gateway',
+          note: 'test-note',
+          fqdn: 'test-fqdn',
+          port: 443,
+          protocol: 'https',
+          allowDelegatedStaking: true,
+          allowedDelegatesLookup: {
+            [STUB_ADDRESS]: true,
+          },
+          minDelegatedStake: 500_000_000,
+          delegateRewardShareRatio: 25,
+          properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
+          autoStake: true,
+        },
+        stats: {
+          passedConsecutiveEpochs: 0,
+          failedConsecutiveEpochs: 0,
+          totalEpochCount: 0,
+          failedEpochCount: 0,
+          passedEpochCount: 0,
+          prescribedEpochCount: 0,
+          observedEpochCount: 0,
+        },
+      });
+    });
   });
 
   describe('Leave-Network', () => {
@@ -910,4 +975,61 @@ describe('GatewayRegistry', async () => {
       // Steps: add a gateway, create the first epoch to prescribe it, submit an observation from the gateway, tick to the epoch distribution timestamp, check the rewards were distributed correctly
     });
   });
+
+  /*
+    Tests for allowlisting:
+    - JoinNetwork:
+      - With Allow-Delegated-Staking =:
+        - true AND Allowed-Delegates = [ 'something_here' ]
+          - allowlist is ignored and not set (everyone can delegate)
+        - false AND Allowed-Delegates = [ 'something_here' ]
+          - allowlist is ignored and not set (no one can delegate)
+        - allowlist and Allowed-Delegates = [ 'something_here' ]
+          - allowlist is set with nothing in it (no one can delegate)
+        - allowlist and Allowed-Delegates = [ 'something_here' ]
+          - allowlist is set with only 'something_here' in it
+          - only 'something_here' can delegate
+        - allowlist and Allowed-Delegates is unset
+          - allowlist is set with nothing in it (no one can delegate)
+    - UpdateGatewaySettings:
+      - With Allow-Delegated-Staking currently set to:
+        - true AND updated Allow-Delegated-Staking =:
+          - true and Allowed-Delegates = [ 'something_here' ]
+            - any previous allowlist is cleared
+            - existing delegates are left untouched
+            - new allowlist is NOT set (anyone one can delegate)
+          - false
+            - any previous allowlist is cleared
+            - allowlist is not set regardless of updated Allowed-Delegates setting
+            - existing delegates are kicked
+          - allowlist and Allowed-Delegates = [ 'something_here' ]
+              - allowlist is updated/replaced with updated list
+              - existing delegates not in the updated allowlist are kicked
+              - only 'something_here' can delegate
+          - allowlist and Allowed-Delegates is unset
+            - allowlist is updated/replaced with an empty list
+            - existing delegates are all kicked
+            - no one can delegate
+        - false AND:
+          - vaulted delegates:
+            - have NOT all exited:
+              - error
+            - HAVE all exited AND updated Allow-Delegated-Staking =:
+              - true:
+                - allowlist is cleared regardless of updated Allowed-Delegates setting
+                - existing delegates are left untouched
+                - anyone can delegate
+              - false
+                - allowlist is cleared regardless of updated Allowed-Delegates setting
+                - existing delegates are kicked
+                - no one can delegate
+              - allowlist and Allowed-Delegates = [ 'something_here' ]
+                - allowlist is replaces with updated list
+                - existing delegates not in the updated allowlist are kicked
+                - only 'something_here' can delegate
+              - allowlist and Allowed-Delegates is unset
+                - allowlist is cleared
+                - existing delegates are all kicked
+                - no one can delegate
+  */
 });
