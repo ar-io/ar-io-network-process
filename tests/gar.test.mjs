@@ -441,6 +441,141 @@ describe('GatewayRegistry', async () => {
         },
       });
     });
+
+    async function allowlistJoinTest({
+      tags,
+      delegateAddresses,
+      expectedAllowDelegatedStaking,
+      expectedAllowedDelegatesLookup,
+      expectedDelegates,
+    }) {
+      const otherGatewayAddress = ''.padEnd(43, '3');
+
+      // give the wallet the joining tokens
+      const transferMemory = await transfer({
+        recipient: otherGatewayAddress,
+        quantity: 100_000_000_000,
+        sharedMemory,
+      });
+
+      const tagNames = tags.map((tag) => tag.name);
+      const joinNetworkTags = validGatewayTags.filter(
+        (tag) => ![...tagNames, 'Observer-Address'].includes(tag.name),
+      );
+      const { memory: joinNetworkMemory } = await joinNetwork({
+        address: otherGatewayAddress,
+        memory: transferMemory,
+        tags: [
+          ...joinNetworkTags,
+          { name: 'Observer-Address', value: otherGatewayAddress },
+          ...tags,
+        ],
+      });
+
+      // check the gateway record from contract
+      const gateway = await getGateway({
+        address: otherGatewayAddress,
+        memory: joinNetworkMemory,
+      });
+      assert.deepEqual(gateway, {
+        observerAddress: otherGatewayAddress,
+        operatorStake: 100_000_000_000,
+        totalDelegatedStake: 0,
+        status: 'joined',
+        delegates: [],
+        vaults: [],
+        startTimestamp: STUB_TIMESTAMP,
+        settings: {
+          label: 'test-gateway',
+          note: 'test-note',
+          fqdn: 'test-fqdn',
+          port: 443,
+          protocol: 'https',
+          allowDelegatedStaking: expectedAllowDelegatedStaking,
+          ...(expectedAllowedDelegatesLookup && {
+            allowedDelegatesLookup: expectedAllowedDelegatesLookup,
+          }),
+          minDelegatedStake: 500_000_000,
+          delegateRewardShareRatio: 25,
+          properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
+          autoStake: true,
+        },
+        stats: {
+          passedConsecutiveEpochs: 0,
+          failedConsecutiveEpochs: 0,
+          totalEpochCount: 0,
+          failedEpochCount: 0,
+          passedEpochCount: 0,
+          prescribedEpochCount: 0,
+          observedEpochCount: 0,
+        },
+      });
+
+      if (delegateAddresses && expectedDelegates) {
+        var nextMemory = joinNetworkMemory;
+        for (const delegateAddress of delegateAddresses) {
+          const { memory: delegatedMemory } = await delegateStake({
+            memory: joinNetworkMemory,
+            timestamp: STUB_TIMESTAMP,
+            delegatorAddress: delegateAddress,
+            quantity: 500_000_000,
+            gatewayAddress: otherGatewayAddress,
+          }).catch(() => {});
+          nextMemory = delegatedMemory;
+        }
+        const updatedGateway = await getGateway({
+          address: otherGatewayAddress,
+          memory: nextMemory,
+        });
+        assert.deepEqual(
+          Object.keys(updatedGateway.delegates),
+          expectedDelegates,
+        );
+      }
+    }
+
+    it('should allow joining of the network with an allow list', async () => {
+      await allowlistJoinTest({
+        tags: [
+          { name: 'Allow-Delegated-Staking', value: 'allowlist' },
+          { name: 'Allowed-Delegates', value: STUB_ADDRESS }, // todo: exercise comma separated list
+        ],
+        expectedAllowDelegatedStaking: true,
+        expectedAllowedDelegatesLookup: {
+          [STUB_ADDRESS]: true,
+        },
+        delegateAddresses: [STUB_ADDRESS],
+        expectedDelegates: [STUB_ADDRESS],
+      });
+    });
+
+    it('should join the network ignoring the allow list if Allow-Delegated-Staking is set to "true"', async () => {
+      await allowlistJoinTest({
+        tags: [
+          { name: 'Allow-Delegated-Staking', value: 'true' },
+          { name: 'Allowed-Delegates', value: STUB_ADDRESS },
+        ],
+        expectedAllowDelegatedStaking: true,
+      });
+    });
+
+    it('should join the network ignoring the allow list if Allow-Delegated-Staking is set to "false"', async () => {
+      await allowlistJoinTest({
+        tags: [
+          { name: 'Allow-Delegated-Staking', value: 'false' },
+          { name: 'Allowed-Delegates', value: STUB_ADDRESS },
+        ],
+        expectedAllowDelegatedStaking: false,
+      });
+    });
+
+    it('should join the network and start an empty allow list if Allow-Delegated-Staking is set to "allowlist"', async () => {
+      await allowlistJoinTest({
+        tags: [{ name: 'Allow-Delegated-Staking', value: 'allowlist' }],
+        expectedAllowDelegatedStaking: true,
+        expectedAllowedDelegatesLookup: [], // TODO: Why is an empty Lua table JSON serialized to an array?
+      });
+    });
   });
 
   describe('Leave-Network', () => {
@@ -910,4 +1045,60 @@ describe('GatewayRegistry', async () => {
       // Steps: add a gateway, create the first epoch to prescribe it, submit an observation from the gateway, tick to the epoch distribution timestamp, check the rewards were distributed correctly
     });
   });
+
+  /*
+    Tests for allowlisting:
+    - JoinNetwork:
+      - With Allow-Delegated-Staking =:
+X       - true AND Allowed-Delegates = [ 'something_here' ]
+X          - allowlist is ignored and not set (everyone can delegate)
+X        - false AND Allowed-Delegates = [ 'something_here' ]
+X          - allowlist is ignored and not set (no one can delegate)
+X       - allowlist and Allowed-Delegates = [ 'something_here' ]
+X         - allowlist is set with only 'something_here' in it
+X          - only 'something_here' can delegate
+X       - allowlist and Allowed-Delegates is unset
+X         - allowlist is set with nothing in it
+          - (no one can delegate)
+    - UpdateGatewaySettings:
+      - With Allow-Delegated-Staking currently set to:
+        - true AND updated Allow-Delegated-Staking =:
+          - true and Allowed-Delegates = [ 'something_here' ]
+            - any previous allowlist is cleared
+            - existing delegates are left untouched
+            - new allowlist is NOT set (anyone one can delegate)
+          - false
+            - any previous allowlist is cleared
+            - allowlist is not set regardless of updated Allowed-Delegates setting
+            - existing delegates are kicked
+          - allowlist and Allowed-Delegates = [ 'something_here' ]
+              - allowlist is updated/replaced with updated list
+              - existing delegates not in the updated allowlist are kicked
+              - only 'something_here' can delegate
+          - allowlist and Allowed-Delegates is unset
+            - allowlist is updated/replaced with an empty list
+            - existing delegates are all kicked
+            - no one can delegate
+        - false AND:
+          - vaulted delegates:
+            - have NOT all exited:
+              - error
+            - HAVE all exited AND updated Allow-Delegated-Staking =:
+              - true:
+                - allowlist is cleared regardless of updated Allowed-Delegates setting
+                - existing delegates are left untouched
+                - anyone can delegate
+              - false
+                - allowlist is cleared regardless of updated Allowed-Delegates setting
+                - existing delegates are kicked
+                - no one can delegate
+              - allowlist and Allowed-Delegates = [ 'something_here' ]
+                - allowlist is replaces with updated list
+                - existing delegates not in the updated allowlist are kicked
+                - only 'something_here' can delegate
+              - allowlist and Allowed-Delegates is unset
+                - allowlist is cleared
+                - existing delegates are all kicked
+                - no one can delegate
+  */
 });
