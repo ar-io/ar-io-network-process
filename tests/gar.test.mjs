@@ -860,6 +860,43 @@ describe('GatewayRegistry', async () => {
         expectedDelegates: [STUB_ADDRESS_8, STUB_ADDRESS_9], // Leftover from previous test and being forced to exit
       });
     });
+
+    it('should allow applying an allowlist when Allowed-Delegates is not supplied', async () => {
+      const { memory: stakedMemory } = await delegateStake({
+        memory: sharedMemory,
+        timestamp: STUB_TIMESTAMP,
+        delegatorAddress: STUB_ADDRESS_8,
+        quantity: 500_000_000,
+        gatewayAddress: STUB_ADDRESS,
+      });
+
+      await updateGatewaySettingsTest({
+        inputMemory: stakedMemory,
+        settingsTags: [{ name: 'Allow-Delegated-Staking', value: 'allowlist' }],
+        expectedUpdatedGatewayProps: {
+          totalDelegatedStake: 0, // 8 kicked
+          delegates: {
+            [STUB_ADDRESS_8]: {
+              // Kicked out due to not being in allowlist
+              delegatedStake: 0,
+              startTimestamp: STUB_TIMESTAMP,
+              vaults: {
+                mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm: {
+                  balance: 500_000_000,
+                  endTimestamp: 2613600000,
+                  startTimestamp: STUB_TIMESTAMP,
+                },
+              },
+            },
+          },
+        },
+        expectedUpdatedSettings: {
+          allowedDelegatesLookup: [],
+        },
+        delegateAddresses: [STUB_ADDRESS_9], // no one is allowed yet
+        expectedDelegates: [STUB_ADDRESS_8], // 8 is exiting
+      });
+    });
   });
 
   describe('Increase-Operator-Stake', () => {
@@ -1261,10 +1298,10 @@ X         - allowlist and Allowed-Delegates = [ 'something_here' ]
 X             - allowlist is updated/replaced with updated list
 X             - existing delegates not in the updated allowlist are kicked
 X             - only 'something_here' can delegate
-          - allowlist and Allowed-Delegates is unset
-            - allowlist is updated/replaced with an empty list
-            - existing delegates are all kicked
-            - no one can delegate
+X         - allowlist and Allowed-Delegates is unset
+X           - allowlist is updated/replaced with an empty list
+X           - existing delegates are all kicked
+X           - no one can delegate
         - false AND:
           - vaulted delegates:
             - have NOT all exited:
