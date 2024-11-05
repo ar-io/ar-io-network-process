@@ -419,7 +419,7 @@ describe("arns", function()
 			end)
 		end)
 
-		describe("calculateLeaseFee [" .. addressType .. "]", function()
+		describe("calculateRegistrationFee [" .. addressType .. "]", function()
 			it("should return the correct fee for a lease", function()
 				local baseFee = 500000000 -- base fee is 500 IO
 				local fee = arns.calculateRegistrationFee("lease", baseFee, 1, 1)
@@ -432,6 +432,19 @@ describe("arns", function()
 				local expected = (baseFee * 0.2 * 20) + baseFee
 				assert.are.equal(expected, fee)
 			end)
+
+			it(
+				"should return the correct fee for registring a name permanently when eligible for ArNS discount ["
+					.. addressType
+					.. "]",
+				function()
+					local baseFee = 500000000 -- base fee is 500 IO
+					local fee = arns.calculateRegistrationFee("permabuy", baseFee, 1, 1, true)
+					local expected = (baseFee * 0.2 * 20) + baseFee
+					local withDiscount = expected - (math.floor(expected * constants.ARNS_DISCOUNT_PERCENTAGE))
+					assert.are.equal(withDiscount, fee)
+				end
+			)
 		end)
 
 		describe("reassignName [" .. addressType .. "]", function()
