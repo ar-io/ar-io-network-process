@@ -5,18 +5,14 @@
       "path": ["?.lua", "?/init.lua"]
     },
     "workspace": {
-      "library": ["src", "spec"]
+      "library": ["src", "spec",
+                "${addons}/busted/module/library",
+                "${3rd}/luassert/library"]
     },
     "diagnostics": {
       "enable": true,
-      "globals": [
-        "describe",
-        "it",
-        "before_each",
-        "after_each",
-        "after_all",
-        "before_all"
-      ]
+      "globals": []
     }
-  }
+  },
+    "workspace.checkThirdParty": false
 }
