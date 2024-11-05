@@ -1698,9 +1698,7 @@ addEventingHandler(
 		local enableOpenDelegatedStaking = allowDelegatedStakingOverride == "true"
 		local enableLimitedDelegatedStaking = allowDelegatedStakingOverride == "allowlist"
 		local disableDelegatedStaking = allowDelegatedStakingOverride == "false"
-		local shouldClearAllowlist = enableOpenDelegatedStaking
-			or disableDelegatedStaking
-			or gateway.settings.allowDelegatedStaking
+		local shouldClearAllowlist = enableOpenDelegatedStaking or disableDelegatedStaking
 
 		local updatedSettings = {
 			label = msg.Tags.Label or gateway.settings.label,
@@ -1714,6 +1712,7 @@ addEventingHandler(
 					and gateway.settings.allowDelegatedStaking, -- otherwise unspecified, so use previous setting
 
 			allowedDelegates = not shouldClearAllowlist
+					and (enableLimitedDelegatedStaking or gateway.settings.allowedDelegatesLookup)
 					and msg.Tags["Allowed-Delegates"]
 					and utils.splitAndTrimString(msg.Tags["Allowed-Delegates"]) -- replace the lookup list - TODO: REMOVE EXISTING DELEGATES
 				or nil, -- change nothing
