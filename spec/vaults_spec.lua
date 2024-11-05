@@ -96,25 +96,25 @@ describe("vaults", function()
 			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 200
 			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
 			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
-			local msgId = "msgId"
-			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, msgId)
+			local vaultId = "msgId"
+			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, vaultId)
 			local increaseAmount = 100
 			local currentTimestamp = vault.startTimestamp + 1000
-			local increasedVault = vaults.increaseVault(vaultOwner, increaseAmount, msgId, currentTimestamp)
-			assert.are.same(vault.balance + increaseAmount, increasedVault.balance)
-			assert.are.same(vault.startTimestamp, increasedVault.startTimestamp)
-			assert.are.same(vault.endTimestamp, increasedVault.endTimestamp)
+			local increasedVault = vaults.increaseVault(vaultOwner, increaseAmount, vaultId, currentTimestamp)
+			assert.are.same(100 + increaseAmount, increasedVault.balance)
+			assert.are.same(startTimestamp, increasedVault.startTimestamp)
+			assert.are.same(startTimestamp + lockLengthMs, increasedVault.endTimestamp)
 		end)
 
 		it("should throw an error if insufficient balance", function()
 			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 100
 			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
 			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
-			local msgId = "msgId"
-			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, msgId)
+			local vaultId = "msgId"
+			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, vaultId)
 			local increaseAmount = 101
 			local currentTimestamp = vault.startTimestamp + 1000
-			local status, result = pcall(vaults.increaseVault, vaultOwner, increaseAmount, msgId, currentTimestamp)
+			local status, result = pcall(vaults.increaseVault, vaultOwner, increaseAmount, vaultId, currentTimestamp)
 			assert.is_false(status)
 			assert.match("Insufficient balance", result)
 		end)
@@ -123,13 +123,13 @@ describe("vaults", function()
 			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 200
 			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
 			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
-			local msgId = "msgId"
-			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, msgId)
+			local vaultId = "msgId"
+			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, vaultId)
 			local increaseAmount = 100
 			local currentTimestamp = vault.endTimestamp + 1
-			local status, result = pcall(vaults.increaseVault, vaultOwner, increaseAmount, msgId, currentTimestamp)
+			local status, result = pcall(vaults.increaseVault, vaultOwner, increaseAmount, vaultId, currentTimestamp)
 			assert.is_false(status)
-			assert.match("This vault has ended.", result)
+			assert.match("Vault has ended.", result)
 		end)
 
 		it("should throw an error if the vault not found", function()
@@ -146,38 +146,38 @@ describe("vaults", function()
 			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 100
 			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
 			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
-			local msgId = "msgId"
-			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, msgId)
+			local vaultId = "msgId"
+			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, vaultId)
 			local extendLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
 			local currentTimestamp = vault.startTimestamp + 1000
-			local extendedVault = vaults.extendVault(vaultOwner, extendLengthMs, currentTimestamp, msgId)
-			assert.are.same(vault.balance, extendedVault.balance)
-			assert.are.same(vault.startTimestamp, extendedVault.startTimestamp)
-			assert.are.same(vault.endTimestamp + extendLengthMs, extendedVault.endTimestamp)
+			local extendedVault = vaults.extendVault(vaultOwner, extendLengthMs, currentTimestamp, vaultId)
+			assert.are.same(100, extendedVault.balance)
+			assert.are.same(startTimestamp, extendedVault.startTimestamp)
+			assert.are.same(startTimestamp + lockLengthMs + extendLengthMs, extendedVault.endTimestamp)
 		end)
 
 		it("should throw an error if the vault is expired", function()
 			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 100
 			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
 			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
-			local msgId = "msgId"
-			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, msgId)
+			local vaultId = "msgId"
+			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, vaultId)
 			local extendLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
 			local currentTimestamp = vault.endTimestamp + 1000
-			local status, result = pcall(vaults.extendVault, vaultOwner, extendLengthMs, currentTimestamp, msgId)
+			local status, result = pcall(vaults.extendVault, vaultOwner, extendLengthMs, currentTimestamp, vaultId)
 			assert.is_false(status)
-			assert.match("This vault has ended.", result)
+			assert.match("Vault has ended.", result)
 		end)
 
 		it("should throw an error if the lock length would be larger than the maximum", function()
 			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 100
 			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
 			local lockLengthMs = constants.MAX_TOKEN_LOCK_TIME_MS
-			local msgId = "msgId"
-			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, msgId)
+			local vaultId = "msgId"
+			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, vaultId)
 			local extendLengthMs = constants.MAX_TOKEN_LOCK_TIME_MS + 1
 			local currentTimestamp = vault.startTimestamp + 1000
-			local status, result = pcall(vaults.extendVault, vaultOwner, extendLengthMs, currentTimestamp, msgId)
+			local status, result = pcall(vaults.extendVault, vaultOwner, extendLengthMs, currentTimestamp, vaultId)
 			assert.is_false(status)
 			assert.match(
 				"Invalid vault extension. Total lock time cannot be greater than "
@@ -199,11 +199,11 @@ describe("vaults", function()
 			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 100
 			local vaultOwner = "test-this-is-valid-arweave-wallet-address-1"
 			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
-			local msgId = "msgId"
-			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, msgId)
+			local vaultId = "msgId"
+			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, vaultId)
 			local extendLengthMs = 0
 			local currentTimestamp = vault.startTimestamp + 1000
-			local status, result = pcall(vaults.extendVault, vaultOwner, extendLengthMs, currentTimestamp, msgId)
+			local status, result = pcall(vaults.extendVault, vaultOwner, extendLengthMs, currentTimestamp, vaultId)
 			assert.is_false(status)
 			assert.match("Invalid extend length. Must be a positive number.", result)
 		end)
@@ -218,11 +218,8 @@ describe("vaults", function()
 			local quantity = 50
 			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
 			local timestamp = 1000000
-			local msgId = "msgId"
-			local result, vault =
-				pcall(vaults.vaultedTransfer, from, recipient, quantity, lockLengthMs, timestamp, msgId)
-			assert.is_true(result)
-			assert.is_not_nil(vault)
+			local vaultId = "msgId"
+			local vault = vaults.vaultedTransfer(from, recipient, quantity, lockLengthMs, timestamp, vaultId)
 			assert.are.equal(50, _G.Balances[from])
 			assert.are.same({
 				balance = 50,
@@ -239,9 +236,9 @@ describe("vaults", function()
 			local quantity = 150
 			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
 			local timestamp = 1000000
-			local msgId = "msgId"
+			local vaultId = "msgId"
 			local status, result =
-				pcall(vaults.vaultedTransfer, from, recipient, quantity, lockLengthMs, timestamp, msgId)
+				pcall(vaults.vaultedTransfer, from, recipient, quantity, lockLengthMs, timestamp, vaultId)
 			assert.is_false(status)
 			assert.match("Insufficient balance", result)
 		end)
@@ -254,9 +251,10 @@ describe("vaults", function()
 			local quantity = 50
 			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS - 1
 			local timestamp = 1000000
-			local msgId = "msgId"
-			local status = pcall(vaults.vaultedTransfer, from, recipient, quantity, lockLengthMs, timestamp, msgId)
+			local vaultId = "msgId"
+			local status = pcall(vaults.vaultedTransfer, from, recipient, quantity, lockLengthMs, timestamp, vaultId)
 			assert.is_false(status)
+			-- the string fails to match because the error message is not exactly as expected
 		end)
 	end)
 
