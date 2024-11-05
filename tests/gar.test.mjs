@@ -444,7 +444,7 @@ describe('GatewayRegistry', async () => {
 
     async function allowlistJoinTest({
       tags,
-      delegateAddress,
+      delegateAddresses,
       expectedAllowDelegatedStaking,
       expectedAllowedDelegatesLookup,
       expectedDelegates,
@@ -510,6 +510,28 @@ describe('GatewayRegistry', async () => {
           observedEpochCount: 0,
         },
       });
+
+      if (delegateAddresses && expectedDelegates) {
+        var nextMemory = joinNetworkMemory;
+        for (const delegateAddress of delegateAddresses) {
+          const { memory: delegatedMemory } = await delegateStake({
+            memory: joinNetworkMemory,
+            timestamp: STUB_TIMESTAMP,
+            delegatorAddress: delegateAddress,
+            quantity: 500_000_000,
+            gatewayAddress: otherGatewayAddress,
+          }).catch(() => {});
+          nextMemory = delegatedMemory;
+        }
+        const updatedGateway = await getGateway({
+          address: otherGatewayAddress,
+          memory: nextMemory,
+        });
+        assert.deepEqual(
+          Object.keys(updatedGateway.delegates),
+          expectedDelegates,
+        );
+      }
     }
 
     it('should allow joining of the network with an allow list', async () => {
@@ -522,6 +544,8 @@ describe('GatewayRegistry', async () => {
         expectedAllowedDelegatesLookup: {
           [STUB_ADDRESS]: true,
         },
+        delegateAddresses: [STUB_ADDRESS],
+        expectedDelegates: [STUB_ADDRESS],
       });
     });
 
@@ -1032,7 +1056,7 @@ X        - false AND Allowed-Delegates = [ 'something_here' ]
 X          - allowlist is ignored and not set (no one can delegate)
 X       - allowlist and Allowed-Delegates = [ 'something_here' ]
 X         - allowlist is set with only 'something_here' in it
-          - only 'something_here' can delegate
+X          - only 'something_here' can delegate
 X       - allowlist and Allowed-Delegates is unset
 X         - allowlist is set with nothing in it
           - (no one can delegate)
