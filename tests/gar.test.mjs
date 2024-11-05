@@ -19,6 +19,7 @@ describe('GatewayRegistry', async () => {
   const { handle: originalHandle, memory: startMemory } =
     await createAosLoader();
   let sharedMemory = startMemory; // memory we'll use across unique tests;
+  const STUB_ADDRESS_8 = ''.padEnd(43, '8');
   const STUB_ADDRESS_9 = ''.padEnd(43, '9');
   async function handle(options = {}, mem = sharedMemory) {
     return originalHandle(
@@ -634,21 +635,24 @@ describe('GatewayRegistry', async () => {
     });
   });
 
+  // TODO: EVICTING PREVIOUS DELEGATES
   describe('Update-Gateway-Settings', () => {
     async function updateGatewaySettingsTest({
       settingsTags,
+      expectedUpdatedGatewayProps = {},
       expectedUpdatedSettings,
       delegateAddresses,
       expectedDelegates,
+      inputMemory = sharedMemory,
     }) {
       // gateway before
       const gateway = await getGateway({
         address: STUB_ADDRESS,
-        memory: sharedMemory,
+        memory: inputMemory,
       });
 
       const { memory: updatedSettingsMemory } = await updateGatewaySettings({
-        memory: sharedMemory,
+        memory: inputMemory,
         address: STUB_ADDRESS,
         settingsTags: [
           { name: 'Action', value: 'Update-Gateway-Settings' },
@@ -662,17 +666,24 @@ describe('GatewayRegistry', async () => {
         memory: updatedSettingsMemory,
       });
 
+      if (
+        [false, true].includes(expectedUpdatedSettings.allowDelegatedStaking)
+      ) {
+        delete gateway.settings.allowedDelegatesLookup; // Special case for expected excision of this property on update
+      }
+
       // should match old gateway, with new settings
       assert.deepStrictEqual(updatedGateway, {
         ...gateway,
+        ...expectedUpdatedGatewayProps,
         settings: {
           ...gateway.settings,
           ...expectedUpdatedSettings,
         },
       });
 
+      var nextMemory = updatedSettingsMemory;
       if (delegateAddresses && expectedDelegates) {
-        var nextMemory = updatedSettingsMemory;
         for (const delegateAddress of delegateAddresses) {
           const maybeDelegateResult = await delegateStake({
             memory: nextMemory,
@@ -693,7 +704,17 @@ describe('GatewayRegistry', async () => {
           Object.keys(updatedGateway.delegates).slice().sort(),
           expectedDelegates.slice().sort(),
         );
+        for (const delegateAddress of expectedDelegates) {
+          assert(
+            !updatedGateway.settings.allowedDelegatesLookup ||
+              updatedGateway.settings.allowedDelegatesLookup[
+                delegateAddress
+              ] === undefined,
+          );
+        }
       }
+
+      return nextMemory;
     }
 
     it('should allow updating the gateway settings', async () => {
@@ -734,14 +755,63 @@ describe('GatewayRegistry', async () => {
       await updateGatewaySettingsTest({
         settingsTags: [{ name: 'Allowed-Delegates', value: STUB_ADDRESS_9 }],
         expectedUpdatedSettings: {},
+        delegateAddresses: [STUB_ADDRESS_9, STUB_ADDRESS_8],
+        expectedDelegates: [STUB_ADDRESS_9, STUB_ADDRESS_8],
       });
 
       await updateGatewaySettingsTest({
         settingsTags: [
-          { name: 'Allowed-Delegated-Staking', value: false },
+          { name: 'Allow-Delegated-Staking', value: 'false' },
           { name: 'Allowed-Delegates', value: STUB_ADDRESS_9 },
         ],
-        expectedUpdatedSettings: {},
+        expectedUpdatedSettings: {
+          allowDelegatedStaking: false,
+        },
+        delegateAddresses: [STUB_ADDRESS_9, STUB_ADDRESS_8],
+        expectedDelegates: [],
+      });
+    });
+
+    it('should apply Allowed-Delegates when allowlist made active', async () => {
+      const updatedMemory = await updateGatewaySettingsTest({
+        settingsTags: [
+          { name: 'Allow-Delegated-Staking', value: 'allowlist' },
+          { name: 'Allowed-Delegates', value: STUB_ADDRESS_9 },
+        ],
+        expectedUpdatedSettings: {
+          allowDelegatedStaking: true,
+          allowedDelegatesLookup: {
+            [STUB_ADDRESS_9]: true, // This is checked BEFORE attempting delegation
+          },
+        },
+        delegateAddresses: [STUB_ADDRESS_9, STUB_ADDRESS_8],
+        expectedDelegates: [STUB_ADDRESS_9],
+      });
+
+      const disabledStakingMemory = await updateGatewaySettingsTest({
+        inputMemory: updatedMemory,
+        settingsTags: [{ name: 'Allow-Delegated-Staking', value: 'false' }],
+        expectedUpdatedGatewayProps: {
+          totalDelegatedStake: 0,
+          delegates: {
+            [STUB_ADDRESS_9]: {
+              delegatedStake: 0,
+              startTimestamp: 21600000,
+              vaults: {
+                mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm: {
+                  balance: 500000000,
+                  endTimestamp: 2613600000,
+                  startTimestamp: 21600000,
+                },
+              },
+            },
+          },
+        },
+        expectedUpdatedSettings: {
+          allowDelegatedStaking: false,
+        },
+        delegateAddresses: [STUB_ADDRESS_8],
+        expectedDelegates: [STUB_ADDRESS_9], // Leftover from previous test and being forced to exit
       });
     });
   });
@@ -1135,15 +1205,16 @@ X         - (no one can delegate)
         - true AND updated Allow-Delegated-Staking =:
           - true and Allowed-Delegates = [ 'something_here' ]
             - existing delegates are left untouched
-            - new allowlist is NOT set (anyone one can delegate)
+X           - new allowlist is NOT set (anyone one can delegate)
           - false
 X           - any previous allowlist is cleared
 X           - allowlist is not set regardless of updated Allowed-Delegates setting
-            - existing delegates are kicked
+X           - existing delegates are kicked
+X           - no one can delegate
           - allowlist and Allowed-Delegates = [ 'something_here' ]
-              - allowlist is updated/replaced with updated list
+X             - allowlist is updated/replaced with updated list
               - existing delegates not in the updated allowlist are kicked
-              - only 'something_here' can delegate
+X             - only 'something_here' can delegate
           - allowlist and Allowed-Delegates is unset
             - allowlist is updated/replaced with an empty list
             - existing delegates are all kicked
