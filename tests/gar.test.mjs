@@ -404,6 +404,7 @@ describe('GatewayRegistry', async () => {
   });
 
   describe('Join-Network', () => {
+    const STUB_ADDRESS_9 = ''.padEnd(43, '9');
     it('should allow joining of the network record', async () => {
       // check the gateway record from contract
       const gateway = await getGateway({
@@ -514,22 +515,24 @@ describe('GatewayRegistry', async () => {
       if (delegateAddresses && expectedDelegates) {
         var nextMemory = joinNetworkMemory;
         for (const delegateAddress of delegateAddresses) {
-          const { memory: delegatedMemory } = await delegateStake({
-            memory: joinNetworkMemory,
+          const maybeDelegateResult = await delegateStake({
+            memory: nextMemory,
             timestamp: STUB_TIMESTAMP,
             delegatorAddress: delegateAddress,
             quantity: 500_000_000,
             gatewayAddress: otherGatewayAddress,
           }).catch(() => {});
-          nextMemory = delegatedMemory;
+          if (maybeDelegateResult?.memory) {
+            nextMemory = maybeDelegateResult.memory;
+          }
         }
         const updatedGateway = await getGateway({
           address: otherGatewayAddress,
           memory: nextMemory,
         });
         assert.deepEqual(
-          Object.keys(updatedGateway.delegates),
-          expectedDelegates,
+          Object.keys(updatedGateway.delegates).slice().sort(),
+          expectedDelegates.slice().sort(),
         );
       }
     }
@@ -544,7 +547,7 @@ describe('GatewayRegistry', async () => {
         expectedAllowedDelegatesLookup: {
           [STUB_ADDRESS]: true,
         },
-        delegateAddresses: [STUB_ADDRESS],
+        delegateAddresses: [STUB_ADDRESS_9, STUB_ADDRESS],
         expectedDelegates: [STUB_ADDRESS],
       });
     });
@@ -556,6 +559,9 @@ describe('GatewayRegistry', async () => {
           { name: 'Allowed-Delegates', value: STUB_ADDRESS },
         ],
         expectedAllowDelegatedStaking: true,
+        expectedAllowedDelegatesLookup: undefined,
+        delegateAddresses: [STUB_ADDRESS, STUB_ADDRESS_9],
+        expectedDelegates: [STUB_ADDRESS, STUB_ADDRESS_9],
       });
     });
 
@@ -566,6 +572,9 @@ describe('GatewayRegistry', async () => {
           { name: 'Allowed-Delegates', value: STUB_ADDRESS },
         ],
         expectedAllowDelegatedStaking: false,
+        delegateAddresses: [STUB_ADDRESS],
+        expectedAllowedDelegatesLookup: undefined,
+        expectedDelegates: [],
       });
     });
 
@@ -573,7 +582,9 @@ describe('GatewayRegistry', async () => {
       await allowlistJoinTest({
         tags: [{ name: 'Allow-Delegated-Staking', value: 'allowlist' }],
         expectedAllowDelegatedStaking: true,
-        expectedAllowedDelegatesLookup: [], // TODO: Why is an empty Lua table JSON serialized to an array?
+        delegateAddresses: [STUB_ADDRESS], // this delegate will be denied
+        expectedAllowedDelegatesLookup: [],
+        expectedDelegates: [],
       });
     });
   });
@@ -1059,7 +1070,7 @@ X         - allowlist is set with only 'something_here' in it
 X          - only 'something_here' can delegate
 X       - allowlist and Allowed-Delegates is unset
 X         - allowlist is set with nothing in it
-          - (no one can delegate)
+X         - (no one can delegate)
     - UpdateGatewaySettings:
       - With Allow-Delegated-Staking currently set to:
         - true AND updated Allow-Delegated-Staking =:
