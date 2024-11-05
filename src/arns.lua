@@ -415,8 +415,16 @@ function arns.getRegistrationFees()
 	return fees
 end
 
+---@class IntendedAction
+---@field purchaseType string|nil The type of purchase (lease/permabuy)
+---@field years number|nil The number of years for lease
+---@field quantity number|nil The quantity for increasing undername limit
+---@field name string The name of the record
+---@field intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name)
+---@field currentTimestamp number The current timestamp
+
 --- Gets the token cost for an intended action
---- @param intendedAction table The intended action with fields:
+--- @param intendedAction IntendedAction The intended action with fields:
 ---   - purchaseType string|nil The type of purchase (lease/permabuy)
 ---   - years number|nil The number of years for lease
 ---   - quantity number|nil The quantity for increasing undername limit
