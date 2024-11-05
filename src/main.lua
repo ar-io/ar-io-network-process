@@ -1051,9 +1051,9 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 		protocol = msg.Tags.Protocol or "https",
 		allowDelegatedStaking = msg.Tags["Allow-Delegated-Staking"] == "true"
 			or msg.Tags["Allow-Delegated-Staking"] == "allowlist",
-		allowedDelegates = msg.Tags["Allow-Delegated-Staking"] == "allowlist" and utils.splitAndTrimString(
-			msg.Tags["Allowed-Delegates"] or ""
-		) or nil,
+		allowedDelegates = msg.Tags["Allow-Delegated-Staking"] == "allowlist"
+				and utils.splitAndTrimString(msg.Tags["Allowed-Delegates"] or "", ",")
+			or nil,
 		minDelegatedStake = tonumber(msg.Tags["Min-Delegated-Stake"]),
 		delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"]) or 0,
 		properties = msg.Tags.Properties or "FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44",
@@ -1698,7 +1698,9 @@ addEventingHandler(
 		local enableOpenDelegatedStaking = allowDelegatedStakingOverride == "true"
 		local enableLimitedDelegatedStaking = allowDelegatedStakingOverride == "allowlist"
 		local disableDelegatedStaking = allowDelegatedStakingOverride == "false"
-		local shouldClearAllowlist = enableOpenDelegatedStaking or disableDelegatedStaking
+		local shouldClearAllowlist = enableOpenDelegatedStaking
+			or disableDelegatedStaking
+			or gateway.settings.allowDelegatedStaking
 
 		local updatedSettings = {
 			label = msg.Tags.Label or gateway.settings.label,

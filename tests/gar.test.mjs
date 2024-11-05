@@ -19,6 +19,7 @@ describe('GatewayRegistry', async () => {
   const { handle: originalHandle, memory: startMemory } =
     await createAosLoader();
   let sharedMemory = startMemory; // memory we'll use across unique tests;
+  const STUB_ADDRESS_9 = ''.padEnd(43, '9');
   async function handle(options = {}, mem = sharedMemory) {
     return originalHandle(
       mem,
@@ -404,7 +405,6 @@ describe('GatewayRegistry', async () => {
   });
 
   describe('Join-Network', () => {
-    const STUB_ADDRESS_9 = ''.padEnd(43, '9');
     it('should allow joining of the network record', async () => {
       // check the gateway record from contract
       const gateway = await getGateway({
@@ -589,6 +589,7 @@ describe('GatewayRegistry', async () => {
     });
   });
 
+  // TODO: HOW IS ALLOWLISTING (SUPPOSED TO BE) AFFECTED?
   describe('Leave-Network', () => {
     it('should allow leaving the network and vault operator stake correctly', async () => {
       // gateway before leaving
@@ -634,7 +635,12 @@ describe('GatewayRegistry', async () => {
   });
 
   describe('Update-Gateway-Settings', () => {
-    it('should allow updating the gateway settings', async () => {
+    async function updateGatewaySettingsTest({
+      settingsTags,
+      expectedUpdatedSettings,
+      delegateAddresses,
+      expectedDelegates,
+    }) {
       // gateway before
       const gateway = await getGateway({
         address: STUB_ADDRESS,
@@ -646,6 +652,53 @@ describe('GatewayRegistry', async () => {
         address: STUB_ADDRESS,
         settingsTags: [
           { name: 'Action', value: 'Update-Gateway-Settings' },
+          ...settingsTags,
+        ],
+      });
+
+      // check the gateway record from contract
+      const updatedGateway = await getGateway({
+        address: STUB_ADDRESS,
+        memory: updatedSettingsMemory,
+      });
+
+      // should match old gateway, with new settings
+      assert.deepStrictEqual(updatedGateway, {
+        ...gateway,
+        settings: {
+          ...gateway.settings,
+          ...expectedUpdatedSettings,
+        },
+      });
+
+      if (delegateAddresses && expectedDelegates) {
+        var nextMemory = updatedSettingsMemory;
+        for (const delegateAddress of delegateAddresses) {
+          const maybeDelegateResult = await delegateStake({
+            memory: nextMemory,
+            timestamp: STUB_TIMESTAMP,
+            delegatorAddress: delegateAddress,
+            quantity: 500_000_000,
+            gatewayAddress: STUB_ADDRESS,
+          }).catch(() => {});
+          if (maybeDelegateResult?.memory) {
+            nextMemory = maybeDelegateResult.memory;
+          }
+        }
+        const updatedGateway = await getGateway({
+          address: STUB_ADDRESS,
+          memory: nextMemory,
+        });
+        assert.deepEqual(
+          Object.keys(updatedGateway.delegates).slice().sort(),
+          expectedDelegates.slice().sort(),
+        );
+      }
+    }
+
+    it('should allow updating the gateway settings', async () => {
+      await updateGatewaySettingsTest({
+        settingsTags: [
           { name: 'Label', value: 'new-label' },
           { name: 'Note', value: 'new-note' },
           { name: 'FQDN', value: 'new-fqdn' },
@@ -660,29 +713,35 @@ describe('GatewayRegistry', async () => {
           },
           { name: 'Auto-Stake', value: 'false' },
         ],
-      });
-
-      // check the gateway record from contract
-      const updatedGateway = await getGateway({
-        address: STUB_ADDRESS,
-        memory: updatedSettingsMemory,
-      });
-
-      // should match old gateway, with new settings
-      assert.deepStrictEqual(updatedGateway, {
-        ...gateway,
-        settings: {
+        expectedUpdatedSettings: {
           label: 'new-label',
           note: 'new-note',
           fqdn: 'new-fqdn',
           port: 80,
           protocol: 'https',
-          autoStake: false,
           allowDelegatedStaking: false,
           minDelegatedStake: 1_000_000_000,
           delegateRewardShareRatio: 10,
           properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
+          autoStake: false,
         },
+        delegateAddresses: [STUB_ADDRESS_9],
+        expectedDelegates: [],
+      });
+    });
+
+    it('should ignore Allowed-Delegates when allowlist is not active before or after the update', async () => {
+      await updateGatewaySettingsTest({
+        settingsTags: [{ name: 'Allowed-Delegates', value: STUB_ADDRESS_9 }],
+        expectedUpdatedSettings: {},
+      });
+
+      await updateGatewaySettingsTest({
+        settingsTags: [
+          { name: 'Allowed-Delegated-Staking', value: false },
+          { name: 'Allowed-Delegates', value: STUB_ADDRESS_9 },
+        ],
+        expectedUpdatedSettings: {},
       });
     });
   });
@@ -1075,12 +1134,11 @@ X         - (no one can delegate)
       - With Allow-Delegated-Staking currently set to:
         - true AND updated Allow-Delegated-Staking =:
           - true and Allowed-Delegates = [ 'something_here' ]
-            - any previous allowlist is cleared
             - existing delegates are left untouched
             - new allowlist is NOT set (anyone one can delegate)
           - false
-            - any previous allowlist is cleared
-            - allowlist is not set regardless of updated Allowed-Delegates setting
+X           - any previous allowlist is cleared
+X           - allowlist is not set regardless of updated Allowed-Delegates setting
             - existing delegates are kicked
           - allowlist and Allowed-Delegates = [ 'something_here' ]
               - allowlist is updated/replaced with updated list
