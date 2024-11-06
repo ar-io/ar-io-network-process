@@ -383,6 +383,46 @@ describe("arns", function()
 					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
 				}
 				assert.is_true(gar.isEligibleForArNSDiscount(testAddress))
+
+				_G.NameRegistry.records["test-name"] = {
+					endTimestamp = timestamp + constants.oneYearMs,
+					processId = testProcessId,
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}
+				local demandBefore = demand.getCurrentPeriodRevenue()
+				local purchasesBefore = demand.getCurrentPeriodPurchases()
+				local status, result = pcall(arns.increaseundernameLimit, testAddress, "test-name", 50, timestamp)
+				local expectation = {
+					endTimestamp = timestamp + constants.oneYearMs,
+					processId = testProcessId,
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 60,
+				}
+				assert.is_true(status)
+				assert.are.same(expectation, result.record)
+				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
+
+				local discountedCost = 25000000 - (math.floor(25000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+
+				assert.is.equal(
+					_G.Balances[testAddress],
+					startBalance - discountedCost,
+					"Balance should be reduced by the purchase price"
+				)
+
+				assert.is.equal(
+					_G.Balances[_G.ao.id],
+					discountedCost,
+					"Protocol balance should be increased by the purchase price"
+				)
+
+				assert.are.equal(demandBefore + discountedCost, demand.getCurrentPeriodRevenue())
+				assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 			end)
 		end)
 
