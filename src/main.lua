@@ -110,6 +110,7 @@ local function lastKnownTotalTokenSupply()
 		+ LastKnownWithdrawSupply
 		+ Balances[Protocol]
 end
+LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
 
 local function eventingPcall(ioEvent, onError, fnToCall, ...)
 	local status, result = pcall(fnToCall, ...)
@@ -275,7 +276,7 @@ end, function(msg)
 		lastKnownWithdrawSupply = LastKnownWithdrawSupply,
 		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
 	}
-	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId)
+	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -302,6 +303,19 @@ end, function(msg)
 			msg.ioEvent:addField("Pruned-Records", prunedRecordNames)
 			msg.ioEvent:addField("Pruned-Records-Count", prunedRecordsCount)
 			msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
+		end
+		local newGracePeriodRecordsCount = utils.lengthOfTable(resultOrError.newGracePeriodRecords or {})
+		if newGracePeriodRecordsCount > 0 then
+			local newGracePeriodRecordNames = {}
+			for name, record in pairs(resultOrError.newGracePeriodRecords) do
+				table.insert(newGracePeriodRecordNames, name)
+				if record.endTimestamp > LastGracePeriodEntryEndTimestamp then
+					LastGracePeriodEntryEndTimestamp = record.endTimestamp
+				end
+			end
+			msg.ioEvent:addField("New-Grace-Period-Records", newGracePeriodRecordNames)
+			msg.ioEvent:addField("New-Grace-Period-Records-Count", newGracePeriodRecordsCount)
+			msg.ioEvent:addField("Last-Grace-Period-Entry-End-Timestamp", LastGracePeriodEntryEndTimestamp)
 		end
 		local prunedAuctions = resultOrError.prunedAuctions or {}
 		local prunedAuctionsCount = utils.lengthOfTable(prunedAuctions)

@@ -1593,17 +1593,23 @@ describe("gar", function()
 			_G.Balances[ao.id] = 0
 			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = gar.getSettings().operators.minStake,
-				totalDelegatedStake = 0,
+				totalDelegatedStake = 123,
 				vaults = {},
 				delegates = {},
 			}
-			local status, err = pcall(gar.slashOperatorStake, stubGatewayAddress, slashAmount)
+			local currentTimestamp = 123456
+			local status, err = pcall(gar.slashOperatorStake, stubGatewayAddress, slashAmount, currentTimestamp)
 			assert.is_true(status)
 			assert.is_nil(err)
-			assert.are.equal(
-				gar.getSettings().operators.minStake - slashAmount,
-				_G.GatewayRegistry[stubGatewayAddress].operatorStake
-			)
+			assert.are.same({
+				operatorStake = gar.getSettings().operators.minStake - slashAmount,
+				totalDelegatedStake = 123,
+				slashings = {
+					[123456] = slashAmount,
+				},
+				vaults = {},
+				delegates = {},
+			}, _G.GatewayRegistry[stubGatewayAddress])
 			assert.are.equal(slashAmount, _G.Balances[ao.id])
 		end)
 	end)
