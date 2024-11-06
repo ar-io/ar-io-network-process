@@ -640,14 +640,14 @@ describe("arns", function()
 
 	describe("pruneRecords", function()
 		it("should prune records and create auctions for expired leased records", function()
-			local currentTimestamp = 1000000000
+			local currentTimestamp = 2000000000
 
 			_G.NameRegistry = {
 				auctions = {},
 				reserved = {},
 				records = {
 					["active-record"] = {
-						endTimestamp = currentTimestamp + 1000000, -- far in the future
+						endTimestamp = 2001000000, -- far in the future
 						processId = "active-process-id",
 						purchasePrice = 600000000,
 						startTimestamp = 0,
@@ -655,7 +655,7 @@ describe("arns", function()
 						undernameLimit = 10,
 					},
 					["expired-record"] = {
-						endTimestamp = currentTimestamp - constants.gracePeriodMs - 1, -- expired and past the grace period
+						endTimestamp = 790399999, -- expired and past the grace period
 						processId = "expired-process-id",
 						purchasePrice = 400000000,
 						startTimestamp = 0,
@@ -680,7 +680,7 @@ describe("arns", function()
 					},
 				},
 			}
-			arns.pruneRecords(currentTimestamp)
+			local prunedRecords, newGracePeriodRecords = arns.pruneRecords(currentTimestamp)
 			assert.are.same({
 				["active-record"] = {
 					endTimestamp = currentTimestamp + 1000000, -- far in the future
@@ -709,8 +709,8 @@ describe("arns", function()
 			}, _G.NameRegistry.records)
 			assert.are.same({
 				["expired-record"] = {
-					startTimestamp = currentTimestamp,
-					endTimestamp = currentTimestamp + (60 * 1000 * 60 * 24 * 14), -- 14 days
+					startTimestamp = 2000000000,
+					endTimestamp = 3209600000, -- plus 14 days
 					initiator = _G.ao.id,
 					baseFee = 400000000,
 					demandFactor = 1,
@@ -724,8 +724,106 @@ describe("arns", function()
 					},
 				},
 			}, _G.NameRegistry.auctions)
+			assert.are.same({
+				["expired-record"] = {
+					endTimestamp = currentTimestamp - constants.gracePeriodMs - 1, -- expired and past the grace period
+					processId = "expired-process-id",
+					purchasePrice = 400000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 5,
+				},
+			}, prunedRecords)
+			assert.are.same({
+				["grace-period-record"] = {
+					endTimestamp = currentTimestamp - constants.gracePeriodMs + 10, -- expired, but within grace period
+					processId = "grace-process-id",
+					purchasePrice = 500000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 8,
+				},
+			}, newGracePeriodRecords)
+
+			-- advance time, run again, and ensure the grace period record is not in the grace period list again
+			local gracePeriodRecordEndTimestamp = currentTimestamp - constants.gracePeriodMs + 10
+			currentTimestamp = currentTimestamp + constants.gracePeriodMs + 1
+			prunedRecords, newGracePeriodRecords = arns.pruneRecords(currentTimestamp, gracePeriodRecordEndTimestamp)
+			assert.are.same({
+				["active-record"] = {
+					endTimestamp = 2001000000,
+					processId = "active-process-id",
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				},
+				["permabuy-record"] = {
+					endTimestamp = nil,
+					processId = "permabuy-process-id",
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "permabuy",
+					undernameLimit = 10,
+				},
+			}, _G.NameRegistry.records)
+			-- grace period record now joins the auction list and is pruned
+			assert.are.same({
+				["expired-record"] = {
+					startTimestamp = 2000000000,
+					endTimestamp = 3209600000, -- plus 14 days
+					initiator = _G.ao.id,
+					baseFee = 400000000,
+					demandFactor = 1,
+					registrationFeeCalculator = arns.calculateRegistrationFee,
+					name = "expired-record",
+					settings = {
+						decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14),
+						scalingExponent = 190,
+						startPriceMultiplier = 50,
+						durationMs = 60 * 1000 * 60 * 24 * 14,
+					},
+				},
+				["grace-period-record"] = {
+					baseFee = 400000000,
+					demandFactor = 1.0,
+					startTimestamp = currentTimestamp,
+					endTimestamp = currentTimestamp + 1209600000, -- plus 14 days
+					initiator = "test",
+					name = "grace-period-record",
+					registrationFeeCalculator = arns.calculateRegistrationFee,
+					settings = {
+						decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14),
+						scalingExponent = 190,
+						startPriceMultiplier = 50,
+						durationMs = 60 * 1000 * 60 * 24 * 14,
+					},
+				},
+			}, _G.NameRegistry.auctions)
+			assert.are.same({
+				["grace-period-record"] = {
+					endTimestamp = 790400010,
+					processId = "grace-process-id",
+					purchasePrice = 500000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 8,
+				},
+			}, prunedRecords)
+			-- active record has entered grace period
+			assert.are.same({
+				["active-record"] = {
+					endTimestamp = 2001000000,
+					processId = "active-process-id",
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				},
+			}, newGracePeriodRecords)
 		end)
 	end)
+
 	describe("pruneReservedNames", function()
 		it("should remove expired reserved names", function()
 			local currentTimestamp = 1000000
