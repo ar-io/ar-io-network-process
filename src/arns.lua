@@ -692,7 +692,8 @@ end
 --- Prunes records that have expired
 --- @param currentTimestamp number The current timestamp
 --- @param lastGracePeriodEntryEndTimestamp number The end timestamp of the last known record to have entered its grace period
---- @return table The pruned records
+--- @return table # The pruned records
+--- @return number # The end timestamp of the last known record to have entered its grace period
 function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 	lastGracePeriodEntryEndTimestamp = lastGracePeriodEntryEndTimestamp or 0
 	local prunedRecords = {}
