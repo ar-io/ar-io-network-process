@@ -108,7 +108,7 @@ end
 
 --- Paginate a table with a cursor
 --- @param tableArray table The table to paginate
---- @param cursor string The cursor to paginate from
+--- @param cursor string|nil The cursor to paginate from (optional)
 --- @param cursorField string The field to use as the cursor
 --- @param limit number The limit of items to return
 --- @param sortBy string The field to sort by

@@ -875,6 +875,29 @@ function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
 	return utils.paginateTableWithCursor(gatewaysArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
+---@param address string # The address of the gateway
+---@param cursor string|nil # The cursor delegate address after which to fetch more delegates (optional)
+---@param limit number # The max number of delegates to fetch
+---@param sortBy string # The delegate field to sort by. Default is "address" (which is added each)
+---@param sortOrder string # The order to sort by, either "asc" or "desc"
+---@return table # A table containing the paginated delegates and pagination metadata
+function gar.getPaginatedDelegates(address, cursor, limit, sortBy, sortOrder)
+	local gateway = gar.getGateway(address)
+	if not gateway then
+		error("Gateway not found")
+	end
+	local delegatesArray = {}
+	local cursorField = "address"
+	for delegateAddress, delegate in pairs(gateway.delegates) do
+		delegate.address = delegateAddress
+		table.insert(delegatesArray, delegate)
+	end
+
+	print("number of delegates " .. utils.lengthOfTable(delegatesArray))
+
+	return utils.paginateTableWithCursor(delegatesArray, cursor, cursorField, limit, sortBy, sortOrder)
+end
+
 function gar.cancelGatewayWithdrawal(from, gatewayAddress, vaultId)
 	local gateway = gar.getGateway(gatewayAddress)
 	if gateway == nil then

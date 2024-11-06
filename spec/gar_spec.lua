@@ -2018,4 +2018,67 @@ describe("gar", function()
 			}, nextGateways)
 		end)
 	end)
+
+	describe("getPaginatedDelegates", function()
+		it(
+			"should return paginated delegates sorted, by defualt, by startTimestamp in descending order (newest first)",
+			function()
+				local gateway = utils.deepCopy(testGateway)
+				local stubDelegate2Address = stubGatewayAddress
+				local delegate1 = {
+					delegatedStake = 1,
+					startTimestamp = 1000,
+					vaults = {},
+				}
+				local delegate2 = {
+					delegatedStake = 2,
+					startTimestamp = 2000,
+					vaults = {},
+				}
+				gateway.delegates = {
+					[stubRandomAddress] = delegate1,
+					[stubDelegate2Address] = delegate2,
+				}
+				_G.GatewayRegistry = {
+					[stubGatewayAddress] = gateway,
+				}
+				local delegates = gar.getPaginatedDelegates(stubGatewayAddress, nil, 1, "startTimestamp", "desc")
+				assert.are.same({
+					limit = 1,
+					sortBy = "startTimestamp",
+					sortOrder = "desc",
+					hasMore = true,
+					nextCursor = stubDelegate2Address,
+					totalItems = 2,
+					items = {
+						{
+							address = stubDelegate2Address,
+							delegatedStake = 2,
+							startTimestamp = 2000,
+							vaults = {},
+						}, -- should be first because it has a higher startTimestamp
+					},
+				}, delegates)
+				-- get the next page
+				local nextDelegates =
+					gar.getPaginatedDelegates(stubGatewayAddress, delegates.nextCursor, 1, "startTimestamp", "desc")
+				assert.are.same({
+					limit = 1,
+					sortBy = "startTimestamp",
+					sortOrder = "desc",
+					hasMore = false,
+					nextCursor = nil,
+					totalItems = 2,
+					items = {
+						{
+							address = stubRandomAddress,
+							delegatedStake = 1,
+							startTimestamp = 1000,
+							vaults = {},
+						},
+					},
+				}, nextDelegates)
+			end
+		)
+	end)
 end)
