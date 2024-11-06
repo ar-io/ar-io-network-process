@@ -7,6 +7,9 @@ function utils.hasMatchingTag(tag, value)
 	return Handlers.utils.hasMatchingTag(tag, value)
 end
 
+--- Checks if a value is an integer
+--- @param value any The value to check
+--- @return boolean Whether the value is an integer
 function utils.isInteger(value)
 	if type(value) == "string" then
 		value = tonumber(value)
@@ -14,6 +17,17 @@ function utils.isInteger(value)
 	return value % 1 == 0
 end
 
+--- Rounds a number to a given precision
+--- @param number number The number to round
+--- @param precision number The precision to round to
+--- @return number The rounded number to the precision provided
+function utils.roundToPrecision(number, precision)
+	return math.floor(number * (10 ^ precision) + 0.5) / (10 ^ precision)
+end
+
+--- Sums the values of a table
+--- @param tbl table The table to sum
+--- @return number The sum of the table values
 function utils.sumTableValues(tbl)
 	local sum = 0
 	for _, value in pairs(tbl) do
@@ -22,6 +36,12 @@ function utils.sumTableValues(tbl)
 	return sum
 end
 
+--- Slices a table
+--- @param tbl table The table to slice
+--- @param first number The first index to slice from
+--- @param last number The last index to slice to
+--- @param step number The step to slice by
+--- @return table The sliced table
 function utils.slice(tbl, first, last, step)
 	local sliced = {}
 
@@ -32,6 +52,9 @@ function utils.slice(tbl, first, last, step)
 	return sliced
 end
 
+--- Parses the pagination tags from a message
+--- @param msg table The message provided to a handler (see ao docs for more info)
+--- @return table The pagination tags
 function utils.parsePaginationTags(msg)
 	local cursor = msg.Tags.Cursor
 	local limit = tonumber(msg.Tags["Limit"]) or 100
@@ -45,8 +68,13 @@ function utils.parsePaginationTags(msg)
 	}
 end
 
+--- Sorts a table by a given field
+--- @param prevTable table The table to sort
+--- @param field string The field to sort by
+--- @param order string The order to sort by ("asc" or "desc")
+--- @return table The sorted table
 function utils.sortTableByField(prevTable, field, order)
-	local tableCopy = utils.deepCopy(prevTable)
+	local tableCopy = utils.deepCopy(prevTable) or {}
 
 	if order ~= "asc" and order ~= "desc" then
 		error("Invalid sort order")
@@ -78,6 +106,14 @@ function utils.sortTableByField(prevTable, field, order)
 	return tableCopy
 end
 
+--- Paginate a table with a cursor
+--- @param tableArray table The table to paginate
+--- @param cursor string The cursor to paginate from
+--- @param cursorField string The field to use as the cursor
+--- @param limit number The limit of items to return
+--- @param sortBy string The field to sort by
+--- @param sortOrder string The order to sort by ("asc" or "desc")
+--- @return table The paginated table
 function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, sortBy, sortOrder)
 	local sortedArray = utils.sortTableByField(tableArray, sortBy, sortOrder)
 
@@ -127,24 +163,32 @@ function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, s
 	}
 end
 
+--- Checks if an address is a valid Arweave address
+--- @param address string The address to check
+--- @return boolean Whether the address is a valid Arweave address
 function utils.isValidArweaveAddress(address)
 	return type(address) == "string" and #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
 end
 
+--- Checks if an address is a valid Ethereum address
+--- @param address string The address to check
+--- @return boolean Whether the address is a valid Ethereum address
 function utils.isValidEthAddress(address)
 	return type(address) == "string" and #address == 42 and string.match(address, "^0x[%x]+$") ~= nil
 end
 
---- Checks if an address is a valid base64url
+--- Checks if an address is a valid AO address
 --- @param url string|nil The address to check
---- @return boolean Whether the address is a valid base64url
+--- @return boolean Whether the address is a valid AO address
 function utils.isValidAOAddress(url)
 	return url and (utils.isValidArweaveAddress(url) or utils.isValidEthAddress(url)) or false
 end
 
--- Convert address to EIP-55 checksum format
--- assumes address has been validated as a valid Ethereum address (see utils.isValidEthAddress)
--- Reference: https://eips.ethereum.org/EIPS/eip-55
+--- Converts an address to EIP-55 checksum format
+--- Assumes address has been validated as a valid Ethereum address (see utils.isValidEthAddress)
+--- Reference: https://eips.ethereum.org/EIPS/eip-55
+--- @param address string The address to convert
+--- @return string The EIP-55 checksum formatted address
 function utils.formatEIP55Address(address)
 	local hex = string.lower(string.sub(address, 3))
 
@@ -166,6 +210,9 @@ function utils.formatEIP55Address(address)
 	return checksumAddress
 end
 
+--- Formats an address to EIP-55 checksum format if it is a valid Ethereum address
+--- @param address string The address to format
+--- @return string The EIP-55 checksum formatted address
 function utils.formatAddress(address)
 	if utils.isValidEthAddress(address) then
 		return utils.formatEIP55Address(address)
@@ -173,6 +220,9 @@ function utils.formatAddress(address)
 	return address
 end
 
+--- Safely decodes a JSON string
+--- @param jsonString string The JSON string to decode
+--- @return table|nil The decoded JSON or nil if the string is nil or the decoding fails
 function utils.safeDecodeJson(jsonString)
 	if not jsonString then
 		return nil
@@ -185,6 +235,10 @@ function utils.safeDecodeJson(jsonString)
 	return result
 end
 
+--- Finds an element in an array that matches a predicate
+--- @param array table The array to search
+--- @param predicate function The predicate to match
+--- @return number|nil The index of the found element or nil if the element is not found
 function utils.findInArray(array, predicate)
 	for i = 1, #array do
 		if predicate(array[i]) then
@@ -194,13 +248,9 @@ function utils.findInArray(array, predicate)
 	return nil -- Return nil if the element is not found
 end
 
-function utils.walletHasSufficientBalance(wallet, quantity)
-	return Balances[wallet] ~= nil and Balances[wallet] >= quantity
-end
-
 --- Deep copies a table
----@param original table The table to copy
----@return table|nil The deep copy of the table or nil if the original is nil
+--- @param original table The table to copy
+--- @return table|nil The deep copy of the table or nil if the original is nil
 function utils.deepCopy(original)
 	if not original then
 		return nil
@@ -221,6 +271,9 @@ function utils.deepCopy(original)
 	return copy
 end
 
+--- Gets the length of a table
+--- @param table table The table to get the length of
+--- @return number The length of the table
 function utils.lengthOfTable(table)
 	local count = 0
 	for _, val in pairs(table) do
@@ -230,25 +283,58 @@ function utils.lengthOfTable(table)
 	end
 	return count
 end
+
+--- Gets a hash from a base64 URL encoded string
+--- @param str string The base64 URL encoded string
+--- @return table The hash
 function utils.getHashFromBase64URL(str)
 	local decodedHash = base64.decode(str, base64.URL_DECODER)
 	local hashStream = crypto.utils.stream.fromString(decodedHash)
 	return crypto.digest.sha2_256(hashStream).asBytes()
 end
 
-function utils.splitString(str, delimiter)
+--- Splits a string by a delimiter
+--- @param input string The string to split
+--- @param delimiter string The delimiter to split by
+--- @return table The split string
+function utils.splitString(input, delimiter)
+	delimiter = delimiter or ","
 	local result = {}
-	for match in (str .. delimiter):gmatch("(.-)" .. delimiter) do
-		result[#result + 1] = match
+	for token in (input or ""):gmatch(string.format("([^%s]+)", delimiter)) do
+		table.insert(result, token)
 	end
 	return result
 end
 
+--- Trims a string
+--- @param input string The string to trim
+--- @return string The trimmed string
+function utils.trimString(input)
+	return input:match("^%s*(.-)%s*$")
+end
+
+--- Splits a string by a delimiter and trims each token
+--- @param input string The string to split
+--- @param delimiter string The delimiter to split by
+--- @return table The split and trimmed string
+function utils.splitAndTrimString(input, delimiter)
+	local tokens = {}
+	for _, token in ipairs(utils.splitString(input, delimiter)) do
+		local trimmed = utils.trimString(token)
+		if #trimmed > 0 then
+			table.insert(tokens, trimmed)
+		end
+	end
+	return tokens
+end
+
+--- Checks if a timestamp is an integer and converts it to milliseconds if it is in seconds
+--- @param timestamp number The timestamp to check and convert
+--- @return number The timestamp in milliseconds
 function utils.checkAndConvertTimestamptoMs(timestamp)
 	-- Check if the timestamp is an integer
-	if type(timestamp) ~= "number" or timestamp % 1 ~= 0 then
-		return error("Timestamp must be an integer")
-	end
+	assert(type(timestamp) == "number", "Timestamp must be a number")
+	assert(utils.isInteger(timestamp), "Timestamp must be an integer")
 
 	-- Define the plausible range for Unix timestamps in seconds
 	local min_timestamp = 0
@@ -267,7 +353,7 @@ function utils.checkAndConvertTimestamptoMs(timestamp)
 		return timestamp
 	end
 
-	return error("Timestamp is out of range")
+	error("Timestamp is out of range")
 end
 
 function utils.reduce(tbl, fn, init)
@@ -303,6 +389,14 @@ function utils.toTrainCase(str)
 		end
 	end)
 	return str
+end
+
+function utils.createLookupTable(tbl)
+	local lookupTable = {}
+	for _, value in ipairs(tbl or {}) do
+		lookupTable[value] = true
+	end
+	return lookupTable
 end
 
 return utils

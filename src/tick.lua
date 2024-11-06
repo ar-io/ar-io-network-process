@@ -3,6 +3,11 @@ local arns = require("arns")
 local gar = require("gar")
 local vaults = require("vaults")
 local epochs = require("epochs")
+
+--- Prunes the state
+--- @param timestamp number The timestamp
+--- @param msgId string The message ID
+--- @return table The pruned records, auctions, reserved names, vaults, gateways, and epochs
 function tick.pruneState(timestamp, msgId)
 	local prunedRecords = arns.pruneRecords(timestamp)
 	local prunedAuctions = arns.pruneAuctions(timestamp)

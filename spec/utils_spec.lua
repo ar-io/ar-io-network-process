@@ -290,4 +290,126 @@ describe("utils", function()
 			}, result)
 		end)
 	end)
+
+	describe("splitAndTrimString", function()
+		it("should split a comma-separated list and trim whitespace", function()
+			local input = "  apple, banana  , cherry ,   date  "
+			local result = utils.splitAndTrimString(input)
+			assert.are.same({ "apple", "banana", "cherry", "date" }, result)
+		end)
+
+		it("should split a pipe-separated list and trim whitespace", function()
+			local input = "  apple| banana  | cherry |   date  "
+			local result = utils.splitAndTrimString(input, "|")
+			assert.are.same({ "apple", "banana", "cherry", "date" }, result)
+		end)
+
+		it("should handle a single item without delimiter", function()
+			local input = "  apple  "
+			local result = utils.splitAndTrimString(input)
+			assert.are.same({ "apple" }, result)
+		end)
+
+		it("should return an empty table for an empty input string", function()
+			local input = ""
+			local result = utils.splitAndTrimString(input)
+			assert.are.same({}, result)
+		end)
+
+		it("should return an empty table for a whitespace input string", function()
+			local input = "   "
+			local result = utils.splitAndTrimString(input)
+			assert.are.same({}, result)
+		end)
+
+		it("should return an empty table for a nil input string", function()
+			local result = utils.splitAndTrimString(nil)
+			assert.are.same({}, result)
+		end)
+
+		it("should handle custom delimiter without trimming unexpected characters", function()
+			local input = "one two three"
+			local result = utils.splitAndTrimString(input, " ")
+			assert.are.same({ "one", "two", "three" }, result)
+		end)
+
+		it("should handle consecutive delimiters as separate items", function()
+			local input = "apple,,banana, ,cherry,"
+			local result = utils.splitAndTrimString(input)
+			assert.are.same({ "apple", "banana", "cherry" }, result)
+		end)
+	end)
+
+	describe("createLookupTable", function()
+		it("should create a lookup table from a list of strings", function()
+			local input = { "apple", "banana", "cherry", "date" }
+			local result = utils.createLookupTable(input)
+			assert.are.same({
+				apple = true,
+				banana = true,
+				cherry = true,
+				date = true,
+			}, result)
+		end)
+
+		it("should create a lookup table from a list of numbers", function()
+			local input = { 1, 2, 3, 4 }
+			local result = utils.createLookupTable(input)
+			assert.are.same({
+				[1] = true,
+				[2] = true,
+				[3] = true,
+				[4] = true,
+			}, result)
+		end)
+
+		it("should create a lookup table from a list of mixed types", function()
+			local input = { "apple", 2, "cherry", 4 }
+			local result = utils.createLookupTable(input)
+			assert.are.same({
+				apple = true,
+				[2] = true,
+				cherry = true,
+				[4] = true,
+			}, result)
+		end)
+
+		it("should create an empty lookup table from an empty list", function()
+			local input = {}
+			local result = utils.createLookupTable(input)
+			assert.are.same({}, result)
+		end)
+
+		it("should create an empty lookup table from a nil list", function()
+			local result = utils.createLookupTable(nil)
+			assert.are.same({}, result)
+		end)
+	end)
+
+	describe("roundToPrecision", function()
+		it("should round to 3 decimal places", function()
+			local result = utils.roundToPrecision(1.23456789, 3)
+			assert.are.equal(1.235, result)
+		end)
+
+		it("should round to 7 decimal places", function()
+			local result = utils.roundToPrecision(1.23456789, 7)
+			assert.are.equal(1.2345679, result)
+		end)
+
+		it("should handle negative numbers", function()
+			local result = utils.roundToPrecision(-1.23456789, 3)
+			assert.are.equal(-1.235, result)
+		end)
+
+		it("should handle zero", function()
+			local result = utils.roundToPrecision(0, 3)
+			assert.are.equal(0, result)
+		end)
+
+		it("should handle large numbers", function()
+			local result = utils.roundToPrecision(123456.789, 3)
+			assert.are.equal(123456.789, result)
+		end)
+	end)
 end)

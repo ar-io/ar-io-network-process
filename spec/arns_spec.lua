@@ -36,10 +36,8 @@ describe("arns", function()
 				function()
 					local demandBefore = demand.getCurrentPeriodRevenue()
 					local purchasesBefore = demand.getCurrentPeriodPurchases()
-					local status, result =
-						pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
+					local result = arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId)
 
-					assert.is_true(status)
 					assert.are.same({
 						purchasePrice = 600000000,
 						type = "lease",
@@ -461,10 +459,7 @@ describe("arns", function()
 
 				-- Reassign the name
 				local newProcessId = "test-this-is-valid-arweave-wallet-address-2"
-				local status, result = pcall(arns.reassignName, "test-name", testProcessId, timestamp, newProcessId)
-
-				-- Assertions
-				assert.is_true(status)
+				local result = arns.reassignName("test-name", testProcessId, timestamp, newProcessId)
 				assert.are.same(newProcessId, result.processId)
 			end)
 
@@ -832,6 +827,7 @@ describe("arns", function()
 			it("should create an auction and remove any existing record", function()
 				local auction = arns.createAuction("test-name", 1000000, "test-initiator")
 				local twoWeeksMs = 1000 * 60 * 60 * 24 * 14
+				assert(auction, "Auction should be created")
 				assert.are.equal(auction.name, "test-name")
 				assert.are.equal(auction.startTimestamp, 1000000)
 				assert.are.equal(auction.endTimestamp, twoWeeksMs + 1000000) -- 14 days late
@@ -881,6 +877,7 @@ describe("arns", function()
 			it("should return the correct price for an auction at a given timestamp permanently", function()
 				local startTimestamp = 1000000
 				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
+				assert(auction, "Auction should be created")
 				local currentTimestamp = startTimestamp + 1000 * 60 * 60 * 24 * 7 -- 1 week into the auction
 				local decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14)
 				local scalingExponent = 190
@@ -903,6 +900,7 @@ describe("arns", function()
 			it("should return the correct prices for an auction with for a lease", function()
 				local startTimestamp = 1729524023521
 				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
+				assert(auction, "Auction should be created")
 				local intervalMs = 1000 * 60 * 15 -- 15 min (how granular we want to compute the prices)
 				local prices = auction:computePricesForAuction("lease", 1, intervalMs)
 				local baseFee = 500000000
@@ -1032,6 +1030,7 @@ describe("arns", function()
 					local floorPrice = baseFee + permabuyAnnualFee
 					local startPrice = floorPrice * 50
 					local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
+					assert(auction, "Auction should be created")
 					local result = arns.submitAuctionBid(
 						"test-name",
 						startPrice,
@@ -1039,7 +1038,7 @@ describe("arns", function()
 						bidTimestamp,
 						"test-process-id",
 						"permabuy",
-						nil
+						0
 					)
 					local totalDecay = auction.settings.decayRate * (bidTimestamp - startTimestamp)
 					local expectedPrice = math.floor(startPrice * ((1 - totalDecay) ^ auction.settings.scalingExponent))
@@ -1081,6 +1080,7 @@ describe("arns", function()
 			it("should throw an error if the bid is not high enough", function()
 				local startTimestamp = 1000000
 				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
+				assert(auction, "Auction should be created")
 				local startPrice = auction:getPriceForAuctionAtTimestamp(startTimestamp, "permabuy", nil)
 				local status, error = pcall(
 					arns.submitAuctionBid,
@@ -1099,6 +1099,7 @@ describe("arns", function()
 			it("should throw an error if the bidder does not have enough balance", function()
 				local startTimestamp = 1000000
 				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
+				assert(auction, "Auction should be created")
 				local requiredBid = auction:getPriceForAuctionAtTimestamp(startTimestamp, "permabuy", nil)
 				_G.Balances[testAddressArweave] = requiredBid - 1
 				local status, error = pcall(
