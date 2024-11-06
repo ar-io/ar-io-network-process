@@ -1062,8 +1062,8 @@ function gar.isEligibleForArNSDiscount(from)
 		return false
 	end
 
-	local tenureWeight = gateway.weights.tenureWeight
-	local gatewayPerformanceRatio = gateway.weights.gatewayRewardRatioWeight
+	local tenureWeight = gateway.weights.tenureWeight or 0
+	local gatewayPerformanceRatio = gateway.weights.gatewayRewardRatioWeight or 0
 
 	return tenureWeight >= constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR
 		and gatewayPerformanceRatio >= constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR
