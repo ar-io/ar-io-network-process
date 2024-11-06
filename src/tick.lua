@@ -7,6 +7,7 @@ local epochs = require("epochs")
 --- Prunes the state
 --- @param timestamp number The timestamp
 --- @param msgId string The message ID
+--- @param lastGracePeriodEntryEndTimestamp number The end timestamp of the last known record to enter grace period
 --- @return table The pruned records, auctions, reserved names, vaults, gateways, and epochs
 function tick.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 	local prunedRecords, newGracePeriodRecords = arns.pruneRecords(timestamp, lastGracePeriodEntryEndTimestamp)
