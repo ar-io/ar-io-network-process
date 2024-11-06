@@ -19,6 +19,7 @@ describe('GatewayRegistry', async () => {
   const { handle: originalHandle, memory: startMemory } =
     await createAosLoader();
   let sharedMemory = startMemory; // memory we'll use across unique tests;
+  const STUB_ADDRESS_6 = ''.padEnd(43, '6');
   const STUB_ADDRESS_7 = ''.padEnd(43, '7');
   const STUB_ADDRESS_8 = ''.padEnd(43, '8');
   const STUB_ADDRESS_9 = ''.padEnd(43, '9');
@@ -490,14 +491,18 @@ describe('GatewayRegistry', async () => {
       await allowlistJoinTest({
         tags: [
           { name: 'Allow-Delegated-Staking', value: 'allowlist' },
-          { name: 'Allowed-Delegates', value: STUB_ADDRESS }, // todo: exercise comma separated list
+          {
+            name: 'Allowed-Delegates',
+            value: [STUB_ADDRESS_9, STUB_ADDRESS_8].join(','),
+          },
         ],
         expectedAllowDelegatedStaking: true,
         expectedAllowedDelegatesLookup: {
-          [STUB_ADDRESS]: true,
+          [STUB_ADDRESS_9]: true,
+          [STUB_ADDRESS_8]: true,
         },
-        delegateAddresses: [STUB_ADDRESS_9, STUB_ADDRESS],
-        expectedDelegates: [STUB_ADDRESS],
+        delegateAddresses: [STUB_ADDRESS_9, STUB_ADDRESS_7],
+        expectedDelegates: [STUB_ADDRESS_9],
       });
     });
 
@@ -538,7 +543,6 @@ describe('GatewayRegistry', async () => {
     });
   });
 
-  // TODO: HOW IS ALLOWLISTING (SUPPOSED TO BE) AFFECTED?
   describe('Leave-Network', () => {
     it('should allow leaving the network and vault operator stake correctly', async () => {
       // gateway before leaving
@@ -583,7 +587,6 @@ describe('GatewayRegistry', async () => {
     });
   });
 
-  // TODO: EVICTING PREVIOUS DELEGATES
   describe('Update-Gateway-Settings', () => {
     async function updateGatewaySettingsTest({
       settingsTags,
@@ -739,7 +742,10 @@ describe('GatewayRegistry', async () => {
         inputMemory: stakedMemory,
         settingsTags: [
           { name: 'Allow-Delegated-Staking', value: 'allowlist' },
-          { name: 'Allowed-Delegates', value: STUB_ADDRESS_9 },
+          {
+            name: 'Allowed-Delegates',
+            value: [STUB_ADDRESS_9, STUB_ADDRESS_7].join(','),
+          },
         ],
         expectedUpdatedGatewayProps: {
           totalDelegatedStake: 0, // 8 exiting and 9 not yet joined
@@ -761,11 +767,12 @@ describe('GatewayRegistry', async () => {
         expectedUpdatedSettings: {
           allowDelegatedStaking: true,
           allowedDelegatesLookup: {
-            [STUB_ADDRESS_9]: true, // This is checked BEFORE attempting next round of delegation
+            [STUB_ADDRESS_9]: true, // These are checked BEFORE attempting next round of delegation
+            [STUB_ADDRESS_7]: true,
           },
         },
-        delegateAddresses: [STUB_ADDRESS_9, STUB_ADDRESS_7],
-        expectedDelegates: [STUB_ADDRESS_9, STUB_ADDRESS_8], // 8 is exiting
+        delegateAddresses: [STUB_ADDRESS_9, STUB_ADDRESS_7, STUB_ADDRESS_6], // 6 is not allowed to delegate
+        expectedDelegates: [STUB_ADDRESS_9, STUB_ADDRESS_7, STUB_ADDRESS_8], // 8 is exiting
       });
 
       await updateGatewaySettingsTest({
@@ -798,13 +805,25 @@ describe('GatewayRegistry', async () => {
                 },
               },
             },
+            [STUB_ADDRESS_7]: {
+              // kicked out in this round of updates
+              delegatedStake: 0,
+              startTimestamp: 21600000,
+              vaults: {
+                mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm: {
+                  balance: 500000000,
+                  endTimestamp: 2613600000,
+                  startTimestamp: 21600000,
+                },
+              },
+            },
           },
         },
         expectedUpdatedSettings: {
           allowDelegatedStaking: false,
         },
-        delegateAddresses: [STUB_ADDRESS_7], // not allowed to delegate
-        expectedDelegates: [STUB_ADDRESS_8, STUB_ADDRESS_9], // Leftover from previous test and being forced to exit
+        delegateAddresses: [STUB_ADDRESS_6], // not allowed to delegate
+        expectedDelegates: [STUB_ADDRESS_7, STUB_ADDRESS_8, STUB_ADDRESS_9], // Leftover from previous test and being forced to exit
       });
     });
 
