@@ -375,6 +375,15 @@ describe("arns", function()
 				assert.are.equal(demandBefore + 25000000, demand.getCurrentPeriodRevenue())
 				assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 			end)
+
+			it("should apply ArNS discount for increasing undername limit for eligible gateways", function()
+				_G.GatewayRegistry[testAddress] = testGateway
+				_G.GatewayRegistry[testAddress].weights = {
+					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
+					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+				}
+				assert.is_true(gar.isEligibleForArNSDiscount(testAddress))
+			end)
 		end)
 
 		describe("extendLease", function()
