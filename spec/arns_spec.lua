@@ -1288,6 +1288,58 @@ describe("arns", function()
 				end
 			)
 
+			it("should apply ArNS discount on auction bids for eligible gateways", function()
+				_G.GatewayRegistry[testAddressArweave] = testGateway
+				_G.GatewayRegistry[testAddressArweave].weights = {
+					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
+					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+				}
+				assert(gar.isEligibleForArNSDiscount(testAddressArweave))
+				local startTimestamp = 1000000
+				local bidTimestamp = startTimestamp + 1000 * 60 * 2 -- 2 min into the auction
+				local demandBefore = demand.getCurrentPeriodPurchases()
+				local revenueBefore = demand.getCurrentPeriodRevenue()
+				local baseFee = 500000000
+				local permabuyAnnualFee = baseFee * constants.ANNUAL_PERCENTAGE_FEE * 20
+				local floorPrice = baseFee + permabuyAnnualFee
+				local startPrice = floorPrice * 50
+				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
+				assert(auction, "Auction should be created")
+				local result = arns.submitAuctionBid(
+					"test-name",
+					startPrice,
+					testAddressArweave,
+					bidTimestamp,
+					"test-process-id",
+					"permabuy",
+					0
+				)
+				local totalDecay = auction.settings.decayRate * (bidTimestamp - startTimestamp)
+				local expectedPrice = math.floor(startPrice * ((1 - totalDecay) ^ auction.settings.scalingExponent))
+				local discountedPrice = expectedPrice - (math.floor(expectedPrice * constants.ARNS_DISCOUNT_PERCENTAGE))
+				local expectedRecord = {
+					endTimestamp = nil,
+					processId = "test-process-id",
+					purchasePrice = discountedPrice,
+					startTimestamp = bidTimestamp,
+					type = "permabuy",
+					undernameLimit = 10,
+				}
+				local expectedInitiatorReward = math.floor(discountedPrice * 0.5)
+				local expectedProtocolReward = discountedPrice - expectedInitiatorReward
+				assert.are.equal(expectedInitiatorReward, _G.Balances["test-initiator"])
+				assert.are.equal(expectedProtocolReward, _G.Balances[_G.ao.id])
+				assert.are.equal(nil, _G.NameRegistry.auctions["test-name"])
+				assert.are.same(expectedRecord, _G.NameRegistry.records["test-name"])
+				assert.are.same(expectedRecord, result.record)
+				assert.are.equal(demandBefore + 1, demand.getCurrentPeriodPurchases(), "Purchases should increase by 1")
+				assert.are.equal(
+					revenueBefore + discountedPrice,
+					demand.getCurrentPeriodRevenue(),
+					"Revenue should increase by the bid amount"
+				)
+			end)
+
 			it("should throw an error if the auction is not found", function()
 				local status, error =
 					pcall(arns.submitAuctionBid, "test-name-2", 1000000000, "test-bidder", 1000000, "test-process-id")
