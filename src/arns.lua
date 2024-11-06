@@ -34,15 +34,14 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 
 	local baseRegistrationFee = demand.baseFeeForNameLength(#name)
 
-	local eligibleForArNSDiscount = gar.isEligibleForArNSDiscount(from)
-
-	local totalRegistrationFee = arns.calculateRegistrationFee(
-		purchaseType,
-		baseRegistrationFee,
-		numYears,
-		demand.getDemandFactor(),
-		eligibleForArNSDiscount
-	)
+	local totalRegistrationFee = arns.getTokenCost({
+		currentTimestamp = timestamp,
+		intent = "Buy-Record",
+		name = name,
+		purchaseType = purchaseType,
+		years = numYears,
+		from = from,
+	})
 
 	assert(balances.getBalance(from) >= totalRegistrationFee, "Insufficient balance")
 
@@ -108,7 +107,13 @@ function arns.extendLease(from, name, years, currentTimestamp)
 	-- throw error if invalid
 	arns.assertValidExtendLease(record, currentTimestamp, years)
 	local baseRegistrationFee = demand.baseFeeForNameLength(#name)
-	local totalExtensionFee = arns.calculateExtensionFee(baseRegistrationFee, years, demand.getDemandFactor())
+	local totalExtensionFee = arns.getTokenCost({
+		currentTimestamp = currentTimestamp,
+		intent = "Extend-Lease",
+		name = name,
+		years = years,
+		from = from,
+	})
 
 	if balances.getBalance(from) < totalExtensionFee then
 		error("Insufficient balance")
@@ -303,17 +308,11 @@ end
 --- @param baseFee number The base fee for the name
 --- @param years number The number of years, may be empty for permabuy
 --- @param demandFactor number The demand factor
---- @param isEligibleForArNSDiscount boolean Whether the buyer is eligible for the ArNS discount
 --- @return number The registration fee
-function arns.calculateRegistrationFee(purchaseType, baseFee, years, demandFactor, isEligibleForArNSDiscount)
+function arns.calculateRegistrationFee(purchaseType, baseFee, years, demandFactor)
 	assert(purchaseType == "lease" or purchaseType == "permabuy", "Invalid purchase type")
 	local registrationFee = purchaseType == "lease" and arns.calculateLeaseFee(baseFee, years, demandFactor)
 		or arns.calculatePermabuyFee(baseFee, demandFactor)
-
-	if isEligibleForArNSDiscount then
-		local discount = math.floor(registrationFee * constants.ARNS_DISCOUNT_PERCENTAGE)
-		registrationFee = registrationFee - discount
-	end
 
 	return registrationFee
 end
@@ -437,6 +436,7 @@ end
 ---@field name string The name of the record
 ---@field intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name)
 ---@field currentTimestamp number The current timestamp
+---@field from string|nil The target address of the intended action
 
 --- Gets the token cost for an intended action
 --- @param intendedAction IntendedAction The intended action with fields:
@@ -446,6 +446,7 @@ end
 ---   - name string The name of the record
 ---   - intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name)
 ---   - currentTimestamp number The current timestamp
+---   - from string|nil The target address of the intended action
 --- @return number The token cost in mIO of the intended action
 function arns.getTokenCost(intendedAction)
 	local tokenCost = 0
@@ -487,10 +488,18 @@ function arns.getTokenCost(intendedAction)
 		arns.assertValidUpgradeName(record, currentTimestamp)
 		tokenCost = arns.calculatePermabuyFee(baseFee, demand.getDemandFactor())
 	end
+
+	-- if the address is eligible for the ArNS discount, apply the discount
+	if gar.isEligibleForArNSDiscount(intendedAction.from) then
+		local discount = math.floor(tokenCost * constants.ARNS_DISCOUNT_PERCENTAGE)
+		tokenCost = tokenCost - discount
+	end
+
 	-- if token Cost is less than 0, throw an error
 	if tokenCost < 0 then
 		error("Invalid token cost for " .. intendedAction.intent)
 	end
+
 	return tokenCost
 end
 
@@ -517,8 +526,12 @@ function arns.upgradeRecord(from, name, currentTimestamp)
 	arns.assertValidUpgradeName(record, currentTimestamp)
 
 	local baseFee = demand.baseFeeForNameLength(#name)
-	local demandFactor = demand.getDemandFactor()
-	local upgradeCost = arns.calculatePermabuyFee(baseFee, demandFactor)
+	local upgradeCost = arns.getTokenCost({
+		currentTimestamp = currentTimestamp,
+		intent = "Upgrade-Name",
+		name = name,
+		from = from,
+	})
 
 	assert(balances.walletHasSufficientBalance(from, upgradeCost), "Insufficient balance")
 
@@ -639,6 +652,12 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 	assert(requiredOrBidAmount >= requiredBid, "Bid amount is less than the required bid of " .. requiredBid)
 
 	local finalBidAmount = math.min(requiredOrBidAmount, requiredBid)
+
+	-- check if bidder is eligible for ArNS discount
+	if gar.isEligibleForArNSDiscount(bidder) then
+		local discount = math.floor(finalBidAmount * constants.ARNS_DISCOUNT_PERCENTAGE)
+		finalBidAmount = finalBidAmount - discount
+	end
 
 	-- check the balance of the bidder
 	assert(balances.walletHasSufficientBalance(bidder, finalBidAmount), "Insufficient balance")
