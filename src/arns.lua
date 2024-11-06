@@ -160,6 +160,12 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
 	local additionalUndernameCost =
 		arns.calculateUndernameCost(baseRegistrationFee, qty, record.type, yearsRemaining, demand.getDemandFactor())
 
+	-- if the address is eligible for the ArNS discount, apply the discount
+	if gar.isEligibleForArNSDiscount(from) then
+		local discount = math.floor(additionalUndernameCost * constants.ARNS_DISCOUNT_PERCENTAGE)
+		additionalUndernameCost = additionalUndernameCost - discount
+	end
+
 	if additionalUndernameCost < 0 then
 		error("Invalid undername cost")
 	end
