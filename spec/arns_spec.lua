@@ -499,6 +499,65 @@ describe("arns", function()
 				assert.is_false(status)
 				assert.match("Cannot extend lease beyond 5 years", error)
 			end)
+
+			it("should apply ArNS discount to eligible gateways for extending leases", function()
+				_G.GatewayRegistry[testAddress] = testGateway
+				_G.GatewayRegistry[testAddress].weights = {
+					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
+					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+				}
+				local result = gar.isEligibleForArNSDiscount(testAddress)
+				assert.is_true(result)
+
+				_G.NameRegistry.records["test-name"] = {
+					-- 1 year lease
+					endTimestamp = timestamp + constants.oneYearMs,
+					processId = testProcessId,
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}
+				local demandBefore = demand.getCurrentPeriodRevenue()
+				local purchasesBefore = demand.getCurrentPeriodPurchases()
+				local status, extendLeaseResult = pcall(arns.extendLease, testAddress, "test-name", 4, timestamp)
+				assert.is_true(status)
+				assert.are.same({
+					endTimestamp = timestamp + constants.oneYearMs * 5,
+					processId = testProcessId,
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}, extendLeaseResult.record)
+				assert.are.same({
+					["test-name"] = {
+						endTimestamp = timestamp + constants.oneYearMs * 5,
+						processId = testProcessId,
+						purchasePrice = 600000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 10,
+					},
+				}, _G.NameRegistry.records)
+
+				local discountedCost = 400000000 - (math.floor(400000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+
+				assert.is.equal(
+					_G.Balances[testAddress],
+					startBalance - discountedCost,
+					"Balance should be reduced by the purchase price"
+				)
+
+				assert.is.equal(
+					_G.Balances[_G.ao.id],
+					discountedCost,
+					"Protocol balance should be increased by the discounted price"
+				)
+
+				assert.are.equal(demandBefore + discountedCost, demand.getCurrentPeriodRevenue())
+				assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
+			end)
 		end)
 
 		describe("calculateRegistrationFee [" .. addressType .. "]", function()
