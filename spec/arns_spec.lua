@@ -4,6 +4,45 @@ local arns = require("arns")
 local demand = require("demand")
 local utils = require("utils")
 local Auction = require("auctions")
+local gar = require("gar")
+
+local stubGatewayAddress = "test-this-is-valid-arweave-wallet-address-1"
+local stubObserverAddress = "test-this-is-valid-arweave-wallet-address-2"
+local stubRandomAddress = "test-this-is-valid-arweave-wallet-address-3"
+local testSettings = {
+	fqdn = "test.com",
+	protocol = "https",
+	port = 443,
+	allowDelegatedStaking = true,
+	minDelegatedStake = 500000000,
+	autoStake = true,
+	label = "test",
+	delegateRewardShareRatio = 0,
+	properties = stubGatewayAddress,
+	allowedDelegatesLookup = {
+		["test-allowlisted-delegator-address-number-1"] = true,
+		["test-allowlisted-delegator-address-number-2"] = true,
+	},
+}
+local testGateway = {
+	operatorStake = gar.getSettings().operators.minStake,
+	totalDelegatedStake = 0,
+	vaults = {},
+	delegates = {},
+	startTimestamp = 0,
+	stats = {
+		prescribedEpochCount = 0,
+		observedEpochCount = 0,
+		totalEpochCount = 0,
+		passedEpochCount = 0,
+		failedEpochCount = 0,
+		failedConsecutiveEpochs = 0,
+		passedConsecutiveEpochs = 0,
+	},
+	settings = testSettings,
+	status = "joined",
+	observerAddress = stubObserverAddress,
+}
 
 describe("arns", function()
 	local timestamp = 0
@@ -23,6 +62,7 @@ describe("arns", function()
 			[testAddressEth] = startBalance,
 		}
 		_G.DemandFactor.currentDemandFactor = 1.0
+		_G.GatewayRegistry = {}
 	end)
 
 	for addressType, testAddress in pairs(testAddresses) do
@@ -59,6 +99,50 @@ describe("arns", function()
 					assert.are.equal(startBalance - 600000000, _G.Balances[testAddress])
 					assert.are.equal(600000000, _G.Balances[_G.ao.id])
 					assert.are.equal(demandBefore + 600000000, demand.getCurrentPeriodRevenue())
+					assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
+				end
+			)
+
+			it(
+				"should apply ArNS discount on lease buys when elgibility requirements are met[" .. addressType .. "]",
+				function()
+					_G.GatewayRegistry[testAddress] = testGateway
+					_G.GatewayRegistry[testAddress].weights = {
+						tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
+						gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+					}
+					local result = gar.isEligibleForArNSDiscount(testAddress)
+					assert.is_true(result)
+
+					local demandBefore = demand.getCurrentPeriodRevenue()
+					local purchasesBefore = demand.getCurrentPeriodPurchases()
+					local discountedCost = 600000000 - (math.floor(600000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+
+					local status, buyRecordResult =
+						pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
+
+					assert.is_true(status)
+					assert.are.same({
+						purchasePrice = discountedCost,
+						type = "lease",
+						undernameLimit = 10,
+						processId = testProcessId,
+						startTimestamp = 0,
+						endTimestamp = timestamp + constants.oneYearMs * 1,
+					}, buyRecordResult.record)
+					assert.are.same({
+						["test-name"] = {
+							purchasePrice = discountedCost,
+							type = "lease",
+							undernameLimit = 10,
+							processId = testProcessId,
+							startTimestamp = 0,
+							endTimestamp = timestamp + constants.oneYearMs * 1,
+						},
+					}, _G.NameRegistry.records)
+					assert.are.equal(startBalance - discountedCost, _G.Balances[testAddress])
+					assert.are.equal(discountedCost, _G.Balances[_G.ao.id])
+					assert.are.equal(demandBefore + discountedCost, demand.getCurrentPeriodRevenue())
 					assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 				end
 			)
@@ -430,19 +514,6 @@ describe("arns", function()
 				local expected = (baseFee * 0.2 * 20) + baseFee
 				assert.are.equal(expected, fee)
 			end)
-
-			it(
-				"should return the correct fee for registring a name permanently when eligible for ArNS discount ["
-					.. addressType
-					.. "]",
-				function()
-					local baseFee = 500000000 -- base fee is 500 IO
-					local fee = arns.calculateRegistrationFee("permabuy", baseFee, 1, 1, true)
-					local expected = (baseFee * 0.2 * 20) + baseFee
-					local withDiscount = expected - (math.floor(expected * constants.ARNS_DISCOUNT_PERCENTAGE))
-					assert.are.equal(withDiscount, fee)
-				end
-			)
 		end)
 
 		describe("reassignName [" .. addressType .. "]", function()
@@ -589,6 +660,56 @@ describe("arns", function()
 			_G.DemandFactor.currentDemandFactor = demandFactor
 			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
 		end)
+
+		it("should return the correct token cost for an ArNS discount eligible address", function()
+			_G.GatewayRegistry[stubRandomAddress] = testGateway
+			_G.GatewayRegistry[stubRandomAddress].weights = {
+				tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
+				gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+			}
+			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
+			assert.is_true(result)
+
+			local baseFee = 500000000
+			local demandFactor = 1.052
+			local expectedCost = math.floor((baseFee * 0.2 * 20) + baseFee) * demandFactor
+			local intendedAction = {
+				intent = "Buy-Record",
+				purchaseType = "permabuy",
+				name = "test-name",
+				currentTimestamp = timestamp,
+				from = stubRandomAddress,
+			}
+			_G.DemandFactor.currentDemandFactor = demandFactor
+
+			local discountedCost = expectedCost - (math.floor(expectedCost * constants.ARNS_DISCOUNT_PERCENTAGE))
+			assert.are.equal(discountedCost, arns.getTokenCost(intendedAction))
+		end)
+
+		it("should not apply discount on a gateway that is found but does not meet the requirements", function()
+			_G.GatewayRegistry[stubRandomAddress] = testGateway
+			_G.GatewayRegistry[stubRandomAddress].weights = {
+				tenureWeight = 0.1,
+				gatewayRewardRatioWeight = 0.1,
+			}
+			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
+			assert.is_false(result)
+
+			local baseFee = 500000000
+			local demandFactor = 1.052
+			local expectedCost = math.floor((baseFee * 0.2 * 20) + baseFee) * demandFactor
+			local intendedAction = {
+				intent = "Buy-Record",
+				purchaseType = "permabuy",
+				name = "test-name",
+				currentTimestamp = timestamp,
+				from = stubRandomAddress,
+			}
+			_G.DemandFactor.currentDemandFactor = demandFactor
+
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+		end)
+
 		it(
 			"should throw an error if trying to increase undername limit of a leased record in the grace period",
 			function()
@@ -962,6 +1083,44 @@ describe("arns", function()
 					baseRegistrationFee = 500000000,
 					remainingBalance = 0,
 					protocolBalance = 2500000000,
+					df = demand.getDemandFactorInfo(),
+				}, updatedRecord)
+			end)
+
+			it("should apply the ArNS discount to the upgrade cost", function()
+				_G.GatewayRegistry[stubRandomAddress] = testGateway
+				_G.GatewayRegistry[stubRandomAddress].weights = {
+					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
+					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+				}
+				_G.NameRegistry.records["upgrade-name"] = {
+					endTimestamp = 1000000,
+					processId = "test-process-id",
+					purchasePrice = 1000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}
+				_G.Balances[stubRandomAddress] = 2500000000
+				assert(gar.isEligibleForArNSDiscount(stubRandomAddress))
+				local updatedRecord = arns.upgradeRecord(stubRandomAddress, "upgrade-name", 1000000)
+
+				local expectedCost = 2500000000 - (math.floor(2500000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+
+				assert.are.same({
+					name = "upgrade-name",
+					record = {
+						endTimestamp = nil,
+						processId = "test-process-id",
+						purchasePrice = expectedCost,
+						startTimestamp = 0,
+						type = "permabuy",
+						undernameLimit = 10,
+					},
+					totalUpgradeFee = expectedCost,
+					baseRegistrationFee = 500000000,
+					remainingBalance = 500000000,
+					protocolBalance = expectedCost,
 					df = demand.getDemandFactorInfo(),
 				}, updatedRecord)
 			end)
