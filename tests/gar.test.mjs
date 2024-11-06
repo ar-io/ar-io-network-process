@@ -33,6 +33,13 @@ describe('GatewayRegistry', async () => {
     );
   }
 
+  function assertNoResultError(result) {
+    const errorTag = result.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.strictEqual(errorTag, undefined);
+  }
+
   const transfer = async ({
     recipient = STUB_ADDRESS,
     quantity = initialOperatorStake,
@@ -51,13 +58,7 @@ describe('GatewayRegistry', async () => {
       },
       memory,
     );
-
-    // assert no error tag
-    const errorTag = transferResult.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(errorTag, undefined);
-
+    assertNoResultError(transferResult);
     return transferResult.Memory;
   };
 
@@ -88,13 +89,7 @@ describe('GatewayRegistry', async () => {
       },
       transferMemory,
     );
-
-    // assert no error tag
-    const errorTag = delegateResult.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(errorTag, undefined);
-
+    assertNoResultError(delegateResult);
     return {
       result: delegateResult,
       memory: delegateResult.Memory,
@@ -154,13 +149,7 @@ describe('GatewayRegistry', async () => {
       },
       transferMemory,
     );
-
-    // assert no error
-    const errorTag = joinNetworkResult.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(errorTag, undefined);
-
+    assertNoResultError(joinNetworkResult);
     return {
       memory: joinNetworkResult.Memory,
       result: joinNetworkResult,
@@ -189,13 +178,7 @@ describe('GatewayRegistry', async () => {
       },
       memory,
     );
-
-    // assert no error
-    const errorTag = result.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(errorTag, undefined);
-
+    assertNoResultError(result);
     return {
       memory: result.Memory,
       result,
@@ -226,13 +209,7 @@ describe('GatewayRegistry', async () => {
       },
       memory,
     );
-
-    // assert no error
-    const errorTag = result.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(errorTag, undefined);
-
+    assertNoResultError(result);
     return {
       memory: result.Memory,
       result,
@@ -259,13 +236,7 @@ describe('GatewayRegistry', async () => {
       },
       memory,
     );
-
-    // assert no error
-    const errorTag = result.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(errorTag, undefined);
-
+    assertNoResultError(result);
     return {
       memory: result.Memory,
       result,
@@ -292,13 +263,7 @@ describe('GatewayRegistry', async () => {
       },
       memory,
     );
-
-    // assert no error
-    const errorTag = result.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(errorTag, undefined);
-
+    assertNoResultError(result);
     return {
       memory: result.Memory,
       result,
@@ -329,13 +294,7 @@ describe('GatewayRegistry', async () => {
       },
       transferMemory,
     );
-
-    // assert no error
-    const errorTag = result.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(errorTag, undefined);
-
+    assertNoResultError(result);
     return {
       memory: result.Memory,
       result,
@@ -356,13 +315,7 @@ describe('GatewayRegistry', async () => {
       },
       memory,
     );
-
-    // assert no error
-    const errorTag = result.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(errorTag, undefined);
-
+    assertNoResultError(result);
     return {
       memory: result.Memory,
       result,
@@ -384,13 +337,7 @@ describe('GatewayRegistry', async () => {
       },
       memory,
     );
-
-    // assert no error
-    const errorTag = result.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(errorTag, undefined);
-
+    assertNoResultError(result);
     return {
       memory: result.Memory,
       result,
@@ -1268,60 +1215,4 @@ describe('GatewayRegistry', async () => {
       // Steps: add a gateway, create the first epoch to prescribe it, submit an observation from the gateway, tick to the epoch distribution timestamp, check the rewards were distributed correctly
     });
   });
-
-  /*
-    Tests for allowlisting:
-    - JoinNetwork:
-      - With Allow-Delegated-Staking =:
-X       - true AND Allowed-Delegates = [ 'something_here' ]
-X          - allowlist is ignored and not set (everyone can delegate)
-X        - false AND Allowed-Delegates = [ 'something_here' ]
-X          - allowlist is ignored and not set (no one can delegate)
-X       - allowlist and Allowed-Delegates = [ 'something_here' ]
-X         - allowlist is set with only 'something_here' in it
-X          - only 'something_here' can delegate
-X       - allowlist and Allowed-Delegates is unset
-X         - allowlist is set with nothing in it
-X         - (no one can delegate)
-    - UpdateGatewaySettings:
-      - With Allow-Delegated-Staking currently set to:
-        - true AND updated Allow-Delegated-Staking =:
-X         - true and Allowed-Delegates = [ 'something_here' ]
-X           - existing delegates are left untouched
-X           - new allowlist is NOT set (anyone one can delegate)
-X         - false
-X           - any previous allowlist is cleared
-X           - allowlist is not set regardless of updated Allowed-Delegates setting
-X           - existing delegates are kicked
-X           - no one can delegate
-X         - allowlist and Allowed-Delegates = [ 'something_here' ]
-X             - allowlist is updated/replaced with updated list
-X             - existing delegates not in the updated allowlist are kicked
-X             - only 'something_here' can delegate
-X         - allowlist and Allowed-Delegates is unset
-X           - allowlist is updated/replaced with an empty list
-X           - existing delegates are all kicked
-X           - no one can delegate
-        - false AND:
-          - vaulted delegates:
-            - have NOT all exited:
-              - error
-            - HAVE all exited AND updated Allow-Delegated-Staking =:
-              - true:
-                - allowlist is cleared regardless of updated Allowed-Delegates setting
-                - existing delegates are left untouched
-                - anyone can delegate
-              - false
-                - allowlist is cleared regardless of updated Allowed-Delegates setting
-                - existing delegates are kicked
-                - no one can delegate
-              - allowlist and Allowed-Delegates = [ 'something_here' ]
-                - allowlist is replaces with updated list
-                - existing delegates not in the updated allowlist are kicked
-                - only 'something_here' can delegate
-              - allowlist and Allowed-Delegates is unset
-                - allowlist is cleared
-                - existing delegates are all kicked
-                - no one can delegate
-  */
 });
