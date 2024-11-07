@@ -712,7 +712,7 @@ end)
 
 addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRecord), function(msg)
 	local name = string.lower(msg.Tags.Name)
-	local purchaseType = string.lower(msg.Tags["Purchase-Type"])
+	local purchaseType = msg.Tags["Purchase-Type"] and string.lower(msg.Tags["Purchase-Type"]) or "lease"
 	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
 	local from = utils.formatAddress(msg.From)
 	local processId = utils.formatAddress(msg.Tags["Process-Id"] or msg.From)
