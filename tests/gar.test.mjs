@@ -129,6 +129,51 @@ describe('GatewayRegistry', async () => {
     return gateway;
   };
 
+  const getDelegates = async ({ memory, from, timestamp, gatewayAddress }) => {
+    const delegatesResult = await handle(
+      {
+        From: from,
+        Owner: from,
+        Tags: [
+          { name: 'Action', value: 'Paginated-Delegates' },
+          { name: 'Address', value: gatewayAddress },
+        ],
+        Timestamp: timestamp,
+      },
+      memory,
+    );
+    assertNoResultError(delegatesResult);
+    return {
+      result: delegatesResult,
+      memory: delegatesResult.Memory,
+    };
+  };
+
+  const getAllowedDelegates = async ({
+    memory,
+    from,
+    timestamp,
+    gatewayAddress,
+  }) => {
+    const delegatesResult = await handle(
+      {
+        From: from,
+        Owner: from,
+        Tags: [
+          { name: 'Action', value: 'Paginated-Allowed-Delegates' },
+          { name: 'Address', value: gatewayAddress },
+        ],
+        Timestamp: timestamp,
+      },
+      memory,
+    );
+    assertNoResultError(delegatesResult);
+    return {
+      result: delegatesResult,
+      memory: delegatesResult.Memory,
+    };
+  };
+
   const joinNetwork = async ({
     memory,
     timestamp = STUB_TIMESTAMP,
@@ -394,17 +439,17 @@ describe('GatewayRegistry', async () => {
     });
 
     async function allowlistJoinTest({
+      gatewayAddress,
       tags,
       delegateAddresses,
       expectedAllowDelegatedStaking,
       expectedAllowedDelegatesLookup,
       expectedDelegates,
     }) {
-      const otherGatewayAddress = ''.padEnd(43, '3');
-
+      gatewayAddress = gatewayAddress || ''.padEnd(43, '3');
       // give the wallet the joining tokens
       const transferMemory = await transfer({
-        recipient: otherGatewayAddress,
+        recipient: gatewayAddress,
         quantity: 100_000_000_000,
         sharedMemory,
       });
@@ -414,22 +459,22 @@ describe('GatewayRegistry', async () => {
         (tag) => ![...tagNames, 'Observer-Address'].includes(tag.name),
       );
       const { memory: joinNetworkMemory } = await joinNetwork({
-        address: otherGatewayAddress,
+        address: gatewayAddress,
         memory: transferMemory,
         tags: [
           ...joinNetworkTags,
-          { name: 'Observer-Address', value: otherGatewayAddress },
+          { name: 'Observer-Address', value: gatewayAddress },
           ...tags,
         ],
       });
 
       // check the gateway record from contract
       const gateway = await getGateway({
-        address: otherGatewayAddress,
+        address: gatewayAddress,
         memory: joinNetworkMemory,
       });
       assert.deepEqual(gateway, {
-        observerAddress: otherGatewayAddress,
+        observerAddress: gatewayAddress,
         operatorStake: 100_000_000_000,
         totalDelegatedStake: 0,
         status: 'joined',
@@ -462,6 +507,7 @@ describe('GatewayRegistry', async () => {
         },
       });
 
+      var returnMemory = joinNetworkMemory;
       if (delegateAddresses && expectedDelegates) {
         var nextMemory = joinNetworkMemory;
         for (const delegateAddress of delegateAddresses) {
@@ -470,25 +516,29 @@ describe('GatewayRegistry', async () => {
             timestamp: STUB_TIMESTAMP,
             delegatorAddress: delegateAddress,
             quantity: 500_000_000,
-            gatewayAddress: otherGatewayAddress,
+            gatewayAddress: gatewayAddress,
           }).catch(() => {});
           if (maybeDelegateResult?.memory) {
             nextMemory = maybeDelegateResult.memory;
           }
         }
         const updatedGateway = await getGateway({
-          address: otherGatewayAddress,
+          address: gatewayAddress,
           memory: nextMemory,
         });
         assert.deepEqual(
           Object.keys(updatedGateway.delegates).slice().sort(),
           expectedDelegates.slice().sort(),
         );
+        returnMemory = nextMemory;
       }
+      return returnMemory;
     }
 
     it('should allow joining of the network with an allow list', async () => {
-      await allowlistJoinTest({
+      const otherGatewayAddress = ''.padEnd(43, '3');
+      const updatedMemory = await allowlistJoinTest({
+        gatewayAddress: otherGatewayAddress,
         tags: [
           { name: 'Allow-Delegated-Staking', value: 'allowlist' },
           {
@@ -504,6 +554,45 @@ describe('GatewayRegistry', async () => {
         delegateAddresses: [STUB_ADDRESS_9, STUB_ADDRESS_7],
         expectedDelegates: [STUB_ADDRESS_9],
       });
+
+      const { result: getDelegatesResult } = await getDelegates({
+        memory: updatedMemory,
+        from: STUB_ADDRESS,
+        timestamp: STUB_TIMESTAMP,
+        gatewayAddress: otherGatewayAddress,
+      });
+      assert.deepEqual(JSON.parse(getDelegatesResult.Messages?.[0]?.Data), {
+        limit: 100,
+        totalItems: 1,
+        sortBy: 'startTimestamp',
+        hasMore: false,
+        items: [
+          {
+            startTimestamp: STUB_TIMESTAMP,
+            delegatedStake: 500_000_000,
+            vaults: [],
+            address: STUB_ADDRESS_9,
+          },
+        ],
+        sortOrder: 'desc',
+      });
+
+      const { result: getAllowedDelegatesResult } = await getAllowedDelegates({
+        memory: updatedMemory,
+        from: STUB_ADDRESS,
+        timestamp: STUB_TIMESTAMP,
+        gatewayAddress: otherGatewayAddress,
+      });
+      assert.deepEqual(
+        JSON.parse(getAllowedDelegatesResult.Messages?.[0]?.Data),
+        {
+          limit: 100,
+          totalItems: 2,
+          hasMore: false,
+          items: [STUB_ADDRESS_9, STUB_ADDRESS_8],
+          sortOrder: 'desc',
+        },
+      );
     });
 
     it('should join the network ignoring the allow list if Allow-Delegated-Staking is set to "true"', async () => {
@@ -836,7 +925,7 @@ describe('GatewayRegistry', async () => {
         gatewayAddress: STUB_ADDRESS,
       });
 
-      await updateGatewaySettingsTest({
+      const updatedMemory = await updateGatewaySettingsTest({
         inputMemory: stakedMemory,
         settingsTags: [{ name: 'Allow-Delegated-Staking', value: 'allowlist' }],
         expectedUpdatedGatewayProps: {
@@ -862,6 +951,51 @@ describe('GatewayRegistry', async () => {
         delegateAddresses: [STUB_ADDRESS_9], // no one is allowed yet
         expectedDelegates: [STUB_ADDRESS_8], // 8 is exiting
       });
+
+      const { result: getDelegatesResult } = await getDelegates({
+        memory: updatedMemory,
+        from: STUB_ADDRESS,
+        timestamp: STUB_TIMESTAMP,
+        gatewayAddress: STUB_ADDRESS,
+      });
+      assert.deepEqual(JSON.parse(getDelegatesResult.Messages?.[0]?.Data), {
+        limit: 100,
+        totalItems: 1,
+        sortBy: 'startTimestamp',
+        hasMore: false,
+        items: [
+          {
+            startTimestamp: STUB_TIMESTAMP,
+            delegatedStake: 0,
+            vaults: {
+              mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm: {
+                balance: 500000000,
+                startTimestamp: STUB_TIMESTAMP,
+                endTimestamp: 2613600000,
+              },
+            },
+            address: STUB_ADDRESS_8,
+          },
+        ],
+        sortOrder: 'desc',
+      });
+
+      const { result: getAllowedDelegatesResult } = await getAllowedDelegates({
+        memory: updatedMemory,
+        from: STUB_ADDRESS,
+        timestamp: STUB_TIMESTAMP,
+        gatewayAddress: STUB_ADDRESS,
+      });
+      assert.deepEqual(
+        JSON.parse(getAllowedDelegatesResult.Messages?.[0]?.Data),
+        {
+          limit: 100,
+          totalItems: 0,
+          hasMore: false,
+          items: [],
+          sortOrder: 'desc',
+        },
+      );
     });
   });
 
