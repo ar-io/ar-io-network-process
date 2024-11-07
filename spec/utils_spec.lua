@@ -415,6 +415,19 @@ describe("utils", function()
 			local result = utils.createLookupTable(nil)
 			assert.are.same({}, result)
 		end)
+
+		it("should use a provided value assignment function", function()
+			local input = { "apple", "banana", "cherry", "date" }
+			local result = utils.createLookupTable(input, function(_, value)
+				return value .. "s"
+			end)
+			assert.are.same({
+				apple = "apples",
+				banana = "bananas",
+				cherry = "cherrys",
+				date = "dates",
+			}, result)
+		end)
 	end)
 
 	describe("roundToPrecision", function()

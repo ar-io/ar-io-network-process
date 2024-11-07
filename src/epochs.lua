@@ -300,16 +300,13 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 
 	-- get our prescribed observers, using the hashchain as entropy
 	local hash = epochHash
-	local prescribedObserversAddresses = {}
-	while #prescribedObserversAddresses < epochs.getSettings().maxObservers do
+	local prescribedObserversAddressesLookup = {}
+	while utils.lengthOfTable(prescribedObserversAddressesLookup) < epochs.getSettings().maxObservers do
 		local hashString = crypto.utils.array.toString(hash)
 		local random = crypto.random(nil, nil, hashString) / 0xffffffff
 		local cumulativeNormalizedCompositeWeight = 0
-		for i = 1, #filteredObservers do
-			local observer = filteredObservers[i]
-			local alreadyPrescribed = utils.findInArray(prescribedObserversAddresses, function(address)
-				return address == observer.gatewayAddress
-			end)
+		for _, observer in ipairs(filteredObservers) do
+			local alreadyPrescribed = prescribedObserversAddressesLookup[observer.gatewayAddress]
 
 			-- add only if observer has not already been prescribed
 			if not alreadyPrescribed then
@@ -318,7 +315,7 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 					+ observer.normalizedCompositeWeight
 				-- if the random value is less than the cumulative weight, we have found our observer
 				if random <= cumulativeNormalizedCompositeWeight then
-					table.insert(prescribedObserversAddresses, observer.gatewayAddress)
+					prescribedObserversAddressesLookup[observer.gatewayAddress] = true
 					break
 				end
 			end
@@ -328,12 +325,12 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 		hash = crypto.digest.sha2_256(newHash).asBytes()
 	end
 	local prescribedObservers = {}
-	-- use ipairs as prescribedObserversAddresses is an array
-	for _, address in ipairs(prescribedObserversAddresses) do
-		local index = utils.findInArray(filteredObservers, function(observer)
-			return observer.gatewayAddress == address
-		end)
-		table.insert(prescribedObservers, filteredObservers[index])
+	local filteredObserversAddressMap = utils.reduce(filteredObservers, function(acc, _, observer)
+		acc[observer.gatewayAddress] = observer
+		return acc
+	end, {})
+	for address, _ in pairs(prescribedObserversAddressesLookup) do
+		table.insert(prescribedObservers, filteredObserversAddressMap[address])
 		table.sort(prescribedObservers, function(a, b)
 			return a.normalizedCompositeWeight > b.normalizedCompositeWeight
 		end)
