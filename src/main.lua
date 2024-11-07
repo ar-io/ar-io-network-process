@@ -2566,6 +2566,23 @@ addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginate
 	end
 end)
 
+addEventingHandler("paginatedVaults", utils.hasMatchingTag("Action", "Paginated-Vaults"), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local status, result =
+		pcall(vaults.getPaginatedVaults, page.cursor, page.limit, page.sortBy or "balance", page.sortOrder)
+
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-Vaults-Notice",
+			Error = "Pagination-Error",
+			Data = json.encode(result),
+		})
+	else
+		ao.send({ Target = msg.From, Action = "Vaults-Notice", Data = json.encode(result) })
+	end
+end)
+
 addEventingHandler("paginatedDelegates", utils.hasMatchingTag("Action", "Paginated-Delegates"), function(msg)
 	local page = utils.parsePaginationTags(msg)
 	local shouldContinue, result = eventingPcall(

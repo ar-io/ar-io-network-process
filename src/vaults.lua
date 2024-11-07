@@ -119,6 +119,26 @@ function vaults.getVaults()
 	return utils.deepCopy(Vaults) or {}
 end
 
+--- Gets all paginated vaults
+--- @param cursor string|nil The address to start from
+--- @param limit number Max number of results to return
+--- @param sortBy string|nil Field to sort by
+--- @param sortOrder string "asc" or "desc" sort direction
+--- @return table Array of {address, vault} objects
+function vaults.getPaginatedVaults(cursor, limit, sortBy, sortOrder)
+	local allVaults = vaults.getVaults()
+	local vaultsArray = {}
+	local cursorField = "address" -- the cursor will be the wallet address
+	for address, vault in pairs(allVaults) do
+		table.insert(vaultsArray, {
+			address = address,
+			vault = vault,
+		})
+	end
+
+	return utils.paginateTableWithCursor(vaultsArray, cursor, cursorField, limit, sortBy, sortOrder)
+end
+
 --- Gets a vault
 --- @param target string The address of the owner
 --- @param id string The vault id
