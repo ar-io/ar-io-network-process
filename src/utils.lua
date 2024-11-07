@@ -85,8 +85,8 @@ function utils.sortTableByField(prevTable, field, order)
 	end
 
 	table.sort(tableCopy, function(a, b)
-		local aField = field and a[field] or a
-		local bField = field and b[field] or b
+		local aField = not field and a or a[field]
+		local bField = not field and b or b[field]
 		-- If one field is nil, ensure it goes to the end
 		if aField == nil and bField ~= nil then
 			return false
