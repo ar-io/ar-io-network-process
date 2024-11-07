@@ -36,7 +36,7 @@ describe('ArNS', async () => {
     transferQty = 1_000_000_000_000,
     name = 'test-name',
     type = 'lease',
-    mem = startMemory,
+    memory,
   }) => {
     if (sender != PROCESS_OWNER) {
       // transfer from the owner to the sender
@@ -50,7 +50,7 @@ describe('ArNS', async () => {
           { name: 'Cast', value: true },
         ],
       });
-      mem = transferResult.Memory;
+      memory = transferResult.Memory;
     }
 
     const buyRecordResult = await handle(
@@ -65,7 +65,7 @@ describe('ArNS', async () => {
           { name: 'Years', value: '1' },
         ],
       },
-      mem,
+      memory,
     );
 
     const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
@@ -142,7 +142,7 @@ describe('ArNS', async () => {
 
     return {
       record,
-      mem: buyRecordResult.Memory,
+      memory: buyRecordResult.Memory,
     };
   };
 
@@ -249,7 +249,7 @@ describe('ArNS', async () => {
   describe('Increase-Undername-Limit', () => {
     it('should increase the undernames', async () => {
       const assertIncreaseUndername = async (sender) => {
-        let mem = startMemory;
+        let memory = startMemory;
 
         if (sender != PROCESS_OWNER) {
           const transferResult = await handle({
@@ -262,7 +262,7 @@ describe('ArNS', async () => {
               { name: 'Cast', value: true },
             ],
           });
-          mem = transferResult.Memory;
+          memory = transferResult.Memory;
         }
 
         const buyUndernameResult = await handle(
@@ -277,7 +277,7 @@ describe('ArNS', async () => {
               { name: 'Process-Id', value: ''.padEnd(43, 'a') },
             ],
           },
-          mem,
+          memory,
         );
 
         const increaseUndernameResult = await handle(
@@ -554,7 +554,7 @@ describe('ArNS', async () => {
       // buy the name first
       const processId = ''.padEnd(43, 'a');
       const initiator = 'ant-owner-'.padEnd(43, '0'); // owner of the ANT at the time of release
-      const { mem, record: initialRecord } = await runBuyRecord({
+      const { memory, record: initialRecord } = await runBuyRecord({
         sender: STUB_ADDRESS,
         processId,
         type: 'permabuy',
@@ -570,7 +570,7 @@ describe('ArNS', async () => {
           From: processId,
           Owner: processId,
         },
-        mem,
+        memory,
       );
 
       // assert no error tag
@@ -758,7 +758,7 @@ describe('ArNS', async () => {
     });
 
     it('should create a lease expiration initiated auction and accept a bid', async () => {
-      const { record: initialRecord, mem } = await runBuyRecord({
+      const { record: initialRecord, memory } = await runBuyRecord({
         sender: STUB_ADDRESS,
         processId: ''.padEnd(43, 'a'),
         type: 'lease',
@@ -773,7 +773,7 @@ describe('ArNS', async () => {
           Tags: [{ name: 'Action', value: 'Tick' }],
           Timestamp: futureTimestamp,
         },
-        mem,
+        memory,
       );
 
       // fetch the auction
@@ -958,7 +958,7 @@ describe('ArNS', async () => {
       // buy the name first
       const processId = ''.padEnd(43, 'a');
       const initiator = 'ant-owner-'.padEnd(43, '0'); // owner of the ANT at the time of release
-      const { mem } = await runBuyRecord({
+      const { memory } = await runBuyRecord({
         sender: STUB_ADDRESS,
         processId,
         type: 'permabuy',
@@ -974,7 +974,7 @@ describe('ArNS', async () => {
           From: processId,
           Owner: processId,
         },
-        mem,
+        memory,
       );
 
       // assert no error tag
@@ -1078,7 +1078,7 @@ describe('ArNS', async () => {
     it('should reassign an arns name to a new process id', async () => {
       // buy the name first
       const processId = ''.padEnd(43, 'a');
-      const { mem } = await runBuyRecord({
+      const { memory } = await runBuyRecord({
         sender: STUB_ADDRESS,
         processId,
         type: 'permabuy',
@@ -1094,7 +1094,7 @@ describe('ArNS', async () => {
           From: processId,
           Owner: processId,
         },
-        mem,
+        memory,
       );
 
       // assert no error tag
@@ -1108,7 +1108,7 @@ describe('ArNS', async () => {
     it('should reassign an arns name to a new process id with initiator', async () => {
       // buy the name first
       const processId = ''.padEnd(43, 'a');
-      const { mem } = await runBuyRecord({
+      const { memory } = await runBuyRecord({
         sender: STUB_ADDRESS,
         processId,
         type: 'permabuy',
@@ -1125,7 +1125,7 @@ describe('ArNS', async () => {
           From: processId,
           Owner: processId,
         },
-        mem,
+        memory,
       );
 
       // assert no error tag
@@ -1140,7 +1140,7 @@ describe('ArNS', async () => {
     it('should not reassign an arns name with invalid ownership', async () => {
       // buy the name first
       const processId = ''.padEnd(43, 'a');
-      const { mem } = await runBuyRecord({
+      const { memory } = await runBuyRecord({
         sender: STUB_ADDRESS,
         processId,
         type: 'permabuy',
@@ -1156,7 +1156,7 @@ describe('ArNS', async () => {
           From: STUB_ADDRESS,
           Owner: STUB_ADDRESS,
         },
-        mem,
+        memory,
       );
 
       // assert error
@@ -1169,7 +1169,7 @@ describe('ArNS', async () => {
     it('should not reassign an arns name with invalid new process id', async () => {
       // buy the name first
       const processId = ''.padEnd(43, 'a');
-      const { mem } = await runBuyRecord({
+      const { memory } = await runBuyRecord({
         sender: STUB_ADDRESS,
         processId,
         type: 'permabuy',
@@ -1185,7 +1185,7 @@ describe('ArNS', async () => {
           From: processId,
           Owner: processId,
         },
-        mem,
+        memory,
       );
 
       // assert error
@@ -1195,6 +1195,92 @@ describe('ArNS', async () => {
       assert.equal(releaseNameErrorTag.value, 'Bad-Input');
     });
   });
+
+  // describe('Paginated-Records', () => {
+  //   it('should paginate records correctly', async () => {
+  //     // buy 3 records
+  //     let buyRecordsMemory; // updated after each purchase
+  //     for (let i = 0; i < 1; i++) {
+  //       // print all the records
+  //       const records = await handle(
+  //         {
+  //           Tags: [{ name: 'Action', value: 'Records' }],
+  //         },
+  //         buyRecordsMemory,
+  //       );
+  //       console.log('Records before purchase', JSON.parse(records.Messages[0].Data));
+  //       const { memory: incrementMemory } = await runBuyRecord({
+  //         name: `test-name-${i}`,
+  //         processId: 'process-id-'.padEnd(43, 1),
+  //         type: 'permabuy',
+  //         memory: buyRecordsMemory,
+  //       });
+
+  //       const { memory: incrementMemory2 } = await runBuyRecord({
+  //         name: `test-name-${i}`,
+  //         processId: 'process-id-'.padEnd(43, 2),
+  //         type: 'permabuy',
+  //         memory: incrementMemory,
+  //       });
+  //       // print all the records
+  //       const recordsAfterPurchase = await handle(
+  //         {
+  //           Tags: [{ name: 'Action', value: 'Records' }],
+  //         },
+  //         incrementMemory2,
+  //       );
+  //       console.log('Records after purchase', JSON.parse(recordsAfterPurchase.Messages[0].Data));
+  //       buyRecordsMemory = incrementMemory; // clone the memory;
+  //     }
+
+  //     // call the paginated records handler repeatedly until all records are fetched
+  //     let paginatedRecords = [];
+  //     let cursor = undefined;
+  //     while (true) {
+  //       const result = await handle(
+  //         {
+  //           Tags: [
+  //             { name: 'Action', value: 'Paginated-Records' },
+  //             { name: 'Cursor', value: cursor },
+  //             { name: 'Limit', value: 1 },
+  //           ],
+  //         },
+  //         buyRecordsMemory,
+  //       );
+  //       // assert no error tag
+  //       const errorTag = result.Messages?.[0]?.Tags?.find(
+  //         (tag) => tag.name === 'Error',
+  //       );
+  //       assert.equal(errorTag, undefined);
+  //       // add the records to the paginated records array
+  //       const {
+  //         items: records,
+  //         nextCursor,
+  //         hasMore,
+  //         totalItems,
+  //         sortBy,
+  //         sortOrder,
+  //       } = JSON.parse(result.Messages?.[0]?.Data);
+  //       assert.equal(totalItems, 3);
+  //       assert.equal(sortBy, 'startTimestamp');
+  //       assert.equal(sortOrder, 'desc');
+  //       paginatedRecords.push(...records);
+  //       // update the cursor
+  //       cursor = nextCursor;
+  //       // if the cursor is undefined, we have reached the end of the records
+  //       if (!hasMore) {
+  //         break;
+  //       }
+  //     }
+  //     console.log(paginatedRecords);
+  //     assert.equal(paginatedRecords.length, 3);
+  //     assert.deepStrictEqual(paginatedRecords, [
+  //       { name: 'test-name-0', processId: ''.padEnd(43, 'a') },
+  //       { name: 'test-name-1', processId: ''.padEnd(43, 'b') },
+  //       { name: 'test-name-2', processId: ''.padEnd(43, 'c') },
+  //     ]);
+  //   });
+  // });
 
   // TODO: add several error scenarios
 });

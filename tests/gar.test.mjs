@@ -1362,6 +1362,46 @@ describe('GatewayRegistry', async () => {
       ); // original stake + penalty
     });
   });
+
+  describe('Paginated-Gateways', () => {
+    it('should paginate gateways correctly', async () => {
+      // add another gateway
+      const { memory: addGatewayMemory2 } = await joinNetwork({
+        address: 'second-gateway-'.padEnd(43, 'a'),
+        memory: sharedMemory,
+      });
+      let cursor;
+      let fetchedGateways = [];
+      while (true) {
+        const paginatedGateways = await handle(
+          {
+            Tags: [
+              { name: 'Action', value: 'Paginated-Gateways' },
+              { name: 'Cursor', value: cursor },
+              { name: 'Limit', value: '1' },
+            ],
+          },
+          addGatewayMemory2,
+        );
+        // parse items, nextCursor
+        const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
+          JSON.parse(paginatedGateways.Messages?.[0]?.Data);
+        assert.equal(totalItems, 2);
+        assert.equal(items.length, 1);
+        assert.equal(sortBy, 'startTimestamp');
+        assert.equal(sortOrder, 'desc');
+        assert.equal(hasMore, !!nextCursor);
+        cursor = nextCursor;
+        fetchedGateways.push(...items);
+        if (!cursor) break;
+      }
+      assert.deepEqual(
+        fetchedGateways.map((g) => g.gatewayAddress),
+        ['second-gateway-'.padEnd(43, 'a'), STUB_ADDRESS],
+      );
+    });
+  });
+
   // save observations
   describe('Save-Observations', () => {
     it('should save observations', async () => {
