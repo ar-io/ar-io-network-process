@@ -309,15 +309,15 @@ describe("vaults", function()
 		before_each(function()
 			-- Setup test vaults
 			_G.Vaults = {
-				["test-this-is-valid-arweave-wallet-address-1"] = {
-					["msgId"] = {
+				["test-this-is-valid-arweave-wallet-address-9"] = {
+					["uniqueMsgId"] = {
 						balance = 100,
 						startTimestamp = 0,
 						endTimestamp = 1000,
 					},
 				},
-				["test-this-is-valid-arweave-wallet-address-2"] = {
-					["msgId"] = {
+				["test-this-is-valid-arweave-wallet-address-8"] = {
+					["uniqueMsgId"] = {
 						balance = 200,
 						startTimestamp = 0,
 						endTimestamp = 1000,
@@ -328,7 +328,7 @@ describe("vaults", function()
 
 		describe("getVault", function()
 			it("should return the vault", function()
-				local returnedVault = vaults.getVault("test-this-is-valid-arweave-wallet-address-1", "msgId")
+				local returnedVault = vaults.getVault("test-this-is-valid-arweave-wallet-address-9", "uniqueMsgId")
 				assert.are.same({
 					balance = 100,
 					startTimestamp = 0,
@@ -337,7 +337,7 @@ describe("vaults", function()
 			end)
 
 			it("should return nil if the vault does not exist", function()
-				local returnedVault = vaults.getVault("test-this-is-valid-arweave-wallet-address-1", "nonExistentId")
+				local returnedVault = vaults.getVault("test-this-is-valid-arweave-wallet-address-9", "nonExistentId")
 				assert.is_nil(returnedVault)
 			end)
 		end)
@@ -346,15 +346,15 @@ describe("vaults", function()
 			it("should return all vaults", function()
 				local returnedVaults = vaults.getVaults()
 				assert.are.same({
-					["test-this-is-valid-arweave-wallet-address-1"] = {
-						["msgId"] = {
+					["test-this-is-valid-arweave-wallet-address-9"] = {
+						["uniqueMsgId"] = {
 							balance = 100,
 							startTimestamp = 0,
 							endTimestamp = 1000,
 						},
 					},
-					["test-this-is-valid-arweave-wallet-address-2"] = {
-						["msgId"] = {
+					["test-this-is-valid-arweave-wallet-address-8"] = {
+						["uniqueMsgId"] = {
 							balance = 200,
 							startTimestamp = 0,
 							endTimestamp = 1000,
@@ -376,9 +376,9 @@ describe("vaults", function()
 					totalItems = 2,
 					items = {
 						{
-							address = "test-this-is-valid-arweave-wallet-address-1",
+							address = "test-this-is-valid-arweave-wallet-address-9",
 							vault = {
-								["msgId"] = {
+								["uniqueMsgId"] = {
 									balance = 100,
 									startTimestamp = 0,
 									endTimestamp = 1000,
@@ -386,9 +386,9 @@ describe("vaults", function()
 							},
 						},
 						{
-							address = "test-this-is-valid-arweave-wallet-address-2",
+							address = "test-this-is-valid-arweave-wallet-address-8",
 							vault = {
-								["msgId"] = {
+								["uniqueMsgId"] = {
 									balance = 200,
 									startTimestamp = 0,
 									endTimestamp = 1000,
