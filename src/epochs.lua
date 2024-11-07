@@ -233,19 +233,17 @@ function epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
 	end
 
 	local epochHash = utils.getHashFromBase64URL(hashchain)
-	local prescribedNames = {}
+	local prescribedNamesLookup = {}
 	local hash = epochHash
-	while #prescribedNames < epochs.getSettings().prescribedNameCount do
+	while utils.lengthOfTable(prescribedNamesLookup) < epochs.getSettings().prescribedNameCount do
 		local hashString = crypto.utils.array.toString(hash)
 		local random = crypto.random(nil, nil, hashString) % #activeArNSNames
 
 		for i = 0, #activeArNSNames do
-			local index = (random + i) % #activeArNSNames
-			local alreadyPrescribed = utils.findInArray(prescribedNames, function(name)
-				return name == activeArNSNames[index]
-			end)
+			local index = (random + i) % #activeArNSNames + 1
+			local alreadyPrescribed = prescribedNamesLookup[activeArNSNames[index]] ~= nil
 			if not alreadyPrescribed then
-				table.insert(prescribedNames, activeArNSNames[index])
+				prescribedNamesLookup[activeArNSNames[index]] = true
 				break
 			end
 		end
@@ -254,6 +252,8 @@ function epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
 		local newHash = crypto.utils.stream.fromArray(hash)
 		hash = crypto.digest.sha2_256(newHash).asBytes()
 	end
+
+	local prescribedNames = utils.getTableKeys(prescribedNamesLookup)
 
 	-- sort them by name
 	table.sort(prescribedNames, function(a, b)

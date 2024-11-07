@@ -222,7 +222,7 @@ describe("epochs", function()
 					undernameLimit = 10,
 				},
 			}
-			local expectation = { "arns-name-1", "arns-name-2", "arns-name-4", "arns-name-5", "arns-name-6" }
+			local expectation = { "arns-name-1", "arns-name-2", "arns-name-3", "arns-name-4", "arns-name-5" }
 			local status, result = pcall(epochs.computePrescribedNamesForEpoch, 0, hashchain)
 			assert.is_true(status)
 			assert.are.equal(5, #result)

@@ -443,4 +443,24 @@ describe("utils", function()
 			assert.are.equal(123456.789, result)
 		end)
 	end)
+
+	describe("getTableKeys", function()
+		it("should return the keys of a table", function()
+			local input = { foo = "bar", baz = "qux" }
+			local result = utils.getTableKeys(input)
+			table.sort(result)
+			assert.are.same({ "baz", "foo" }, result)
+		end)
+
+		it("should return an empty table for an empty table", function()
+			local input = {}
+			local result = utils.getTableKeys(input)
+			assert.are.same({}, result)
+		end)
+
+		it("should return an empty table for a nil table", function()
+			local result = utils.getTableKeys(nil)
+			assert.are.same({}, result)
+		end)
+	end)
 end)

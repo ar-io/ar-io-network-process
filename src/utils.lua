@@ -402,10 +402,18 @@ end
 
 function utils.createLookupTable(tbl)
 	local lookupTable = {}
-	for _, value in ipairs(tbl or {}) do
+	for _, value in pairs(tbl or {}) do
 		lookupTable[value] = true
 	end
 	return lookupTable
+end
+
+function utils.getTableKeys(tbl)
+	local keys = {}
+	for key, _ in pairs(tbl or {}) do
+		table.insert(keys, key)
+	end
+	return keys
 end
 
 return utils
