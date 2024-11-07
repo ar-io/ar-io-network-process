@@ -863,12 +863,18 @@ function gar.slashOperatorStake(address, slashAmount, currentTimestamp)
 	-- TODO: send slash notice to gateway address
 end
 
+---@param cursor string|nil # The cursor gateway address after which to fetch more gateways (optional)
+---@param limit number # The max number of gateways to fetch
+---@param sortBy string # The gateway field to sort by. Default is "gatewayAddress" (which is added each time)
+---@param sortOrder string # The order to sort by, either "asc" or "desc"
+---@return table # A table containing the paginated gateways and pagination metadata
 function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
 	local gateways = gar.getGateways()
 	local gatewaysArray = {}
 	local cursorField = "gatewayAddress" -- the cursor will be the gateway address
 	for address, record in pairs(gateways) do
 		record.gatewayAddress = address
+		-- TODO: remove delegates here to avoid sending an unbounded array; to fetch delegates, use getPaginatedDelegates
 		table.insert(gatewaysArray, record)
 	end
 
