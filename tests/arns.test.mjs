@@ -1196,91 +1196,77 @@ describe('ArNS', async () => {
     });
   });
 
-  // describe('Paginated-Records', () => {
-  //   it('should paginate records correctly', async () => {
-  //     // buy 3 records
-  //     let buyRecordsMemory; // updated after each purchase
-  //     for (let i = 0; i < 1; i++) {
-  //       // print all the records
-  //       const records = await handle(
-  //         {
-  //           Tags: [{ name: 'Action', value: 'Records' }],
-  //         },
-  //         buyRecordsMemory,
-  //       );
-  //       console.log('Records before purchase', JSON.parse(records.Messages[0].Data));
-  //       const { memory: incrementMemory } = await runBuyRecord({
-  //         name: `test-name-${i}`,
-  //         processId: 'process-id-'.padEnd(43, 1),
-  //         type: 'permabuy',
-  //         memory: buyRecordsMemory,
-  //       });
+  describe('Paginated-Records', () => {
+    it('should paginate records correctly', async () => {
+      // buy 3 records
+      let buyRecordsMemory; // updated after each purchase
+      const recordsCount = 3;
+      for (let i = 0; i < recordsCount; i++) {
+        const buyRecordsResult = await handle(
+          {
+            Tags: [
+              { name: 'Action', value: 'Buy-Record' },
+              { name: 'Name', value: `test-name-${i}` },
+              { name: 'Process-Id', value: ''.padEnd(43, `${i}`) },
+            ],
+            Timestamp: STUB_TIMESTAMP + i * 1000, // order of names is based on timestamp
+          },
+          buyRecordsMemory,
+        );
+        buyRecordsMemory = buyRecordsResult.Memory;
+      }
 
-  //       const { memory: incrementMemory2 } = await runBuyRecord({
-  //         name: `test-name-${i}`,
-  //         processId: 'process-id-'.padEnd(43, 2),
-  //         type: 'permabuy',
-  //         memory: incrementMemory,
-  //       });
-  //       // print all the records
-  //       const recordsAfterPurchase = await handle(
-  //         {
-  //           Tags: [{ name: 'Action', value: 'Records' }],
-  //         },
-  //         incrementMemory2,
-  //       );
-  //       console.log('Records after purchase', JSON.parse(recordsAfterPurchase.Messages[0].Data));
-  //       buyRecordsMemory = incrementMemory; // clone the memory;
-  //     }
-
-  //     // call the paginated records handler repeatedly until all records are fetched
-  //     let paginatedRecords = [];
-  //     let cursor = undefined;
-  //     while (true) {
-  //       const result = await handle(
-  //         {
-  //           Tags: [
-  //             { name: 'Action', value: 'Paginated-Records' },
-  //             { name: 'Cursor', value: cursor },
-  //             { name: 'Limit', value: 1 },
-  //           ],
-  //         },
-  //         buyRecordsMemory,
-  //       );
-  //       // assert no error tag
-  //       const errorTag = result.Messages?.[0]?.Tags?.find(
-  //         (tag) => tag.name === 'Error',
-  //       );
-  //       assert.equal(errorTag, undefined);
-  //       // add the records to the paginated records array
-  //       const {
-  //         items: records,
-  //         nextCursor,
-  //         hasMore,
-  //         totalItems,
-  //         sortBy,
-  //         sortOrder,
-  //       } = JSON.parse(result.Messages?.[0]?.Data);
-  //       assert.equal(totalItems, 3);
-  //       assert.equal(sortBy, 'startTimestamp');
-  //       assert.equal(sortOrder, 'desc');
-  //       paginatedRecords.push(...records);
-  //       // update the cursor
-  //       cursor = nextCursor;
-  //       // if the cursor is undefined, we have reached the end of the records
-  //       if (!hasMore) {
-  //         break;
-  //       }
-  //     }
-  //     console.log(paginatedRecords);
-  //     assert.equal(paginatedRecords.length, 3);
-  //     assert.deepStrictEqual(paginatedRecords, [
-  //       { name: 'test-name-0', processId: ''.padEnd(43, 'a') },
-  //       { name: 'test-name-1', processId: ''.padEnd(43, 'b') },
-  //       { name: 'test-name-2', processId: ''.padEnd(43, 'c') },
-  //     ]);
-  //   });
-  // });
+      // call the paginated records handler repeatedly until all records are fetched
+      let paginatedRecords = [];
+      let cursor = undefined;
+      while (true) {
+        const result = await handle(
+          {
+            Tags: [
+              { name: 'Action', value: 'Paginated-Records' },
+              { name: 'Cursor', value: cursor },
+              { name: 'Limit', value: 1 },
+            ],
+          },
+          buyRecordsMemory,
+        );
+        // assert no error tag
+        const errorTag = result.Messages?.[0]?.Tags?.find(
+          (tag) => tag.name === 'Error',
+        );
+        assert.equal(errorTag, undefined);
+        // add the records to the paginated records array
+        const {
+          items: records,
+          nextCursor,
+          hasMore,
+          totalItems,
+          sortBy,
+          sortOrder,
+        } = JSON.parse(result.Messages?.[0]?.Data);
+        assert.equal(totalItems, recordsCount);
+        assert.equal(sortBy, 'startTimestamp');
+        assert.equal(sortOrder, 'desc');
+        paginatedRecords.push(...records);
+        // update the cursor
+        cursor = nextCursor;
+        // if the cursor is undefined, we have reached the end of the records
+        if (!hasMore) {
+          break;
+        }
+      }
+      assert.equal(paginatedRecords.length, recordsCount);
+      // assert all the names are returned in the correct order
+      const expectedNames = Array.from(
+        { length: recordsCount },
+        (_, i) => `test-name-${recordsCount - i - 1}`,
+      );
+      assert.deepEqual(
+        paginatedRecords.map((record) => record.name),
+        expectedNames,
+      );
+    });
+  });
 
   // TODO: add several error scenarios
 });

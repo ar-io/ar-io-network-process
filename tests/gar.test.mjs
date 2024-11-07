@@ -16,13 +16,15 @@ const initialOperatorStake = 100_000_000_000;
 const delegatorAddress = 'delegator-address-'.padEnd(43, 'x');
 
 describe('GatewayRegistry', async () => {
-  const { handle: originalHandle, memory: startMemory } =
-    await createAosLoader();
-  let sharedMemory = startMemory; // memory we'll use across unique tests;
   const STUB_ADDRESS_6 = ''.padEnd(43, '6');
   const STUB_ADDRESS_7 = ''.padEnd(43, '7');
   const STUB_ADDRESS_8 = ''.padEnd(43, '8');
   const STUB_ADDRESS_9 = ''.padEnd(43, '9');
+
+  const { handle: originalHandle, memory: startMemory } =
+    await createAosLoader();
+  let sharedMemory = startMemory; // memory we'll use across unique tests;
+
   async function handle(options = {}, mem = sharedMemory) {
     return originalHandle(
       mem,
