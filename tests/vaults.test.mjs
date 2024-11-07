@@ -57,23 +57,6 @@ describe('Vaults', async () => {
     return { result: createVaultResult, memory: createVaultResult.Memory };
   };
 
-  // const getVaults = async ({ memory, from, timestamp }) => {
-  //   const vaultsResult = await handle(
-  //     {
-  //       From: from,
-  //       Owner: from,
-  //       Tags: [{ name: 'Action', value: 'Paginated-Vaults' }],
-  //       Timestamp: timestamp,
-  //     },
-  //     memory,
-  //   );
-  //   assertNoResultError(vaultsResult);
-  //   return {
-  //     result: vaultsResult,
-  //     memory: vaultsResult.Memory,
-  //   };
-  // };
-
   describe('createVault', () => {
     it('should create a vault', async () => {
       const lockLengthMs = 1209600000;
