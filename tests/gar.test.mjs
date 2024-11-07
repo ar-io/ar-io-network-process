@@ -1368,8 +1368,9 @@ describe('GatewayRegistry', async () => {
   describe('Paginated-Gateways', () => {
     it('should paginate gateways correctly', async () => {
       // add another gateway
+      const secondGatewayAddress = 'second-gateway-'.padEnd(43, 'a');
       const { memory: addGatewayMemory2 } = await joinNetwork({
-        address: 'second-gateway-'.padEnd(43, 'a'),
+        address: secondGatewayAddress,
         memory: sharedMemory,
       });
       let cursor;
@@ -1399,7 +1400,7 @@ describe('GatewayRegistry', async () => {
       }
       assert.deepEqual(
         fetchedGateways.map((g) => g.gatewayAddress),
-        ['second-gateway-'.padEnd(43, 'a'), STUB_ADDRESS],
+        [STUB_ADDRESS, secondGatewayAddress],
       );
     });
   });
