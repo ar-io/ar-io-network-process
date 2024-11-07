@@ -893,8 +893,6 @@ function gar.getPaginatedDelegates(address, cursor, limit, sortBy, sortOrder)
 		table.insert(delegatesArray, delegate)
 	end
 
-	print("number of delegates " .. utils.lengthOfTable(delegatesArray))
-
 	return utils.paginateTableWithCursor(delegatesArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
