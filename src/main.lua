@@ -1013,6 +1013,7 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 		quantity = tonumber(msg.Tags.Quantity),
 		purchaseType = msg.Tags["Purchase-Type"] or "lease",
 		currentTimestamp = tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp),
+		from = msg.From,
 	})
 	if not status then
 		ao.send({
