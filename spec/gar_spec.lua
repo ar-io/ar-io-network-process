@@ -2081,4 +2081,62 @@ describe("gar", function()
 			end
 		)
 	end)
+
+	describe("getPaginatedAllowedDelegates", function()
+		it("should return paginated allowed delegates sorted, by defualt, by address in descending order", function()
+			local gateway = utils.deepCopy(testGateway)
+			local delegateAAddress = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+			local delegateBAddress = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+			local delegateCAddress = "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"
+			local delegateA = {
+				delegatedStake = 1,
+				startTimestamp = 1000,
+				vaults = {},
+			}
+			local delegateB = {
+				delegatedStake = 0,
+				startTimestamp = 1000,
+				vaults = {
+					["vault_id"] = {
+						balance = 1000,
+						startTimestamp = 1000,
+						endTimestamp = 1000 + gar.getSettings().delegates.withdrawLengthMs,
+					},
+				},
+			}
+			gateway.delegates = {
+				[delegateAAddress] = delegateA,
+				[delegateBAddress] = delegateB, -- Will be excluded since exiting and not in allow list
+			}
+			gateway.settings.allowedDelegatesLookup = {
+				[delegateCAddress] = true,
+			}
+			_G.GatewayRegistry = {
+				[stubGatewayAddress] = gateway,
+			}
+			local delegates = gar.getPaginatedAllowedDelegates(stubGatewayAddress, nil, 1, "desc")
+			assert.are.same({
+				limit = 1,
+				sortOrder = "desc",
+				hasMore = true,
+				nextCursor = delegateCAddress,
+				totalItems = 2,
+				items = {
+					[1] = delegateCAddress,
+				},
+			}, delegates)
+			-- get the next page
+			local nextDelegates = gar.getPaginatedAllowedDelegates(stubGatewayAddress, delegates.nextCursor, 1, "desc")
+			assert.are.same({
+				limit = 1,
+				sortOrder = "desc",
+				hasMore = false,
+				nextCursor = nil,
+				totalItems = 2,
+				items = {
+					[1] = delegateAAddress,
+				},
+			}, nextDelegates)
+		end)
+	end)
 end)

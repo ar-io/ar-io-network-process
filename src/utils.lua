@@ -70,7 +70,7 @@ end
 
 --- Sorts a table by a given field
 --- @param prevTable table The table to sort
---- @param field string The field to sort by
+--- @param field string|nil The field to sort by. Nil if sorting by the primitive items themselves.
 --- @param order string The order to sort by ("asc" or "desc")
 --- @return table The sorted table
 function utils.sortTableByField(prevTable, field, order)
@@ -85,8 +85,8 @@ function utils.sortTableByField(prevTable, field, order)
 	end
 
 	table.sort(tableCopy, function(a, b)
-		local aField = a[field]
-		local bField = b[field]
+		local aField = field and a[field] or a
+		local bField = field and b[field] or b
 		-- If one field is nil, ensure it goes to the end
 		if aField == nil and bField ~= nil then
 			return false
@@ -109,9 +109,9 @@ end
 --- Paginate a table with a cursor
 --- @param tableArray table The table to paginate
 --- @param cursor string|nil The cursor to paginate from (optional)
---- @param cursorField string The field to use as the cursor
+--- @param cursorField string|nil The field to use as the cursor or nil for lists of primitives
 --- @param limit number The limit of items to return
---- @param sortBy string The field to sort by
+--- @param sortBy string|nil The field to sort by. Nil if sorting by the primitive items themselves.
 --- @param sortOrder string The order to sort by ("asc" or "desc")
 --- @return table The paginated table
 function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, sortBy, sortOrder)
@@ -133,7 +133,7 @@ function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, s
 
 	if cursor then
 		for i, obj in ipairs(sortedArray) do
-			if obj[cursorField] == cursor then
+			if cursorField and obj[cursorField] == cursor or cursor == obj then
 				startIndex = i + 1
 				break
 			end
@@ -149,7 +149,7 @@ function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, s
 
 	local nextCursor = nil
 	if endIndex < #sortedArray then
-		nextCursor = sortedArray[endIndex][cursorField]
+		nextCursor = cursorField and sortedArray[endIndex][cursorField] or sortedArray[endIndex]
 	end
 
 	return {

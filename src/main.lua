@@ -2591,6 +2591,26 @@ addEventingHandler("paginatedDelegates", utils.hasMatchingTag("Action", "Paginat
 	ao.send({ Target = msg.From, Action = "Delegates-Notice", Data = json.encode(result) })
 end)
 
+addEventingHandler(
+	"paginatedAllowedDelegates",
+	utils.hasMatchingTag("Action", "Paginated-Allowed-Delegates"),
+	function(msg)
+		local page = utils.parsePaginationTags(msg)
+		local shouldContinue, result = eventingPcall(msg.ioEvent, function(error)
+			ao.send({
+				Target = msg.From,
+				Action = "Invalid-Allowed-Delegates-Notice",
+				Error = "Pagination-Error",
+				Data = json.encode(error),
+			})
+		end, gar.getPaginatedAllowedDelegates, msg.Tags.Address or msg.From, page.cursor, page.limit, page.sortOrder)
+		if not shouldContinue then
+			return
+		end
+		ao.send({ Target = msg.From, Action = "Allowed-Delegates-Notice", Data = json.encode(result) })
+	end
+)
+
 -- END READ HANDLERS
 
 -- AUCTION HANDLER
