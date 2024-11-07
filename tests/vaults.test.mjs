@@ -30,7 +30,6 @@ describe('Vaults', async () => {
     from = PROCESS_OWNER,
     messageId,
   }) => {
-    console.log('from', from);
     const createVaultResult = await handle(
       {
         Id: messageId,
