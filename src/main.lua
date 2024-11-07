@@ -84,8 +84,7 @@ local ActionMap = {
 	DelegateStake = "Delegate-Stake",
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
 	CancelWithdrawal = "Cancel-Withdrawal",
-	InstantDelegateWithdrawal = "Instant-Delegate-Withdrawal",
-	InstantOperatorWithdrawal = "Instant-Operator-Withdrawal",
+	InstantWithdrawal = "Instant-Withdrawal",
 	ReassignName = "Reassign-Name",
 	-- auctions
 	Auctions = "Auctions",
@@ -93,6 +92,8 @@ local ActionMap = {
 	AuctionInfo = "Auction-Info",
 	AuctionBid = "Auction-Bid",
 	AuctionPrices = "Auction-Prices",
+	AllowDelegates = "Allow-Delegates",
+	DisallowDelegates = "Disallow-Delegates",
 }
 
 -- Low fidelity trackers
@@ -109,6 +110,7 @@ local function lastKnownTotalTokenSupply()
 		+ LastKnownWithdrawSupply
 		+ Balances[Protocol]
 end
+LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
 
 local function eventingPcall(ioEvent, onError, fnToCall, ...)
 	local status, result = pcall(fnToCall, ...)
@@ -274,7 +276,7 @@ end, function(msg)
 		lastKnownWithdrawSupply = LastKnownWithdrawSupply,
 		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
 	}
-	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId)
+	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -301,6 +303,19 @@ end, function(msg)
 			msg.ioEvent:addField("Pruned-Records", prunedRecordNames)
 			msg.ioEvent:addField("Pruned-Records-Count", prunedRecordsCount)
 			msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
+		end
+		local newGracePeriodRecordsCount = utils.lengthOfTable(resultOrError.newGracePeriodRecords or {})
+		if newGracePeriodRecordsCount > 0 then
+			local newGracePeriodRecordNames = {}
+			for name, record in pairs(resultOrError.newGracePeriodRecords) do
+				table.insert(newGracePeriodRecordNames, name)
+				if record.endTimestamp > LastGracePeriodEntryEndTimestamp then
+					LastGracePeriodEntryEndTimestamp = record.endTimestamp
+				end
+			end
+			msg.ioEvent:addField("New-Grace-Period-Records", newGracePeriodRecordNames)
+			msg.ioEvent:addField("New-Grace-Period-Records-Count", newGracePeriodRecordsCount)
+			msg.ioEvent:addField("Last-Grace-Period-Entry-End-Timestamp", LastGracePeriodEntryEndTimestamp)
 		end
 		local prunedAuctions = resultOrError.prunedAuctions or {}
 		local prunedAuctionsCount = utils.lengthOfTable(prunedAuctions)
@@ -714,7 +729,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 		) -- make sure it's a string, not empty, not longer than 51 characters, and not an arweave address
 		-- assert processId is valid pattern
 		assert(type(processId) == "string", "Process id is required and must be a string.")
-		assert(utils.isValidAOAddress(processId), "Process id must be a valid base64url.")
+		assert(utils.isValidAOAddress(processId), "Process Id must be a valid AO signer address..")
 		if years then
 			assert(
 				years >= 1 and years <= 5 and utils.isInteger(years),
@@ -1048,7 +1063,11 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 		fqdn = msg.Tags.FQDN,
 		port = tonumber(msg.Tags.Port) or 443,
 		protocol = msg.Tags.Protocol or "https",
-		allowDelegatedStaking = msg.Tags["Allow-Delegated-Staking"] == "true",
+		allowDelegatedStaking = msg.Tags["Allow-Delegated-Staking"] == "true"
+			or msg.Tags["Allow-Delegated-Staking"] == "allowlist",
+		allowedDelegates = msg.Tags["Allow-Delegated-Staking"] == "allowlist"
+				and utils.splitAndTrimString(msg.Tags["Allowed-Delegates"] or "", ",")
+			or nil,
 		minDelegatedStake = tonumber(msg.Tags["Min-Delegated-Stake"]),
 		delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"]) or 0,
 		properties = msg.Tags.Properties or "FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44",
@@ -1244,7 +1263,10 @@ addEventingHandler(
 	function(msg)
 		local checkAssertions = function()
 			assert(
-				utils.isInteger(tonumber(msg.Tags.Quantity)) and tonumber(msg.Tags.Quantity) > 0,
+				msg.Tags.Quantity
+					and tonumber(msg.Tags.Quantity)
+					and utils.isInteger(tonumber(msg.Tags.Quantity))
+					and tonumber(msg.Tags.Quantity) > 0,
 				"Invalid quantity. Must be integer greater than 0"
 			)
 			if msg.Tags.Instant ~= nil then
@@ -1335,84 +1357,11 @@ addEventingHandler(
 	end
 )
 
-addEventingHandler(
-	ActionMap.InstantOperatorWithdrawal,
-	utils.hasMatchingTag("Action", ActionMap.InstantOperatorWithdrawal),
-	function(msg)
-		local checkAssertions = function()
-			assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
-		end
-
-		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Invalid-" .. ActionMap.InstantOperatorWithdrawal .. "-Notice",
-					Error = "Bad-Input",
-				},
-				Data = tostring(error),
-			})
-		end, checkAssertions)
-		if not shouldContinue then
-			return
-		end
-
-		local fromAddress = utils.formatAddress(msg.From)
-		local vaultId = msg.Tags["Vault-Id"]
-		msg.ioEvent:addField("Target-Formatted", fromAddress)
-
-		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Invalid-" .. ActionMap.InstantOperatorWithdrawal .. "-Notice",
-					Error = "Invalid-" .. ActionMap.InstantOperatorWithdrawal,
-				},
-				Data = tostring(error),
-			})
-		end, gar.instantOperatorWithdrawal, fromAddress, vaultId, msg.Timestamp)
-		if not shouldContinue2 then
-			return
-		end
-
-		local gatewayResult = result and result.gateway or {
-			operatorStake = 0,
-			vaults = {},
-		}
-
-		local amountWithdrawn = 0
-		msg.ioEvent:addField("Remaining-Operator-Stake", gatewayResult.operatorStake)
-		if result ~= nil then
-			msg.ioEvent:addField("Vault-Elapsed-Time", result.elapsedTime)
-			msg.ioEvent:addField("Vault-Remaining-Time", result.remainingTime)
-			msg.ioEvent:addField("Penalty-Rate", result.penaltyRate)
-			msg.ioEvent:addField("Instant-Withdrawal-Fee", result.expeditedWithdrawalFee)
-			msg.ioEvent:addField("Amount-Withdrawn", result.amountWithdrawn)
-			msg.ioEvent:addField("Previous-Vault-Balance", result.amountWithdrawn + result.expeditedWithdrawalFee)
-			LastKnownCirculatingSupply = LastKnownCirculatingSupply + result.amountWithdrawn
-			LastKnownWithdrawSupply = LastKnownWithdrawSupply - result.amountWithdrawn - result.expeditedWithdrawalFee
-			amountWithdrawn = result.amountWithdrawn
-		end
-
-		addSupplyData(msg.ioEvent)
-
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = ActionMap.InstantOperatorWithdrawal .. "-Notice",
-				["Vault-Id"] = msg.Tags["Vault-Id"],
-				["Amount-Withdrawn"] = amountWithdrawn,
-			},
-			Data = json.encode(gatewayResult),
-		})
-	end
-)
-
 addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.DelegateStake), function(msg)
 	local checkAssertions = function()
-		assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid target address")
+		assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
 		assert(
-			tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+			msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
 			"Invalid quantity. Must be integer greater than 0"
 		)
 	end
@@ -1542,19 +1491,25 @@ addEventingHandler(ActionMap.CancelWithdrawal, utils.hasMatchingTag("Action", Ac
 end)
 
 addEventingHandler(
-	ActionMap.InstantDelegateWithdrawal,
-	utils.hasMatchingTag("Action", ActionMap.InstantDelegateWithdrawal),
+	ActionMap.InstantWithdrawal,
+	utils.hasMatchingTag("Action", ActionMap.InstantWithdrawal),
 	function(msg)
+		local from = utils.formatAddress(msg.From)
+		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From) -- if not provided, use sender
+		local vaultId = utils.formatAddress(msg.Tags["Vault-Id"])
+		local timestamp = tonumber(msg.Timestamp)
+		msg.ioEvent:addField("Target-Formatted", target)
+
 		local checkAssertions = function()
-			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
-			assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
+			assert(utils.isValidAOAddress(target), "Invalid gateway address")
+			assert(utils.isValidAOAddress(vaultId), "Invalid vault id")
 		end
 
 		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = {
-					Action = "Invalid-" .. ActionMap.InstantDelegateWithdrawal .. "-Notice",
+					Action = "Invalid-" .. ActionMap.InstantWithdrawal .. "-Notice",
 					Error = "Bad-Input",
 				},
 				Data = tostring(error),
@@ -1564,33 +1519,23 @@ addEventingHandler(
 			return
 		end
 
-		local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
-		local fromAddress = utils.formatAddress(msg.From)
-		local vaultId = msg.Tags["Vault-Id"]
-		msg.ioEvent:addField("Target-Formatted", gatewayAddress)
-
 		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = {
-					Action = "Invalid-" .. ActionMap.InstantDelegateWithdrawal .. "-Notice",
-					Error = "Invalid-" .. ActionMap.InstantDelegateWithdrawal,
+					Action = "Invalid-" .. ActionMap.InstantWithdrawal .. "-Notice",
+					Error = "Invalid-" .. ActionMap.InstantWithdrawal,
 				},
 				Data = tostring(error),
 			})
-		end, gar.instantDelegateWithdrawal, fromAddress, gatewayAddress, vaultId, msg.Timestamp)
+		end, gar.instantGatewayWithdrawal, from, target, vaultId, timestamp)
 		if not shouldContinue2 then
 			return
 		end
 
-		local delegateResult = result and result.delegate or {
-			delegatedStake = 0,
-			vaults = {},
-		}
-
-		local amountWithdrawn = 0
-		msg.ioEvent:addField("Remaining-Delegate-Stake", delegateResult.delegatedStake)
 		if result ~= nil then
+			local vaultBalance = result.vaultBalance
+			msg.ioEvent:addField("Stake-Amount-Withdrawn", vaultBalance)
 			msg.ioEvent:addField("Vault-Elapsed-Time", result.elapsedTime)
 			msg.ioEvent:addField("Vault-Remaining-Time", result.remainingTime)
 			msg.ioEvent:addField("Penalty-Rate", result.penaltyRate)
@@ -1599,21 +1544,20 @@ addEventingHandler(
 			msg.ioEvent:addField("Previous-Vault-Balance", result.amountWithdrawn + result.expeditedWithdrawalFee)
 			LastKnownCirculatingSupply = LastKnownCirculatingSupply + result.amountWithdrawn
 			LastKnownWithdrawSupply = LastKnownWithdrawSupply - result.amountWithdrawn - result.expeditedWithdrawalFee
-			amountWithdrawn = result.amountWithdrawn
+			addSupplyData(msg.ioEvent)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = ActionMap.InstantWithdrawal .. "-Notice",
+					Address = target,
+					["Vault-Id"] = vaultId,
+					["Amount-Withdrawn"] = result.amountWithdrawn,
+					["Penalty-Rate"] = result.penaltyRate,
+					["Expedited-Withdrawal-Fee"] = result.expeditedWithdrawalFee,
+				},
+				Data = json.encode(result),
+			})
 		end
-
-		addSupplyData(msg.ioEvent)
-
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = ActionMap.InstantDelegateWithdrawal .. "-Notice",
-				Address = gatewayAddress,
-				["Vault-Id"] = msg.Tags["Vault-Id"],
-				["Amount-Withdrawn"] = amountWithdrawn,
-			},
-			Data = json.encode(delegateResult),
-		})
 	end
 )
 
@@ -1622,9 +1566,9 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", ActionMap.DecreaseDelegateStake),
 	function(msg)
 		local checkAssertions = function()
-			assert(utils.isValidArweaveAddress(msg.Tags.Target or msg.Tags.Address), "Invalid target address")
+			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
 			assert(
-				tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+				msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(msg.Tags.Quantity),
 				"Invalid quantity. Must be integer greater than 0"
 			)
 			if msg.Tags.Instant ~= nil then
@@ -1729,6 +1673,7 @@ addEventingHandler(
 	end
 )
 
+-- TODO: Update the UpdateGatewaySettings handler to consider replacing the allowedDelegates list
 addEventingHandler(
 	ActionMap.UpdateGatewaySettings,
 	utils.hasMatchingTag("Action", ActionMap.UpdateGatewaySettings),
@@ -1761,14 +1706,33 @@ addEventingHandler(
 		end
 
 		-- keep defaults, but update any new ones
+
+		-- If delegated staking is being fully enabled or disabled, clear the allowlist
+		local allowDelegatedStakingOverride = msg.Tags["Allow-Delegated-Staking"]
+		local enableOpenDelegatedStaking = allowDelegatedStakingOverride == "true"
+		local enableLimitedDelegatedStaking = allowDelegatedStakingOverride == "allowlist"
+		local disableDelegatedStaking = allowDelegatedStakingOverride == "false"
+		local shouldClearAllowlist = enableOpenDelegatedStaking or disableDelegatedStaking
+		local needNewAllowlist = not shouldClearAllowlist
+			and (
+				enableLimitedDelegatedStaking
+				or (gateway.settings.allowedDelegatedLooksup and msg.Tags["Allowed-Delegates"] ~= nil)
+			)
+
 		local updatedSettings = {
 			label = msg.Tags.Label or gateway.settings.label,
 			note = msg.Tags.Note or gateway.settings.note,
 			fqdn = msg.Tags.FQDN or gateway.settings.fqdn,
 			port = tonumber(msg.Tags.Port) or gateway.settings.port,
 			protocol = msg.Tags.Protocol or gateway.settings.protocol,
-			allowDelegatedStaking = not msg.Tags["Allow-Delegated-Staking"] and gateway.settings.allowDelegatedStaking
-				or msg.Tags["Allow-Delegated-Staking"] == "true",
+			allowDelegatedStaking = enableOpenDelegatedStaking -- clear directive to enable
+				or enableLimitedDelegatedStaking -- clear directive to enable
+				or not disableDelegatedStaking -- NOT clear directive to DISABLE
+					and gateway.settings.allowDelegatedStaking, -- otherwise unspecified, so use previous setting
+
+			allowedDelegates = needNewAllowlist and utils.splitAndTrimString(msg.Tags["Allowed-Delegates"], ",") -- replace the lookup list
+				or nil, -- change nothing
+
 			minDelegatedStake = tonumber(msg.Tags["Min-Delegated-Stake"]) or gateway.settings.minDelegatedStake,
 			delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"])
 				or gateway.settings.delegateRewardShareRatio,
@@ -1815,7 +1779,7 @@ addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", Action
 	local initiator = utils.formatAddress(msg.Tags.Initiator)
 	local checkAssertions = function()
 		assert(name and #name > 0, "Name is required")
-		assert(utils.isValidAOAddress(newProcessId), "Process id must be a valid base64url.")
+		assert(utils.isValidAOAddress(newProcessId), "Process Id must be a valid AO signer address..")
 		if initiator ~= nil then
 			assert(utils.isValidAOAddress(initiator), "Invalid initiator address.")
 		end
@@ -1876,7 +1840,7 @@ end)
 
 addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
 	local reportTxId = msg.Tags["Report-Tx-Id"]
-	local failedGateways = msg.Tags["Failed-Gateways"] and utils.splitString(msg.Tags["Failed-Gateways"], ",") or {}
+	local failedGateways = utils.splitAndTrimString(msg.Tags["Failed-Gateways"], ",")
 	local checkAssertions = function()
 		assert(utils.isValidAOAddress(reportTxId), "Invalid report tx id")
 		for _, gateway in ipairs(failedGateways) do
@@ -2602,6 +2566,51 @@ addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginate
 	end
 end)
 
+addEventingHandler("paginatedDelegates", utils.hasMatchingTag("Action", "Paginated-Delegates"), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local shouldContinue, result = eventingPcall(
+		msg.ioEvent,
+		function(error)
+			ao.send({
+				Target = msg.From,
+				Action = "Invalid-Delegates-Notice",
+				Error = "Pagination-Error",
+				Data = json.encode(error),
+			})
+		end,
+		gar.getPaginatedDelegates,
+		msg.Tags.Address or msg.From,
+		page.cursor,
+		page.limit,
+		page.sortBy or "startTimestamp",
+		page.sortOrder
+	)
+	if not shouldContinue then
+		return
+	end
+	ao.send({ Target = msg.From, Action = "Delegates-Notice", Data = json.encode(result) })
+end)
+
+addEventingHandler(
+	"paginatedAllowedDelegates",
+	utils.hasMatchingTag("Action", "Paginated-Allowed-Delegates"),
+	function(msg)
+		local page = utils.parsePaginationTags(msg)
+		local shouldContinue, result = eventingPcall(msg.ioEvent, function(error)
+			ao.send({
+				Target = msg.From,
+				Action = "Invalid-Allowed-Delegates-Notice",
+				Error = "Pagination-Error",
+				Data = json.encode(error),
+			})
+		end, gar.getPaginatedAllowedDelegates, msg.Tags.Address or msg.From, page.cursor, page.limit, page.sortOrder)
+		if not shouldContinue then
+			return
+		end
+		ao.send({ Target = msg.From, Action = "Allowed-Delegates-Notice", Data = json.encode(result) })
+	end
+)
+
 -- END READ HANDLERS
 
 -- AUCTION HANDLER
@@ -2899,6 +2908,104 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 			}),
 		})
 	end
+end)
+
+addEventingHandler("allowDelegates", utils.hasMatchingTag("Action", ActionMap.AllowDelegates), function(msg)
+	local function checkAssertions()
+		assert(
+			#(msg.Tags["Allowed-Delegates"] or ""),
+			"Allowed-Delegates, a comma-separated list string of delegate addresses, is required"
+		)
+	end
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.AllowDelegates .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
+
+	local newAllowedDelegates = utils.splitAndTrimString(msg.Tags["Allowed-Delegates"])
+	msg.ioEvent:addField("Input-New-Delegates-Count", utils.lengthOfTable(newAllowedDelegates))
+
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.AllowDelegates .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, gar.allowDelegates, newAllowedDelegates, msg.From)
+	if not shouldContinue2 then
+		return
+	end
+
+	if result ~= nil then
+		msg.ioEvent:addField("New-Allowed-Delegates", result.newAllowedDelegates or {})
+		msg.ioEvent:addField("New-Allowed-Delegates-Count", utils.lengthOfTable(result.newAllowedDelegates))
+		msg.ioEvent:addField(
+			"Gateway-Total-Allowed-Delegates",
+			utils.lengthOfTable(result.gateway and result.gateway.settings.allowedDelegatesLookup or {})
+				+ utils.lengthOfTable(result.gateway and result.gateway.delegates or {})
+		)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = ActionMap.AllowDelegates .. "-Notice" },
+		Data = json.encode(result and result.newAllowedDelegates or {}),
+	})
+end)
+
+addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap.DisallowDelegates), function(msg)
+	local function checkAssertions()
+		assert(
+			#(msg.Tags["Disallowed-Delegates"] or ""),
+			"Disallowed-Delegates, a comma-separated list string of delegate addresses, is required"
+		)
+	end
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.DisallowDelegates .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
+
+	local disallowedDelegates = utils.splitAndTrimString(msg.Tags["Disallowed-Delegates"])
+	msg.ioEvent:addField("Input-Disallowed-Delegates-Count", utils.lengthOfTable(disallowedDelegates))
+
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.DisallowDelegates .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, gar.disallowDelegates, disallowedDelegates, msg.From)
+	if not shouldContinue2 then
+		return
+	end
+
+	if result ~= nil then
+		msg.ioEvent:addField("New-Disallowed-Delegates", result.removedDelegates or {})
+		msg.ioEvent:addField("New-Disallowed-Delegates-Count", utils.lengthOfTable(result.removedDelegates))
+		msg.ioEvent:addField(
+			"Gateway-Total-Allowed-Delegates",
+			utils.lengthOfTable(result.gateway and result.gateway.settings.allowedDelegatesLookup or {})
+				+ utils.lengthOfTable(result.gateway and result.gateway.delegates or {})
+		)
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = ActionMap.DisallowDelegates .. "-Notice" },
+		Data = json.encode(result and result.removedDelegates or {}),
+	})
 end)
 
 return process

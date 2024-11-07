@@ -36,10 +36,8 @@ describe("arns", function()
 				function()
 					local demandBefore = demand.getCurrentPeriodRevenue()
 					local purchasesBefore = demand.getCurrentPeriodPurchases()
-					local status, result =
-						pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
+					local result = arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId)
 
-					assert.is_true(status)
 					assert.are.same({
 						purchasePrice = 600000000,
 						type = "lease",
@@ -448,10 +446,7 @@ describe("arns", function()
 
 				-- Reassign the name
 				local newProcessId = "test-this-is-valid-arweave-wallet-address-2"
-				local status, result = pcall(arns.reassignName, "test-name", testProcessId, timestamp, newProcessId)
-
-				-- Assertions
-				assert.is_true(status)
+				local result = arns.reassignName("test-name", testProcessId, timestamp, newProcessId)
 				assert.are.same(newProcessId, result.processId)
 			end)
 
@@ -645,14 +640,14 @@ describe("arns", function()
 
 	describe("pruneRecords", function()
 		it("should prune records and create auctions for expired leased records", function()
-			local currentTimestamp = 1000000000
+			local currentTimestamp = 2000000000
 
 			_G.NameRegistry = {
 				auctions = {},
 				reserved = {},
 				records = {
 					["active-record"] = {
-						endTimestamp = currentTimestamp + 1000000, -- far in the future
+						endTimestamp = 2001000000, -- far in the future
 						processId = "active-process-id",
 						purchasePrice = 600000000,
 						startTimestamp = 0,
@@ -660,7 +655,7 @@ describe("arns", function()
 						undernameLimit = 10,
 					},
 					["expired-record"] = {
-						endTimestamp = currentTimestamp - constants.gracePeriodMs - 1, -- expired and past the grace period
+						endTimestamp = 790399999, -- expired and past the grace period
 						processId = "expired-process-id",
 						purchasePrice = 400000000,
 						startTimestamp = 0,
@@ -685,7 +680,7 @@ describe("arns", function()
 					},
 				},
 			}
-			arns.pruneRecords(currentTimestamp)
+			local prunedRecords, newGracePeriodRecords = arns.pruneRecords(currentTimestamp)
 			assert.are.same({
 				["active-record"] = {
 					endTimestamp = currentTimestamp + 1000000, -- far in the future
@@ -714,8 +709,8 @@ describe("arns", function()
 			}, _G.NameRegistry.records)
 			assert.are.same({
 				["expired-record"] = {
-					startTimestamp = currentTimestamp,
-					endTimestamp = currentTimestamp + (60 * 1000 * 60 * 24 * 14), -- 14 days
+					startTimestamp = 2000000000,
+					endTimestamp = 3209600000, -- plus 14 days
 					initiator = _G.ao.id,
 					baseFee = 400000000,
 					demandFactor = 1,
@@ -729,8 +724,106 @@ describe("arns", function()
 					},
 				},
 			}, _G.NameRegistry.auctions)
+			assert.are.same({
+				["expired-record"] = {
+					endTimestamp = currentTimestamp - constants.gracePeriodMs - 1, -- expired and past the grace period
+					processId = "expired-process-id",
+					purchasePrice = 400000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 5,
+				},
+			}, prunedRecords)
+			assert.are.same({
+				["grace-period-record"] = {
+					endTimestamp = currentTimestamp - constants.gracePeriodMs + 10, -- expired, but within grace period
+					processId = "grace-process-id",
+					purchasePrice = 500000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 8,
+				},
+			}, newGracePeriodRecords)
+
+			-- advance time, run again, and ensure the grace period record is not in the grace period list again
+			local gracePeriodRecordEndTimestamp = currentTimestamp - constants.gracePeriodMs + 10
+			currentTimestamp = currentTimestamp + constants.gracePeriodMs + 1
+			prunedRecords, newGracePeriodRecords = arns.pruneRecords(currentTimestamp, gracePeriodRecordEndTimestamp)
+			assert.are.same({
+				["active-record"] = {
+					endTimestamp = 2001000000,
+					processId = "active-process-id",
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				},
+				["permabuy-record"] = {
+					endTimestamp = nil,
+					processId = "permabuy-process-id",
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "permabuy",
+					undernameLimit = 10,
+				},
+			}, _G.NameRegistry.records)
+			-- grace period record now joins the auction list and is pruned
+			assert.are.same({
+				["expired-record"] = {
+					startTimestamp = 2000000000,
+					endTimestamp = 3209600000, -- plus 14 days
+					initiator = _G.ao.id,
+					baseFee = 400000000,
+					demandFactor = 1,
+					registrationFeeCalculator = arns.calculateRegistrationFee,
+					name = "expired-record",
+					settings = {
+						decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14),
+						scalingExponent = 190,
+						startPriceMultiplier = 50,
+						durationMs = 60 * 1000 * 60 * 24 * 14,
+					},
+				},
+				["grace-period-record"] = {
+					baseFee = 400000000,
+					demandFactor = 1.0,
+					startTimestamp = currentTimestamp,
+					endTimestamp = currentTimestamp + 1209600000, -- plus 14 days
+					initiator = "test",
+					name = "grace-period-record",
+					registrationFeeCalculator = arns.calculateRegistrationFee,
+					settings = {
+						decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14),
+						scalingExponent = 190,
+						startPriceMultiplier = 50,
+						durationMs = 60 * 1000 * 60 * 24 * 14,
+					},
+				},
+			}, _G.NameRegistry.auctions)
+			assert.are.same({
+				["grace-period-record"] = {
+					endTimestamp = 790400010,
+					processId = "grace-process-id",
+					purchasePrice = 500000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 8,
+				},
+			}, prunedRecords)
+			-- active record has entered grace period
+			assert.are.same({
+				["active-record"] = {
+					endTimestamp = 2001000000,
+					processId = "active-process-id",
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				},
+			}, newGracePeriodRecords)
 		end)
 	end)
+
 	describe("pruneReservedNames", function()
 		it("should remove expired reserved names", function()
 			local currentTimestamp = 1000000
@@ -819,6 +912,7 @@ describe("arns", function()
 			it("should create an auction and remove any existing record", function()
 				local auction = arns.createAuction("test-name", 1000000, "test-initiator")
 				local twoWeeksMs = 1000 * 60 * 60 * 24 * 14
+				assert(auction, "Auction should be created")
 				assert.are.equal(auction.name, "test-name")
 				assert.are.equal(auction.startTimestamp, 1000000)
 				assert.are.equal(auction.endTimestamp, twoWeeksMs + 1000000) -- 14 days late
@@ -868,6 +962,7 @@ describe("arns", function()
 			it("should return the correct price for an auction at a given timestamp permanently", function()
 				local startTimestamp = 1000000
 				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
+				assert(auction, "Auction should be created")
 				local currentTimestamp = startTimestamp + 1000 * 60 * 60 * 24 * 7 -- 1 week into the auction
 				local decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14)
 				local scalingExponent = 190
@@ -890,6 +985,7 @@ describe("arns", function()
 			it("should return the correct prices for an auction with for a lease", function()
 				local startTimestamp = 1729524023521
 				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
+				assert(auction, "Auction should be created")
 				local intervalMs = 1000 * 60 * 15 -- 15 min (how granular we want to compute the prices)
 				local prices = auction:computePricesForAuction("lease", 1, intervalMs)
 				local baseFee = 500000000
@@ -1019,6 +1115,7 @@ describe("arns", function()
 					local floorPrice = baseFee + permabuyAnnualFee
 					local startPrice = floorPrice * 50
 					local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
+					assert(auction, "Auction should be created")
 					local result = arns.submitAuctionBid(
 						"test-name",
 						startPrice,
@@ -1026,7 +1123,7 @@ describe("arns", function()
 						bidTimestamp,
 						"test-process-id",
 						"permabuy",
-						nil
+						0
 					)
 					local totalDecay = auction.settings.decayRate * (bidTimestamp - startTimestamp)
 					local expectedPrice = math.floor(startPrice * ((1 - totalDecay) ^ auction.settings.scalingExponent))
@@ -1068,6 +1165,7 @@ describe("arns", function()
 			it("should throw an error if the bid is not high enough", function()
 				local startTimestamp = 1000000
 				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
+				assert(auction, "Auction should be created")
 				local startPrice = auction:getPriceForAuctionAtTimestamp(startTimestamp, "permabuy", nil)
 				local status, error = pcall(
 					arns.submitAuctionBid,
@@ -1086,6 +1184,7 @@ describe("arns", function()
 			it("should throw an error if the bidder does not have enough balance", function()
 				local startTimestamp = 1000000
 				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
+				assert(auction, "Auction should be created")
 				local requiredBid = auction:getPriceForAuctionAtTimestamp(startTimestamp, "permabuy", nil)
 				_G.Balances[testAddressArweave] = requiredBid - 1
 				local status, error = pcall(

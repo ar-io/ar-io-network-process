@@ -87,35 +87,43 @@ Each handler is identified by an action name and it has required and optional ta
 ### Lua Setup (MacOS)
 
 1. Clone the repository and navigate to the project directory.
-1. Install `lua`
-   - `brew install lua@5.3`
-1. Add the following to your `.zshrc` or `.bashrc` file:
+2. Install `lua`
 
-   ```bash
-   echo 'export LDFLAGS="-L/usr/local/opt/lua@5.3/lib"' >> ~/.zshrc
-   echo 'export CPPFLAGS="-I/usr/local/opt/lua@5.3/include"' >> ~/.zshrc
-   echo 'export PKG_CONFIG_PATH="/usr/local/opt/lua@5.3/lib/pkgconfig"' >> ~/.zshrc
-   echo 'export PATH="/usr/local/opt/lua@5.3/bin:$PATH"' >> ~/.zshrc
-   ```
+- `brew install lua@5.3`
+
+3. Add the following to your `.zshrc` or `.bashrc` file:
+
+```bash
+echo 'export LDFLAGS="-L/usr/local/opt/lua@5.3/lib"' >> ~/.zshrc
+echo 'export CPPFLAGS="-I/usr/local/opt/lua@5.3/include/lua5.3"' >> ~/.zshrc
+echo 'export PKG_CONFIG_PATH="/usr/local/opt/lua@5.3/lib/pkgconfig"' >> ~/.zshrc
+echo 'export PATH="/usr/local/opt/lua@5.3/bin:$PATH"' >> ~/.zshrc
+```
 
 1. Run `source ~/.zshrc` or `source ~/.bashrc` to apply the changes.
-1. Run `lua -v` to verify the installation.
+2. Run `lua -v` to verify the installation.
 
 ### LuaRocks Setup
 
 1. Install `luarocks`
 
-   ```bash
-   curl -R -O http://luarocks.github.io/luarocks/releases/luarocks-3.9.1.tar.gz
-   tar zxpf luarocks-3.9.1.tar.gz
-   cd luarocks-3.9.1
-   ./configure --with-lua=/usr/local/opt/lua@5.3 --with-lua-include=/usr/local/opt/lua@5.3/include
-   make build
-   sudo make install
-   ```
+```bash
+curl -R -O http://luarocks.github.io/luarocks/releases/luarocks-3.9.1.tar.gz
+tar zxpf luarocks-3.9.1.tar.gz
+cd luarocks-3.9.1
+./configure --with-lua=/usr/local/opt/lua@5.3 --with-lua-include=/usr/local/opt/lua@5.3/include/lua5.3
+make build
+sudo make install
+```
 
-1. Check the installation by running `luarocks --version`.
-1. Check the LuaRocks configuration by running `luarocks config | grep LUA`
+2. Ensure that the `luarocks` binary is in your path by running `echo $PATH`. Otherwise, add it to your path and reload your shell:
+
+```bash
+echo 'export PATH=$HOME/.luarocks/bin:$PATH' >> ~/.zshrc
+```
+
+3. Check the installation by running `luarocks --version`.
+4. Check the LuaRocks configuration by running `luarocks config | grep LUA`
 
 If you ever need to refresh .luarocks, run the following command:
 
@@ -125,6 +133,12 @@ luarocks purge && luarocks install ar-io-ao-0.1-1.rockspec
 
 ### aos
 
+Get aos:
+
+```sh
+yarn global add https://get_ao.g8way.io
+```
+
 To load the module into the `aos` REPL, run the following command:
 
 ```sh
@@ -132,6 +146,18 @@ aos --load src/main.lua
 ```
 
 ### Code Formatting
+
+To get the code formatter, we'll need to install rust to access `cargo`. To install rust on MacOS, run the following command:
+
+```sh
+brew install rust
+```
+
+If not already added, include `cargo` binary in your path so that packages installed using `cargo` can be accessed globally:
+
+```
+echo 'export PATH=$HOME/.cargo/bin:$PATH' >> ~/.zshrc
+```
 
 The code is formatted using `stylua`. To install `stylua`, run the following command:
 
@@ -148,7 +174,13 @@ To run the tests, execute the following command:
 busted .
 ```
 
-To see the test coverage, run the following command:
+To see the test coverage, get luacov:
+
+```sh
+luarocks install luacov
+```
+
+With luacov installed, run the following command:
 
 ```sh
 luacov --reporter html && open luacov-html/index.html

@@ -5,6 +5,58 @@ local balances = require("balances")
 local arns = require("arns")
 local epochs = {}
 
+--- @class Epoch
+--- @field epochIndex number The index of the epoch
+--- @field startTimestamp number The start timestamp of the epoch
+--- @field endTimestamp number The end timestamp of the epoch
+--- @field startHeight number The start height of the epoch
+--- @field distributionTimestamp number The distribution timestamp of the epoch
+--- @field prescribedObservers table The prescribed observers of the epoch
+--- @field prescribedNames table The prescribed names of the epoch
+--- @field observations Observations The observations of the epoch
+--- @field distributions Distribution The distributions of the epoch
+
+--- @class EpochSettings
+--- @field pruneEpochsCount number The number of epochs to prune
+--- @field prescribedNameCount number The number of prescribed names
+--- @field rewardPercentage number The reward percentage
+--- @field maxObservers number The maximum number of observers
+--- @field epochZeroStartTimestamp number The start timestamp of epoch zero
+--- @field durationMs number The duration of an epoch in milliseconds
+--- @field distributionDelayMs number The distribution delay in milliseconds
+
+--- @class WeightedGateway
+--- @field gatewayAddress string The gateway address
+--- @field stakeWeight number The stake weight
+--- @field tenureWeight number The tenure weight
+--- @field gatewayRewardRatioWeight number The gateway reward ratio weight
+--- @field observerRewardRatioWeight number The observer reward ratio weight
+--- @field compositeWeight number The composite weight
+--- @field normalizedCompositeWeight number The normalized composite weight
+
+--- @class Observations
+--- @field failureSummaries table The failure summaries
+--- @field reports Reports The reports for the epoch (indexed by observer address)
+
+--- @class Reports: table<string, string>
+
+--- @class GatewayRewards
+--- @field operatorReward number The total operator reward eligible
+--- @field delegateRewards table<string, number> The delegate rewards eligible, indexed by delegate address
+
+--- @class Rewards
+--- @field eligible table<string, GatewayRewards> A table representing the eligible operator and delegate rewards for a gateway
+--- @field distributed table<string, number> A table representing the distributed rewards, only set if rewards have been distributed
+
+--- @class Distribution
+--- @field totalEligibleGateways number The total eligible gateways
+--- @field totalEligibleRewards number The total eligible rewards
+--- @field totalEligibleGatewayReward number The total eligible gateway reward
+--- @field totalEligibleObserverReward number The total eligible observer reward
+--- @field distributedTimestamp number|nil The distributed timestamp, only set if rewards have been distributed
+--- @field totalDistributedRewards number|nil The total distributed rewards, only set if rewards have been distributed
+--- @field rewards Rewards The rewards
+
 Epochs = Epochs or {}
 EpochSettings = EpochSettings
 	or {
@@ -17,39 +69,60 @@ EpochSettings = EpochSettings
 		distributionDelayMs = 60 * 1000 * 40, -- 40 minutes (~ 20 arweave blocks)
 	}
 
+--- Gets all the epochs
+--- @return table<number, Epoch> The epochs indexed by their epoch index
 function epochs.getEpochs()
-	return utils.deepCopy(epochs) or {}
+	return utils.deepCopy(Epochs) or {}
 end
 
+--- Gets an epoch by index
+--- @param epochIndex number The epoch index
+--- @return Epoch The epoch
 function epochs.getEpoch(epochIndex)
 	local epoch = utils.deepCopy(Epochs[epochIndex]) or {}
 	return epoch
 end
 
-function epochs.getObservers()
-	return epochs.getCurrentEpoch().prescribedObservers or {}
+--- Gets the current epoch
+--- @return Epoch The current epoch
+function epochs.getCurrentEpoch()
+	return epochs.getEpoch(epochs.getEpochIndexForTimestamp(os.time()))
 end
 
+--- Gets the epoch settings
+--- @return EpochSettings|nil The epoch settings
 function epochs.getSettings()
 	return utils.deepCopy(EpochSettings)
 end
 
+--- Gets the observations for the current epoch
+--- @return Observations The observations for the current epoch
 function epochs.getObservations()
 	return epochs.getCurrentEpoch().observations or {}
 end
 
+--- Gets the reports for the current epoch
+--- @return Reports The reports for the current epoch
 function epochs.getReports()
 	return epochs.getObservations().reports or {}
 end
 
+--- Gets the current distribution
+--- @return Distribution The current distribution
 function epochs.getDistribution()
 	return epochs.getCurrentEpoch().distributions or {}
 end
 
+--- Gets the prescribed observers for an epoch
+--- @param epochIndex number The epoch index
+--- @return WeightedGateway[] The prescribed observers for the epoch
 function epochs.getPrescribedObserversForEpoch(epochIndex)
 	return epochs.getEpoch(epochIndex).prescribedObservers or {}
 end
 
+--- Gets the eligible rewards for an epoch
+--- @param epochIndex number The epoch index
+--- @return Rewards The eligible rewards for the epoch
 function epochs.getEligibleRewardsForEpoch(epochIndex)
 	local epoch = epochs.getEpoch(epochIndex)
 	local eligible = epoch
@@ -60,6 +133,9 @@ function epochs.getEligibleRewardsForEpoch(epochIndex)
 	return eligible
 end
 
+--- Gets the distributed rewards for an epoch
+--- @param epochIndex number The epoch index
+--- @return Rewards The distributed rewards for the epoch
 function epochs.getDistributedRewardsForEpoch(epochIndex)
 	local epoch = epochs.getEpoch(epochIndex)
 	local distributed = epoch
@@ -70,30 +146,52 @@ function epochs.getDistributedRewardsForEpoch(epochIndex)
 	return distributed
 end
 
+--- Gets the observations for an epoch
+--- @param epochIndex number The epoch index
+--- @return Observations The observations for the epoch
 function epochs.getObservationsForEpoch(epochIndex)
 	return epochs.getEpoch(epochIndex).observations or {}
 end
 
+--- Gets the distributions for an epoch
+--- @param epochIndex number The epoch index
+--- @return Distribution The distributions for the epoch
 function epochs.getDistributionsForEpoch(epochIndex)
 	return epochs.getEpoch(epochIndex).distributions or {}
 end
 
+--- Gets the prescribed names for an epoch
+--- @param epochIndex number The epoch index
+--- @return string[] The prescribed names for the epoch
 function epochs.getPrescribedNamesForEpoch(epochIndex)
 	return epochs.getEpoch(epochIndex).prescribedNames or {}
 end
 
+--- Gets the reports for an epoch
+--- @param epochIndex number The epoch index
+--- @return table<string, Report> The reports for the epoch
 function epochs.getReportsForEpoch(epochIndex)
 	return epochs.getEpoch(epochIndex).observations.reports or {}
 end
 
+--- Gets the distribution for an epoch
+--- @param epochIndex number The epoch index
+--- @return Distribution The distribution for the epoch
 function epochs.getDistributionForEpoch(epochIndex)
 	return epochs.getEpoch(epochIndex).distributions or {}
 end
 
+--- Gets the epoch from a timestamp
+--- @param timestamp number The timestamp
+--- @return Epoch The epoch
 function epochs.getEpochFromTimestamp(timestamp)
 	local epochIndex = epochs.getEpochIndexForTimestamp(timestamp)
 	return epochs.getEpoch(epochIndex)
 end
+
+--- Sets the prescribed observers for an epoch
+--- @param epochIndex number The epoch index
+--- @param hashchain string The hashchain
 function epochs.setPrescribedObserversForEpoch(epochIndex, hashchain)
 	local prescribedObservers = epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	local epoch = epochs.getEpoch(epochIndex)
@@ -102,6 +200,9 @@ function epochs.setPrescribedObserversForEpoch(epochIndex, hashchain)
 	Epochs[epochIndex] = epoch
 end
 
+--- Sets the prescribed names for an epoch
+--- @param epochIndex number The epoch index
+--- @param hashchain string The hashchain
 function epochs.setPrescribedNamesForEpoch(epochIndex, hashchain)
 	local prescribedNames = epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
 	local epoch = epochs.getEpoch(epochIndex)
@@ -110,6 +211,10 @@ function epochs.setPrescribedNamesForEpoch(epochIndex, hashchain)
 	Epochs[epochIndex] = epoch
 end
 
+--- Computes the prescribed names for an epoch
+--- @param epochIndex number The epoch index
+--- @param hashchain string The hashchain
+--- @return string[] The prescribed names for the epoch
 function epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
 	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 	local activeArNSNames = arns.getActiveArNSNamesBetweenTimestamps(epochStartTimestamp, epochEndTimestamp)
@@ -157,6 +262,10 @@ function epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
 	return prescribedNames
 end
 
+--- Computes the prescribed observers for an epoch
+--- @param epochIndex number The epoch index
+--- @param hashchain string The hashchain
+--- @return WeightedGateway[], WeightedGateway[] The prescribed observers for the epoch, and all the gateways with weights
 function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	assert(epochIndex >= 0, "Epoch index must be greater than or equal to 0")
 	assert(type(hashchain) == "string", "Hashchain must be a string")
@@ -239,6 +348,9 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	return prescribedObservers, weightedGateways
 end
 
+--- Gets the epoch timestamps for an epoch index
+--- @param epochIndex number The epoch index
+--- @return number, number, number The epoch start timestamp, epoch end timestamp, and epoch distribution timestamp
 function epochs.getEpochTimestampsForIndex(epochIndex)
 	local epochStartTimestamp = epochs.getSettings().epochZeroStartTimestamp
 		+ epochs.getSettings().durationMs * epochIndex
@@ -247,6 +359,9 @@ function epochs.getEpochTimestampsForIndex(epochIndex)
 	return epochStartTimestamp, epochEndTimestamp, epochDistributionTimestamp
 end
 
+--- Gets the epoch index for a given timestamp
+--- @param timestamp number The timestamp
+--- @return number The epoch index
 function epochs.getEpochIndexForTimestamp(timestamp)
 	local timestampInMS = utils.checkAndConvertTimestamptoMs(timestamp)
 	local epochZeroStartTimestamp = epochs.getSettings().epochZeroStartTimestamp
@@ -255,6 +370,11 @@ function epochs.getEpochIndexForTimestamp(timestamp)
 	return epochIndex
 end
 
+--- Creates a new epoch and updates the gateway weights
+--- @param timestamp number The timestamp
+--- @param blockHeight number The block height
+--- @param hashchain string The hashchain
+--- @return Epoch|nil The created epoch, or nil if an epoch already exists for the index
 function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	assert(type(timestamp) == "number", "Timestamp must be a number")
 	assert(type(blockHeight) == "number", "Block height must be a number")
@@ -325,6 +445,12 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	return epoch
 end
 
+--- Saves the observations for an epoch
+--- @param observerAddress string The observer address
+--- @param reportTxId string The report transaction ID
+--- @param failedGatewayAddresses string[] The failed gateway addresses
+--- @param timestamp number The timestamp
+--- @return Observations The updated observations for the epoch
 function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddresses, timestamp)
 	-- assert report tx id is valid arweave address
 	assert(utils.isValidArweaveAddress(reportTxId), "Report transaction ID is not a valid Arweave address")
@@ -414,11 +540,22 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	return epoch.observations
 end
 
--- for testing purposes
+--- Updates the epoch settings
+--- @param newSettings EpochSettings The new settings
 function epochs.updateEpochSettings(newSettings)
 	EpochSettings = newSettings
 end
 
+--- @class ComputedRewards
+--- @field totalEligibleRewards number The total eligible rewards
+--- @field perGatewayReward number The per gateway reward
+--- @field perObserverReward number The per observer reward
+--- @field potentialRewards table<string, GatewayRewards> The potential rewards for each gateway
+
+--- Computes the total eligible rewards for an epoch based on the protocol balance and the reward percentage and prescribed observers
+--- @param epochIndex number The epoch index
+--- @param prescribedObservers Observer[] The prescribed observers
+--- @return ComputedRewards The total eligible rewards
 function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
 	local epochStartTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 	local activeGatewayAddresses = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
@@ -470,13 +607,15 @@ function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObserv
 		potentialRewards = potentialRewards,
 	}
 end
--- Steps
--- 1. Get gateways participated in full epoch based on start and end timestamp
--- 2. Get the prescribed observers for the relevant epoch
--- 3. Calcualte the rewards for the epoch based on protocol balance
--- 4. Allocate 95% of the rewards for passed gateways, 5% for observers - based on total gateways during the epoch and # of prescribed observers
--- 5. Distribute the rewards to the gateways and observers
--- 6. Increment the epoch stats for the gateways
+--- Distributes the rewards for an epoch
+--- 1. Get gateways participated in full epoch based on start and end timestamp
+--- 2. Get the prescribed observers for the relevant epoch
+--- 3. Calcualte the rewards for the epoch based on protocol balance
+--- 4. Allocate 95% of the rewards for passed gateways, 5% for observers - based on total gateways during the epoch and # of prescribed observers
+--- 5. Distribute the rewards to the gateways and observers
+--- 6. Increment the epoch stats for the gateways
+--- @param currentTimestamp number The current timestamp
+--- @return Epoch|nil The updated epoch with the distributed rewards, or nil if no rewards were distributed
 function epochs.distributeRewardsForEpoch(currentTimestamp)
 	local epochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp - epochs.getSettings().durationMs) -- go back to previous epoch
 	local epoch = epochs.getEpoch(epochIndex)
@@ -636,7 +775,9 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	return epochs.getEpoch(epochIndex)
 end
 
--- prune epochs older than 14 days
+--- Prunes epochs older than the cutoff epoch index
+--- @param timestamp number The timestamp to prune epochs older than
+--- @return Epoch[] The pruned epochs
 function epochs.pruneEpochs(timestamp)
 	local prunedEpochs = {}
 	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)

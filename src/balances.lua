@@ -52,8 +52,8 @@ function balances.reduceBalance(target, qty)
 end
 
 --- Increases the balance of an address
----@param target string The address to increase balance for
----@param qty number The amount to increase by (must be integer)
+--- @param target string The address to increase balance for
+--- @param qty number The amount to increase by (must be integer)
 function balances.increaseBalance(target, qty)
 	assert(utils.isInteger(qty), debug.traceback("Quantity must be an integer: " .. qty))
 	local prevBalance = balances.getBalance(target) or 0
@@ -61,11 +61,11 @@ function balances.increaseBalance(target, qty)
 end
 
 --- Gets paginated list of all balances
----@param cursor string|nil The address to start from
----@param limit number|nil Max number of results to return
----@param sortBy string|nil Field to sort by
----@param sortOrder string|nil "asc" or "desc" sort direction
----@return table Array of {address, balance} objects
+--- @param cursor string|nil The address to start from
+--- @param limit number|nil Max number of results to return
+--- @param sortBy string|nil Field to sort by
+--- @param sortOrder string|nil "asc" or "desc" sort direction
+--- @return table Array of {address, balance} objects
 function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder)
 	local allBalances = balances.getBalances()
 	local balancesArray = {}
@@ -78,6 +78,14 @@ function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder)
 	end
 
 	return utils.paginateTableWithCursor(balancesArray, cursor, cursorField, limit, sortBy, sortOrder)
+end
+
+--- Checks if a wallet has a sufficient balance
+--- @param wallet string The address of the wallet
+--- @param quantity number The amount to check against the balance
+--- @return boolean True if the wallet has a sufficient balance, false otherwise
+function balances.walletHasSufficientBalance(wallet, quantity)
+	return Balances[wallet] ~= nil and Balances[wallet] >= quantity
 end
 
 return balances
