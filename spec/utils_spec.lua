@@ -289,6 +289,37 @@ describe("utils", function()
 				nextCursor = "1000",
 			}, result)
 		end)
+
+		it("correctly handles a nil cursorField and sortBy on a table of non-table values", function()
+			local arr = { "1", "2", "3" }
+			local cursor = ""
+			local cursorField = nil
+			local limit = 1
+			local sortOrder = "asc"
+			local sortBy = nil
+			local result = utils.paginateTableWithCursor(arr, cursor, cursorField, limit, sortBy, sortOrder)
+			assert.are.same({
+				items = {
+					[1] = "1",
+				},
+				limit = 1,
+				totalItems = 3,
+				sortOrder = "asc",
+				nextCursor = "1",
+				hasMore = true,
+			}, result)
+			local result2 = utils.paginateTableWithCursor(arr, result.nextCursor, cursorField, limit, sortBy, sortOrder)
+			assert.are.same({
+				items = {
+					[1] = "2",
+				},
+				limit = 1,
+				totalItems = 3,
+				sortOrder = "asc",
+				nextCursor = "2",
+				hasMore = true,
+			}, result2)
+		end)
 	end)
 
 	describe("splitAndTrimString", function()
