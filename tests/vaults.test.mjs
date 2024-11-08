@@ -431,7 +431,7 @@ describe('Vaults', async () => {
 
         assert.equal(totalItems, 2);
         assert.equal(items.length, 1);
-        assert.equal(sortBy, 'balance');
+        assert.equal(sortBy, 'address');
         assert.equal(sortOrder, 'desc');
         assert.equal(hasMore, !!nextCursor);
         cursor = nextCursor;

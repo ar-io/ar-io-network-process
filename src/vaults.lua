@@ -122,10 +122,9 @@ end
 --- Gets all paginated vaults
 --- @param cursor string|nil The address to start from
 --- @param limit number Max number of results to return
---- @param sortBy string|nil Field to sort by
 --- @param sortOrder string "asc" or "desc" sort direction
 --- @return table Array of {address, vault} objects
-function vaults.getPaginatedVaults(cursor, limit, sortBy, sortOrder)
+function vaults.getPaginatedVaults(cursor, limit, sortOrder)
 	local allVaults = vaults.getVaults()
 	local vaultsArray = {}
 	local cursorField = "address" -- the cursor will be the wallet address
@@ -136,7 +135,7 @@ function vaults.getPaginatedVaults(cursor, limit, sortBy, sortOrder)
 		})
 	end
 
-	return utils.paginateTableWithCursor(vaultsArray, cursor, cursorField, limit, sortBy, sortOrder)
+	return utils.paginateTableWithCursor(vaultsArray, cursor, cursorField, limit, "address", sortOrder)
 end
 
 --- Gets a vault
