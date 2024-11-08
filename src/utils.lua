@@ -367,8 +367,10 @@ end
 
 function utils.reduce(tbl, fn, init)
 	local acc = init
+	local i = 1
 	for k, v in pairs(tbl) do
-		acc = fn(acc, k, v)
+		acc = fn(acc, k, v, i)
+		i = i + 1
 	end
 	return acc
 end

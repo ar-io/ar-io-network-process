@@ -86,6 +86,14 @@ describe("utils", function()
 			end
 			assert.are.same(30, utils.reduce(input, reducer, 0))
 		end)
+
+		it("should provide a numeric index in the reducer function for any kind of table", function()
+			local reducer = function(acc, _, value, i)
+				return acc + value + i
+			end
+			assert.are.same(45, utils.reduce({ foo = 2, bar = 4, baz = 6, oof = 8, rab = 10 }, reducer, 0))
+			assert.are.same(12, utils.reduce({ 1, 2, 3 }, reducer, 0))
+		end)
 	end)
 
 	describe("map", function()
