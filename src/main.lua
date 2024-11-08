@@ -974,15 +974,16 @@ addEventingHandler(
 )
 
 addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.TokenCost), function(msg)
+	local fundingSources = msg.Tags["Fund-From"]
 	local checkAssertions = function()
+		local intentType = msg.Tags.Intent
+		local validIntents =
+			utils.createLookupTable({ ActionMap.BuyRecord, ActionMap.ExtendLease, ActionMap.IncreaseUndernameLimit })
 		assert(
-			type(msg.Tags.Intent) == "string",
-			-- assert is one of those three interactions
-			msg.Tags.Intent == ActionMap.BuyRecord
-				or msg.Tags.Intent == ActionMap.ExtendLease
-				or msg.Tags.Intent == ActionMap.IncreaseUndernameLimit,
+			type(intentType) == "string",
+			validIntents[intentType],
 			"Intent must be valid registry interaction (e.g. BuyRecord, ExtendLease, IncreaseUndernameLimit). Provided intent: "
-				.. (msg.Tags.Intent or "nil")
+				.. (intentType or "nil")
 		)
 		-- if years is provided, assert it is a number and integer between 1 and 5
 		if msg.Tags.Years then
@@ -993,40 +994,71 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 		if msg.Tags.Quantity then
 			assert(utils.isInteger(tonumber(msg.Tags.Quantity)), "Invalid quantity. Must be integer greater than 0")
 		end
+
+		if fundingSources then
+			local validFundFrom = utils.createLookupTable({ "any", "balance", "stake" })
+			assert(validFundFrom[fundingSources], "Invalid fund from type. Must be one of: any, balance, stake")
+			-- TODO: expand this privilege to other purchase actions?
+			assert(
+				intentType == ActionMap.BuyRecord or fundingSources == "balance",
+				"Only Buy-Record may fund with sources other than balance"
+			)
+		end
 	end
 
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
-	local status, result = pcall(arns.getTokenCost, {
-		intent = msg.Tags.Intent,
-		name = string.lower(msg.Tags.Name),
-		years = tonumber(msg.Tags.Years) or 1,
-		quantity = tonumber(msg.Tags.Quantity),
-		purchaseType = msg.Tags["Purchase-Type"] or "lease",
-		currentTimestamp = tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp),
-	})
-	if not status then
+	local shouldContinue2, tokenCost = eventingPcall(
+		msg.ioEvent,
+		function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Invalid-Token-Cost" },
+				Data = tostring(error),
+			})
+		end,
+		arns.getTokenCost,
+		{
+			intent = msg.Tags.Intent,
+			name = string.lower(msg.Tags.Name),
+			years = tonumber(msg.Tags.Years) or 1,
+			quantity = tonumber(msg.Tags.Quantity),
+			purchaseType = msg.Tags["Purchase-Type"] or "lease",
+			currentTimestamp = tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp),
+		}
+	)
+	if not shouldContinue2 then
+		return
+	end
+
+	local shouldContinue3, fundingSourcesResult = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Invalid-Token-Cost" },
-			Data = tostring(result),
+			Data = tostring(error),
 		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(result) },
-			Data = json.encode(result),
-		})
+	end, gar.getFundingSources, msg.From, tokenCost, fundingSources)
+	if not shouldContinue3 then
+		return
 	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(tokenCost) },
+		Data = json.encode({
+			tokenCost = tokenCost,
+			fundingSources = fundingSourcesResult,
+		}),
+	})
 end)
 
 addEventingHandler(
