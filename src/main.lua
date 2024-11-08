@@ -1054,10 +1054,13 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(tokenCost) },
-		Data = json.encode({
-			tokenCost = tokenCost,
-			fundingSources = fundingSourcesResult,
-		}),
+		Data = fundingSources
+				and json.encode({
+					tokenCost = tokenCost,
+					fundingSources = fundingSourcesResult,
+				})
+			-- maintain backwards compatibility with the previous response format
+			or json.encode(tokenCost),
 	})
 end)
 

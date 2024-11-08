@@ -1,9 +1,7 @@
-import { createAosLoader } from './utils.mjs';
+import { handle, startMemory, transfer } from './helpers.mjs';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import {
-  AO_LOADER_HANDLER_ENV,
-  DEFAULT_HANDLE_OPTIONS,
   PROCESS_ID,
   PROCESS_OWNER,
   STUB_ADDRESS,
@@ -16,20 +14,6 @@ import {
 const testEthAddress = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa';
 
 describe('ArNS', async () => {
-  const { handle: originalHandle, memory: startMemory } =
-    await createAosLoader();
-
-  async function handle(options = {}, mem = startMemory) {
-    return originalHandle(
-      mem,
-      {
-        ...DEFAULT_HANDLE_OPTIONS,
-        ...options,
-      },
-      AO_LOADER_HANDLER_ENV,
-    );
-  }
-
   const runBuyRecord = async ({
     sender = STUB_ADDRESS,
     processId = ''.padEnd(43, 'a'),
@@ -40,17 +24,11 @@ describe('ArNS', async () => {
   }) => {
     if (sender != PROCESS_OWNER) {
       // transfer from the owner to the sender
-      const transferResult = await handle({
-        From: PROCESS_OWNER,
-        Owner: PROCESS_OWNER,
-        Tags: [
-          { name: 'Action', value: 'Transfer' },
-          { name: 'Recipient', value: sender },
-          { name: 'Quantity', value: transferQty },
-          { name: 'Cast', value: true },
-        ],
+      memory = await transfer({
+        recipient: sender,
+        quantity: transferQty,
+        cast: true,
       });
-      memory = transferResult.Memory;
     }
 
     const buyRecordResult = await handle(
@@ -116,6 +94,7 @@ describe('ArNS', async () => {
       'Withdraw-Supply': 0, // Artifact of starting out without initializing this properly
       'Locked-Supply': 0, // Artifact of starting out without initializing this properly
     };
+    // TODO: ASSERT THE EVENT DATA
 
     // fetch the record
     const realRecord = await handle(
@@ -331,18 +310,39 @@ describe('ArNS', async () => {
   describe('Token-Cost', () => {
     //Reference: https://ardriveio.sharepoint.com/:x:/s/AR.IOLaunch/Ec3L8aX0wuZOlG7yRtlQoJgB39wCOoKu02PE_Y4iBMyu7Q?e=ZG750l
     it('should return the correct cost of buying a name as a lease', async () => {
-      const result = await handle({
-        Tags: [
-          { name: 'Action', value: 'Token-Cost' },
-          { name: 'Intent', value: 'Buy-Record' },
-          { name: 'Name', value: 'test-name' },
-          { name: 'Purchase-Type', value: 'lease' },
-          { name: 'Years', value: '1' },
-          { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-        ],
+      const transferMemory = await transfer({
+        recipient: STUB_ADDRESS,
+        quantity: 400_000_000,
+        cast: true,
       });
-      const tokenCost = JSON.parse(result.Messages[0].Data);
-      assert.equal(tokenCost, 600000000);
+
+      const result = await handle(
+        {
+          From: STUB_ADDRESS,
+          Owner: STUB_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Token-Cost' },
+            { name: 'Intent', value: 'Buy-Record' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Purchase-Type', value: 'lease' },
+            { name: 'Years', value: '1' },
+            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+            { name: 'Fund-From', value: 'balance' },
+          ],
+        },
+        transferMemory,
+      );
+
+      console.log(`result: ${result.Messages[0].Data}`);
+      const tokenCostResult = JSON.parse(result.Messages[0].Data);
+      assert.deepEqual(tokenCostResult, {
+        tokenCost: 600_000_000,
+        fundingSources: {
+          balance: 400_000_000,
+          shortfall: 200_000_000,
+          stakes: [],
+        },
+      });
     });
     it('should return the correct cost of increasing an undername limit', async () => {
       const buyRecordResult = await handle({
