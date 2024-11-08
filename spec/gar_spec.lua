@@ -2256,7 +2256,7 @@ describe("gar", function()
 					},
 				}
 				for _, balance in pairs({ 0, 10000 }) do
-					_G._Balances[stubRandomAddress] = balance
+					_G.Balances[stubRandomAddress] = balance
 
 					assert.are.same({
 						balance = 0,
