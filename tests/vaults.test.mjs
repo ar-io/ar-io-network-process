@@ -444,7 +444,7 @@ describe('Vaults', async () => {
           address: secondVaulter,
           vault: {
             [vaultId2]: {
-              balance: 600,
+              balance: 500,
               startTimestamp: 21600000,
               endTimestamp: 1231200000,
             },
