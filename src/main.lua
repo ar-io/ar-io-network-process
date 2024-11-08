@@ -908,6 +908,7 @@ addEventingHandler(
 	function(msg)
 		local checkAssertions = function()
 			assert(type(msg.Tags.Name) == "string", "Invalid name")
+			assert(msg.Tags.Quantity, "Must provide a quantity")
 			assert(
 				tonumber(msg.Tags.Quantity) > 0
 					and tonumber(msg.Tags.Quantity) < 9990
