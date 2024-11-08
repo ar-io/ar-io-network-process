@@ -1193,6 +1193,7 @@ function gar.delegateAllowedToStake(delegateAddress, gateway)
 end
 
 function gar.getFundingSources(address, quantity, sourcesPreference)
+	sourcesPreference = sourcesPreference or "balance"
 	local sources = {
 		balance = 0,
 		stakes = {},
