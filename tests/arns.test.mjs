@@ -1,5 +1,5 @@
-import { createAosLoader } from './utils.mjs';
-import { describe, it } from 'node:test';
+import { createAosLoader, assertNoResultError } from './utils.mjs';
+import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
 import {
   AO_LOADER_HANDLER_ENV,
@@ -10,6 +10,7 @@ import {
   INITIAL_PROTOCOL_BALANCE,
   STUB_MESSAGE_ID,
   STUB_TIMESTAMP,
+  validGatewayTags,
 } from '../tools/constants.mjs';
 
 // EIP55-formatted test address
@@ -146,6 +147,8 @@ describe('ArNS', async () => {
     };
   };
 
+  const basePermabuyPrice = 2500000000;
+  const baseLeasePrice = 600000000;
   describe('Buy-Record', () => {
     it('should buy a record with an Arweave address', async () => {
       await runBuyRecord({ sender: STUB_ADDRESS });
@@ -180,7 +183,7 @@ describe('ArNS', async () => {
       const record = JSON.parse(realRecord.Messages[0].Data);
       assert.deepEqual(record, {
         processId: ''.padEnd(43, 'a'),
-        purchasePrice: 2500000000,
+        purchasePrice: basePermabuyPrice,
         startTimestamp: buyRecordData.startTimestamp,
         type: 'permabuy',
         undernameLimit: 10,
@@ -237,7 +240,7 @@ describe('ArNS', async () => {
       const record = JSON.parse(realRecord.Messages[0].Data);
       assert.deepEqual(record, {
         processId: ''.padEnd(43, 'a'),
-        purchasePrice: 600000000,
+        purchasePrice: baseLeasePrice,
         startTimestamp: buyRecordData.startTimestamp,
         endTimestamp: buyRecordData.endTimestamp,
         type: 'lease',
@@ -342,8 +345,9 @@ describe('ArNS', async () => {
         ],
       });
       const tokenCost = JSON.parse(result.Messages[0].Data);
-      assert.equal(tokenCost, 600000000);
+      assert.equal(tokenCost, baseLeasePrice);
     });
+
     it('should return the correct cost of increasing an undername limit', async () => {
       const buyRecordResult = await handle({
         Tags: [
@@ -438,7 +442,7 @@ describe('ArNS', async () => {
       );
 
       const tokenCost = JSON.parse(upgradeNameResult.Messages[0].Data);
-      assert.equal(tokenCost, 2500000000);
+      assert.equal(tokenCost, basePermabuyPrice);
     });
   });
 
@@ -544,7 +548,7 @@ describe('ArNS', async () => {
         startTimestamp: buyRecordTimestamp,
         processId: ''.padEnd(43, 'a'),
         undernameLimit: 10,
-        purchasePrice: 2500000000, // expected price for a permanent 9 character name
+        purchasePrice: basePermabuyPrice, // expected price for a permanent 9 character name
       });
     });
   });
@@ -1197,4 +1201,280 @@ describe('ArNS', async () => {
   });
 
   // TODO: add several error scenarios
+
+  describe('ArNS Discount Eligible Gateways', () => {
+    // TODO: pull these helpers from utils
+    const transfer = async ({
+      recipient = STUB_ADDRESS,
+      quantity = initialOperatorStake,
+      memory = startMemory,
+    } = {}) => {
+      const transferResult = await handle(
+        {
+          From: PROCESS_OWNER,
+          Owner: PROCESS_OWNER,
+          Tags: [
+            { name: 'Action', value: 'Transfer' },
+            { name: 'Recipient', value: recipient },
+            { name: 'Quantity', value: quantity },
+            { name: 'Cast', value: false },
+          ],
+        },
+        memory,
+      );
+      assertNoResultError(transferResult);
+      return transferResult.Memory;
+    };
+
+    const joinNetwork = async ({
+      memory = startMemory,
+      timestamp = STUB_TIMESTAMP,
+      address,
+      tags = validGatewayTags,
+    }) => {
+      // give them twice the join network token amount to ensure they have enough to join the network perform arns purchase
+      const transferMemory = await transfer({
+        recipient: address,
+        quantity: 200_000_000_000,
+        memory,
+      });
+      const joinNetworkResult = await handle(
+        {
+          From: address,
+          Owner: address,
+          Tags: tags,
+          Timestamp: timestamp,
+        },
+        transferMemory,
+      );
+      assertNoResultError(joinNetworkResult);
+      return {
+        memory: joinNetworkResult.Memory,
+        result: joinNetworkResult,
+      };
+    };
+
+    const getBalances = async ({ memory }) => {
+      const result = await handle(
+        {
+          Tags: [{ name: 'Action', value: 'Balances' }],
+        },
+        memory,
+      );
+
+      const balances = JSON.parse(result.Messages?.[0]?.Data);
+      return balances;
+    };
+
+    const joinedGateway = 'joined-unique-gateway-'.padEnd(43, '0');
+    const firstEpochTimestamp = 1719900000000;
+    const afterDistributionTimestamp =
+      firstEpochTimestamp + 1000 * 60 * 60 * 24 + 1000 * 60 * 40;
+
+    let arnsDiscountMemory;
+    before(async () => {
+      // create gateways
+      const { memory: join1Memory } = await joinNetwork({
+        address: joinedGateway,
+      });
+
+      // TODO: Join failing gateway -- Submit an observation with another joined gateway that marks the gateway as failing
+      // const failingGateway = 'failing-unique-gateway-'.padEnd(43, '0');
+      // const { memory: join2Memory } = await joinNetwork(
+      //   {
+      //     address: failingGateway,
+      //   },
+      //   firstTick.Memory,
+      // );
+
+      // TODO: We should be able to create and distribute an epoch within one tick. But for now, this errors -- so we tick twice
+      const firstTick = await handle(
+        {
+          Tags: [{ name: 'Action', value: 'Tick' }],
+          Timestamp: firstEpochTimestamp,
+        },
+        join1Memory,
+      );
+      const futureTickResult = await handle(
+        {
+          Tags: [{ name: 'Action', value: 'Tick' }],
+          Timestamp: afterDistributionTimestamp,
+        },
+        firstTick.Memory,
+      );
+
+      arnsDiscountMemory = futureTickResult.Memory;
+    });
+
+    it('should return the correct cost for an ArNS discount eligible gateway', async () => {
+      const result = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Token-Cost' },
+            { name: 'Intent', value: 'Buy-Record' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Purchase-Type', value: 'lease' },
+            { name: 'Years', value: '1' },
+            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+          ],
+          From: joinedGateway,
+          Owner: joinedGateway,
+          Timestamp: afterDistributionTimestamp,
+        },
+        arnsDiscountMemory,
+      );
+
+      const tokenCost = JSON.parse(result.Messages[0].Data);
+      assert.equal(tokenCost, baseLeasePrice * 0.8);
+    });
+
+    describe('with a buy record', () => {
+      let buyRecordResult;
+      before(async () => {
+        buyRecordResult = await handle(
+          {
+            From: joinedGateway,
+            Owner: joinedGateway,
+            Tags: [
+              { name: 'Action', value: 'Buy-Record' },
+              { name: 'Name', value: 'great-name' },
+              { name: 'Purchase-Type', value: 'lease' },
+              { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+              { name: 'Years', value: '1' },
+            ],
+            Timestamp: afterDistributionTimestamp,
+          },
+
+          arnsDiscountMemory,
+        );
+        assertNoResultError(buyRecordResult);
+      });
+
+      it('result should include ArNS discount', async () => {
+        const record = JSON.parse(buyRecordResult.Messages[0].Data);
+        assert.deepEqual(record, {
+          processId: ''.padEnd(43, 'a'),
+          purchasePrice: baseLeasePrice * 0.8,
+          startTimestamp: afterDistributionTimestamp,
+          endTimestamp: 1751524800000,
+          name: 'great-name',
+          undernameLimit: 10,
+        });
+      });
+
+      it('extending lease should include ArNS discount', async () => {
+        const balancesBefore = await getBalances({
+          memory: buyRecordResult.Memory,
+        });
+        const extendResult = await handle(
+          {
+            From: joinedGateway,
+            Owner: joinedGateway,
+            Tags: [
+              { name: 'Action', value: 'Extend-Lease' },
+              { name: 'Name', value: 'great-name' },
+              { name: 'Years', value: '1' },
+            ],
+            Timestamp: afterDistributionTimestamp,
+          },
+          buyRecordResult.Memory,
+        );
+
+        const record = JSON.parse(extendResult.Messages[0].Data);
+        assert.deepEqual(record, {
+          processId: ''.padEnd(43, 'a'),
+          purchasePrice: baseLeasePrice * 0.8,
+          startTimestamp: afterDistributionTimestamp,
+          endTimestamp: 1783060800000,
+          undernameLimit: 10,
+          type: 'lease',
+        });
+
+        const balancesAfter = await getBalances({
+          memory: extendResult.Memory,
+        });
+        const expectedCost = 100_000_000 * 0.8;
+        assert.equal(
+          balancesAfter[joinedGateway],
+          balancesBefore[joinedGateway] - expectedCost,
+        );
+      });
+
+      it('upgrading leases to permabuys should include ArNS discount', async () => {
+        const balancesBefore = await getBalances({
+          memory: buyRecordResult.Memory,
+        });
+        const upgradeResult = await handle(
+          {
+            From: joinedGateway,
+            Owner: joinedGateway,
+            Tags: [
+              { name: 'Action', value: 'Upgrade-Name' },
+              { name: 'Name', value: 'great-name' },
+            ],
+            Timestamp: afterDistributionTimestamp,
+          },
+          buyRecordResult.Memory,
+        );
+
+        const record = JSON.parse(upgradeResult.Messages[0].Data);
+        assert.deepEqual(record, {
+          processId: ''.padEnd(43, 'a'),
+          purchasePrice: basePermabuyPrice * 0.8,
+          startTimestamp: afterDistributionTimestamp,
+          name: 'great-name',
+          undernameLimit: 10,
+          type: 'permabuy',
+        });
+
+        const balancesAfter = await getBalances({
+          memory: upgradeResult.Memory,
+        });
+        const expectedCost = basePermabuyPrice * 0.8;
+        assert.equal(
+          balancesAfter[joinedGateway],
+          balancesBefore[joinedGateway] - expectedCost,
+        );
+      });
+
+      it('increasing undername limit should include ArNS discount', async () => {
+        const balancesBefore = await getBalances({
+          memory: buyRecordResult.Memory,
+        });
+        const increaseLimitResult = await handle(
+          {
+            From: joinedGateway,
+            Owner: joinedGateway,
+            Tags: [
+              { name: 'Action', value: 'Increase-Undername-Limit' },
+              { name: 'Name', value: 'great-name' },
+              { name: 'Quantity', value: '20' },
+            ],
+            Timestamp: afterDistributionTimestamp,
+          },
+          buyRecordResult.Memory,
+        );
+
+        const record = JSON.parse(increaseLimitResult.Messages[0].Data);
+        assert.deepEqual(record, {
+          processId: ''.padEnd(43, 'a'),
+          purchasePrice: baseLeasePrice * 0.8,
+          endTimestamp: 1751524800000,
+          startTimestamp: afterDistributionTimestamp,
+          undernameLimit: 30,
+          type: 'lease',
+        });
+
+        const balancesAfter = await getBalances({
+          memory: increaseLimitResult.Memory,
+        });
+        const priceOfOneUnderName = 500_000;
+        const expectedCost = priceOfOneUnderName * 20 * 0.8;
+        assert.equal(
+          balancesAfter[joinedGateway],
+          balancesBefore[joinedGateway] - expectedCost,
+        );
+      });
+    });
+  });
 });
