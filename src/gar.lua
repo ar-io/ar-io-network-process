@@ -1112,11 +1112,7 @@ end
 
 function gar.isEligibleForArNSDiscount(from)
 	local gateway = gar.getGateway(from)
-	if gateway == nil then
-		return false
-	end
-
-	if gateway.weights == nil then
+	if gateway == nil or gateway.weights == nil then
 		return false
 	end
 
