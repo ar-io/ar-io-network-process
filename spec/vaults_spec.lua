@@ -304,4 +304,100 @@ describe("vaults", function()
 			assert.are.equal(1300, _G.Balances["owner2"]) -- 1000 + 300 from expired vault
 		end)
 	end)
+
+	describe("Reading vaults", function()
+		before_each(function()
+			-- Setup test vaults
+			_G.Vaults = {
+				["test-this-is-valid-arweave-wallet-address-9"] = {
+					["uniqueMsgId"] = {
+						balance = 100,
+						startTimestamp = 0,
+						endTimestamp = 1000,
+					},
+				},
+				["test-this-is-valid-arweave-wallet-address-8"] = {
+					["uniqueMsgId"] = {
+						balance = 200,
+						startTimestamp = 0,
+						endTimestamp = 1000,
+					},
+				},
+			}
+		end)
+
+		describe("getVault", function()
+			it("should return the vault", function()
+				local returnedVault = vaults.getVault("test-this-is-valid-arweave-wallet-address-9", "uniqueMsgId")
+				assert.are.same({
+					balance = 100,
+					startTimestamp = 0,
+					endTimestamp = 1000,
+				}, returnedVault)
+			end)
+
+			it("should return nil if the vault does not exist", function()
+				local returnedVault = vaults.getVault("test-this-is-valid-arweave-wallet-address-9", "nonExistentId")
+				assert.is_nil(returnedVault)
+			end)
+		end)
+
+		describe("getVaults", function()
+			it("should return all vaults", function()
+				local returnedVaults = vaults.getVaults()
+				assert.are.same({
+					["test-this-is-valid-arweave-wallet-address-9"] = {
+						["uniqueMsgId"] = {
+							balance = 100,
+							startTimestamp = 0,
+							endTimestamp = 1000,
+						},
+					},
+					["test-this-is-valid-arweave-wallet-address-8"] = {
+						["uniqueMsgId"] = {
+							balance = 200,
+							startTimestamp = 0,
+							endTimestamp = 1000,
+						},
+					},
+				}, returnedVaults)
+			end)
+		end)
+
+		describe("getPaginatedVaults", function()
+			it("should return paginated vaults", function()
+				local returnedVaults = vaults.getPaginatedVaults(nil, 10, "balance", "desc")
+
+				assert.are.same({
+					limit = 10,
+					sortBy = "balance",
+					sortOrder = "desc",
+					hasMore = false,
+					totalItems = 2,
+					items = {
+						{
+							address = "test-this-is-valid-arweave-wallet-address-9",
+							vault = {
+								["uniqueMsgId"] = {
+									balance = 100,
+									startTimestamp = 0,
+									endTimestamp = 1000,
+								},
+							},
+						},
+						{
+							address = "test-this-is-valid-arweave-wallet-address-8",
+							vault = {
+								["uniqueMsgId"] = {
+									balance = 200,
+									startTimestamp = 0,
+									endTimestamp = 1000,
+								},
+							},
+						},
+					},
+				}, returnedVaults)
+			end)
+		end)
+	end)
 end)

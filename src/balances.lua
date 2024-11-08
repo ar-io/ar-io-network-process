@@ -62,9 +62,9 @@ end
 
 --- Gets paginated list of all balances
 --- @param cursor string|nil The address to start from
---- @param limit number|nil Max number of results to return
+--- @param limit number Max number of results to return
 --- @param sortBy string|nil Field to sort by
---- @param sortOrder string|nil "asc" or "desc" sort direction
+--- @param sortOrder string "asc" or "desc" sort direction
 --- @return table Array of {address, balance} objects
 function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder)
 	local allBalances = balances.getBalances()

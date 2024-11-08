@@ -400,12 +400,23 @@ function utils.toTrainCase(str)
 	return str
 end
 
-function utils.createLookupTable(tbl)
+function utils.createLookupTable(tbl, valueFn)
 	local lookupTable = {}
-	for _, value in ipairs(tbl or {}) do
-		lookupTable[value] = true
+	valueFn = valueFn or function()
+		return true
+	end
+	for key, value in pairs(tbl or {}) do
+		lookupTable[value] = valueFn(key, value)
 	end
 	return lookupTable
+end
+
+function utils.getTableKeys(tbl)
+	local keys = {}
+	for key, _ in pairs(tbl or {}) do
+		table.insert(keys, key)
+	end
+	return keys
 end
 
 return utils

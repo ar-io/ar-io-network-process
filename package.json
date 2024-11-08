@@ -28,8 +28,8 @@
       "stylua",
       "luacheck --config .luacheckrc"
     ],
-    "*.{js,mjs}": [
-      "prettier --write"
+    "*": [
+      "prettier --write ."
     ]
   },
   "license": "AGPL-3.0-or-later"
