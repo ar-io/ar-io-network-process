@@ -1220,30 +1220,32 @@ function gar.getFundingSources(address, quantity, sourcesPreference)
 	end, {})
 
 	-- calculate and stash the excess delegated stake over the gateway minimum on each delegation
-	delegations = utils.map(delegations, function(gatewayAddress, delegation)
+	local delegationsSortedByExcessStake = utils.reduce(delegations, function(acc, gatewayAddress, delegation, i)
 		local excessStake = math.max(0, delegation.delegatedStake - gateways[gatewayAddress].settings.minDelegatedStake)
-		return {
+		acc[i] = {
 			gatewayAddress = gatewayAddress,
 			delegatedStake = delegation.delegatedStake,
 			excessStake = excessStake,
+			vaults = delegation.vaults,
 		}
-	end)
+		return acc
+	end, {})
 	-- TODO: Tiebreaker sorting
-	delegations = utils.sortTableByField(delegations, "excessStake", "desc")
+	delegationsSortedByExcessStake = utils.sortTableByField(delegationsSortedByExcessStake, "excessStake", "desc")
 
 	-- simulate drawing down excess stakes until the remaining balance is satisfied OR excess stakes are exhausted
-	local nextGatewayAddress, nextDelegation = next(delegations)
+	local delegationIndex, nextDelegation = next(delegationsSortedByExcessStake)
 	while sources.shortfall > 0 and nextDelegation do
 		local excessStake = nextDelegation.excessStake
 		local stakeToDraw = math.min(excessStake, sources.shortfall)
-		sources["stakes"][nextGatewayAddress] = {
+		sources["stakes"][nextDelegation.gatewayAddress] = {
 			delegatedStake = stakeToDraw,
 			vaults = {}, -- set up vault spend tracking now while we're passing through
 		}
 		sources.shortfall = sources.shortfall - stakeToDraw
 		nextDelegation.delegatedStake = excessStake - stakeToDraw
 		nextDelegation.excessStake = excessStake - stakeToDraw -- maintain consistency
-		nextGatewayAddress, nextDelegation = next(delegations, nextGatewayAddress)
+		delegationIndex, nextDelegation = next(delegationsSortedByExcessStake, delegationIndex)
 	end
 
 	-- early return if possible. Otherwise we'll move on to use delegation vaults
@@ -1252,10 +1254,11 @@ function gar.getFundingSources(address, quantity, sourcesPreference)
 	end
 
 	-- simulate drawing down vaults until the remaining balance is satisfied OR vaults are exhausted
-	local vaults = utils.reduce(delegations, function(acc, gatewayAddress, delegation)
+	local vaults = utils.reduce(delegationsSortedByExcessStake, function(acc, i, delegation)
 		for vaultId, vault in pairs(delegation.vaults) do
-			acc[vaultId] = {
-				gatewayAddress = gatewayAddress,
+			acc[i] = {
+				vaultId = vaultId,
+				gatewayAddress = delegation.gatewayAddress,
 				endTimestamp = vault.endTimestamp,
 				balance = vault.balance,
 			}
@@ -1264,7 +1267,7 @@ function gar.getFundingSources(address, quantity, sourcesPreference)
 	end, {})
 	-- TODO: tiebreaker sorting by smallest to largest
 	vaults = utils.sortTableByField(vaults, "endTimestamp", "asc")
-	local nextVaultId, nextVault = next(vaults)
+	local vaultIndex, nextVault = next(vaults)
 	while sources.shortfall > 0 and nextVault do
 		local balance = nextVault.balance
 		local balanceToDraw = math.min(balance, sources.shortfall)
@@ -1275,10 +1278,10 @@ function gar.getFundingSources(address, quantity, sourcesPreference)
 				vaults = {},
 			}
 		end
-		sources["stakes"][gatewayAddress].vaults[nextVaultId] = balanceToDraw
+		sources["stakes"][gatewayAddress].vaults[nextVault.vaultId] = balanceToDraw
 		sources.shortfall = sources.shortfall - balanceToDraw
 		nextVault.balance = balance - balanceToDraw
-		nextVaultId, nextVault = next(vaults, nextVaultId)
+		vaultIndex, nextVault = next(vaults, vaultIndex)
 	end
 
 	-- early return if possible. Otherwise we'll move on to using minimum stakes
