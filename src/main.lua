@@ -2568,8 +2568,7 @@ end)
 
 addEventingHandler("paginatedVaults", utils.hasMatchingTag("Action", "Paginated-Vaults"), function(msg)
 	local page = utils.parsePaginationTags(msg)
-	local status, result =
-		pcall(vaults.getPaginatedVaults, page.cursor, page.limit, page.sortBy or "balance", page.sortOrder)
+	local status, result = pcall(vaults.getPaginatedVaults, page.cursor, page.limit, page.sortOrder)
 
 	if not status then
 		ao.send({
