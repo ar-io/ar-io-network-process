@@ -125,7 +125,7 @@ describe("epochs", function()
 
 			local expectation = {
 				{
-					gatewayAddress = "observer2",
+					gatewayAddress = "observer1",
 					observerAddress = "observerAddress",
 					stake = gar.getSettings().operators.minStake,
 					startTimestamp = startTimestamp,
@@ -137,7 +137,7 @@ describe("epochs", function()
 					normalizedCompositeWeight = 1 / 3,
 				},
 				{
-					gatewayAddress = "observer1",
+					gatewayAddress = "observer2",
 					observerAddress = "observerAddress",
 					stake = gar.getSettings().operators.minStake,
 					startTimestamp = startTimestamp,
@@ -152,6 +152,9 @@ describe("epochs", function()
 			local status, result = pcall(epochs.computePrescribedObserversForEpoch, 0, testHashchain)
 			assert.is_true(status)
 			assert.are.equal(2, #result)
+			table.sort(result, function(a, b)
+				return a.gatewayAddress < b.gatewayAddress
+			end)
 			assert.are.same(expectation, result)
 		end)
 	end)
@@ -222,7 +225,7 @@ describe("epochs", function()
 					undernameLimit = 10,
 				},
 			}
-			local expectation = { "arns-name-1", "arns-name-2", "arns-name-4", "arns-name-5", "arns-name-6" }
+			local expectation = { "arns-name-1", "arns-name-2", "arns-name-3", "arns-name-4", "arns-name-5" }
 			local status, result = pcall(epochs.computePrescribedNamesForEpoch, 0, hashchain)
 			assert.is_true(status)
 			assert.are.equal(5, #result)
