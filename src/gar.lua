@@ -326,6 +326,7 @@ function gar.getGateway(address)
 	return utils.deepCopy(GatewayRegistry[address])
 end
 
+-- TODO: Add a getGatewaysProps function that omits lots of heavy data like vaults and delegates
 --- Gets all gateways
 ---@return table All gateway objects
 function gar.getGateways()
@@ -1189,6 +1190,105 @@ function gar.delegateAllowedToStake(delegateAddress, gateway)
 	-- Delegate must either be in the allow list or have a balance greater than 0
 	return gateway.settings.allowedDelegatesLookup[delegateAddress]
 		or (gateway.delegates[delegateAddress] and gateway.delegates[delegateAddress].delegatedStake or 0) > 0
+end
+
+function gar.getFundingSources(address, quantity, sourcesPreference)
+	local sources = {
+		balance = 0,
+		stakes = {},
+		shortfall = quantity,
+	}
+	local availableBalance = balances.getBalance(address)
+	if sourcesPreference == "balance" or sourcesPreference == "any" then
+		sources.balance = math.min(availableBalance, sources.shortfall)
+		sources.shortfall = sources.shortfall - sources.balance
+	end
+
+	-- if the remaining quantity is 0 or there are no more sources, return early
+	if sources.shortfall == 0 or sourcesPreference == "balance" then
+		return sources
+	end
+
+	-- find all the address's delegations across the gateways
+	local gateways = gar.getGateways()
+	local delegations = utils.reduce(gateways, function(acc, gatewayAddress, gateway)
+		local delegation = gateway.delegates[address]
+		if delegation then
+			acc[gatewayAddress] = delegation
+		end
+		return acc
+	end, {})
+
+	-- calculate and stash the excess delegated stake over the gateway minimum on each delegation
+	delegations = utils.map(delegations, function(gatewayAddress, delegation)
+		local excessStake = math.max(0, delegation.delegatedStake - gateways[gatewayAddress].settings.minDelegatedStake)
+		return {
+			gatewayAddress = gatewayAddress,
+			delegatedStake = delegation.delegatedStake,
+			excessStake = excessStake,
+		}
+	end)
+	-- TODO: Tiebreaker sorting
+	delegations = utils.sortTableByField(delegations, "excessStake", "desc")
+
+	-- simulate drawing down excess stakes until the remaining balance is satisfied OR excess stakes are exhausted
+	local nextGatewayAddress, nextDelegation = next(delegations)
+	while sources.shortfall > 0 and nextDelegation do
+		local excessStake = nextDelegation.excessStake
+		local stakeToDraw = math.min(excessStake, sources.shortfall)
+		sources["stakes"][nextGatewayAddress] = {
+			delegatedStake = stakeToDraw,
+			vaults = {}, -- set up vault spend tracking now while we're passing through
+		}
+		sources.shortfall = sources.shortfall - stakeToDraw
+		nextDelegation.delegatedStake = excessStake - stakeToDraw
+		nextDelegation.excessStake = excessStake - stakeToDraw -- maintain consistency
+		nextGatewayAddress, nextDelegation = next(delegations, nextGatewayAddress)
+	end
+
+	-- early return if possible. Otherwise we'll move on to use delegation vaults
+	if sources.shortfall == 0 then
+		return sources
+	end
+
+	-- simulate drawing down vaults until the remaining balance is satisfied OR vaults are exhausted
+	local vaults = utils.reduce(delegations, function(acc, gatewayAddress, delegation)
+		for vaultId, vault in pairs(delegation.vaults) do
+			acc[vaultId] = {
+				gatewayAddress = gatewayAddress,
+				endTimestamp = vault.endTimestamp,
+				balance = vault.balance,
+			}
+		end
+		return acc
+	end, {})
+	-- TODO: tiebreaker sorting by smallest to largest
+	vaults = utils.sortTableByField(vaults, "endTimestamp", "asc")
+	local nextVaultId, nextVault = next(vaults)
+	while sources.shortfall > 0 and nextVault do
+		local balance = nextVault.balance
+		local balanceToDraw = math.min(balance, sources.shortfall)
+		local gatewayAddress = nextVault.gatewayAddress
+		if not sources["stakes"][gatewayAddress] then
+			sources["stakes"][gatewayAddress] = {
+				delegatedStake = 0,
+				vaults = {},
+			}
+		end
+		sources["stakes"][gatewayAddress].vaults[nextVaultId] = balanceToDraw
+		sources.shortfall = sources.shortfall - balanceToDraw
+		nextVault.balance = balance - balanceToDraw
+		nextVaultId, nextVault = next(vaults, nextVaultId)
+	end
+
+	-- early return if possible. Otherwise we'll move on to using minimum stakes
+	if sources.shortfall == 0 then
+		return sources
+	end
+
+	-- TODO: sort the delegations by worst-performing to best-performing gateways, tiebroken by gw total stake, then by gw tenure
+
+	return sources
 end
 
 return gar
