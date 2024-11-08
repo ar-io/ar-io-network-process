@@ -135,6 +135,8 @@ function vaults.getPaginatedVaults(cursor, limit, sortOrder)
 		})
 	end
 
+	-- TODO: Consider normalize and flattening vaultId into the table
+	-- For now, we hard code sorting by wallet address
 	return utils.paginateTableWithCursor(vaultsArray, cursor, cursorField, limit, "address", sortOrder)
 end
 
