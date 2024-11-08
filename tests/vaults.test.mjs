@@ -395,8 +395,8 @@ describe('Vaults', async () => {
           Tags: [
             { name: 'Action', value: 'Transfer' },
             { name: 'Recipient', value: secondVaulter },
-            { name: 'Quantity', value: 500 }, // 100 IO
-            { name: 'Cast', value: true },
+            { name: 'Quantity', value: 600 }, // 100 IO
+            { name: 'Cast', value: false },
           ],
         },
         updatedMemory,
@@ -404,7 +404,7 @@ describe('Vaults', async () => {
 
       const vaultId2 = 'unique-id-2-'.padEnd(43, 'a');
       const { memory: updatedMemory2 } = await createVault({
-        quantity: 500,
+        quantity: 600,
         lockLengthMs: 1209600000,
         memory: transferResult.Memory,
         from: secondVaulter,
@@ -441,19 +441,19 @@ describe('Vaults', async () => {
 
       assert.deepEqual(fetchedVaults, [
         {
-          address: PROCESS_OWNER,
+          address: secondVaulter,
           vault: {
-            [vaultId1]: {
-              balance: 500,
+            [vaultId2]: {
+              balance: 600,
               startTimestamp: 21600000,
               endTimestamp: 1231200000,
             },
           },
         },
         {
-          address: secondVaulter,
+          address: PROCESS_OWNER,
           vault: {
-            [vaultId2]: {
+            [vaultId1]: {
               balance: 500,
               startTimestamp: 21600000,
               endTimestamp: 1231200000,
