@@ -395,8 +395,8 @@ describe('Vaults', async () => {
           Tags: [
             { name: 'Action', value: 'Transfer' },
             { name: 'Recipient', value: secondVaulter },
-            { name: 'Quantity', value: 600 }, // 100 IO
-            { name: 'Cast', value: false },
+            { name: 'Quantity', value: 500 },
+            { name: 'Cast', value: true },
           ],
         },
         updatedMemory,
@@ -404,7 +404,7 @@ describe('Vaults', async () => {
 
       const vaultId2 = 'unique-id-2-'.padEnd(43, 'a');
       const { memory: updatedMemory2 } = await createVault({
-        quantity: 600,
+        quantity: 500,
         lockLengthMs: 1209600000,
         memory: transferResult.Memory,
         from: secondVaulter,
