@@ -68,22 +68,49 @@ function utils.parsePaginationTags(msg)
 	}
 end
 
---- Sorts a table by multiple fields, with support for nested fields.
---- Uses subsequent fields as tiebreakers.
+--- Sorts a table by multiple fields with specified orders for each field.
+--- Supports tables of non-table values by using `nil` as a field name.
+--- Each field is provided as a table with 'field' (string|nil) and 'order' ("asc" or "desc").
+--- Supports nested fields using dot notation.
 --- @param prevTable table The table to sort
---- @param order string The order to sort by ("asc" or "desc")
---- @param ... string The fields to sort by, in priority order (supports nested fields with dot notation)
+--- @param fields table A list of fields with order specified, e.g., { { field = "name", order = "asc" } }
 --- @return table The sorted table
-function utils.sortTableByFields(prevTable, order, ...)
-	local tableCopy = utils.deepCopy(prevTable) or {}
-	local fields = { ... }
+function utils.sortTableByFields(prevTable, fields)
+	-- Handle sorting for non-table values with possible nils
+	if fields[1].field == nil then
+		-- Separate non-nil values and count nil values
+		local nonNilValues = {}
+		local nilValuesCount = 0
 
-	-- Validate order
-	if order ~= "asc" and order ~= "desc" then
-		error("Invalid sort order. Expected 'asc' or 'desc'")
+		for _, value in pairs(prevTable) do -- Use pairs instead of ipairs to include all elements
+			if value == nil then
+				nilValuesCount = nilValuesCount + 1
+			else
+				table.insert(nonNilValues, value)
+			end
+		end
+
+		-- Sort non-nil values
+		table.sort(nonNilValues, function(a, b)
+			if fields[1].order == "asc" then
+				return a < b
+			else
+				return a > b
+			end
+		end)
+
+		-- Append nil values to the end
+		for _ = 1, nilValuesCount do
+			table.insert(nonNilValues, nil)
+		end
+
+		return nonNilValues
 	end
 
-	-- If there are no elements or no fields, return the copied table as-is
+	-- Deep copy for sorting complex nested values
+	local tableCopy = utils.deepCopy(prevTable) or {}
+
+	-- If no elements or no fields, return the copied table as-is
 	if #tableCopy == 0 or #fields == 0 then
 		return tableCopy
 	end
@@ -101,11 +128,26 @@ function utils.sortTableByFields(prevTable, order, ...)
 		return current
 	end
 
-	-- Sort table using table.sort with multiple fields and nested support
+	-- Sort table using table.sort with multiple fields and specified orders
 	table.sort(tableCopy, function(a, b)
-		for _, field in ipairs(fields) do
-			local aField = getNestedValue(a, field)
-			local bField = getNestedValue(b, field)
+		for _, fieldSpec in ipairs(fields) do
+			local fieldPath = fieldSpec.field
+			local order = fieldSpec.order
+			local aField, bField
+
+			-- Check if field is nil, treating a and b as simple values
+			if fieldPath == nil then
+				aField = a
+				bField = b
+			else
+				aField = getNestedValue(a, fieldPath)
+				bField = getNestedValue(b, fieldPath)
+			end
+
+			-- Validate order
+			if order ~= "asc" and order ~= "desc" then
+				error("Invalid sort order. Expected 'asc' or 'desc'")
+			end
 
 			-- Handle nil values to ensure they go to the end
 			if aField == nil and bField ~= nil then
@@ -148,7 +190,7 @@ end
 --- @param sortOrder string The order to sort by ("asc" or "desc")
 --- @return PaginatedTable The paginated table result
 function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, sortBy, sortOrder)
-	local sortedArray = utils.sortTableByFields(tableArray, sortOrder, sortBy)
+	local sortedArray = utils.sortTableByFields(tableArray, { { order = sortOrder, field = sortBy } })
 
 	if not sortedArray or #sortedArray == 0 then
 		return {
