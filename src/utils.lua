@@ -52,9 +52,15 @@ function utils.slice(tbl, first, last, step)
 	return sliced
 end
 
+--- @class PaginationTags
+--- @field cursor string|nil The cursor to paginate from
+--- @field limit number The limit of results to return
+--- @field sortBy string|nil The field to sort by
+--- @field sortOrder string The order to sort by
+
 --- Parses the pagination tags from a message
 --- @param msg table The message provided to a handler (see ao docs for more info)
---- @return table The pagination tags
+--- @return PaginationTags The pagination tags
 function utils.parsePaginationTags(msg)
 	local cursor = msg.Tags.Cursor
 	local limit = tonumber(msg.Tags["Limit"]) or 100
