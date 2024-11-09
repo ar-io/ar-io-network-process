@@ -68,41 +68,65 @@ function utils.parsePaginationTags(msg)
 	}
 end
 
---- Sorts a table by a given field
+--- Sorts a table by multiple fields, with support for nested fields.
+--- Uses subsequent fields as tiebreakers.
 --- @param prevTable table The table to sort
---- @param field string|nil The field to sort by. Nil if sorting by the primitive items themselves.
 --- @param order string The order to sort by ("asc" or "desc")
+--- @param ... string The fields to sort by, in priority order (supports nested fields with dot notation)
 --- @return table The sorted table
-function utils.sortTableByField(prevTable, field, order)
+function utils.sortTableByFields(prevTable, order, ...)
 	local tableCopy = utils.deepCopy(prevTable) or {}
+	local fields = { ... }
 
+	-- Validate order
 	if order ~= "asc" and order ~= "desc" then
-		error("Invalid sort order")
+		error("Invalid sort order. Expected 'asc' or 'desc'")
 	end
 
-	if not tableCopy or #tableCopy == 0 then
+	-- If there are no elements or no fields, return the copied table as-is
+	if #tableCopy == 0 or #fields == 0 then
 		return tableCopy
 	end
 
-	table.sort(tableCopy, function(a, b)
-		local aField = not field and a or a[field]
-		local bField = not field and b or b[field]
-		-- If one field is nil, ensure it goes to the end
-		if aField == nil and bField ~= nil then
-			return false
-		elseif aField ~= nil and bField == nil then
-			return true
-		elseif aField == nil and bField == nil then
-			-- If both fields are nil, consider them equal
-			return false
+	-- Helper function to retrieve a nested field value by path
+	local function getNestedValue(tbl, fieldPath)
+		local current = tbl
+		for segment in fieldPath:gmatch("[^.]+") do
+			if type(current) == "table" then
+				current = current[segment]
+			else
+				return nil
+			end
 		end
+		return current
+	end
 
-		if order == "asc" then
-			return aField < bField
-		else
-			return aField > bField
+	-- Sort table using table.sort with multiple fields and nested support
+	table.sort(tableCopy, function(a, b)
+		for _, field in ipairs(fields) do
+			local aField = getNestedValue(a, field)
+			local bField = getNestedValue(b, field)
+
+			-- Handle nil values to ensure they go to the end
+			if aField == nil and bField ~= nil then
+				return false
+			elseif aField ~= nil and bField == nil then
+				return true
+			elseif aField ~= nil and bField ~= nil then
+				-- Compare based on the specified order
+				if aField ~= bField then
+					if order == "asc" then
+						return aField < bField
+					else
+						return aField > bField
+					end
+				end
+			end
 		end
+		-- All fields are equal
+		return false
 	end)
+
 	return tableCopy
 end
 
@@ -124,7 +148,7 @@ end
 --- @param sortOrder string The order to sort by ("asc" or "desc")
 --- @return PaginatedTable The paginated table result
 function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, sortBy, sortOrder)
-	local sortedArray = utils.sortTableByField(tableArray, sortBy, sortOrder)
+	local sortedArray = utils.sortTableByFields(tableArray, sortOrder, sortBy)
 
 	if not sortedArray or #sortedArray == 0 then
 		return {
