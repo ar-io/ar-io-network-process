@@ -1192,7 +1192,7 @@ function gar.delegateAllowedToStake(delegateAddress, gateway)
 		or (gateway.delegates[delegateAddress] and gateway.delegates[delegateAddress].delegatedStake or 0) > 0
 end
 
-function gar.getFundingSources(address, quantity, sourcesPreference)
+function gar.getFundingPlan(address, quantity, sourcesPreference)
 	sourcesPreference = sourcesPreference or "balance"
 	local sources = {
 		balance = 0,

@@ -1046,7 +1046,7 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 			Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Invalid-Token-Cost" },
 			Data = tostring(error),
 		})
-	end, gar.getFundingSources, msg.From, tokenCost, fundingSources)
+	end, gar.getFundingPlan, msg.From, tokenCost, fundingSources)
 	if not shouldContinue3 then
 		return
 	end
