@@ -2140,13 +2140,13 @@ describe("gar", function()
 		end)
 	end)
 
-	describe("getFundingSources", function()
+	describe("getFundingPlan", function()
 		before_each(function()
 			_G.Balances = {}
 		end)
 
 		it("should identify a shortfall when the user has no spending power of any kind", function()
-			local fundingSources = gar.getFundingSources(stubRandomAddress, 1000, "any")
+			local fundingSources = gar.getFundingPlan(stubRandomAddress, 1000, "any")
 			assert.are.same({
 				balance = 0,
 				stakes = {},
@@ -2162,12 +2162,12 @@ describe("gar", function()
 					balance = 1000,
 					stakes = {},
 					shortfall = 0,
-				}, gar.getFundingSources(stubRandomAddress, 1000, "any"))
+				}, gar.getFundingPlan(stubRandomAddress, 1000, "any"))
 				assert.are.same({
 					balance = 1000,
 					stakes = {},
 					shortfall = 0,
-				}, gar.getFundingSources(stubRandomAddress, 1000, "balance"))
+				}, gar.getFundingPlan(stubRandomAddress, 1000, "balance"))
 			end
 		)
 
@@ -2177,7 +2177,7 @@ describe("gar", function()
 				balance = 0,
 				stakes = {},
 				shortfall = 1000,
-			}, gar.getFundingSources(stubRandomAddress, 1000, "stakes"))
+			}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
 		end)
 
 		it(
@@ -2205,7 +2205,7 @@ describe("gar", function()
 						},
 					},
 					shortfall = 0,
-				}, gar.getFundingSources(stubRandomAddress, 1000, "stakes"))
+				}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
 
 				_G.Balances[stubRandomAddress] = 1000
 				assert.are.same({
@@ -2217,7 +2217,7 @@ describe("gar", function()
 						},
 					},
 					shortfall = 0,
-				}, gar.getFundingSources(stubRandomAddress, 1000, "stakes"))
+				}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
 			end
 		)
 
@@ -2271,7 +2271,7 @@ describe("gar", function()
 							},
 						},
 						shortfall = 0,
-					}, gar.getFundingSources(stubRandomAddress, 1000, "stakes"))
+					}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
 				end
 			end
 		)
@@ -2340,7 +2340,7 @@ describe("gar", function()
 							},
 						},
 						shortfall = 0,
-					}, gar.getFundingSources(stubRandomAddress, 1000, "stakes"))
+					}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
 				end
 			end
 		)
@@ -2420,7 +2420,7 @@ describe("gar", function()
 								},
 							},
 							shortfall = 993 - (fundingPreference == "any" and balance or 0),
-						}, gar.getFundingSources(stubRandomAddress, 1000, fundingPreference))
+						}, gar.getFundingPlan(stubRandomAddress, 1000, fundingPreference))
 					end
 				end
 			end
