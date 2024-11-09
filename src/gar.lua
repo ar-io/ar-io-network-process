@@ -1232,7 +1232,7 @@ function gar.getFundingPlan(address, quantity, sourcesPreference)
 		return acc
 	end, {})
 	-- TODO: Tiebreaker sorting
-	delegationsSortedByExcessStake = utils.sortTableByField(delegationsSortedByExcessStake, "excessStake", "desc")
+	delegationsSortedByExcessStake = utils.sortTableByFields(delegationsSortedByExcessStake, "desc", "excessStake")
 
 	-- simulate drawing down excess stakes until the remaining balance is satisfied OR excess stakes are exhausted
 	local delegationIndex, nextDelegation = next(delegationsSortedByExcessStake)
@@ -1267,7 +1267,7 @@ function gar.getFundingPlan(address, quantity, sourcesPreference)
 		return acc
 	end, {})
 	-- TODO: tiebreaker sorting by smallest to largest
-	vaults = utils.sortTableByField(vaults, "endTimestamp", "asc")
+	vaults = utils.sortTableByFields(vaults, "asc", "endTimestamp")
 	local vaultIndex, nextVault = next(vaults)
 	while sources.shortfall > 0 and nextVault do
 		local balance = nextVault.balance
@@ -1305,7 +1305,7 @@ function gar.getFundingPlan(address, quantity, sourcesPreference)
 		}
 	end)
 	-- todo: tiebreaking
-	delegationsSortedByGwPerf = utils.sortTableByField(delegationsSortedByGwPerf, "gatewayRewardRatioWeight", "asc")
+	delegationsSortedByGwPerf = utils.sortTableByFields(delegationsSortedByGwPerf, "asc", "gatewayRewardRatioWeight")
 	local index, nextDelegate = next(delegationsSortedByGwPerf)
 	while sources.shortfall > 0 and nextDelegate do
 		local stakeToDraw = math.min(nextDelegate.delegatedStake, sources.shortfall)
