@@ -466,15 +466,50 @@ describe("utils", function()
 	end)
 
 	describe("sortTableByFields", function()
-		local nestedDataTable = {
+		local nestedTableData = {
 			{ name = "Alice", details = { age = 30, score = 85 } },
 			{ name = "Bob", details = { age = 25, score = 92 } },
 			{ name = "Alice", details = { age = 22, score = 90 } },
 			{ name = "Charlie", details = { age = 30, score = 88 } },
 		}
 
+		it("sorts a number-indexed table of simple values in ascending order", function()
+			local simpleValues = { 5, 2, 9, 1, 4 }
+			local sortedData = utils.sortTableByFields(simpleValues, { { field = nil, order = "asc" } })
+			local expectedData = { 1, 2, 4, 5, 9 }
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("sorts a number-indexed table of simple values in descending order", function()
+			local simpleValues = { 5, 2, 9, 1, 4 }
+			local sortedData = utils.sortTableByFields(simpleValues, { { field = nil, order = "desc" } })
+			local expectedData = { 9, 5, 4, 2, 1 }
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("handles an empty table gracefully", function()
+			local simpleValues = {}
+			local sortedData = utils.sortTableByFields(simpleValues, { { field = nil, order = "asc" } })
+			local expectedData = {}
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("handles a table with identical values", function()
+			local simpleValues = { 3, 3, 3, 3 }
+			local sortedData = utils.sortTableByFields(simpleValues, { { field = nil, order = "asc" } })
+			local expectedData = { 3, 3, 3, 3 }
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("handles a table with nil values, placing them at the end", function()
+			local simpleValues = { 7, nil, 2, nil, 5 }
+			local sortedData = utils.sortTableByFields(simpleValues, { { field = nil, order = "asc" } })
+			local expectedData = { 2, 5, 7, nil, nil }
+			assert.are.same(expectedData, sortedData)
+		end)
+
 		it("sorts by a single top-level field in ascending order", function()
-			local sortedData = utils.sortTableByFields(nestedDataTable, "asc", "name")
+			local sortedData = utils.sortTableByFields(nestedTableData, { { field = "name", order = "asc" } })
 			local expectedData = {
 				{ name = "Alice", details = { age = 30, score = 85 } },
 				{ name = "Alice", details = { age = 22, score = 90 } },
@@ -485,18 +520,18 @@ describe("utils", function()
 		end)
 
 		it("sorts by a single top-level field in descending order", function()
-			local sortedData = utils.sortTableByFields(nestedDataTable, "desc", "name")
+			local sortedData = utils.sortTableByFields(nestedTableData, { { field = "name", order = "desc" } })
 			local expectedData = {
 				{ name = "Charlie", details = { age = 30, score = 88 } },
 				{ name = "Bob", details = { age = 25, score = 92 } },
-				{ name = "Alice", details = { age = 22, score = 90 } }, -- TODO: If lua can't sort this stably, build a merge sort
+				{ name = "Alice", details = { age = 22, score = 90 } }, -- if this does not sort stably, implement a merge sort
 				{ name = "Alice", details = { age = 30, score = 85 } },
 			}
 			assert.are.same(expectedData, sortedData)
 		end)
 
 		it("sorts by a single nested field in ascending order", function()
-			local sortedData = utils.sortTableByFields(nestedDataTable, "asc", "details.age")
+			local sortedData = utils.sortTableByFields(nestedTableData, { { field = "details.age", order = "asc" } })
 			local expectedData = {
 				{ name = "Alice", details = { age = 22, score = 90 } },
 				{ name = "Bob", details = { age = 25, score = 92 } },
@@ -507,7 +542,7 @@ describe("utils", function()
 		end)
 
 		it("sorts by a single nested field in descending order", function()
-			local sortedData = utils.sortTableByFields(nestedDataTable, "desc", "details.age")
+			local sortedData = utils.sortTableByFields(nestedTableData, { { field = "details.age", order = "desc" } })
 			local expectedData = {
 				{ name = "Alice", details = { age = 30, score = 85 } },
 				{ name = "Charlie", details = { age = 30, score = 88 } },
@@ -517,11 +552,14 @@ describe("utils", function()
 			assert.are.same(expectedData, sortedData)
 		end)
 
-		it("sorts by multiple fields, with second field as tiebreaker", function()
-			local sortedData = utils.sortTableByFields(nestedDataTable, "asc", "name", "details.age")
+		it("sorts by multiple fields with different orders for each field", function()
+			local sortedData = utils.sortTableByFields(nestedTableData, {
+				{ field = "name", order = "asc" },
+				{ field = "details.age", order = "desc" },
+			})
 			local expectedData = {
-				{ name = "Alice", details = { age = 22, score = 90 } },
 				{ name = "Alice", details = { age = 30, score = 85 } },
+				{ name = "Alice", details = { age = 22, score = 90 } },
 				{ name = "Bob", details = { age = 25, score = 92 } },
 				{ name = "Charlie", details = { age = 30, score = 88 } },
 			}
@@ -529,7 +567,10 @@ describe("utils", function()
 		end)
 
 		it("sorts by multiple nested fields", function()
-			local sortedData = utils.sortTableByFields(nestedDataTable, "asc", "details.age", "details.score")
+			local sortedData = utils.sortTableByFields(nestedTableData, {
+				{ field = "details.age", order = "asc" },
+				{ field = "details.score", order = "asc" },
+			})
 			local expectedData = {
 				{ name = "Alice", details = { age = 22, score = 90 } },
 				{ name = "Bob", details = { age = 25, score = 92 } },
@@ -549,11 +590,11 @@ describe("utils", function()
 				{ name = "Derek", details = { age = nil, score = 70 } },
 			}
 
-			local sortedData = utils.sortTableByFields(dataWithNil, "asc", "details.age")
+			local sortedData = utils.sortTableByFields(dataWithNil, { { field = "details.age", order = "asc" } })
 			local expectedData = {
 				{ name = "Alice", details = { age = 22, score = 90 } },
 				{ name = "Bob", details = { age = 25, score = 92 } },
-				{ name = "Charlie", details = { age = 30, score = 88 } }, -- TODO: If lua can't sort this stably, build a merge sort
+				{ name = "Charlie", details = { age = 30, score = 88 } }, -- if this does not sort stably, implement a merge sort
 				{ name = "Alice", details = { age = 30, score = 85 } },
 				{ name = "Derek", details = { age = nil, score = 70 } },
 			}
