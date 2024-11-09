@@ -465,6 +465,102 @@ describe("utils", function()
 		end)
 	end)
 
+	describe("sortTableByFields", function()
+		local nestedDataTable = {
+			{ name = "Alice", details = { age = 30, score = 85 } },
+			{ name = "Bob", details = { age = 25, score = 92 } },
+			{ name = "Alice", details = { age = 22, score = 90 } },
+			{ name = "Charlie", details = { age = 30, score = 88 } },
+		}
+
+		it("sorts by a single top-level field in ascending order", function()
+			local sortedData = utils.sortTableByFields(nestedDataTable, "asc", "name")
+			local expectedData = {
+				{ name = "Alice", details = { age = 30, score = 85 } },
+				{ name = "Alice", details = { age = 22, score = 90 } },
+				{ name = "Bob", details = { age = 25, score = 92 } },
+				{ name = "Charlie", details = { age = 30, score = 88 } },
+			}
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("sorts by a single top-level field in descending order", function()
+			local sortedData = utils.sortTableByFields(nestedDataTable, "desc", "name")
+			local expectedData = {
+				{ name = "Charlie", details = { age = 30, score = 88 } },
+				{ name = "Bob", details = { age = 25, score = 92 } },
+				{ name = "Alice", details = { age = 22, score = 90 } }, -- TODO: If lua can't sort this stably, build a merge sort
+				{ name = "Alice", details = { age = 30, score = 85 } },
+			}
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("sorts by a single nested field in ascending order", function()
+			local sortedData = utils.sortTableByFields(nestedDataTable, "asc", "details.age")
+			local expectedData = {
+				{ name = "Alice", details = { age = 22, score = 90 } },
+				{ name = "Bob", details = { age = 25, score = 92 } },
+				{ name = "Alice", details = { age = 30, score = 85 } },
+				{ name = "Charlie", details = { age = 30, score = 88 } },
+			}
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("sorts by a single nested field in descending order", function()
+			local sortedData = utils.sortTableByFields(nestedDataTable, "desc", "details.age")
+			local expectedData = {
+				{ name = "Alice", details = { age = 30, score = 85 } },
+				{ name = "Charlie", details = { age = 30, score = 88 } },
+				{ name = "Bob", details = { age = 25, score = 92 } },
+				{ name = "Alice", details = { age = 22, score = 90 } },
+			}
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("sorts by multiple fields, with second field as tiebreaker", function()
+			local sortedData = utils.sortTableByFields(nestedDataTable, "asc", "name", "details.age")
+			local expectedData = {
+				{ name = "Alice", details = { age = 22, score = 90 } },
+				{ name = "Alice", details = { age = 30, score = 85 } },
+				{ name = "Bob", details = { age = 25, score = 92 } },
+				{ name = "Charlie", details = { age = 30, score = 88 } },
+			}
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("sorts by multiple nested fields", function()
+			local sortedData = utils.sortTableByFields(nestedDataTable, "asc", "details.age", "details.score")
+			local expectedData = {
+				{ name = "Alice", details = { age = 22, score = 90 } },
+				{ name = "Bob", details = { age = 25, score = 92 } },
+				{ name = "Alice", details = { age = 30, score = 85 } },
+				{ name = "Charlie", details = { age = 30, score = 88 } },
+			}
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("handles nil fields gracefully, placing them at the end", function()
+			-- Add an entry with a nil field to test nil handling
+			local dataWithNil = {
+				{ name = "Alice", details = { age = 30, score = 85 } },
+				{ name = "Bob", details = { age = 25, score = 92 } },
+				{ name = "Alice", details = { age = 22, score = 90 } },
+				{ name = "Charlie", details = { age = 30, score = 88 } },
+				{ name = "Derek", details = { age = nil, score = 70 } },
+			}
+
+			local sortedData = utils.sortTableByFields(dataWithNil, "asc", "details.age")
+			local expectedData = {
+				{ name = "Alice", details = { age = 22, score = 90 } },
+				{ name = "Bob", details = { age = 25, score = 92 } },
+				{ name = "Charlie", details = { age = 30, score = 88 } }, -- TODO: If lua can't sort this stably, build a merge sort
+				{ name = "Alice", details = { age = 30, score = 85 } },
+				{ name = "Derek", details = { age = nil, score = 70 } },
+			}
+			assert.are.same(expectedData, sortedData)
+		end)
+	end)
+
 	describe("getTableKeys", function()
 		it("should return the keys of a table", function()
 			local input = { foo = "bar", baz = "qux" }
