@@ -2344,5 +2344,86 @@ describe("gar", function()
 				end
 			end
 		)
+
+		it(
+			"should use minimum stakes from multiple gateways if needed and funding source is 'any' or 'stakes'",
+			function()
+				-- TO TEST:
+				-- Minimum stakes are used next ordered from:
+				-- worst performing gateway to best performing gateway
+				-- Next tie breaker is highest total gateway stake to lowest (hurst the biggest and baddest gateway first)
+				-- Final tie breaker is gateway tenure
+				_G.GatewayRegistry[stubGatewayAddress] = {
+					totalDelegatedStake = 2,
+					vaults = {},
+					delegates = {
+						[stubRandomAddress] = {
+							delegatedStake = 2,
+							vaults = {
+								["vault_id_1"] = {
+									balance = 1,
+									startTimestamp = 0,
+									endTimestamp = 1001, -- later end timestamp
+								},
+							},
+						},
+					},
+					settings = {
+						minDelegatedStake = 1,
+					},
+					stats = {
+						passedEpochCount = 1,
+						totalEpochCount = 5,
+					},
+				}
+				_G.GatewayRegistry[stubObserverAddress] = {
+					totalDelegatedStake = 3,
+					vaults = {},
+					delegates = {
+						[stubRandomAddress] = {
+							delegatedStake = 3,
+							vaults = {
+								["vault_id_2"] = {
+									balance = 1,
+									startTimestamp = 0,
+									endTimestamp = 1000, -- earlier end timestamp
+								},
+							},
+						},
+					},
+					settings = {
+						minDelegatedStake = 1,
+					},
+					stats = {
+						passedEpochCount = 1,
+						totalEpochCount = 3,
+					},
+				}
+
+				for _, fundingPreference in pairs({ "any", "stakes" }) do
+					for _, balance in pairs({ 0, 10 }) do
+						_G.Balances[stubRandomAddress] = balance
+						assert.are.same({
+							balance = fundingPreference == "any" and balance or 0,
+							stakes = {
+								[stubGatewayAddress] = {
+									delegatedStake = 2,
+									vaults = {
+										["vault_id_1"] = 1,
+									},
+								},
+								[stubObserverAddress] = {
+									delegatedStake = 3,
+									vaults = {
+										["vault_id_2"] = 1,
+									},
+								},
+							},
+							shortfall = 993 - (fundingPreference == "any" and balance or 0),
+						}, gar.getFundingSources(stubRandomAddress, 1000, fundingPreference))
+					end
+				end
+			end
+		)
 	end)
 end)

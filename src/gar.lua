@@ -1244,7 +1244,7 @@ function gar.getFundingSources(address, quantity, sourcesPreference)
 			vaults = {}, -- set up vault spend tracking now while we're passing through
 		}
 		sources.shortfall = sources.shortfall - stakeToDraw
-		nextDelegation.delegatedStake = excessStake - stakeToDraw
+		nextDelegation.delegatedStake = nextDelegation.delegatedStake - stakeToDraw
 		nextDelegation.excessStake = excessStake - stakeToDraw -- maintain consistency
 		delegationIndex, nextDelegation = next(delegationsSortedByExcessStake, delegationIndex)
 	end
@@ -1291,6 +1291,30 @@ function gar.getFundingSources(address, quantity, sourcesPreference)
 	end
 
 	-- TODO: sort the delegations by worst-performing to best-performing gateways, tiebroken by gw total stake, then by gw tenure
+	local gwRewardRatioWeights = utils.reduce(gateways, function(acc, gatewayAddress, gateway)
+		local totalEpochsGatewayPassed = gateway.stats.passedEpochCount or 0
+		local totalEpochsParticipatedIn = gateway.stats.totalEpochCount or 0
+		acc[gatewayAddress] = (1 + totalEpochsGatewayPassed) / (1 + totalEpochsParticipatedIn)
+		return acc
+	end, {})
+	local delegationsSortedByGwPerf = utils.map(delegationsSortedByExcessStake, function(_, delegation)
+		return {
+			gatewayAddress = delegation.gatewayAddress,
+			delegatedStake = delegation.delegatedStake,
+			gatewayRewardRatioWeight = gwRewardRatioWeights[delegation.gatewayAddress],
+		}
+	end)
+	-- todo: tiebreaking
+	delegationsSortedByGwPerf = utils.sortTableByField(delegationsSortedByGwPerf, "gatewayRewardRatioWeight", "asc")
+	local index, nextDelegate = next(delegationsSortedByGwPerf)
+	while sources.shortfall > 0 and nextDelegate do
+		local stakeToDraw = math.min(nextDelegate.delegatedStake, sources.shortfall)
+		sources["stakes"][nextDelegate.gatewayAddress].delegatedStake = sources["stakes"][nextDelegate.gatewayAddress].delegatedStake
+			+ stakeToDraw
+		sources.shortfall = sources.shortfall - stakeToDraw
+		nextDelegate.delegatedStake = nextDelegate.delegatedStake - stakeToDraw -- not needed after this, but keep track
+		index, nextDelegate = next(delegationsSortedByGwPerf, index)
+	end
 
 	return sources
 end
