@@ -2195,6 +2195,10 @@ describe("gar", function()
 					settings = {
 						minDelegatedStake = 500,
 					},
+					stats = {
+						passedEpochCount = 0,
+						totalEpochCount = 0,
+					},
 				}
 				assert.are.same({
 					balance = 0,
@@ -2241,6 +2245,10 @@ describe("gar", function()
 					settings = {
 						minDelegatedStake = 50,
 					},
+					stats = {
+						passedEpochCount = 0,
+						totalEpochCount = 0,
+					},
 				}
 				_G.GatewayRegistry[stubObserverAddress] = {
 					totalDelegatedStake = 1000,
@@ -2253,6 +2261,10 @@ describe("gar", function()
 					},
 					settings = {
 						minDelegatedStake = 700,
+					},
+					stats = {
+						passedEpochCount = 0,
+						totalEpochCount = 0,
 					},
 				}
 				for _, balance in pairs({ 0, 10000 }) do
@@ -2281,7 +2293,7 @@ describe("gar", function()
 			function()
 				-- TO TEST:
 				-- Withdraw balances are used next, ordered from nearest-to-liquid to furthest from liquid.
-				-- tie broken here by smallest to largest to help the contract save memory
+				-- tie broken here by smallest to largest to help the contract save memory when pruning expended vaults
 				_G.GatewayRegistry[stubGatewayAddress] = {
 					totalDelegatedStake = 1000,
 					vaults = {},
@@ -2299,6 +2311,10 @@ describe("gar", function()
 					},
 					settings = {
 						minDelegatedStake = 50,
+					},
+					stats = {
+						passedEpochCount = 0,
+						totalEpochCount = 0,
 					},
 				}
 				_G.GatewayRegistry[stubObserverAddress] = {
@@ -2318,6 +2334,10 @@ describe("gar", function()
 					},
 					settings = {
 						minDelegatedStake = 700,
+					},
+					stats = {
+						passedEpochCount = 0,
+						totalEpochCount = 0,
 					},
 				}
 
