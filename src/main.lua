@@ -717,6 +717,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	local from = utils.formatAddress(msg.From)
 	local processId = utils.formatAddress(msg.Tags["Process-Id"] or msg.From)
 	local timestamp = tonumber(msg.Timestamp)
+	local fundFrom = msg.Tags["Fund-From"]
 
 	local checkAssertions = function()
 		assert(
@@ -735,6 +736,11 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 				years >= 1 and years <= 5 and utils.isInteger(years),
 				"Invalid years. Must be integer between 1 and 5"
 			)
+		end
+
+		if fundFrom then
+			local validFundFrom = utils.createLookupTable({ "any", "balance", "stake" })
+			assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stake")
 		end
 	end
 
@@ -760,7 +766,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 			},
 			Data = tostring(error),
 		})
-	end, arns.buyRecord, name, purchaseType, years, from, timestamp, processId)
+	end, arns.buyRecord, name, purchaseType, years, from, timestamp, processId, msg.Id, fundFrom)
 	if not shouldContinue2 then
 		return
 	end
@@ -974,7 +980,7 @@ addEventingHandler(
 )
 
 addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.TokenCost), function(msg)
-	local fundingSources = msg.Tags["Fund-From"]
+	local fundFrom = msg.Tags["Fund-From"]
 	local checkAssertions = function()
 		local intentType = msg.Tags.Intent
 		local validIntents =
@@ -995,12 +1001,12 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 			assert(utils.isInteger(tonumber(msg.Tags.Quantity)), "Invalid quantity. Must be integer greater than 0")
 		end
 
-		if fundingSources then
+		if fundFrom then
 			local validFundFrom = utils.createLookupTable({ "any", "balance", "stake" })
-			assert(validFundFrom[fundingSources], "Invalid fund from type. Must be one of: any, balance, stake")
+			assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stake")
 			-- TODO: expand this privilege to other purchase actions?
 			assert(
-				intentType == ActionMap.BuyRecord or fundingSources == "balance",
+				intentType == ActionMap.BuyRecord or fundFrom == "balance",
 				"Only Buy-Record may fund with sources other than balance"
 			)
 		end
@@ -1046,7 +1052,7 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 			Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Invalid-Token-Cost" },
 			Data = tostring(error),
 		})
-	end, gar.getFundingPlan, msg.From, tokenCost, fundingSources)
+	end, gar.getFundingPlan, msg.From, tokenCost, fundFrom)
 	if not shouldContinue3 then
 		return
 	end
@@ -1054,7 +1060,7 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(tokenCost) },
-		Data = fundingSources
+		Data = fundFrom
 				and json.encode({
 					tokenCost = tokenCost,
 					fundingSources = fundingSourcesResult,
