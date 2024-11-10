@@ -20,6 +20,8 @@ NameRegistry = NameRegistry or {
 --- @param from string The address of the sender
 --- @param timestamp number The current timestamp
 --- @param processId string The process id
+--- @param msgId string The current message id
+--- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
 --- @return table The updated record
 function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
@@ -75,6 +77,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 		recordsCount = utils.lengthOfTable(NameRegistry.records),
 		reservedRecordsCount = utils.lengthOfTable(NameRegistry.reserved),
 		df = demand.getDemandFactorInfo(),
+		fundingPlan = appliedPlan,
 	}
 end
 

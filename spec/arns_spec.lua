@@ -36,7 +36,8 @@ describe("arns", function()
 				function()
 					local demandBefore = demand.getCurrentPeriodRevenue()
 					local purchasesBefore = demand.getCurrentPeriodPurchases()
-					local result = arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId)
+					local result =
+						arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId, "msgId")
 
 					assert.are.same({
 						purchasePrice = 600000000,
