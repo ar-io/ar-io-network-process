@@ -2146,12 +2146,13 @@ describe("gar", function()
 		end)
 
 		it("should identify a shortfall when the user has no spending power of any kind", function()
-			local fundingSources = gar.getFundingPlan(stubRandomAddress, 1000, "any")
+			local fundingPlan = gar.getFundingPlan(stubRandomAddress, 1000, "any")
 			assert.are.same({
+				address = stubRandomAddress,
 				balance = 0,
 				stakes = {},
 				shortfall = 1000,
-			}, fundingSources)
+			}, fundingPlan)
 		end)
 
 		it(
@@ -2159,11 +2160,13 @@ describe("gar", function()
 			function()
 				_G.Balances[stubRandomAddress] = 1000
 				assert.are.same({
+					address = stubRandomAddress,
 					balance = 1000,
 					stakes = {},
 					shortfall = 0,
 				}, gar.getFundingPlan(stubRandomAddress, 1000, "any"))
 				assert.are.same({
+					address = stubRandomAddress,
 					balance = 1000,
 					stakes = {},
 					shortfall = 0,
@@ -2174,6 +2177,7 @@ describe("gar", function()
 		it("should have a shortfall when holding balance but no stakes and funding source is 'stakes'", function()
 			_G.Balances[stubRandomAddress] = 1000
 			assert.are.same({
+				address = stubRandomAddress,
 				balance = 0,
 				stakes = {},
 				shortfall = 1000,
@@ -2201,6 +2205,7 @@ describe("gar", function()
 					},
 				}
 				assert.are.same({
+					address = stubRandomAddress,
 					balance = 0,
 					stakes = {
 						[stubGatewayAddress] = {
@@ -2213,6 +2218,7 @@ describe("gar", function()
 
 				_G.Balances[stubRandomAddress] = 1000
 				assert.are.same({
+					address = stubRandomAddress,
 					balance = 0,
 					stakes = {
 						[stubGatewayAddress] = {
@@ -2271,6 +2277,7 @@ describe("gar", function()
 					_G.Balances[stubRandomAddress] = balance
 
 					assert.are.same({
+						address = stubRandomAddress,
 						balance = 0,
 						stakes = {
 							[stubGatewayAddress] = {
@@ -2344,6 +2351,7 @@ describe("gar", function()
 				for _, balance in pairs({ 0, 1000 }) do
 					_G.Balances[stubRandomAddress] = balance
 					assert.are.same({
+						address = stubRandomAddress,
 						balance = 0,
 						stakes = {
 							[stubGatewayAddress] = {
@@ -2424,6 +2432,7 @@ describe("gar", function()
 					for _, balance in pairs({ 0, 10 }) do
 						_G.Balances[stubRandomAddress] = balance
 						assert.are.same({
+							address = stubRandomAddress,
 							balance = fundingPreference == "any" and balance or 0,
 							stakes = {
 								[stubGatewayAddress] = {

@@ -333,11 +333,11 @@ describe('ArNS', async () => {
         transferMemory,
       );
 
-      console.log(`result: ${result.Messages[0].Data}`);
       const tokenCostResult = JSON.parse(result.Messages[0].Data);
       assert.deepEqual(tokenCostResult, {
         tokenCost: 600_000_000,
         fundingSources: {
+          address: STUB_ADDRESS,
           balance: 400_000_000,
           shortfall: 200_000_000,
           stakes: [],
