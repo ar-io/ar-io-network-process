@@ -334,6 +334,10 @@ function gar.getGateways()
 	return gateways or {}
 end
 
+function gar.getGatewaysUnsafe()
+	return GatewayRegistry or {}
+end
+
 function gar.delegateStake(from, target, qty, currentTimestamp)
 	assert(type(qty) == "number", "Quantity is required and must be a number")
 	assert(qty > 0, "Quantity must be greater than 0")
@@ -1211,42 +1215,63 @@ function gar.getFundingPlan(address, quantity, sourcesPreference)
 	end
 
 	-- find all the address's delegations across the gateways
-	local gateways = gar.getGateways()
-	local delegations = utils.reduce(gateways, function(acc, gatewayAddress, gateway)
-		local delegation = gateway.delegates[address]
-		if delegation then
-			acc[gatewayAddress] = delegation
-		end
-		return acc
-	end, {})
-
-	-- calculate and stash the excess delegated stake over the gateway minimum on each delegation
-	local delegationsSortedByExcessStake = utils.reduce(delegations, function(acc, gatewayAddress, delegation, i)
-		local excessStake = math.max(0, delegation.delegatedStake - gateways[gatewayAddress].settings.minDelegatedStake)
-		acc[i] = {
-			gatewayAddress = gatewayAddress,
-			delegatedStake = delegation.delegatedStake,
-			excessStake = excessStake,
-			vaults = delegation.vaults,
+	local gatewaysInfo = utils.sortTableByFields(
+		utils.map(
+			-- only consider gateways that have the address as a delegate
+			utils.filterDictionary(gar.getGatewaysUnsafe(), function(_, gateway)
+				return gateway.delegates[address] ~= nil
+			end),
+			-- extract only the essential gateway fields, copying tables so we don't mutate references
+			function(gatewayAddress, gateway)
+				local totalEpochsGatewayPassed = gateway.stats.passedEpochCount or 0
+				local totalEpochsParticipatedIn = gateway.stats.totalEpochCount or 0
+				local gatewayRewardRatioWeight = (1 + totalEpochsGatewayPassed) / (1 + totalEpochsParticipatedIn)
+				local delegate = gateway.delegates[address]
+				delegate.excessStake = math.max(0, delegate.delegatedStake - gateway.settings.minDelegatedStake)
+				delegate.gatewayAddress = gatewayAddress
+				return {
+					totalDelegatedStake = gateway.totalDelegatedStake, -- for comparing gw total stake
+					gatewayRewardRatioWeight = gatewayRewardRatioWeight, -- for comparing gw performance
+					delegate = delegate,
+					startTimestamp = gateway.startTimestamp, -- for comparing gw tenure
+				}
+			end
+		),
+		{
+			{
+				order = "desc",
+				field = "delegate.excessStake",
+			},
+			{
+				order = "asc",
+				field = "gatewayRewardRatioWeight",
+			},
+			{
+				order = "desc",
+				field = "totalDelegatedStake",
+			},
+			{
+				order = "desc",
+				field = "startTimestamp",
+			},
 		}
-		return acc
-	end, {})
-	-- TODO: Tiebreaker sorting
-	delegationsSortedByExcessStake = utils.sortTableByFields(delegationsSortedByExcessStake, "desc", "excessStake")
+	)
 
 	-- simulate drawing down excess stakes until the remaining balance is satisfied OR excess stakes are exhausted
-	local delegationIndex, nextDelegation = next(delegationsSortedByExcessStake)
-	while sources.shortfall > 0 and nextDelegation do
-		local excessStake = nextDelegation.excessStake
+	local gatewayIndex, nextGateway = next(gatewaysInfo)
+	while sources.shortfall > 0 and nextGateway do
+		local excessStake = nextGateway.delegate.excessStake
 		local stakeToDraw = math.min(excessStake, sources.shortfall)
-		sources["stakes"][nextDelegation.gatewayAddress] = {
+		sources["stakes"][nextGateway.delegate.gatewayAddress] = {
 			delegatedStake = stakeToDraw,
 			vaults = {}, -- set up vault spend tracking now while we're passing through
 		}
 		sources.shortfall = sources.shortfall - stakeToDraw
-		nextDelegation.delegatedStake = nextDelegation.delegatedStake - stakeToDraw
-		nextDelegation.excessStake = excessStake - stakeToDraw -- maintain consistency
-		delegationIndex, nextDelegation = next(delegationsSortedByExcessStake, delegationIndex)
+		nextGateway.delegate.delegatedStake = nextGateway.delegate.delegatedStake - stakeToDraw
+		-- maintain consistency
+		nextGateway.delegate.excessStake = excessStake - stakeToDraw
+		nextGateway.totalDelegatedStake = nextGateway.totalDelegatedStake - stakeToDraw
+		gatewayIndex, nextGateway = next(gatewaysInfo, gatewayIndex)
 	end
 
 	-- early return if possible. Otherwise we'll move on to use delegation vaults
@@ -1255,19 +1280,26 @@ function gar.getFundingPlan(address, quantity, sourcesPreference)
 	end
 
 	-- simulate drawing down vaults until the remaining balance is satisfied OR vaults are exhausted
-	local vaults = utils.reduce(delegationsSortedByExcessStake, function(acc, i, delegation)
-		for vaultId, vault in pairs(delegation.vaults) do
-			acc[i] = {
-				vaultId = vaultId,
-				gatewayAddress = delegation.gatewayAddress,
-				endTimestamp = vault.endTimestamp,
-				balance = vault.balance,
-			}
-		end
-		return acc
-	end, {})
-	-- TODO: tiebreaker sorting by smallest to largest
-	vaults = utils.sortTableByFields(vaults, "asc", "endTimestamp")
+	local vaults = utils.sortTableByFields(
+		utils.reduce(gatewaysInfo, function(acc, _, gatewayInfo)
+			for vaultId, vault in pairs(gatewayInfo.delegate.vaults) do
+				acc[#acc + 1] = {
+					vaultId = vaultId,
+					gatewayAddress = gatewayInfo.delegate.gatewayAddress,
+					endTimestamp = vault.endTimestamp,
+					balance = vault.balance,
+				}
+			end
+			return acc
+		end, {}),
+		{
+			{
+				order = "asc",
+				field = "endTimestamp",
+			},
+		}
+	)
+
 	local vaultIndex, nextVault = next(vaults)
 	while sources.shortfall > 0 and nextVault do
 		local balance = nextVault.balance
@@ -1290,30 +1322,32 @@ function gar.getFundingPlan(address, quantity, sourcesPreference)
 		return sources
 	end
 
-	-- TODO: sort the delegations by worst-performing to best-performing gateways, tiebroken by gw total stake, then by gw tenure
-	local gwRewardRatioWeights = utils.reduce(gateways, function(acc, gatewayAddress, gateway)
-		local totalEpochsGatewayPassed = gateway.stats.passedEpochCount or 0
-		local totalEpochsParticipatedIn = gateway.stats.totalEpochCount or 0
-		acc[gatewayAddress] = (1 + totalEpochsGatewayPassed) / (1 + totalEpochsParticipatedIn)
-		return acc
-	end, {})
-	local delegationsSortedByGwPerf = utils.map(delegationsSortedByExcessStake, function(_, delegation)
-		return {
-			gatewayAddress = delegation.gatewayAddress,
-			delegatedStake = delegation.delegatedStake,
-			gatewayRewardRatioWeight = gwRewardRatioWeights[delegation.gatewayAddress],
-		}
-	end)
-	-- todo: tiebreaking
-	delegationsSortedByGwPerf = utils.sortTableByFields(delegationsSortedByGwPerf, "asc", "gatewayRewardRatioWeight")
-	local index, nextDelegate = next(delegationsSortedByGwPerf)
-	while sources.shortfall > 0 and nextDelegate do
-		local stakeToDraw = math.min(nextDelegate.delegatedStake, sources.shortfall)
-		sources["stakes"][nextDelegate.gatewayAddress].delegatedStake = sources["stakes"][nextDelegate.gatewayAddress].delegatedStake
+	-- re-sort the gateways since their totalDelegatedStakes may have changed
+	gatewaysInfo = utils.sortTableByFields(gatewaysInfo, {
+		{
+			order = "asc",
+			field = "gatewayRewardRatioWeight",
+		},
+		{
+			order = "desc",
+			field = "totalDelegatedStake",
+		},
+		{
+			order = "desc",
+			field = "startTimestamp",
+		},
+	})
+
+	local index, nextGatewayInfo = next(gatewaysInfo)
+	while sources.shortfall > 0 and nextGatewayInfo do
+		local stakeToDraw = math.min(nextGatewayInfo.delegate.delegatedStake, sources.shortfall)
+		sources["stakes"][nextGatewayInfo.delegate.gatewayAddress].delegatedStake = sources["stakes"][nextGatewayInfo.delegate.gatewayAddress].delegatedStake
 			+ stakeToDraw
 		sources.shortfall = sources.shortfall - stakeToDraw
-		nextDelegate.delegatedStake = nextDelegate.delegatedStake - stakeToDraw -- not needed after this, but keep track
-		index, nextDelegate = next(delegationsSortedByGwPerf, index)
+		-- not needed after this, but keep track
+		nextGatewayInfo.delegate.delegatedStake = nextGatewayInfo.delegate.delegatedStake - stakeToDraw
+		nextGatewayInfo.totalDelegatedStake = nextGatewayInfo.totalDelegatedStake - stakeToDraw
+		index, nextGatewayInfo = next(gatewaysInfo, index)
 	end
 
 	return sources
