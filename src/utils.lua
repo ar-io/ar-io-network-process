@@ -487,4 +487,24 @@ function utils.getTableKeys(tbl)
 	return keys
 end
 
+function utils.filterArray(arr, predicate)
+	local filtered = {}
+	for i, value in ipairs(arr or {}) do -- ipairs ensures we only traverse numeric keys sequentially
+		if predicate and predicate(i, value) then
+			table.insert(filtered, value) -- Insert re-indexes automatically
+		end
+	end
+	return filtered
+end
+
+function utils.filterDictionary(tbl, predicate)
+	local filtered = {}
+	for key, value in pairs(tbl or {}) do
+		if predicate and predicate(key, value) then
+			filtered[key] = value
+		end
+	end
+	return filtered
+end
+
 return utils

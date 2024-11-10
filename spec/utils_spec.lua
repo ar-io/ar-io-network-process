@@ -621,4 +621,72 @@ describe("utils", function()
 			assert.are.same({}, result)
 		end)
 	end)
+
+	describe("filterArray", function()
+		it("should filter an array based on a predicate", function()
+			local input = { 1, 2, 3, 4, 5 }
+			local predicate = function(value)
+				return value % 2 == 0
+			end
+			local result = utils.filterArray(input, predicate)
+			assert.are.same({ 2, 4 }, result)
+		end)
+
+		it("should return an empty table for an empty input table", function()
+			local input = {}
+			local predicate = function(value)
+				return value % 2 == 0
+			end
+			local result = utils.filterArray(input, predicate)
+			assert.are.same({}, result)
+		end)
+
+		it("should return an empty table for a nil input table", function()
+			local predicate = function(value)
+				return value % 2 == 0
+			end
+			local result = utils.filterArray(nil, predicate)
+			assert.are.same({}, result)
+		end)
+
+		it("should return an empty table for a nil predicate", function()
+			local input = { 1, 2, 3, 4, 5 }
+			local result = utils.filterArray(input, nil)
+			assert.are.same({}, result)
+		end)
+	end)
+
+	describe("filterDictionary", function()
+		it("should filter a dictionary based on a predicate", function()
+			local input = { foo = 1, bar = 2, baz = 3, qux = 4, quux = 5 }
+			local predicate = function(_, value)
+				return value % 2 == 0
+			end
+			local result = utils.filterDictionary(input, predicate)
+			assert.are.same({ bar = 2, qux = 4 }, result)
+		end)
+
+		it("should return an empty table for an empty input table", function()
+			local input = {}
+			local predicate = function(_, value)
+				return value % 2 == 0
+			end
+			local result = utils.filterDictionary(input, predicate)
+			assert.are.same({}, result)
+		end)
+
+		it("should return an empty table for a nil input table", function()
+			local predicate = function(_, value)
+				return value % 2 == 0
+			end
+			local result = utils.filterDictionary(nil, predicate)
+			assert.are.same({}, result)
+		end)
+
+		it("should return an empty table for a nil predicate", function()
+			local input = { foo = 1, bar = 2, baz = 3, qux = 4, quux = 5 }
+			local result = utils.filterDictionary(input, nil)
+			assert.are.same({}, result)
+		end)
+	end)
 end)
