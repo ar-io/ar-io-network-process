@@ -3,6 +3,7 @@ local utils = require("utils")
 local constants = require("constants")
 local balances = require("balances")
 local demand = require("demand")
+local gar = require("gar")
 local arns = {}
 local Auction = require("auctions")
 
@@ -20,7 +21,8 @@ NameRegistry = NameRegistry or {
 --- @param timestamp number The current timestamp
 --- @param processId string The process id
 --- @return table The updated record
-function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
+function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, msgId, fundFrom)
+	fundFrom = fundFrom or "balance"
 	arns.assertValidBuyRecord(name, years, purchaseType, processId)
 	if purchaseType == nil then
 		purchaseType = "lease" -- set to lease by default
@@ -36,7 +38,8 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 	local totalRegistrationFee =
 		arns.calculateRegistrationFee(purchaseType, baseRegistrationFee, numYears, demand.getDemandFactor())
 
-	assert(balances.getBalance(from) >= totalRegistrationFee, "Insufficient balance")
+	local fundingPlan = gar.getFundingPlan(from, totalRegistrationFee, fundFrom)
+	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
 
 	local record = arns.getRecord(name)
 	local isPermabuy = record ~= nil and record.type == "permabuy"
@@ -57,8 +60,10 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 	}
 
 	-- Register the leased or permanently owned name
+	local appliedPlan = gar.applyFundingPlan(fundingPlan, msgId, timestamp)
+	assert(appliedPlan.totalFunded == totalRegistrationFee, "Funding plan application failed")
 	-- Transfer tokens to the protocol balance
-	balances.transfer(ao.id, from, totalRegistrationFee)
+	balances.increaseBalance(ao.id, totalRegistrationFee)
 	arns.addRecord(name, newRecord)
 	demand.tallyNamePurchase(totalRegistrationFee)
 	return {
