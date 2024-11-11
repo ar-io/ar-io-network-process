@@ -94,6 +94,11 @@ local ActionMap = {
 	AuctionPrices = "Auction-Prices",
 	AllowDelegates = "Allow-Delegates",
 	DisallowDelegates = "Disallow-Delegates",
+	-- PRIMARY NAMES
+	SetPrimaryName = "Set-Primary-Name",
+	ReleasePrimaryName = "Release-Primary-Name",
+	GetPrimaryNames = "Get-Primary-Names",
+	PrimaryName = "Primary-Name",
 }
 
 -- Low fidelity trackers
@@ -3075,6 +3080,108 @@ addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap
 		Target = msg.From,
 		Tags = { Action = ActionMap.DisallowDelegates .. "-Notice" },
 		Data = json.encode(result and result.removedDelegates or {}),
+	})
+end)
+
+--- PRIMARY NAMES
+local primaryNames = require("primary_names")
+addEventingHandler("releasePrimaryName", utils.hasMatchingTag("Action", ActionMap.ReleasePrimaryName), function(msg)
+	local name = string.lower(msg.Tags.Name)
+	local owner = utils.formatAddress(msg.From)
+	local shouldContinue, removedNames = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.ReleasePrimaryName .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, primaryNames.releasePrimaryName, owner, name)
+	if not shouldContinue or not removedNames then
+		return
+	end
+
+	ao.send({
+		Target = msg.From,
+		Action = ActionMap.ReleasePrimaryName .. "-Notice",
+		Data = json.encode(removedNames),
+	})
+end)
+
+addEventingHandler("setPrimaryName", utils.hasMatchingTag("Action", ActionMap.SetPrimaryName), function(msg)
+	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
+	local owner = msg.Tags.Owner and utils.formatAddress(msg.Tags.Owner) or utils.formatAddress(msg.From)
+	local from = utils.formatAddress(msg.From)
+	local timestamp = tonumber(msg.Timestamp)
+	local shouldContinue, primaryName = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.SetPrimaryName .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, primaryNames.setPrimaryName, name, owner, from, timestamp)
+	if not shouldContinue or not primaryName then
+		return
+	end
+
+	-- send two notices, one to the owner and one to the from
+	ao.send({
+		Target = owner,
+		Action = ActionMap.SetPrimaryName .. "-Notice",
+		Data = json.encode(primaryName),
+	})
+	ao.send({
+		Target = from,
+		Action = ActionMap.SetPrimaryName .. "-Notice",
+		Data = json.encode(primaryName),
+	})
+end)
+
+addEventingHandler("getPrimaryName", utils.hasMatchingTag("Action", ActionMap.PrimaryName), function(msg)
+	--- accepts either the primary name or the owner of the primary name
+	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
+	local address = msg.Tags.Address and utils.formatAddress(msg.Tags.Address) or utils.formatAddress(msg.From)
+	local primaryName = primaryNames.getPrimaryNameForAddress(address) or primaryNames.getPrimaryName(name)
+	if not primaryName then
+		return ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Invalid-" .. ActionMap.PrimaryName .. "-Notice",
+				Error = "Primary-Name-Not-Found",
+				Name = name,
+				Owner = address,
+			},
+		})
+	end
+	return ao.send({
+		Target = msg.From,
+		Action = ActionMap.PrimaryName .. "-Notice",
+		Tags = { Owner = primaryName.owner, ["Primary-Name"] = name },
+		Data = json.encode(primaryName),
+	})
+end)
+
+addEventingHandler("getPaginatedPrimaryNames", utils.hasMatchingTag("Action", ActionMap.GetPrimaryNames), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local status, result = pcall(
+		primaryNames.getPaginatedPrimaryNames,
+		page.cursor,
+		page.limit,
+		page.sortBy or "name",
+		page.sortOrder or "asc"
+	)
+
+	if not status or not result then
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.GetPaginatedPrimaryNames .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+		return
+	end
+
+	return ao.send({
+		Target = msg.From,
+		Action = ActionMap.GetPrimaryNames .. "-Notice",
+		Data = json.encode(result),
 	})
 end)
 
