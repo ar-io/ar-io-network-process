@@ -1,7 +1,6 @@
-import { createAosLoader, assertNoResultError } from './utils.mjs';
+import { assertNoResultError } from './utils.mjs';
 import { describe, it, before } from 'node:test';
 import { handle, startMemory, transfer } from './helpers.mjs';
-import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import {
   PROCESS_ID,
