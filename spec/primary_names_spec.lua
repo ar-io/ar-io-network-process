@@ -114,7 +114,7 @@ describe("Primary Names", function()
 			assert.are.same({
 				name = "test",
 				startTimestamp = 1234567890,
-			}, claimedName)
+			}, claimedName.primaryName)
 			assert.are.same({
 				["recipient"] = { name = "test", startTimestamp = 1234567890 },
 			}, _G.PrimaryNames)
