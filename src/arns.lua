@@ -21,7 +21,7 @@ NameRegistry = NameRegistry or {
 --- @param timestamp number The current timestamp
 --- @param processId string The process id
 --- @param msgId string The current message id
---- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
+--- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stakes". Default "balance"
 --- @return table The updated record
 function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
@@ -108,7 +108,7 @@ end
 ---@param years number The number of years to extend the lease
 ---@param currentTimestamp number The current timestamp
 ---@param msgId string The current message id
----@param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
+---@param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stakes". Default "balance"
 function arns.extendLease(from, name, years, currentTimestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
 	local record = arns.getRecord(name)

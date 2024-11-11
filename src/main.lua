@@ -245,7 +245,7 @@ local function assertValidFundFrom(fundFrom)
 	if fundFrom == nil then
 		return
 	end
-	local validFundFrom = utils.createLookupTable({ "any", "balance", "stake" })
+	local validFundFrom = utils.createLookupTable({ "any", "balance", "stakes" })
 	assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stake")
 end
 
