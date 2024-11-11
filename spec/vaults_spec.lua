@@ -396,6 +396,32 @@ describe("vaults", function()
 				local vault2 = returnedVaults.items[2]
 				assert.same(expectedVault2, vault2)
 			end)
+
+			it("should return paginated vaults sorted by balance", function()
+				local returnedVaults = vaults.getPaginatedVaults(nil, 10, "asc", "balance")
+
+				assert(returnedVaults.limit, 10)
+				assert(returnedVaults.sortBy, "balance")
+				assert(returnedVaults.sortOrder, "asc")
+				assert.is_false(returnedVaults.hasMore)
+				assert(returnedVaults.totalItems, 2)
+
+				assert.same({
+					address = address1,
+					vaultId = "uniqueMsgId",
+					balance = 100,
+					startTimestamp = 0,
+					endTimestamp = 1000,
+				}, returnedVaults.items[1])
+
+				assert.same({
+					address = address2,
+					vaultId = "uniqueMsgId",
+					balance = 200,
+					startTimestamp = 0,
+					endTimestamp = 1000,
+				}, returnedVaults.items[2])
+			end)
 		end)
 	end)
 end)
