@@ -4,6 +4,7 @@ local constants = require("constants")
 local balances = require("balances")
 local demand = require("demand")
 local gar = require("gar")
+local json = require("json")
 local arns = {}
 local Auction = require("auctions")
 
@@ -145,7 +146,9 @@ function arns.calculateExtensionFee(baseFee, years, demandFactor)
 	return math.floor(demandFactor * extensionFee)
 end
 
-function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
+function arns.increaseundernameLimit(from, name, qty, currentTimestamp, msgId, fundFrom)
+	fundFrom = fundFrom or "balance"
+
 	-- validate record can increase undernames
 	local record = arns.getRecord(name)
 
@@ -169,9 +172,11 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
 		error("Invalid undername cost")
 	end
 
-	if balances.getBalance(from) < additionalUndernameCost then
-		error("Insufficient balance")
-	end
+	local fundingPlan = gar.getFundingPlan(from, additionalUndernameCost, fundFrom)
+	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
+	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
+	print("funding plan: " .. json.encode(fundingPlan))
+	print("funding result: " .. json.encode(fundingResult))
 
 	-- update the record with the new undername count
 	arns.modifyRecordundernameLimit(name, qty)
@@ -188,6 +193,8 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
 		recordsCount = utils.lengthOfTable(NameRegistry.records),
 		reservedRecordsCount = utils.lengthOfTable(NameRegistry.reserved),
 		df = demand.getDemandFactorInfo(),
+		fundingPlan = fundingPlan,
+		fundingResult = fundingResult,
 	}
 end
 
