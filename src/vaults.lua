@@ -123,21 +123,26 @@ end
 --- @param cursor string|nil The address to start from
 --- @param limit number Max number of results to return
 --- @param sortOrder string "asc" or "desc" sort direction
---- @return table Array of {address, vault} objects
-function vaults.getPaginatedVaults(cursor, limit, sortOrder)
+--- @param sortBy string|nil "address", "vaultId", "balance", "startTimestamp", "endTimestamp" field to sort by
+--- @return table Array of { address, vaultId, balance, startTimestamp, endTimestamp } objects
+function vaults.getPaginatedVaults(cursor, limit, sortOrder, sortBy)
 	local allVaults = vaults.getVaults()
 	local vaultsArray = {}
 	local cursorField = "address" -- the cursor will be the wallet address
-	for address, vault in pairs(allVaults) do
-		table.insert(vaultsArray, {
-			address = address,
-			vault = vault,
-		})
+
+	for address, vaultsForAddress in pairs(allVaults) do
+		for vaultId, vault in pairs(vaultsForAddress) do
+			table.insert(vaultsArray, {
+				address = address,
+				vaultId = vaultId,
+				balance = vault.balance,
+				startTimestamp = vault.startTimestamp,
+				endTimestamp = vault.endTimestamp,
+			})
+		end
 	end
 
-	-- TODO: Consider normalize and flattening vaultId into the table
-	-- For now, we hard code sorting by wallet address
-	return utils.paginateTableWithCursor(vaultsArray, cursor, cursorField, limit, "address", sortOrder)
+	return utils.paginateTableWithCursor(vaultsArray, cursor, cursorField, limit, sortBy or "address", sortOrder)
 end
 
 --- Gets a vault
