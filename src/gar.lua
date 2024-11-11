@@ -1393,13 +1393,13 @@ function gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
 				-- if the whole vault is used, "prune" it by moving on
 				if vault.balance ~= delegationPlan.vaults[vaultId] then
 					acc[vaultId] = {
-						balance = vault.balance - delegationPlan.vaults[vaultId].balance,
+						balance = vault.balance - delegationPlan.vaults[vaultId],
 						startTimestamp = vault.startTimestamp,
 						endTimestamp = vault.endTimestamp,
 					}
 					assert(acc[vaultId].balance >= 0, "Vault balance cannot be negative")
 				end
-				appliedPlan.totalFunded = appliedPlan.totalFunded + delegationPlan.vaults[vaultId].balance
+				appliedPlan.totalFunded = appliedPlan.totalFunded + delegationPlan.vaults[vaultId]
 			else
 				-- nothing to change
 				acc[vaultId] = vault
