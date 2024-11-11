@@ -247,8 +247,15 @@ describe("arns", function()
 					type = "lease",
 					undernameLimit = 10,
 				}
-				local status, error =
-					pcall(arns.increaseundernameLimit, testAddress, "test-name", 1, timestamp + constants.oneYearMs + 1)
+				local status, error = pcall(
+					arns.increaseundernameLimit,
+					testAddress,
+					"test-name",
+					1,
+					timestamp + constants.oneYearMs + 1,
+					"msg-id",
+					"balance"
+				)
 				assert.is_false(status)
 				assert.match("Name must be active to increase undername limit", error)
 			end)
@@ -277,9 +284,11 @@ describe("arns", function()
 				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
 
+				-- NOTE: Was seeing a bizarre behavior where putting this expression into the equal function was causing the wrong value to be expected
+				local expectedBalance = startBalance - 25000000
 				assert.is.equal(
 					_G.Balances[testAddress],
-					startBalance - 25000000,
+					expectedBalance,
 					"Balance should be reduced by the purchase price"
 				)
 
