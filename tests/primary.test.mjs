@@ -31,30 +31,50 @@ describe('primary names', function () {
     };
   };
 
-  const setPrimaryName = async ({
+  const createNameClaim = async ({
     name,
     owner,
-    processId,
+    recipient,
     timestamp,
     memory,
   }) => {
-    const setPrimaryNameResult = await handle(
+    const createNameClaimResult = await handle(
       {
-        From: processId,
-        Owner: processId,
+        From: owner,
+        Owner: owner,
         Timestamp: timestamp,
         Tags: [
-          { name: 'Action', value: 'Set-Primary-Name' },
+          { name: 'Action', value: 'Create-Primary-Name-Claim' },
           { name: 'Name', value: name },
-          { name: 'Owner', value: owner },
+          { name: 'Recipient', value: recipient },
         ],
       },
       memory,
     );
-    assertNoResultError(setPrimaryNameResult);
+    assertNoResultError(createNameClaimResult);
     return {
-      result: setPrimaryNameResult,
-      memory: setPrimaryNameResult.Memory,
+      result: createNameClaimResult,
+      memory: createNameClaimResult.Memory,
+    };
+  };
+
+  const claimPrimaryName = async ({ name, recipient, timestamp, memory }) => {
+    const claimPrimaryNameResult = await handle(
+      {
+        From: recipient,
+        Owner: recipient,
+        Timestamp: timestamp,
+        Tags: [
+          { name: 'Action', value: 'Claim-Primary-Name' },
+          { name: 'Name', value: name },
+        ],
+      },
+      memory,
+    );
+    assertNoResultError(claimPrimaryNameResult);
+    return {
+      result: claimPrimaryNameResult,
+      memory: claimPrimaryNameResult.Memory,
     };
   };
 
@@ -92,52 +112,61 @@ describe('primary names', function () {
     };
   };
 
-  it('should allow setting of a primary name on a record owned by a specific ant', async function () {
+  it('should allow creating and claiming a primary name on a an arns record', async function () {
+    const processId = ''.padEnd(43, 'a');
+    const recipient = ''.padEnd(43, 'b');
     const { memory: buyRecordMemory } = await buyRecord({
       name: 'test-name',
-      processId: ''.padEnd(43, 'a'),
+      processId,
     });
 
     // give balance to the owner
     const transferMemory = await transfer({
-      recipient: STUB_ADDRESS,
+      recipient,
       quantity: 100000000, // the cost of a primary name
       memory: buyRecordMemory,
     });
 
-    const { result: primaryNameResult } = await setPrimaryName({
+    const { result: createClaimResult } = await createNameClaim({
       name: 'test-name',
-      owner: STUB_ADDRESS,
-      processId: ''.padEnd(43, 'a'),
+      owner: processId,
+      recipient, // the process creates the claim, the recipient approves it
       timestamp: 1234567890,
       memory: transferMemory,
     });
 
+    const { result: claimPrimaryNameResult } = await claimPrimaryName({
+      name: 'test-name',
+      recipient,
+      timestamp: 1234567890,
+      memory: createClaimResult.Memory,
+    });
+
     // there should be two messages, one to the ant and one to the owner
-    assert.equal(primaryNameResult.Messages.length, 2);
-    assert.equal(primaryNameResult.Messages[0].Target, STUB_ADDRESS);
-    assert.equal(primaryNameResult.Messages[1].Target, ''.padEnd(43, 'a'));
+    assert.equal(claimPrimaryNameResult.Messages.length, 2);
+    assert.equal(claimPrimaryNameResult.Messages[0].Target, processId);
+    assert.equal(claimPrimaryNameResult.Messages[1].Target, recipient);
 
     // find the action tag in the messages
-    const actionTag = primaryNameResult.Messages[0].Tags.find(
+    const actionTag = claimPrimaryNameResult.Messages[0].Tags.find(
       (tag) => tag.name === 'Action',
     ).value;
-    assert.equal(actionTag, 'Set-Primary-Name-Notice');
+    assert.equal(actionTag, 'Claim-Primary-Name-Notice');
 
     // the primary name should be set
-    assert.equal(
-      primaryNameResult.Messages[0].Data,
-      JSON.stringify({
-        name: 'test-name',
-        startTimestamp: 1234567890,
-      }),
+    const primaryNameSetResult = JSON.parse(
+      claimPrimaryNameResult.Messages[0].Data,
     );
+    assert.deepStrictEqual(primaryNameSetResult, {
+      name: 'test-name',
+      startTimestamp: 1234567890,
+    });
 
     // now fetch the primary name using the owner address
     const { result: primaryNameForAddressResult } =
       await getPrimaryNameForAddress({
-        address: STUB_ADDRESS,
-        memory: primaryNameResult.Memory,
+        address: recipient,
+        memory: claimPrimaryNameResult.Memory,
       });
 
     const primaryNameLookupResult = JSON.parse(
@@ -145,20 +174,20 @@ describe('primary names', function () {
     );
     assert.deepStrictEqual(primaryNameLookupResult, {
       name: 'test-name',
-      owner: STUB_ADDRESS,
+      owner: recipient,
       startTimestamp: 1234567890,
     });
 
     // reverse lookup the owner of the primary name
     const { result: ownerOfPrimaryNameResult } = await getOwnerOfPrimaryName({
       name: 'test-name',
-      memory: primaryNameForAddressResult.Memory,
+      memory: claimPrimaryNameResult.Memory,
     });
 
     const ownerResult = JSON.parse(ownerOfPrimaryNameResult.Messages[0].Data);
     assert.deepStrictEqual(ownerResult, {
       name: 'test-name',
-      owner: STUB_ADDRESS,
+      owner: recipient,
       startTimestamp: 1234567890,
     });
   });

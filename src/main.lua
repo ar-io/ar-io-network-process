@@ -95,8 +95,9 @@ local ActionMap = {
 	AllowDelegates = "Allow-Delegates",
 	DisallowDelegates = "Disallow-Delegates",
 	-- PRIMARY NAMES
-	SetPrimaryName = "Set-Primary-Name",
 	ReleasePrimaryName = "Release-Primary-Name",
+	CreatePrimaryNameClaim = "Create-Primary-Name-Claim",
+	ClaimPrimaryName = "Claim-Primary-Name",
 	GetPrimaryNames = "Get-Primary-Names",
 	PrimaryName = "Primary-Name",
 }
@@ -3106,32 +3107,64 @@ addEventingHandler("releasePrimaryName", utils.hasMatchingTag("Action", ActionMa
 	})
 end)
 
-addEventingHandler("setPrimaryName", utils.hasMatchingTag("Action", ActionMap.SetPrimaryName), function(msg)
-	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
-	local owner = msg.Tags.Owner and utils.formatAddress(msg.Tags.Owner) or utils.formatAddress(msg.From)
-	local from = utils.formatAddress(msg.From)
-	local timestamp = tonumber(msg.Timestamp)
-	local shouldContinue, primaryName = eventingPcall(msg.ioEvent, function(error)
+addEventingHandler(
+	"createPrimaryNameClaim",
+	utils.hasMatchingTag("Action", ActionMap.CreatePrimaryNameClaim),
+	function(msg)
+		local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
+		local recipient = utils.formatAddress(msg.Recipient) -- the recipient of the primary name
+		local from = utils.formatAddress(msg.From) -- the process that is creating the claim
+		local timestamp = tonumber(msg.Timestamp)
+
+		local shouldContinue, claim = eventingPcall(msg.ioEvent, function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-" .. ActionMap.CreatePrimaryNameClaim .. "-Notice", Error = "Bad-Input" },
+				Data = tostring(error),
+			})
+		end, primaryNames.createNameClaim, name, recipient, from, timestamp)
+		if not shouldContinue or not claim then
+			return
+		end
+
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.SetPrimaryName .. "-Notice", Error = "Bad-Input" },
+			Action = ActionMap.CreatePrimaryNameClaim .. "-Notice",
+			Data = json.encode(claim),
+		})
+		ao.send({
+			Target = recipient,
+			Action = ActionMap.CreatePrimaryNameClaim .. "-Notice",
+			Data = json.encode(claim),
+		})
+	end
+)
+
+addEventingHandler("claimPrimaryName", utils.hasMatchingTag("Action", ActionMap.ClaimPrimaryName), function(msg)
+	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
+	local recipient = utils.formatAddress(msg.From) -- the recipient of the primary name
+	local timestamp = tonumber(msg.Timestamp)
+	local shouldContinue, primaryNameAndClaim = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.ClaimPrimaryName .. "-Notice", Error = "Bad-Input" },
 			Data = tostring(error),
 		})
-	end, primaryNames.setPrimaryName, name, owner, from, timestamp)
-	if not shouldContinue or not primaryName then
+	end, primaryNames.claimPrimaryName, name, recipient, timestamp)
+	if not shouldContinue or not primaryNameAndClaim then
 		return
 	end
 
-	-- send two notices, one to the owner and one to the from
+	-- -- send two notices, one to the owner and one to the from
 	ao.send({
-		Target = owner,
-		Action = ActionMap.SetPrimaryName .. "-Notice",
-		Data = json.encode(primaryName),
+		Target = primaryNameAndClaim.claim.processId,
+		Action = ActionMap.ClaimPrimaryName .. "-Notice",
+		Data = json.encode(primaryNameAndClaim.primaryName),
 	})
 	ao.send({
-		Target = from,
-		Action = ActionMap.SetPrimaryName .. "-Notice",
-		Data = json.encode(primaryName),
+		Target = recipient,
+		Action = ActionMap.ClaimPrimaryName .. "-Notice",
+		Data = json.encode(primaryNameAndClaim.primaryName),
 	})
 end)
 

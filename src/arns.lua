@@ -6,7 +6,6 @@ local demand = require("demand")
 local gar = require("gar")
 local arns = {}
 local Auction = require("auctions")
-
 NameRegistry = NameRegistry or {
 	reserved = {},
 	records = {},
@@ -715,10 +714,12 @@ end
 --- @param currentTimestamp number The current timestamp
 --- @param lastGracePeriodEntryEndTimestamp number The end timestamp of the last known record to have entered its grace period
 --- @return table # The pruned records
---- @return number # The end timestamp of the last known record to have entered its grace period
+--- @return table # The records that have entered their grace period
+--- @return table # The primary names that are removed as a result of name expiring
 function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 	lastGracePeriodEntryEndTimestamp = lastGracePeriodEntryEndTimestamp or 0
 	local prunedRecords = {}
+	local removedPrimaryNameClaims = {}
 	local newGracePeriodRecords = {}
 	-- identify any records that are leases and that have expired, account for a one week grace period in seconds
 	for name, record in pairs(arns.getRecords()) do
@@ -726,14 +727,17 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 			if currentTimestamp >= record.endTimestamp + constants.gracePeriodMs then
 				-- lease is outside the grade period. start a dutch auction. it will get pruned out if it expires with no bids
 				prunedRecords[name] = record
+				-- create the auction and remove primary name claims
 				arns.createAuction(name, currentTimestamp, ao.id)
+				-- TODO; there is a circular dependency here. primary names needs to know about auctions and auctions needs to know about primary names
+				-- removedPrimaryNameClaims = primaryNames.removePrimaryNamesForArNSName(name)
 			elseif record.endTimestamp > lastGracePeriodEntryEndTimestamp then
 				-- lease is newly recognized as being within the grace period
 				newGracePeriodRecords[name] = record
 			end
 		end
 	end
-	return prunedRecords, newGracePeriodRecords
+	return prunedRecords, newGracePeriodRecords, removedPrimaryNameClaims
 end
 
 --- Prunes auctions that have expired
