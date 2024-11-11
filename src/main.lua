@@ -1266,8 +1266,8 @@ addEventingHandler(
 				msg.Tags.Quantity
 					and tonumber(msg.Tags.Quantity)
 					and utils.isInteger(tonumber(msg.Tags.Quantity))
-					and tonumber(msg.Tags.Quantity) > 0,
-				"Invalid quantity. Must be integer greater than 0"
+					and tonumber(msg.Tags.Quantity) > constants.MINIUMUM_WITHDRAWAL_AMOUNT,
+				"Invalid quantity. Must be integer greater than " .. constants.MINIUMUM_WITHDRAWAL_AMOUNT
 			)
 			if msg.Tags.Instant ~= nil then
 				assert(
@@ -1568,8 +1568,10 @@ addEventingHandler(
 		local checkAssertions = function()
 			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
 			assert(
-				msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(msg.Tags.Quantity),
-				"Invalid quantity. Must be integer greater than 0"
+				msg.Tags.Quantity
+					and tonumber(msg.Tags.Quantity) > constants.MINIUMUM_WITHDRAWAL_AMOUNT
+					and utils.isInteger(msg.Tags.Quantity),
+				"Invalid quantity. Must be integer greater than " .. constants.MINIUMUM_WITHDRAWAL_AMOUNT
 			)
 			if msg.Tags.Instant ~= nil then
 				assert(
