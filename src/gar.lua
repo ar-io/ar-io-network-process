@@ -1256,26 +1256,28 @@ end
 function planExcessStakesDrawdown(fundingPlan)
 	-- find all the address's delegations across the gateways
 	local gatewaysInfo = utils.sortTableByFields(
-		utils.map(
+		utils.reduce(
 			-- only consider gateways that have the address as a delegate
 			utils.filterDictionary(gar.getGatewaysUnsafe(), function(_, gateway)
 				return gateway.delegates[fundingPlan.address] ~= nil
 			end),
 			-- extract only the essential gateway fields, copying tables so we don't mutate references
-			function(gatewayAddress, gateway)
+			function(acc, gatewayAddress, gateway)
 				local totalEpochsGatewayPassed = gateway.stats.passedEpochCount or 0
 				local totalEpochsParticipatedIn = gateway.stats.totalEpochCount or 0
 				local gatewayRewardRatioWeight = (1 + totalEpochsGatewayPassed) / (1 + totalEpochsParticipatedIn)
 				local delegate = gateway.delegates[fundingPlan.address]
 				delegate.excessStake = math.max(0, delegate.delegatedStake - gateway.settings.minDelegatedStake)
 				delegate.gatewayAddress = gatewayAddress
-				return {
+				table.insert(acc, {
 					totalDelegatedStake = gateway.totalDelegatedStake, -- for comparing gw total stake
 					gatewayRewardRatioWeight = gatewayRewardRatioWeight, -- for comparing gw performance
 					delegate = delegate,
 					startTimestamp = gateway.startTimestamp, -- for comparing gw tenure
-				}
-			end
+				})
+				return acc
+			end,
+			{}
 		),
 		{
 			{
