@@ -1,4 +1,4 @@
-import { handle, startMemory, transfer } from './helpers.mjs';
+import { handle, joinNetwork, startMemory, transfer } from './helpers.mjs';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import {
@@ -226,7 +226,7 @@ describe('ArNS', async () => {
   });
 
   describe('Increase-Undername-Limit', () => {
-    it('should increase the undernames', async () => {
+    it('should increase the undernames by spending from balance', async () => {
       const assertIncreaseUndername = async (sender) => {
         let memory = startMemory;
 
@@ -271,6 +271,92 @@ describe('ArNS', async () => {
           },
           buyUndernameResult.Memory,
         );
+        const result = await handle(
+          {
+            From: sender,
+            Owner: sender,
+            Tags: [
+              { name: 'Action', value: 'Record' },
+              { name: 'Name', value: 'test-name' },
+            ],
+          },
+          increaseUndernameResult.Memory,
+        );
+        const record = JSON.parse(result.Messages[0].Data);
+        assert.equal(record.undernameLimit, 11);
+      };
+      await assertIncreaseUndername(STUB_ADDRESS);
+      await assertIncreaseUndername(testEthAddress);
+    });
+
+    it('should increase the undernames by spending from stakes', async () => {
+      const STUB_OPERATOR_ADDRESS = ''.padEnd(43, 'E');
+      const assertIncreaseUndername = async (sender) => {
+        let memory = startMemory;
+
+        if (sender != PROCESS_OWNER) {
+          // Send enough money to the user to delegate stake, buy record, and increase undername limit
+          memory = await transfer({
+            recipient: sender,
+            quantity: 650000000,
+            memory,
+            cast: true,
+          });
+
+          // Stake a gateway for the user to delegate to
+          const joinNetworkResult = await joinNetwork({
+            memory,
+            address: STUB_OPERATOR_ADDRESS,
+          });
+          memory = joinNetworkResult.memory;
+
+          const stakeResult = await handle(
+            {
+              From: sender,
+              Owner: sender,
+              Tags: [
+                { name: 'Action', value: 'Delegate-Stake' },
+                { name: 'Quantity', value: `${650000000}` }, // delegate all of their balance
+                { name: 'Address', value: STUB_OPERATOR_ADDRESS }, // our gateway address
+              ],
+              Timestamp: STUB_TIMESTAMP + 1,
+            },
+            memory,
+          );
+          memory = stakeResult.Memory;
+        }
+
+        const buyUndernameResult = await handle(
+          {
+            From: sender,
+            Owner: sender,
+            Tags: [
+              { name: 'Action', value: 'Buy-Record' },
+              { name: 'Name', value: 'test-name' },
+              { name: 'Purchase-Type', value: 'lease' },
+              { name: 'Years', value: '1' },
+              { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+              { name: 'Fund-From', value: 'stakes' },
+            ],
+          },
+          memory,
+        );
+        memory = buyUndernameResult.Memory;
+
+        const increaseUndernameResult = await handle(
+          {
+            From: sender,
+            Owner: sender,
+            Tags: [
+              { name: 'Action', value: 'Increase-Undername-Limit' },
+              { name: 'Name', value: 'test-name' },
+              { name: 'Quantity', value: '1' },
+              { name: 'Fund-From', value: 'stakes' },
+            ],
+          },
+          memory,
+        );
+
         const result = await handle(
           {
             From: sender,
