@@ -191,4 +191,29 @@ describe('primary names', function () {
       startTimestamp: 1234567890,
     });
   });
+
+  describe('getPaginatedPrimaryNames', function () {
+    it('should return all primary names', async function () {
+      const getPaginatedPrimaryNamesResult = await handle({
+        Tags: [
+          { name: 'Action', value: 'Get-Primary-Names' },
+          { name: 'Limit', value: 10 },
+          { name: 'Sort-By', value: 'owner' },
+          { name: 'Sort-Order', value: 'asc' },
+        ],
+      });
+      assertNoResultError(getPaginatedPrimaryNamesResult);
+      const primaryNames = JSON.parse(
+        getPaginatedPrimaryNamesResult.Messages[0].Data,
+      );
+      assert.deepStrictEqual(primaryNames, {
+        items: [],
+        totalItems: 0,
+        limit: 10,
+        hasMore: false,
+        sortBy: 'owner',
+        sortOrder: 'asc',
+      });
+    });
+  });
 });

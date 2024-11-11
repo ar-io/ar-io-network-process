@@ -3169,10 +3169,9 @@ addEventingHandler("claimPrimaryName", utils.hasMatchingTag("Action", ActionMap.
 end)
 
 addEventingHandler("getPrimaryName", utils.hasMatchingTag("Action", ActionMap.PrimaryName), function(msg)
-	--- accepts either the primary name or the owner of the primary name
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
 	local address = msg.Tags.Address and utils.formatAddress(msg.Tags.Address) or utils.formatAddress(msg.From)
-	local primaryName = primaryNames.getPrimaryNameForAddress(address) or primaryNames.getPrimaryName(name)
+	local primaryName = primaryNames.getPrimaryName(name) or primaryNames.getPrimaryNameForAddress(address)
 	if not primaryName then
 		return ao.send({
 			Target = msg.From,
@@ -3205,7 +3204,7 @@ addEventingHandler("getPaginatedPrimaryNames", utils.hasMatchingTag("Action", Ac
 	if not status or not result then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.GetPaginatedPrimaryNames .. "-Notice", Error = "Bad-Input" },
+			Tags = { Action = "Invalid-" .. ActionMap.GetPrimaryNames .. "-Notice", Error = "Bad-Input" },
 			Data = tostring(error),
 		})
 		return
