@@ -127,12 +127,11 @@ end
 --- @return table Array of { address, vaultId, balance, startTimestamp, endTimestamp } objects
 function vaults.getPaginatedVaults(cursor, limit, sortOrder, sortBy)
 	local allVaults = vaults.getVaults()
-	local vaultsArray = {}
 	local cursorField = "address" -- the cursor will be the wallet address
 
-	for address, vaultsForAddress in pairs(allVaults) do
+	local vaultsArray = utils.reduce(allVaults, function(acc, address, vaultsForAddress)
 		for vaultId, vault in pairs(vaultsForAddress) do
-			table.insert(vaultsArray, {
+			table.insert(acc, {
 				address = address,
 				vaultId = vaultId,
 				balance = vault.balance,
@@ -140,7 +139,8 @@ function vaults.getPaginatedVaults(cursor, limit, sortOrder, sortBy)
 				endTimestamp = vault.endTimestamp,
 			})
 		end
-	end
+		return acc
+	end, {})
 
 	return utils.paginateTableWithCursor(vaultsArray, cursor, cursorField, limit, sortBy or "address", sortOrder)
 end
