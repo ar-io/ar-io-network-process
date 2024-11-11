@@ -1,6 +1,7 @@
 import {
   assertNoResultError,
   handle,
+  joinNetwork,
   startMemory,
   transfer,
 } from './helpers.mjs';
@@ -132,34 +133,6 @@ describe('GatewayRegistry', async () => {
     return {
       result: delegatesResult,
       memory: delegatesResult.Memory,
-    };
-  };
-
-  const joinNetwork = async ({
-    memory,
-    timestamp = STUB_TIMESTAMP,
-    address,
-    tags = validGatewayTags,
-  }) => {
-    // give them the join network token amount
-    const transferMemory = await transfer({
-      recipient: address,
-      quantity: 100_000_000_000,
-      memory,
-    });
-    const joinNetworkResult = await handle(
-      {
-        From: address,
-        Owner: address,
-        Tags: tags,
-        Timestamp: timestamp,
-      },
-      transferMemory,
-    );
-    assertNoResultError(joinNetworkResult);
-    return {
-      memory: joinNetworkResult.Memory,
-      result: joinNetworkResult,
     };
   };
 
