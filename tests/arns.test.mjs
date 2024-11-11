@@ -310,6 +310,7 @@ describe('ArNS', async () => {
   describe('Token-Cost', () => {
     //Reference: https://ardriveio.sharepoint.com/:x:/s/AR.IOLaunch/Ec3L8aX0wuZOlG7yRtlQoJgB39wCOoKu02PE_Y4iBMyu7Q?e=ZG750l
     it('should return the correct cost of buying a name as a lease', async () => {
+      // the name will cost 600_000_000, so we'll want to see a shortfall of 200_000_000 in the funding plan
       const transferMemory = await transfer({
         recipient: STUB_ADDRESS,
         quantity: 400_000_000,
@@ -336,7 +337,7 @@ describe('ArNS', async () => {
       const tokenCostResult = JSON.parse(result.Messages[0].Data);
       assert.deepEqual(tokenCostResult, {
         tokenCost: 600_000_000,
-        fundingSources: {
+        fundingPlan: {
           address: STUB_ADDRESS,
           balance: 400_000_000,
           shortfall: 200_000_000,

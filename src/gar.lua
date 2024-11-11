@@ -1284,12 +1284,12 @@ function gar.getFundingPlan(address, quantity, sourcesPreference)
 	local vaults = utils.sortTableByFields(
 		utils.reduce(gatewaysInfo, function(acc, _, gatewayInfo)
 			for vaultId, vault in pairs(gatewayInfo.delegate.vaults) do
-				acc[#acc + 1] = {
+				table.insert(acc, {
 					vaultId = vaultId,
 					gatewayAddress = gatewayInfo.delegate.gatewayAddress,
 					endTimestamp = vault.endTimestamp,
 					balance = vault.balance,
-				}
+				})
 			end
 			return acc
 		end, {}),

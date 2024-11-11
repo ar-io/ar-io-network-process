@@ -400,6 +400,17 @@ describe("arns", function()
 
 				assert.are.equal(demandBefore + 400000000, demand.getCurrentPeriodRevenue())
 				assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
+
+				assert.are.same({
+					address = testAddress,
+					balance = 400000000,
+					stakes = {},
+					shortfall = 0,
+				}, result.fundingPlan)
+				assert.are.same({
+					totalFunded = 400000000,
+					newWithdrawVaults = {},
+				}, result.fundingResult)
 			end)
 
 			it("should throw an error when trying to extend beyond 5 years [" .. addressType .. "]", function()

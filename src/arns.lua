@@ -62,8 +62,8 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 	}
 
 	-- Register the leased or permanently owned name
-	local appliedPlan = gar.applyFundingPlan(fundingPlan, msgId, timestamp)
-	assert(appliedPlan.totalFunded == totalRegistrationFee, "Funding plan application failed")
+	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, timestamp)
+	assert(fundingResult.totalFunded == totalRegistrationFee, "Funding plan application failed")
 	-- Transfer tokens to the protocol balance
 	balances.increaseBalance(ao.id, totalRegistrationFee)
 	arns.addRecord(name, newRecord)
@@ -77,7 +77,8 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 		recordsCount = utils.lengthOfTable(NameRegistry.records),
 		reservedRecordsCount = utils.lengthOfTable(NameRegistry.reserved),
 		df = demand.getDemandFactorInfo(),
-		fundingPlan = appliedPlan,
+		fundingPlan = fundingPlan,
+		fundingResult = fundingResult,
 	}
 end
 
@@ -102,23 +103,23 @@ function arns.getPaginatedRecords(cursor, limit, sortBy, sortOrder)
 	return utils.paginateTableWithCursor(recordsArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
-function arns.extendLease(from, name, years, currentTimestamp)
+function arns.extendLease(from, name, years, currentTimestamp, msgId, fundFrom)
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
 	-- throw error if invalid
 	arns.assertValidExtendLease(record, currentTimestamp, years)
 	local baseRegistrationFee = demand.baseFeeForNameLength(#name)
 	local totalExtensionFee = arns.calculateExtensionFee(baseRegistrationFee, years, demand.getDemandFactor())
-
-	if balances.getBalance(from) < totalExtensionFee then
-		error("Insufficient balance")
-	end
+	local fundingPlan = gar.getFundingPlan(from, totalExtensionFee, fundFrom)
+	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
+	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
+	assert(fundingResult.totalFunded == totalExtensionFee, "Funding plan application failed")
 
 	-- modify the record with the new end timestamp
 	arns.modifyRecordEndTimestamp(name, record.endTimestamp + constants.oneYearMs * years)
 
 	-- Transfer tokens to the protocol balance
-	balances.transfer(ao.id, from, totalExtensionFee)
+	balances.increaseBalance(ao.id, totalExtensionFee)
 	demand.tallyNamePurchase(totalExtensionFee)
 	return {
 		record = arns.getRecord(name),
@@ -127,6 +128,8 @@ function arns.extendLease(from, name, years, currentTimestamp)
 		remainingBalance = balances.getBalance(from),
 		protocolBalance = balances.getBalance(ao.id),
 		df = demand.getDemandFactorInfo(),
+		fundingPlan = fundingPlan,
+		fundingResult = fundingResult,
 	}
 end
 
