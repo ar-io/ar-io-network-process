@@ -241,6 +241,14 @@ local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
 	end
 end
 
+local function assertValidFundFrom(fundFrom)
+	if fundFrom == nil then
+		return
+	end
+	local validFundFrom = utils.createLookupTable({ "any", "balance", "stake" })
+	assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stake")
+end
+
 local function addEventingHandler(handlerName, pattern, handleFn)
 	Handlers.add(handlerName, pattern, function(msg)
 		eventingPcall(msg.ioEvent, function()
@@ -739,11 +747,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 				"Invalid years. Must be integer between 1 and 5"
 			)
 		end
-
-		if fundFrom then
-			local validFundFrom = utils.createLookupTable({ "any", "balance", "stake" })
-			assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stake")
-		end
+		assertValidFundFrom(fundFrom)
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -864,10 +868,7 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 			tonumber(msg.Tags.Years) > 0 and tonumber(msg.Tags.Years) < 5 and utils.isInteger(tonumber(msg.Tags.Years)),
 			"Invalid years. Must be integer between 1 and 5"
 		)
-		if fundFrom then
-			local validFundFrom = utils.createLookupTable({ "any", "balance", "stake" })
-			assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stake")
-		end
+		assertValidFundFrom(fundFrom)
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -930,6 +931,7 @@ addEventingHandler(
 	ActionMap.IncreaseUndernameLimit,
 	utils.hasMatchingTag("Action", ActionMap.IncreaseUndernameLimit),
 	function(msg)
+		local fundFrom = msg.Tags["Fund-From"]
 		local checkAssertions = function()
 			assert(type(msg.Tags.Name) == "string", "Invalid name")
 			assert(
@@ -938,6 +940,7 @@ addEventingHandler(
 					and utils.isInteger(msg.Tags.Quantity),
 				"Invalid quantity. Must be an integer value greater than 0 and less than 9990"
 			)
+			assertValidFundFrom(fundFrom)
 		end
 
 		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -970,7 +973,9 @@ addEventingHandler(
 			msg.From,
 			string.lower(msg.Tags.Name),
 			tonumber(msg.Tags.Quantity),
-			msg.Timestamp
+			msg.Timestamp,
+			msg.Id,
+			fundFrom
 		)
 		if not shouldContinue2 then
 			return
@@ -1018,11 +1023,7 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 		if msg.Tags.Quantity then
 			assert(utils.isInteger(tonumber(msg.Tags.Quantity)), "Invalid quantity. Must be integer greater than 0")
 		end
-
-		if fundFrom then
-			local validFundFrom = utils.createLookupTable({ "any", "balance", "stake" })
-			assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stake")
-		end
+		assertValidFundFrom(fundFrom)
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
