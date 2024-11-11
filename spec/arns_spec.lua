@@ -271,7 +271,8 @@ describe("arns", function()
 				}
 				local demandBefore = demand.getCurrentPeriodRevenue()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
-				local status, result = pcall(arns.increaseundernameLimit, testAddress, "test-name", 50, timestamp)
+				local status, result =
+					pcall(arns.increaseundernameLimit, testAddress, "test-name", 50, timestamp, "msg-id")
 				local expectation = {
 					endTimestamp = timestamp + constants.oneYearMs,
 					processId = testProcessId,
@@ -284,11 +285,9 @@ describe("arns", function()
 				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
 
-				-- NOTE: Was seeing a bizarre behavior where putting this expression into the equal function was causing the wrong value to be expected
-				local expectedBalance = startBalance - 25000000
 				assert.is.equal(
+					startBalance - 25000000,
 					_G.Balances[testAddress],
-					expectedBalance,
 					"Balance should be reduced by the purchase price"
 				)
 

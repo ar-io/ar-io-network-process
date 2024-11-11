@@ -179,7 +179,7 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp, msgId, f
 	arns.modifyRecordundernameLimit(name, qty)
 
 	-- Transfer tokens to the protocol balance
-	balances.transfer(ao.id, from, additionalUndernameCost)
+	balances.increaseBalance(ao.id, additionalUndernameCost)
 	demand.tallyNamePurchase(additionalUndernameCost)
 	return {
 		record = arns.getRecord(name),
