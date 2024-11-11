@@ -103,7 +103,14 @@ function arns.getPaginatedRecords(cursor, limit, sortBy, sortOrder)
 	return utils.paginateTableWithCursor(recordsArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
+---@param from string The address of the sender
+---@param name string The name of the record
+---@param years number The number of years to extend the lease
+---@param currentTimestamp number The current timestamp
+---@param msgId string The current message id
+---@param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
 function arns.extendLease(from, name, years, currentTimestamp, msgId, fundFrom)
+	fundFrom = fundFrom or "balance"
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
 	-- throw error if invalid
