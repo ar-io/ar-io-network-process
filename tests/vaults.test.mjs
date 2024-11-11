@@ -442,23 +442,17 @@ describe('Vaults', async () => {
       assert.deepEqual(fetchedVaults, [
         {
           address: secondVaulter,
-          vault: {
-            [vaultId2]: {
-              balance: 500,
-              startTimestamp: 21600000,
-              endTimestamp: 1231200000,
-            },
-          },
+          vaultId: vaultId2,
+          balance: 500,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
         },
         {
           address: PROCESS_OWNER,
-          vault: {
-            [vaultId1]: {
-              balance: 500,
-              startTimestamp: 21600000,
-              endTimestamp: 1231200000,
-            },
-          },
+          vaultId: vaultId1,
+          balance: 500,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
         },
       ]);
     });

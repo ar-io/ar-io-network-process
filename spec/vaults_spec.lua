@@ -376,8 +376,25 @@ describe("vaults", function()
 				assert.is_false(returnedVaults.hasMore)
 				assert(returnedVaults.totalItems, 2)
 
-				assert(returnedVaults.items[1].address, address1)
-				assert(returnedVaults.items[2].address, address2)
+				local expectedVault1 = {
+					address = address1,
+					vaultId = "uniqueMsgId",
+					balance = 100,
+					startTimestamp = 0,
+					endTimestamp = 1000,
+				}
+				local vault1 = returnedVaults.items[1]
+				assert.same(expectedVault1, vault1)
+
+				local expectedVault2 = {
+					address = address2,
+					vaultId = "uniqueMsgId",
+					balance = 200,
+					startTimestamp = 0,
+					endTimestamp = 1000,
+				}
+				local vault2 = returnedVaults.items[2]
+				assert.same(expectedVault2, vault2)
 			end)
 		end)
 	end)
