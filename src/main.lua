@@ -139,6 +139,8 @@ local function addRecordResultFields(ioEvent, result)
 			"purchasesThisPeriod",
 		})
 	end
+
+	-- TODO: Add funding plan info?
 end
 
 local function addAuctionResultFields(ioEvent, result)
@@ -781,6 +783,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 
 	msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
 
+	-- TODO: Send back fundingPlan and fundingResult as well?
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = ActionMap.BuyRecord .. "-Notice", Name = name },
@@ -1004,11 +1007,6 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 		if fundFrom then
 			local validFundFrom = utils.createLookupTable({ "any", "balance", "stake" })
 			assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stake")
-			-- TODO: expand this privilege to other purchase actions?
-			assert(
-				intentType == ActionMap.BuyRecord or fundFrom == "balance",
-				"Only Buy-Record may fund with sources other than balance"
-			)
 		end
 	end
 
@@ -1046,7 +1044,7 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 		return
 	end
 
-	local shouldContinue3, fundingSourcesResult = eventingPcall(msg.ioEvent, function(error)
+	local shouldContinue3, fundingPlan = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Invalid-Token-Cost" },
@@ -1060,11 +1058,10 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(tokenCost) },
-		Data = fundFrom
-				and json.encode({
-					tokenCost = tokenCost,
-					fundingSources = fundingSourcesResult,
-				})
+		Data = fundFrom and json.encode({
+				tokenCost = tokenCost,
+				fundingPlan = fundingPlan,
+			})
 			-- maintain backwards compatibility with the previous response format
 			or json.encode(tokenCost),
 	})
