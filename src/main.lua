@@ -1038,7 +1038,7 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 		return
 	end
 
-	local shouldContinue2, tokenCost = eventingPcall(
+	local shouldContinue2, tokenCostResult = eventingPcall(
 		msg.ioEvent,
 		function(error)
 			ao.send({
@@ -1061,6 +1061,7 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 	if not shouldContinue2 then
 		return
 	end
+	local tokenCost = tokenCostResult.tokenCost
 
 	local shouldContinue3, fundingPlan = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
@@ -1076,10 +1077,12 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(tokenCost) },
-		Data = fundFrom and json.encode({
-				tokenCost = tokenCost,
-				fundingPlan = fundingPlan,
-			})
+		Data = fundFrom
+				and json.encode({
+					tokenCost = tokenCost,
+					fundingPlan = fundingPlan,
+					discounts = tokenCostResult.discounts,
+				})
 			-- maintain backwards compatibility with the previous response format
 			or json.encode(tokenCost),
 	})

@@ -37,7 +37,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 
 	local baseRegistrationFee = demand.baseFeeForNameLength(#name)
 
-	local totalRegistrationFee = arns.getTokenCost({
+	local tokenCostResult = arns.getTokenCost({
 		currentTimestamp = timestamp,
 		intent = "Buy-Record",
 		name = name,
@@ -45,6 +45,8 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 		years = numYears,
 		from = from,
 	})
+
+	local totalRegistrationFee = tokenCostResult.tokenCost
 
 	local fundingPlan = gar.getFundingPlan(from, totalRegistrationFee, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
@@ -122,13 +124,14 @@ function arns.extendLease(from, name, years, currentTimestamp, msgId, fundFrom)
 	-- throw error if invalid
 	arns.assertValidExtendLease(record, currentTimestamp, years)
 	local baseRegistrationFee = demand.baseFeeForNameLength(#name)
-	local totalExtensionFee = arns.getTokenCost({
+	local tokenCostResult = arns.getTokenCost({
 		currentTimestamp = currentTimestamp,
 		intent = "Extend-Lease",
 		name = name,
 		years = years,
 		from = from,
 	})
+	local totalExtensionFee = tokenCostResult.tokenCost
 
 	local fundingPlan = gar.getFundingPlan(from, totalExtensionFee, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
@@ -466,6 +469,15 @@ end
 ---@field currentTimestamp number The current timestamp
 ---@field from string|nil The target address of the intended action
 
+---@class Discount
+---@field name string The name of the discount
+---@field discountedCost number The discounted cost
+---@field multiplier number The multiplier for the discount
+
+---@class TokenCostResult
+---@field tokenCost number The token cost in mIO of the intended action
+---@field discounts table The discounts applied to the token cost
+
 --- Gets the token cost for an intended action
 --- @param intendedAction IntendedAction The intended action with fields:
 ---   - purchaseType string|nil The type of purchase (lease/permabuy)
@@ -475,7 +487,7 @@ end
 ---   - intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name)
 ---   - currentTimestamp number The current timestamp
 ---   - from string|nil The target address of the intended action
---- @return number The token cost in mIO of the intended action
+--- @return TokenCostResult The token cost in mIO of the intended action
 function arns.getTokenCost(intendedAction)
 	local tokenCost = 0
 	local purchaseType = intendedAction.purchaseType
@@ -517,10 +529,18 @@ function arns.getTokenCost(intendedAction)
 		tokenCost = arns.calculatePermabuyFee(baseFee, demand.getDemandFactor())
 	end
 
+	local discounts = {}
+
 	-- if the address is eligible for the ArNS discount, apply the discount
 	if gar.isEligibleForArNSDiscount(intendedAction.from) then
-		local discount = math.floor(tokenCost * constants.ARNS_DISCOUNT_PERCENTAGE)
-		tokenCost = tokenCost - discount
+		local discountedCost = math.floor(tokenCost * constants.ARNS_DISCOUNT_PERCENTAGE)
+		local discount = {
+			name = "ArNS Discount",
+			discountedCost = discountedCost,
+			multiplier = constants.ARNS_DISCOUNT_PERCENTAGE,
+		}
+		table.insert(discounts, discount)
+		tokenCost = tokenCost - discountedCost
 	end
 
 	-- if token Cost is less than 0, throw an error
@@ -528,7 +548,7 @@ function arns.getTokenCost(intendedAction)
 		error("Invalid token cost for " .. intendedAction.intent)
 	end
 
-	return tokenCost
+	return { tokenCost = tokenCost, discounts = discounts }
 end
 
 --- Asserts that a name is valid for upgrading
@@ -554,27 +574,28 @@ function arns.upgradeRecord(from, name, currentTimestamp)
 	arns.assertValidUpgradeName(record, currentTimestamp)
 
 	local baseFee = demand.baseFeeForNameLength(#name)
-	local upgradeCost = arns.getTokenCost({
+	local tokenCostResult = arns.getTokenCost({
 		currentTimestamp = currentTimestamp,
 		intent = "Upgrade-Name",
 		name = name,
 		from = from,
 	})
+	local tokenCost = tokenCostResult.tokenCost
 
-	assert(balances.walletHasSufficientBalance(from, upgradeCost), "Insufficient balance")
+	assert(balances.walletHasSufficientBalance(from, tokenCost), "Insufficient balance")
 
 	record.endTimestamp = nil
 	record.type = "permabuy"
-	record.purchasePrice = upgradeCost
+	record.purchasePrice = tokenCost
 
-	balances.transfer(ao.id, from, upgradeCost)
-	demand.tallyNamePurchase(upgradeCost)
+	balances.transfer(ao.id, from, tokenCost)
+	demand.tallyNamePurchase(tokenCost)
 
 	NameRegistry.records[name] = record
 	return {
 		name = name,
 		record = record,
-		totalUpgradeFee = upgradeCost,
+		totalUpgradeFee = tokenCost,
 		baseRegistrationFee = baseFee,
 		remainingBalance = balances.getBalance(from),
 		protocolBalance = balances.getBalance(ao.id),

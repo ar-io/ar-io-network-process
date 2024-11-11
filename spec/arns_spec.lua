@@ -726,7 +726,7 @@ describe("arns", function()
 				currentTimestamp = timestamp,
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
-			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
 		end)
 		it("should return the correct token cost for a buying name permanently", function()
 			local baseFee = 500000000
@@ -739,7 +739,7 @@ describe("arns", function()
 				currentTimestamp = timestamp,
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
-			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
 		end)
 		it("should return the correct token cost for increasing undername limit", function()
 			_G.NameRegistry.records["test-name"] = {
@@ -764,7 +764,7 @@ describe("arns", function()
 				currentTimestamp = constants.oneYearMs / 2,
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
-			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
 		end)
 		it("should return the token cost for extending a lease", function()
 			_G.NameRegistry.records["test-name"] = {
@@ -786,7 +786,7 @@ describe("arns", function()
 				currentTimestamp = timestamp + constants.oneYearMs,
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
-			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
 		end)
 
 		it("should return the correct token cost for an ArNS discount eligible address", function()
@@ -811,7 +811,7 @@ describe("arns", function()
 			_G.DemandFactor.currentDemandFactor = demandFactor
 
 			local discountedCost = expectedCost - (math.floor(expectedCost * constants.ARNS_DISCOUNT_PERCENTAGE))
-			assert.are.equal(discountedCost, arns.getTokenCost(intendedAction))
+			assert.are.equal(discountedCost, arns.getTokenCost(intendedAction).tokenCost)
 		end)
 
 		it("should not apply discount on a gateway that is found but does not meet the requirements", function()
@@ -835,7 +835,7 @@ describe("arns", function()
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
 
-			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
 		end)
 
 		it(
