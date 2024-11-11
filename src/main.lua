@@ -857,12 +857,17 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 end)
 
 addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.ExtendLease), function(msg)
+	local fundFrom = msg.Tags["Fund-From"]
 	local checkAssertions = function()
 		assert(type(msg.Tags.Name) == "string", "Invalid name")
 		assert(
 			tonumber(msg.Tags.Years) > 0 and tonumber(msg.Tags.Years) < 5 and utils.isInteger(tonumber(msg.Tags.Years)),
 			"Invalid years. Must be integer between 1 and 5"
 		)
+		if fundFrom then
+			local validFundFrom = utils.createLookupTable({ "any", "balance", "stake" })
+			assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stake")
+		end
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -879,16 +884,26 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 		return
 	end
 
-	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.ExtendLease .. "-Notice",
-				Error = "Invalid-" .. ActionMap.ExtendLease,
-			},
-			Data = tostring(error),
-		})
-	end, arns.extendLease, msg.From, string.lower(msg.Tags.Name), tonumber(msg.Tags.Years), msg.Timestamp)
+	local shouldContinue2, result = eventingPcall(
+		msg.ioEvent,
+		function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Invalid-" .. ActionMap.ExtendLease .. "-Notice",
+					Error = "Invalid-" .. ActionMap.ExtendLease,
+				},
+				Data = tostring(error),
+			})
+		end,
+		arns.extendLease,
+		msg.From,
+		string.lower(msg.Tags.Name),
+		tonumber(msg.Tags.Years),
+		msg.Timestamp,
+		msg.Id,
+		fundFrom
+	)
 	if not shouldContinue2 then
 		return
 	end
