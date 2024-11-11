@@ -59,12 +59,14 @@ export const DEFAULT_HANDLE_OPTIONS = {
   'Hash-Chain': STUB_HASH_CHAIN,
 };
 
+export const INITIAL_OPERATOR_STAKE = '100000000000'; // 100K IO
+
 export const validGatewayTags = [
   { name: 'Action', value: 'Join-Network' },
   { name: 'Label', value: 'test-gateway' },
   { name: 'Note', value: 'test-note' },
   { name: 'FQDN', value: 'test-fqdn' },
-  { name: 'Operator-Stake', value: `${100_000_000_000}` }, // 100K IO
+  { name: 'Operator-Stake', value: `${INITIAL_OPERATOR_STAKE}` }, // 100K IO
   { name: 'Port', value: '443' },
   { name: 'Protocol', value: 'https' },
   { name: 'Allow-Delegated-Staking', value: 'true' },
