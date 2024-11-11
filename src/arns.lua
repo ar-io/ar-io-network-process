@@ -476,7 +476,7 @@ end
 
 ---@class TokenCostResult
 ---@field tokenCost number The token cost in mIO of the intended action
----@field discounts table The discounts applied to the token cost
+---@field discounts table|nil The discounts applied to the token cost
 
 --- Gets the token cost for an intended action
 --- @param intendedAction IntendedAction The intended action with fields:
@@ -548,7 +548,11 @@ function arns.getTokenCost(intendedAction)
 		error("Invalid token cost for " .. intendedAction.intent)
 	end
 
-	return { tokenCost = tokenCost, discounts = discounts }
+	return {
+		tokenCost = tokenCost,
+		-- if there are no discounts, set discounts to nil
+		discounts = #discounts > 0 and discounts or nil,
+	}
 end
 
 --- Asserts that a name is valid for upgrading
