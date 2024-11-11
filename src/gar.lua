@@ -1252,7 +1252,7 @@ function planExcessStakesDrawdown(fundingPlan)
 				local totalEpochsGatewayPassed = gateway.stats.passedEpochCount or 0
 				local totalEpochsParticipatedIn = gateway.stats.totalEpochCount or 0
 				local gatewayRewardRatioWeight = (1 + totalEpochsGatewayPassed) / (1 + totalEpochsParticipatedIn)
-				local delegate = gateway.delegates[fundingPlan.address]
+				local delegate = utils.deepCopy(gateway.delegates[fundingPlan.address])
 				delegate.excessStake = math.max(0, delegate.delegatedStake - gateway.settings.minDelegatedStake)
 				delegate.gatewayAddress = gatewayAddress
 				table.insert(acc, {
@@ -1417,7 +1417,7 @@ function gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
 						startTimestamp = vault.startTimestamp,
 						endTimestamp = vault.endTimestamp,
 					}
-					assert(acc[vaultId].balance >= 0, "Vault balance cannot be negative")
+					assert(acc[vaultId].balance > 0, "Vault balance should be greater than 0")
 				end
 				appliedPlan.totalFunded = appliedPlan.totalFunded + delegationPlan.vaults[vaultId]
 			else
@@ -1428,7 +1428,7 @@ function gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
 		end, {})
 
 		-- create an exit vault for the remaining stake if less than the gateway's minimum
-		if delegate.delegatedStake < gateway.settings.minDelegatedStake then
+		if delegate.delegatedStake > 0 and delegate.delegatedStake < gateway.settings.minDelegatedStake then
 			-- create a vault for the remaining stake
 			delegate.vaults[msgId] = {
 				balance = delegate.delegatedStake,
@@ -1439,6 +1439,8 @@ function gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
 			gateway.totalDelegatedStake = gateway.totalDelegatedStake - delegate.delegatedStake
 			appliedPlan.newWithdrawVaults[gatewayAddress] = utils.deepCopy(delegate.vaults[msgId])
 		end
+
+		-- TODO: ensure delegates with 0 stake and no vaults are pruned
 
 		-- update the gateway
 		GatewayRegistry[gatewayAddress] = gateway

@@ -4,7 +4,9 @@ import {
   AO_LOADER_HANDLER_ENV,
   DEFAULT_HANDLE_OPTIONS,
   STUB_ADDRESS,
+  STUB_TIMESTAMP,
   PROCESS_OWNER,
+  validGatewayTags,
 } from '../tools/constants.mjs';
 
 const initialOperatorStake = 100_000_000_000;
@@ -51,4 +53,32 @@ export const transfer = async ({
   );
   assertNoResultError(transferResult);
   return transferResult.Memory;
+};
+
+export const joinNetwork = async ({
+  memory,
+  timestamp = STUB_TIMESTAMP,
+  address,
+  tags = validGatewayTags,
+}) => {
+  // give them the join network token amount
+  const transferMemory = await transfer({
+    recipient: address,
+    quantity: 100_000_000_000,
+    memory,
+  });
+  const joinNetworkResult = await handle(
+    {
+      From: address,
+      Owner: address,
+      Tags: tags,
+      Timestamp: timestamp,
+    },
+    transferMemory,
+  );
+  assertNoResultError(joinNetworkResult);
+  return {
+    memory: joinNetworkResult.Memory,
+    result: joinNetworkResult,
+  };
 };
