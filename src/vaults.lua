@@ -119,12 +119,19 @@ function vaults.getVaults()
 	return utils.deepCopy(Vaults) or {}
 end
 
+--- @class WalletVault
+--- @field address string - the wallet address that owns the vault
+--- @field vaultId string - the unique id of the vault
+--- @field startTimestamp number - the timestamp in ms of the vault started
+--- @field endTimestamp number - the ending timestamp of the vault
+--- @field balance number - the number of mIO stored in the vault
+
 --- Gets all paginated vaults
 --- @param cursor string|nil The address to start from
 --- @param limit number Max number of results to return
 --- @param sortOrder string "asc" or "desc" sort direction
 --- @param sortBy string|nil "address", "vaultId", "balance", "startTimestamp", "endTimestamp" field to sort by
---- @return table Array of { address, vaultId, balance, startTimestamp, endTimestamp } objects
+--- @return WalletVault[] - array of wallet vaults indexed by address and vault id
 function vaults.getPaginatedVaults(cursor, limit, sortOrder, sortBy)
 	local allVaults = vaults.getVaults()
 	local cursorField = "address" -- the cursor will be the wallet address
