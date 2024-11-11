@@ -119,6 +119,10 @@ function vaults.getVaults()
 	return utils.deepCopy(Vaults) or {}
 end
 
+function vaults.getVaultsUnsafe()
+	return Vaults or {}
+end
+
 --- @class WalletVault
 --- @field address string - the wallet address that owns the vault
 --- @field vaultId string - the unique id of the vault
@@ -133,7 +137,7 @@ end
 --- @param sortBy string|nil "address", "vaultId", "balance", "startTimestamp", "endTimestamp" field to sort by
 --- @return WalletVault[] - array of wallet vaults indexed by address and vault id
 function vaults.getPaginatedVaults(cursor, limit, sortOrder, sortBy)
-	local allVaults = vaults.getVaults()
+	local allVaults = vaults.getVaultsUnsafe()
 	local cursorField = "address" -- the cursor will be the wallet address
 
 	local vaultsArray = utils.reduce(allVaults, function(acc, address, vaultsForAddress)
