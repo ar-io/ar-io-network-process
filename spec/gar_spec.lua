@@ -2455,4 +2455,134 @@ describe("gar", function()
 			end
 		)
 	end)
+
+	describe("applyFundingPlan", function()
+		it("should apply the funding plan and return the applied plan and total spent", function()
+			_G.Balances = {
+				["test-address-1"] = 100, -- all of this will get drawn down
+			}
+			_G.GatewayRegistry["gateway-1"] = {
+				totalDelegatedStake = 51, -- 50 of this will get drawn down
+				vaults = {},
+				delegates = {
+					["test-address-1"] = {
+						delegatedStake = 51, -- 50 of this will get drawn down
+						vaults = {
+							["vault-1"] = {
+								balance = 20, -- 10 of this will get drawn down
+								startTimestamp = 0,
+								endTimestamp = 1000,
+							},
+							["vault-2"] = {
+								balance = 10, -- all of this will get drawn down
+								startTimestamp = 0,
+								endTimestamp = 998,
+							},
+						},
+					},
+				},
+				settings = {
+					minDelegatedStake = 1,
+				},
+				stats = {
+					passedEpochCount = 1,
+					totalEpochCount = 3,
+				},
+			}
+			_G.GatewayRegistry["gateway-2"] = {
+				totalDelegatedStake = 42, -- 40 of this will get drawn down
+				vaults = {},
+				delegates = {
+					["test-address-1"] = {
+						delegatedStake = 42, -- 40 of this will get drawn down
+						vaults = {
+							["vault-3"] = {
+								balance = 10, -- this will not be drawn down
+								startTimestamp = 0,
+								endTimestamp = 999,
+							},
+						},
+					},
+				},
+				settings = {
+					minDelegatedStake = 2,
+				},
+				stats = {
+					passedEpochCount = 1,
+					totalEpochCount = 3,
+				},
+			}
+			local fundingPlan = {
+				address = "test-address-1",
+				balance = 100,
+				stakes = {
+					["gateway-1"] = {
+						delegatedStake = 50,
+						vaults = {
+							["vault-1"] = 10,
+							["vault-2"] = 10,
+						},
+					},
+					["gateway-2"] = {
+						delegatedStake = 40,
+						vaults = {},
+					},
+				},
+			}
+			local result = gar.applyFundingPlan(fundingPlan, "stub-msg-id", 12345)
+			assert.are.same({
+				totalFunded = 210,
+				newWithdrawVaults = {},
+			}, result)
+			assert.equals(0, _G.Balances["test-address-1"])
+			assert.are.same({
+				totalDelegatedStake = 1,
+				vaults = {},
+				delegates = {
+					["test-address-1"] = {
+						delegatedStake = 1,
+						vaults = {
+							-- drawn down
+							["vault-1"] = {
+								balance = 10,
+								startTimestamp = 0,
+								endTimestamp = 1000,
+							},
+						},
+					},
+				},
+				settings = {
+					minDelegatedStake = 1,
+				},
+				stats = {
+					passedEpochCount = 1,
+					totalEpochCount = 3,
+				},
+			}, _G.GatewayRegistry["gateway-1"])
+			assert.are.same({
+				totalDelegatedStake = 2,
+				vaults = {},
+				delegates = {
+					["test-address-1"] = {
+						delegatedStake = 2,
+						vaults = {
+							-- untouched
+							["vault-3"] = {
+								balance = 10,
+								startTimestamp = 0,
+								endTimestamp = 999,
+							},
+						},
+					},
+				},
+				settings = {
+					minDelegatedStake = 2,
+				},
+				stats = {
+					passedEpochCount = 1,
+					totalEpochCount = 3,
+				},
+			}, _G.GatewayRegistry["gateway-2"])
+		end)
+	end)
 end)
