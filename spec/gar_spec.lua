@@ -2182,4 +2182,450 @@ describe("gar", function()
 			}, nextDelegates)
 		end)
 	end)
+
+	describe("getFundingPlan", function()
+		before_each(function()
+			_G.Balances = {}
+		end)
+
+		it("should identify a shortfall when the user has no spending power of any kind", function()
+			local fundingPlan = gar.getFundingPlan(stubRandomAddress, 1000, "any")
+			assert.are.same({
+				address = stubRandomAddress,
+				balance = 0,
+				stakes = {},
+				shortfall = 1000,
+			}, fundingPlan)
+		end)
+
+		it(
+			"should use balance when the user has just enough and preferred source is either 'balance' or 'any'",
+			function()
+				_G.Balances[stubRandomAddress] = 1000
+				assert.are.same({
+					address = stubRandomAddress,
+					balance = 1000,
+					stakes = {},
+					shortfall = 0,
+				}, gar.getFundingPlan(stubRandomAddress, 1000, "any"))
+				assert.are.same({
+					address = stubRandomAddress,
+					balance = 1000,
+					stakes = {},
+					shortfall = 0,
+				}, gar.getFundingPlan(stubRandomAddress, 1000, "balance"))
+			end
+		)
+
+		it("should have a shortfall when holding balance but no stakes and funding source is 'stakes'", function()
+			_G.Balances[stubRandomAddress] = 1000
+			assert.are.same({
+				address = stubRandomAddress,
+				balance = 0,
+				stakes = {},
+				shortfall = 1000,
+			}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
+		end)
+
+		it(
+			"should use stakes in excess of gateway minimum stake from a single gateway whether or not holding balance and funding source is 'stakes'",
+			function()
+				_G.GatewayRegistry[stubGatewayAddress] = {
+					totalDelegatedStake = 1500,
+					vaults = {},
+					delegates = {
+						[stubRandomAddress] = {
+							delegatedStake = 1500,
+							vaults = {},
+						},
+					},
+					settings = {
+						minDelegatedStake = 500,
+					},
+					stats = {
+						passedEpochCount = 0,
+						totalEpochCount = 0,
+					},
+				}
+				assert.are.same({
+					address = stubRandomAddress,
+					balance = 0,
+					stakes = {
+						[stubGatewayAddress] = {
+							delegatedStake = 1000,
+							vaults = {},
+						},
+					},
+					shortfall = 0,
+				}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
+
+				_G.Balances[stubRandomAddress] = 1000
+				assert.are.same({
+					address = stubRandomAddress,
+					balance = 0,
+					stakes = {
+						[stubGatewayAddress] = {
+							delegatedStake = 1000,
+							vaults = {},
+						},
+					},
+					shortfall = 0,
+				}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
+			end
+		)
+
+		it(
+			"should use stakes in excess of gateway minimum stake from multiple gateways whether or not holding balance and funding source is 'stakes'",
+			function()
+				-- TO TEST:
+				-- Excess stakes above the minimum are used first, ordered from largest excess over each gateways’ proposed minimum to smallest.
+				-- Tie broken here by ordering from worst performing gateway to best
+				-- Next tie breaker is highest total gateway stake to lowest (hurst the biggest and baddest gateway first)
+				-- Final tie breaker is gateway tenure
+				_G.GatewayRegistry[stubGatewayAddress] = {
+					totalDelegatedStake = 1000,
+					vaults = {},
+					delegates = {
+						[stubRandomAddress] = {
+							delegatedStake = 800, -- 750 over minimum, but lower total delegated stake
+							vaults = {},
+						},
+					},
+					settings = {
+						minDelegatedStake = 50,
+					},
+					stats = {
+						passedEpochCount = 0,
+						totalEpochCount = 0,
+					},
+				}
+				_G.GatewayRegistry[stubObserverAddress] = {
+					totalDelegatedStake = 1000,
+					vaults = {},
+					delegates = {
+						[stubRandomAddress] = {
+							delegatedStake = 1000, -- 300 over minimum, but higher total delegated stake
+							vaults = {},
+						},
+					},
+					settings = {
+						minDelegatedStake = 700,
+					},
+					stats = {
+						passedEpochCount = 0,
+						totalEpochCount = 0,
+					},
+				}
+				for _, balance in pairs({ 0, 10000 }) do
+					_G.Balances[stubRandomAddress] = balance
+
+					assert.are.same({
+						address = stubRandomAddress,
+						balance = 0,
+						stakes = {
+							[stubGatewayAddress] = {
+								delegatedStake = 750,
+								vaults = {},
+							},
+							[stubObserverAddress] = {
+								delegatedStake = 250, -- not using all available excess stake because ranked lower in ordering
+								vaults = {},
+							},
+						},
+						shortfall = 0,
+					}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
+				end
+			end
+		)
+
+		it(
+			"should use vaulted stake withdrawals from multiple gateways when no excess stake is available and whether or not holding balance and funding source is 'stakes'",
+			function()
+				-- TO TEST:
+				-- Withdraw balances are used next, ordered from nearest-to-liquid to furthest from liquid.
+				-- tie broken here by smallest to largest to help the contract save memory when pruning expended vaults
+				_G.GatewayRegistry[stubGatewayAddress] = {
+					totalDelegatedStake = 1000,
+					vaults = {},
+					delegates = {
+						[stubRandomAddress] = {
+							delegatedStake = 50, -- lower total delegated stake
+							vaults = {
+								["vault_id_1"] = {
+									balance = 1000, -- enough to satisfy the whole purchase but ordered lower for drawdown
+									startTimestamp = 0,
+									endTimestamp = 1001, -- later end timestamp
+								},
+							},
+						},
+					},
+					settings = {
+						minDelegatedStake = 50,
+					},
+					stats = {
+						passedEpochCount = 0,
+						totalEpochCount = 0,
+					},
+				}
+				_G.GatewayRegistry[stubObserverAddress] = {
+					totalDelegatedStake = 1000,
+					vaults = {},
+					delegates = {
+						[stubRandomAddress] = {
+							delegatedStake = 700, -- higher total delegated stake
+							vaults = {
+								["vault_id_2"] = {
+									balance = 250,
+									startTimestamp = 0,
+									endTimestamp = 1000, -- earlier end timestamp
+								},
+							},
+						},
+					},
+					settings = {
+						minDelegatedStake = 700,
+					},
+					stats = {
+						passedEpochCount = 0,
+						totalEpochCount = 0,
+					},
+				}
+
+				for _, balance in pairs({ 0, 1000 }) do
+					_G.Balances[stubRandomAddress] = balance
+					assert.are.same({
+						address = stubRandomAddress,
+						balance = 0,
+						stakes = {
+							[stubGatewayAddress] = {
+								delegatedStake = 0,
+								vaults = {
+									["vault_id_1"] = 750, -- partial drawdown (750 of 1000)
+								},
+							},
+							[stubObserverAddress] = {
+								delegatedStake = 0,
+								vaults = {
+									["vault_id_2"] = 250, -- whole vault
+								},
+							},
+						},
+						shortfall = 0,
+					}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
+				end
+			end
+		)
+
+		it(
+			"should use minimum stakes from multiple gateways if needed and funding source is 'any' or 'stakes'",
+			function()
+				-- TO TEST:
+				-- Minimum stakes are used next ordered from:
+				-- worst performing gateway to best performing gateway
+				-- Next tie breaker is highest total gateway stake to lowest (hurst the biggest and baddest gateway first)
+				-- Final tie breaker is gateway tenure
+				_G.GatewayRegistry[stubGatewayAddress] = {
+					totalDelegatedStake = 2,
+					vaults = {},
+					delegates = {
+						[stubRandomAddress] = {
+							delegatedStake = 2,
+							vaults = {
+								["vault_id_1"] = {
+									balance = 1,
+									startTimestamp = 0,
+									endTimestamp = 1001, -- later end timestamp
+								},
+							},
+						},
+					},
+					settings = {
+						minDelegatedStake = 1,
+					},
+					stats = {
+						passedEpochCount = 1,
+						totalEpochCount = 5,
+					},
+				}
+				_G.GatewayRegistry[stubObserverAddress] = {
+					totalDelegatedStake = 3,
+					vaults = {},
+					delegates = {
+						[stubRandomAddress] = {
+							delegatedStake = 3,
+							vaults = {
+								["vault_id_2"] = {
+									balance = 1,
+									startTimestamp = 0,
+									endTimestamp = 1000, -- earlier end timestamp
+								},
+							},
+						},
+					},
+					settings = {
+						minDelegatedStake = 1,
+					},
+					stats = {
+						passedEpochCount = 1,
+						totalEpochCount = 3,
+					},
+				}
+
+				for _, fundingPreference in pairs({ "any", "stakes" }) do
+					for _, balance in pairs({ 0, 10 }) do
+						_G.Balances[stubRandomAddress] = balance
+						assert.are.same({
+							address = stubRandomAddress,
+							balance = fundingPreference == "any" and balance or 0,
+							stakes = {
+								[stubGatewayAddress] = {
+									delegatedStake = 2,
+									vaults = {
+										["vault_id_1"] = 1,
+									},
+								},
+								[stubObserverAddress] = {
+									delegatedStake = 3,
+									vaults = {
+										["vault_id_2"] = 1,
+									},
+								},
+							},
+							shortfall = 993 - (fundingPreference == "any" and balance or 0),
+						}, gar.getFundingPlan(stubRandomAddress, 1000, fundingPreference))
+					end
+				end
+			end
+		)
+	end)
+
+	describe("applyFundingPlan", function()
+		it("should apply the funding plan and return the applied plan and total spent", function()
+			_G.Balances = {
+				["test-address-1"] = 100, -- all of this will get drawn down
+			}
+			_G.GatewayRegistry["gateway-1"] = {
+				totalDelegatedStake = 51, -- 50 of this will get drawn down
+				vaults = {},
+				delegates = {
+					["test-address-1"] = {
+						delegatedStake = 51, -- 50 of this will get drawn down
+						vaults = {
+							["vault-1"] = {
+								balance = 20, -- 10 of this will get drawn down
+								startTimestamp = 0,
+								endTimestamp = 1000,
+							},
+							["vault-2"] = {
+								balance = 10, -- all of this will get drawn down
+								startTimestamp = 0,
+								endTimestamp = 998,
+							},
+						},
+					},
+				},
+				settings = {
+					minDelegatedStake = 1,
+				},
+				stats = {
+					passedEpochCount = 1,
+					totalEpochCount = 3,
+				},
+			}
+			_G.GatewayRegistry["gateway-2"] = {
+				totalDelegatedStake = 42, -- 40 of this will get drawn down
+				vaults = {},
+				delegates = {
+					["test-address-1"] = {
+						delegatedStake = 42, -- 40 of this will get drawn down
+						vaults = {
+							["vault-3"] = {
+								balance = 10, -- this will not be drawn down
+								startTimestamp = 0,
+								endTimestamp = 999,
+							},
+						},
+					},
+				},
+				settings = {
+					minDelegatedStake = 2,
+				},
+				stats = {
+					passedEpochCount = 1,
+					totalEpochCount = 3,
+				},
+			}
+			local fundingPlan = {
+				address = "test-address-1",
+				balance = 100,
+				stakes = {
+					["gateway-1"] = {
+						delegatedStake = 50,
+						vaults = {
+							["vault-1"] = 10,
+							["vault-2"] = 10,
+						},
+					},
+					["gateway-2"] = {
+						delegatedStake = 40,
+						vaults = {},
+					},
+				},
+			}
+			local result = gar.applyFundingPlan(fundingPlan, "stub-msg-id", 12345)
+			assert.are.same({
+				totalFunded = 210,
+				newWithdrawVaults = {},
+			}, result)
+			assert.equals(0, _G.Balances["test-address-1"])
+			assert.are.same({
+				totalDelegatedStake = 1,
+				vaults = {},
+				delegates = {
+					["test-address-1"] = {
+						delegatedStake = 1,
+						vaults = {
+							-- drawn down
+							["vault-1"] = {
+								balance = 10,
+								startTimestamp = 0,
+								endTimestamp = 1000,
+							},
+						},
+					},
+				},
+				settings = {
+					minDelegatedStake = 1,
+				},
+				stats = {
+					passedEpochCount = 1,
+					totalEpochCount = 3,
+				},
+			}, _G.GatewayRegistry["gateway-1"])
+			assert.are.same({
+				totalDelegatedStake = 2,
+				vaults = {},
+				delegates = {
+					["test-address-1"] = {
+						delegatedStake = 2,
+						vaults = {
+							-- untouched
+							["vault-3"] = {
+								balance = 10,
+								startTimestamp = 0,
+								endTimestamp = 999,
+							},
+						},
+					},
+				},
+				settings = {
+					minDelegatedStake = 2,
+				},
+				stats = {
+					passedEpochCount = 1,
+					totalEpochCount = 3,
+				},
+			}, _G.GatewayRegistry["gateway-2"])
+		end)
+	end)
 end)
