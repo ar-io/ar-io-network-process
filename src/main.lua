@@ -140,7 +140,6 @@ local function addRecordResultFields(ioEvent, result)
 		})
 	end
 
-	-- ioEvent:addFieldsIfExist(result, { "fundingPlan", "appliedPlan" })
 	ioEvent:addFieldsWithPrefixIfExist(result.fundingPlan, "FP-", { "balance" })
 	local fundingPlanVaultsCount = 0
 	local fundingPlanStakesAmount = utils.reduce(
@@ -162,7 +161,7 @@ local function addRecordResultFields(ioEvent, result)
 		ioEvent:addField("FP-Vaults-Count", fundingPlanVaultsCount)
 	end
 	local newWithdrawVaultsTallies = utils.reduce(
-		result.appliedPlan and result.appliedPlan.newWithdrawVaults or {},
+		result.fundingResult and result.fundingResult.newWithdrawVaults or {},
 		function(acc, _, newWithdrawVault)
 			acc.totalBalance = acc.totalBalance
 				+ utils.reduce(newWithdrawVault, function(acc2, _, vault)
@@ -2626,8 +2625,13 @@ end)
 
 addEventingHandler("paginatedGateways", utils.hasMatchingTag("Action", "Paginated-Gateways"), function(msg)
 	local page = utils.parsePaginationTags(msg)
-	local status, result =
-		pcall(gar.getPaginatedGateways, page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
+	local status, result = pcall(
+		gar.getPaginatedGateways,
+		page.cursor,
+		page.limit,
+		page.sortBy or "startTimestamp",
+		page.sortOrder or "desc"
+	)
 	if not status then
 		ao.send({
 			Target = msg.From,

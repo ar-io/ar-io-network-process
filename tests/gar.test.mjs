@@ -1304,6 +1304,7 @@ describe('GatewayRegistry', async () => {
       const { memory: addGatewayMemory2 } = await joinNetwork({
         address: secondGatewayAddress,
         memory: sharedMemory,
+        timestamp: STUB_TIMESTAMP - 1,
       });
       let cursor;
       let fetchedGateways = [];
