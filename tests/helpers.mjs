@@ -61,11 +61,12 @@ export const joinNetwork = async ({
   timestamp = STUB_TIMESTAMP,
   address,
   tags = validGatewayTags,
+  quantity = 100_000_000_000,
 }) => {
   // give them the join network token amount
   const transferMemory = await transfer({
     recipient: address,
-    quantity: 100_000_000_000,
+    quantity,
     memory,
   });
   const joinNetworkResult = await handle(
