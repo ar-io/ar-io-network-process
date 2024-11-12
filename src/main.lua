@@ -791,7 +791,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = ActionMap.BuyRecord .. "-Notice", Name = name },
-		Data = json.encode({
+		Data = json.encode(fundFrom and result or {
 			name = name,
 			startTimestamp = record.startTimestamp,
 			endTimestamp = record.endTimestamp,
@@ -923,7 +923,7 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = ActionMap.ExtendLease .. "-Notice", Name = string.lower(msg.Tags.Name) },
-		Data = json.encode(recordResult),
+		Data = json.encode(fundFrom and result or recordResult),
 	})
 end)
 
@@ -997,7 +997,7 @@ addEventingHandler(
 				Action = ActionMap.IncreaseUndernameLimit .. "-Notice",
 				Name = string.lower(msg.Tags.Name),
 			},
-			Data = json.encode(recordResult),
+			Data = json.encode(fundFrom and result or recordResult),
 		})
 	end
 )

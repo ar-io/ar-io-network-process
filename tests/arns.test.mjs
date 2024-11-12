@@ -13,6 +13,8 @@ import {
 // EIP55-formatted test address
 const testEthAddress = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa';
 
+const STUB_OPERATOR_ADDRESS = ''.padEnd(43, 'E');
+
 describe('ArNS', async () => {
   const runBuyRecord = async ({
     sender = STUB_ADDRESS,
@@ -290,7 +292,6 @@ describe('ArNS', async () => {
     });
 
     it('should increase the undernames by spending from stakes', async () => {
-      const STUB_OPERATOR_ADDRESS = ''.padEnd(43, 'E');
       const assertIncreaseUndername = async (sender) => {
         let memory = startMemory;
 
@@ -573,6 +574,99 @@ describe('ArNS', async () => {
       assert.equal(
         record.endTimestamp,
         recordBefore.endTimestamp + 60 * 1000 * 60 * 24 * 365,
+      );
+    });
+
+    it('should properly handle extending a leased record paying with balance and stakes', async () => {
+      let memory = startMemory;
+      // Send enough money to the user to delegate stake, buy record, and increase undername limit
+      memory = await transfer({
+        recipient: STUB_ADDRESS,
+        quantity: 700000000, // 600000000 for name purchase + 100000000 for extending the lease
+        memory,
+        cast: true,
+      });
+
+      // Stake a gateway for the user to delegate to
+      const joinNetworkResult = await joinNetwork({
+        memory,
+        address: STUB_OPERATOR_ADDRESS,
+      });
+      memory = joinNetworkResult.memory;
+
+      const stakeResult = await handle(
+        {
+          From: STUB_ADDRESS,
+          Owner: STUB_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Delegate-Stake' },
+            { name: 'Quantity', value: `${650000000}` }, // delegate more of their balance so that name purchase uses balance and stakes
+            { name: 'Address', value: STUB_OPERATOR_ADDRESS }, // our gateway address
+          ],
+          Timestamp: STUB_TIMESTAMP + 1,
+        },
+        memory,
+      );
+      memory = stakeResult.Memory;
+
+      const buyRecordResult = await handle(
+        {
+          From: STUB_ADDRESS,
+          Owner: STUB_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Purchase-Type', value: 'lease' },
+            { name: 'Years', value: '1' },
+            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+            { name: 'Fund-From', value: 'any' },
+          ],
+        },
+        memory,
+      );
+      memory = buyRecordResult.Memory;
+
+      const recordResultBefore = await handle(
+        {
+          From: STUB_ADDRESS,
+          Owner: STUB_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Record' },
+            { name: 'Name', value: 'test-name' },
+          ],
+        },
+        buyRecordResult.Memory,
+      );
+      const recordBefore = JSON.parse(recordResultBefore.Messages[0].Data);
+
+      // Last 100,000,000 mIO will be paid from exit vault 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm'
+      const extendResult = await handle(
+        {
+          From: STUB_ADDRESS,
+          Owner: STUB_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Extend-Lease' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Years', value: '1' },
+            { name: 'Fund-From', value: 'any' },
+          ],
+        },
+        buyRecordResult.Memory,
+      );
+
+      const recordResult = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Record' },
+            { name: 'Name', value: 'test-name' },
+          ],
+        },
+        extendResult.Memory,
+      );
+      const record = JSON.parse(recordResult.Messages[0].Data);
+      assert.equal(
+        recordBefore.endTimestamp + 60 * 1000 * 60 * 24 * 365,
+        record.endTimestamp,
       );
     });
   });
