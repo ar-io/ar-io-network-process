@@ -838,9 +838,11 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 end)
 
 addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.UpgradeName), function(msg)
+	local fundFrom = msg.Tags["Fund-From"]
 	local checkAssertions = function()
 		assert(type(msg.Tags.Name) == "string", "Invalid name")
 		assert(msg.Timestamp, "Timestamp is required")
+		assertValidFundFrom(fundFrom)
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -867,7 +869,7 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 			},
 			Data = tostring(error),
 		})
-	end, arns.upgradeRecord, from, name, timestamp)
+	end, arns.upgradeRecord, from, name, timestamp, msg.Id, fundFrom)
 	if not shouldContinue2 then
 		return
 	end
@@ -883,7 +885,7 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 	ao.send({
 		Target = from,
 		Tags = { Action = ActionMap.UpgradeName .. "-Notice", Name = name },
-		Data = json.encode({
+		Data = json.encode(fundFrom and result or {
 			name = name,
 			startTimestamp = record.startTimestamp,
 			endTimestamp = record.endTimestamp,

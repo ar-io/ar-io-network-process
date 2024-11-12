@@ -1,4 +1,10 @@
-import { handle, joinNetwork, startMemory, transfer } from './helpers.mjs';
+import {
+  handle,
+  joinNetwork,
+  startMemory,
+  setUpStake,
+  transfer,
+} from './helpers.mjs';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import {
@@ -7,13 +13,13 @@ import {
   STUB_ADDRESS,
   INITIAL_PROTOCOL_BALANCE,
   STUB_MESSAGE_ID,
+  STUB_OPERATOR_ADDRESS,
   STUB_TIMESTAMP,
 } from '../tools/constants.mjs';
+import { assertNoResultError } from './utils.mjs';
 
 // EIP55-formatted test address
 const testEthAddress = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa';
-
-const STUB_OPERATOR_ADDRESS = ''.padEnd(43, 'E');
 
 describe('ArNS', async () => {
   const runBuyRecord = async ({
@@ -579,35 +585,13 @@ describe('ArNS', async () => {
 
     it('should properly handle extending a leased record paying with balance and stakes', async () => {
       let memory = startMemory;
-      // Send enough money to the user to delegate stake, buy record, and increase undername limit
-      memory = await transfer({
-        recipient: STUB_ADDRESS,
-        quantity: 700000000, // 600000000 for name purchase + 100000000 for extending the lease
+      const stakeResult = await setUpStake({
         memory,
-        cast: true,
+        transferQty: 700000000, // 600000000 for name purchase + 100000000 for extending the lease
+        stakeQty: 650000000, // delegate most of their balance so that name purchase uses balance and stakes
       });
 
-      // Stake a gateway for the user to delegate to
-      const joinNetworkResult = await joinNetwork({
-        memory,
-        address: STUB_OPERATOR_ADDRESS,
-      });
-      memory = joinNetworkResult.memory;
-
-      const stakeResult = await handle(
-        {
-          From: STUB_ADDRESS,
-          Owner: STUB_ADDRESS,
-          Tags: [
-            { name: 'Action', value: 'Delegate-Stake' },
-            { name: 'Quantity', value: `${650000000}` }, // delegate more of their balance so that name purchase uses balance and stakes
-            { name: 'Address', value: STUB_OPERATOR_ADDRESS }, // our gateway address
-          ],
-          Timestamp: STUB_TIMESTAMP + 1,
-        },
-        memory,
-      );
-      memory = stakeResult.Memory;
+      memory = stakeResult.memory;
 
       const buyRecordResult = await handle(
         {
@@ -727,6 +711,81 @@ describe('ArNS', async () => {
         undernameLimit: 10,
         purchasePrice: 2500000000, // expected price for a permanent 9 character name
       });
+    });
+
+    it('should properly handle upgrading a name paying with balance and stakes', async () => {
+      let memory = startMemory;
+      const stakeResult = await setUpStake({
+        memory,
+        transferQty: 3_100_000_000, // 60,000,0000 for name purchase + 2,500,000,000 for upgrading the name
+        stakeQty: 3_100_000_000 - 50_000_000, // delegate most of their balance so that name purchase uses balance and stakes
+        stakerAddress: STUB_ADDRESS,
+      });
+      memory = stakeResult.memory;
+
+      const buyRecordTimestamp = STUB_TIMESTAMP + 1;
+      const buyRecordResult = await handle(
+        {
+          From: STUB_ADDRESS,
+          Owner: STUB_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Purchase-Type', value: 'lease' },
+            { name: 'Years', value: '1' },
+            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+            { name: 'Fund-From', value: 'any' },
+          ],
+          Timestamp: buyRecordTimestamp,
+        },
+        memory,
+      );
+      assertNoResultError(buyRecordResult);
+
+      // now upgrade the name
+      const upgradeNameResult = await handle(
+        {
+          From: STUB_ADDRESS,
+          Owner: STUB_ADDRESS,
+          Tags: [
+            { name: 'Action', value: 'Upgrade-Name' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Fund-From', value: 'stakes' },
+          ],
+          Timestamp: buyRecordTimestamp + 1,
+        },
+        buyRecordResult.Memory,
+      );
+      assertNoResultError(upgradeNameResult);
+
+      // assert the message includes the upgrade name notice
+      const upgradeNameNoticeTag = upgradeNameResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Action' && tag.value === 'Upgrade-Name-Notice',
+      );
+
+      assert.ok(upgradeNameNoticeTag);
+
+      const upgradedNameData = JSON.parse(
+        upgradeNameResult.Messages?.[0]?.Data,
+      );
+      assert.deepStrictEqual(
+        {
+          name: upgradedNameData.name,
+          type: upgradedNameData.record.type,
+          startTimestamp: upgradedNameData.record.startTimestamp,
+          processId: upgradedNameData.record.processId,
+          undernameLimit: upgradedNameData.record.undernameLimit,
+          purchasePrice: upgradedNameData.record.purchasePrice,
+        },
+        {
+          name: 'test-name',
+          type: 'permabuy',
+          startTimestamp: buyRecordTimestamp,
+          processId: ''.padEnd(43, 'a'),
+          undernameLimit: 10,
+          purchasePrice: 2500000000, // expected price for a permanent 9 character name
+        },
+      );
     });
   });
 
