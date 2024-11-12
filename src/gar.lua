@@ -1298,7 +1298,7 @@ function planExcessStakesDrawdown(fundingPlan)
 		}
 		fundingPlan.shortfall = fundingPlan.shortfall - stakeToDraw
 		gatewayInfo.delegate.delegatedStake = gatewayInfo.delegate.delegatedStake - stakeToDraw
-		-- maintain consistency
+		-- maintain consistency for future re-sorting of the gatewayInfos based on theoretical updated state
 		gatewayInfo.delegate.excessStake = excessStake - stakeToDraw
 		gatewayInfo.totalDelegatedStake = gatewayInfo.totalDelegatedStake - stakeToDraw
 	end
