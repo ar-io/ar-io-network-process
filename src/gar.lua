@@ -1308,6 +1308,7 @@ end
 function planVaultsDrawdown(fundingPlan, gatewaysInfo)
 	-- simulate drawing down vaults until the remaining balance is satisfied OR vaults are exhausted
 	local vaults = utils.sortTableByFields(
+		-- flatten the vaults across all gateways so we can sort them together
 		utils.reduce(gatewaysInfo, function(acc, _, gatewayInfo)
 			for vaultId, vault in pairs(gatewayInfo.delegate.vaults) do
 				table.insert(acc, {
