@@ -390,7 +390,8 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	if
 		prevEpochIndex >= 0
 		and (
-			prevEpoch.distributions.distributedTimestamp == nil
+			prevEpoch.distributions == nil
+			or prevEpoch.distributions.distributedTimestamp == nil
 			or timestamp < prevEpoch.distributions.distributedTimestamp
 		)
 	then
