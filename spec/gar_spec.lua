@@ -2158,7 +2158,36 @@ describe("gar", function()
 		it(
 			"should use balance when the user has just enough and preferred source is either 'balance' or 'any'",
 			function()
-				_G.Balances[stubRandomAddress] = 1000
+				local expectedBalances = {
+					[stubRandomAddress] = 1000,
+				}
+				local expectedGatewaysRegistry = {
+					[stubGatewayAddress] = {
+						totalDelegatedStake = 1500,
+						vaults = {},
+						delegates = {
+							[stubRandomAddress] = {
+								delegatedStake = 1500, -- none of this should be touched
+								vaults = {
+									["vault_id_1"] = {
+										balance = 1000, -- none of this should be touched
+										startTimestamp = 0,
+										endTimestamp = 1001,
+									},
+								},
+							},
+						},
+						settings = {
+							minDelegatedStake = 500,
+						},
+						stats = {
+							passedEpochCount = 0,
+							totalEpochCount = 0,
+						},
+					},
+				}
+				_G.Balances = expectedBalances
+				_G.GatewayRegistry = expectedGatewaysRegistry
 				assert.are.same({
 					address = stubRandomAddress,
 					balance = 1000,
@@ -2171,10 +2200,16 @@ describe("gar", function()
 					stakes = {},
 					shortfall = 0,
 				}, gar.getFundingPlan(stubRandomAddress, 1000, "balance"))
+				assert.are.same(expectedBalances, _G.Balances)
+				assert.are.same(expectedGatewaysRegistry, _G.GatewayRegistry)
 			end
 		)
 
 		it("should have a shortfall when holding balance but no stakes and funding source is 'stakes'", function()
+			local expectedBalances = {
+				[stubRandomAddress] = 1000,
+			}
+			local expectedGatewaysRegistry = {}
 			_G.Balances[stubRandomAddress] = 1000
 			assert.are.same({
 				address = stubRandomAddress,
@@ -2182,28 +2217,33 @@ describe("gar", function()
 				stakes = {},
 				shortfall = 1000,
 			}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
+			assert.are.same(expectedBalances, _G.Balances)
+			assert.are.same(expectedGatewaysRegistry, _G.GatewayRegistry)
 		end)
 
 		it(
 			"should use stakes in excess of gateway minimum stake from a single gateway whether or not holding balance and funding source is 'stakes'",
 			function()
-				_G.GatewayRegistry[stubGatewayAddress] = {
-					totalDelegatedStake = 1500,
-					vaults = {},
-					delegates = {
-						[stubRandomAddress] = {
-							delegatedStake = 1500,
-							vaults = {},
+				local expectedGatewaysRegistry = {
+					[stubGatewayAddress] = {
+						totalDelegatedStake = 1500,
+						vaults = {},
+						delegates = {
+							[stubRandomAddress] = {
+								delegatedStake = 1500,
+								vaults = {},
+							},
 						},
-					},
-					settings = {
-						minDelegatedStake = 500,
-					},
-					stats = {
-						passedEpochCount = 0,
-						totalEpochCount = 0,
+						settings = {
+							minDelegatedStake = 500,
+						},
+						stats = {
+							passedEpochCount = 0,
+							totalEpochCount = 0,
+						},
 					},
 				}
+				_G.GatewayRegistry = expectedGatewaysRegistry
 				assert.are.same({
 					address = stubRandomAddress,
 					balance = 0,
@@ -2215,19 +2255,27 @@ describe("gar", function()
 					},
 					shortfall = 0,
 				}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
+				assert.are.same(expectedGatewaysRegistry, _G.GatewayRegistry)
 
-				_G.Balances[stubRandomAddress] = 1000
-				assert.are.same({
-					address = stubRandomAddress,
-					balance = 0,
-					stakes = {
-						[stubGatewayAddress] = {
-							delegatedStake = 1000,
-							vaults = {},
+				for _, balance in pairs({ 0, 10000 }) do
+					local expectedBalances = {
+						[stubRandomAddress] = balance,
+					}
+					_G.Balances = expectedBalances
+					assert.are.same({
+						address = stubRandomAddress,
+						balance = 0,
+						stakes = {
+							[stubGatewayAddress] = {
+								delegatedStake = 1000,
+								vaults = {},
+							},
 						},
-					},
-					shortfall = 0,
-				}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
+						shortfall = 0,
+					}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
+					assert.are.same(expectedBalances, _G.Balances)
+					assert.are.same(expectedGatewaysRegistry, _G.GatewayRegistry)
+				end
 			end
 		)
 
@@ -2239,42 +2287,48 @@ describe("gar", function()
 				-- Tie broken here by ordering from worst performing gateway to best
 				-- Next tie breaker is highest total gateway stake to lowest (hurst the biggest and baddest gateway first)
 				-- Final tie breaker is gateway tenure
-				_G.GatewayRegistry[stubGatewayAddress] = {
-					totalDelegatedStake = 1000,
-					vaults = {},
-					delegates = {
-						[stubRandomAddress] = {
-							delegatedStake = 800, -- 750 over minimum, but lower total delegated stake
-							vaults = {},
+				local expectedGatewaysRegistry = {
+					[stubGatewayAddress] = {
+						totalDelegatedStake = 1000,
+						vaults = {},
+						delegates = {
+							[stubRandomAddress] = {
+								delegatedStake = 800, -- 750 over minimum, but lower total delegated stake
+								vaults = {},
+							},
+						},
+						settings = {
+							minDelegatedStake = 50,
+						},
+						stats = {
+							passedEpochCount = 0,
+							totalEpochCount = 0,
 						},
 					},
-					settings = {
-						minDelegatedStake = 50,
-					},
-					stats = {
-						passedEpochCount = 0,
-						totalEpochCount = 0,
-					},
-				}
-				_G.GatewayRegistry[stubObserverAddress] = {
-					totalDelegatedStake = 1000,
-					vaults = {},
-					delegates = {
-						[stubRandomAddress] = {
-							delegatedStake = 1000, -- 300 over minimum, but higher total delegated stake
-							vaults = {},
+					[stubObserverAddress] = {
+						totalDelegatedStake = 1000,
+						vaults = {},
+						delegates = {
+							[stubRandomAddress] = {
+								delegatedStake = 1000, -- 300 over minimum, but higher total delegated stake
+								vaults = {},
+							},
+						},
+						settings = {
+							minDelegatedStake = 700,
+						},
+						stats = {
+							passedEpochCount = 0,
+							totalEpochCount = 0,
 						},
 					},
-					settings = {
-						minDelegatedStake = 700,
-					},
-					stats = {
-						passedEpochCount = 0,
-						totalEpochCount = 0,
-					},
 				}
+				_G.GatewayRegistry = expectedGatewaysRegistry
 				for _, balance in pairs({ 0, 10000 }) do
-					_G.Balances[stubRandomAddress] = balance
+					local expectedBalances = {
+						[stubRandomAddress] = balance,
+					}
+					_G.Balances = expectedBalances
 
 					assert.are.same({
 						address = stubRandomAddress,
@@ -2291,6 +2345,8 @@ describe("gar", function()
 						},
 						shortfall = 0,
 					}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
+					assert.are.same(expectedBalances, _G.Balances)
+					assert.are.same(expectedGatewaysRegistry, _G.GatewayRegistry)
 				end
 			end
 		)
@@ -2301,55 +2357,61 @@ describe("gar", function()
 				-- TO TEST:
 				-- Withdraw balances are used next, ordered from nearest-to-liquid to furthest from liquid.
 				-- tie broken here by smallest to largest to help the contract save memory when pruning expended vaults
-				_G.GatewayRegistry[stubGatewayAddress] = {
-					totalDelegatedStake = 1000,
-					vaults = {},
-					delegates = {
-						[stubRandomAddress] = {
-							delegatedStake = 50, -- lower total delegated stake
-							vaults = {
-								["vault_id_1"] = {
-									balance = 1000, -- enough to satisfy the whole purchase but ordered lower for drawdown
-									startTimestamp = 0,
-									endTimestamp = 1001, -- later end timestamp
+				local expectedGatewaysRegistry = {
+					[stubGatewayAddress] = {
+						totalDelegatedStake = 1000,
+						vaults = {},
+						delegates = {
+							[stubRandomAddress] = {
+								delegatedStake = 50, -- lower total delegated stake
+								vaults = {
+									["vault_id_1"] = {
+										balance = 1000, -- enough to satisfy the whole purchase but ordered lower for drawdown
+										startTimestamp = 0,
+										endTimestamp = 1001, -- later end timestamp
+									},
 								},
 							},
 						},
+						settings = {
+							minDelegatedStake = 50,
+						},
+						stats = {
+							passedEpochCount = 0,
+							totalEpochCount = 0,
+						},
 					},
-					settings = {
-						minDelegatedStake = 50,
-					},
-					stats = {
-						passedEpochCount = 0,
-						totalEpochCount = 0,
-					},
-				}
-				_G.GatewayRegistry[stubObserverAddress] = {
-					totalDelegatedStake = 1000,
-					vaults = {},
-					delegates = {
-						[stubRandomAddress] = {
-							delegatedStake = 700, -- higher total delegated stake
-							vaults = {
-								["vault_id_2"] = {
-									balance = 250,
-									startTimestamp = 0,
-									endTimestamp = 1000, -- earlier end timestamp
+					[stubObserverAddress] = {
+						totalDelegatedStake = 1000,
+						vaults = {},
+						delegates = {
+							[stubRandomAddress] = {
+								delegatedStake = 700, -- higher total delegated stake
+								vaults = {
+									["vault_id_2"] = {
+										balance = 250,
+										startTimestamp = 0,
+										endTimestamp = 1000, -- earlier end timestamp
+									},
 								},
 							},
 						},
-					},
-					settings = {
-						minDelegatedStake = 700,
-					},
-					stats = {
-						passedEpochCount = 0,
-						totalEpochCount = 0,
+						settings = {
+							minDelegatedStake = 700,
+						},
+						stats = {
+							passedEpochCount = 0,
+							totalEpochCount = 0,
+						},
 					},
 				}
+				_G.GatewayRegistry = expectedGatewaysRegistry
 
 				for _, balance in pairs({ 0, 1000 }) do
-					_G.Balances[stubRandomAddress] = balance
+					local expectedBalances = {
+						[stubRandomAddress] = balance,
+					}
+					_G.Balances = expectedBalances
 					assert.are.same({
 						address = stubRandomAddress,
 						balance = 0,
@@ -2369,6 +2431,8 @@ describe("gar", function()
 						},
 						shortfall = 0,
 					}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
+					assert.are.same(expectedBalances, _G.Balances)
+					assert.are.same(expectedGatewaysRegistry, _G.GatewayRegistry)
 				end
 			end
 		)
@@ -2381,56 +2445,62 @@ describe("gar", function()
 				-- worst performing gateway to best performing gateway
 				-- Next tie breaker is highest total gateway stake to lowest (hurst the biggest and baddest gateway first)
 				-- Final tie breaker is gateway tenure
-				_G.GatewayRegistry[stubGatewayAddress] = {
-					totalDelegatedStake = 2,
-					vaults = {},
-					delegates = {
-						[stubRandomAddress] = {
-							delegatedStake = 2,
-							vaults = {
-								["vault_id_1"] = {
-									balance = 1,
-									startTimestamp = 0,
-									endTimestamp = 1001, -- later end timestamp
+				local expectedGatewaysRegistry = {
+					[stubGatewayAddress] = {
+						totalDelegatedStake = 2,
+						vaults = {},
+						delegates = {
+							[stubRandomAddress] = {
+								delegatedStake = 2,
+								vaults = {
+									["vault_id_1"] = {
+										balance = 1,
+										startTimestamp = 0,
+										endTimestamp = 1001, -- later end timestamp
+									},
 								},
 							},
 						},
+						settings = {
+							minDelegatedStake = 1,
+						},
+						stats = {
+							passedEpochCount = 1,
+							totalEpochCount = 5,
+						},
 					},
-					settings = {
-						minDelegatedStake = 1,
-					},
-					stats = {
-						passedEpochCount = 1,
-						totalEpochCount = 5,
-					},
-				}
-				_G.GatewayRegistry[stubObserverAddress] = {
-					totalDelegatedStake = 3,
-					vaults = {},
-					delegates = {
-						[stubRandomAddress] = {
-							delegatedStake = 3,
-							vaults = {
-								["vault_id_2"] = {
-									balance = 1,
-									startTimestamp = 0,
-									endTimestamp = 1000, -- earlier end timestamp
+					[stubObserverAddress] = {
+						totalDelegatedStake = 3,
+						vaults = {},
+						delegates = {
+							[stubRandomAddress] = {
+								delegatedStake = 3,
+								vaults = {
+									["vault_id_2"] = {
+										balance = 1,
+										startTimestamp = 0,
+										endTimestamp = 1000, -- earlier end timestamp
+									},
 								},
 							},
 						},
-					},
-					settings = {
-						minDelegatedStake = 1,
-					},
-					stats = {
-						passedEpochCount = 1,
-						totalEpochCount = 3,
+						settings = {
+							minDelegatedStake = 1,
+						},
+						stats = {
+							passedEpochCount = 1,
+							totalEpochCount = 3,
+						},
 					},
 				}
+				_G.GatewayRegistry = expectedGatewaysRegistry
 
 				for _, fundingPreference in pairs({ "any", "stakes" }) do
 					for _, balance in pairs({ 0, 10 }) do
-						_G.Balances[stubRandomAddress] = balance
+						local expectedBalances = {
+							[stubRandomAddress] = balance,
+						}
+						_G.Balances = expectedBalances
 						assert.are.same({
 							address = stubRandomAddress,
 							balance = fundingPreference == "any" and balance or 0,
@@ -2450,6 +2520,8 @@ describe("gar", function()
 							},
 							shortfall = 993 - (fundingPreference == "any" and balance or 0),
 						}, gar.getFundingPlan(stubRandomAddress, 1000, fundingPreference))
+						assert.are.same(expectedBalances, _G.Balances)
+						assert.are.same(expectedGatewaysRegistry, _G.GatewayRegistry)
 					end
 				end
 			end
@@ -2490,11 +2562,11 @@ describe("gar", function()
 				},
 			}
 			_G.GatewayRegistry["gateway-2"] = {
-				totalDelegatedStake = 42, -- 40 of this will get drawn down
+				totalDelegatedStake = 41, -- 40 of this will get drawn down
 				vaults = {},
 				delegates = {
 					["test-address-1"] = {
-						delegatedStake = 42, -- 40 of this will get drawn down
+						delegatedStake = 41, -- 40 of this will get drawn down, with the last mIO forced to a withdraw vault
 						vaults = {
 							["vault-3"] = {
 								balance = 10, -- this will not be drawn down
@@ -2532,7 +2604,15 @@ describe("gar", function()
 			local result = gar.applyFundingPlan(fundingPlan, "stub-msg-id", 12345)
 			assert.are.same({
 				totalFunded = 210,
-				newWithdrawVaults = {},
+				newWithdrawVaults = {
+					["gateway-2"] = {
+						["stub-msg-id"] = {
+							balance = 1,
+							startTimestamp = 12345,
+							endTimestamp = 12345 + gar.getSettings().delegates.withdrawLengthMs,
+						},
+					},
+				},
 			}, result)
 			assert.equals(0, _G.Balances["test-address-1"])
 			assert.are.same({
@@ -2560,17 +2640,22 @@ describe("gar", function()
 				},
 			}, _G.GatewayRegistry["gateway-1"])
 			assert.are.same({
-				totalDelegatedStake = 2,
+				totalDelegatedStake = 0,
 				vaults = {},
 				delegates = {
 					["test-address-1"] = {
-						delegatedStake = 2,
+						delegatedStake = 0,
 						vaults = {
 							-- untouched
 							["vault-3"] = {
 								balance = 10,
 								startTimestamp = 0,
 								endTimestamp = 999,
+							},
+							["stub-msg-id"] = {
+								balance = 1,
+								startTimestamp = 12345,
+								endTimestamp = 12345 + gar.getSettings().delegates.withdrawLengthMs,
 							},
 						},
 					},

@@ -568,8 +568,11 @@ end
 --- @param from string The address of the sender
 --- @param name string The name of the record
 --- @param currentTimestamp number The current timestamp
+--- @param msgId string The current message id
+--- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stakes". Default "balance"
 --- @return UpgradeRecordResult The upgraded record with name and record fields
-function arns.upgradeRecord(from, name, currentTimestamp)
+function arns.upgradeRecord(from, name, currentTimestamp, msgId, fundFrom)
+	fundFrom = fundFrom or "balance"
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
 	assert(currentTimestamp, "Timestamp is required")
@@ -579,14 +582,15 @@ function arns.upgradeRecord(from, name, currentTimestamp)
 	local demandFactor = demand.getDemandFactor()
 	local upgradeCost = arns.calculatePermabuyFee(baseFee, demandFactor)
 
-	assert(balances.walletHasSufficientBalance(from, upgradeCost), "Insufficient balance")
+	local fundingPlan = gar.getFundingPlan(from, upgradeCost, fundFrom)
+	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
+	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
+	balances.increaseBalance(ao.id, upgradeCost)
+	demand.tallyNamePurchase(upgradeCost)
 
 	record.endTimestamp = nil
 	record.type = "permabuy"
 	record.purchasePrice = upgradeCost
-
-	balances.transfer(ao.id, from, upgradeCost)
-	demand.tallyNamePurchase(upgradeCost)
 
 	NameRegistry.records[name] = record
 	return {
@@ -597,6 +601,8 @@ function arns.upgradeRecord(from, name, currentTimestamp)
 		remainingBalance = balances.getBalance(from),
 		protocolBalance = balances.getBalance(ao.id),
 		df = demand.getDemandFactorInfo(),
+		fundingPlan = fundingPlan,
+		fundingResult = fundingResult,
 	}
 end
 
