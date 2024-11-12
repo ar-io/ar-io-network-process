@@ -761,7 +761,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	local name = string.lower(msg.Tags.Name)
 	local purchaseType = msg.Tags["Purchase-Type"] and string.lower(msg.Tags["Purchase-Type"]) or "lease"
 	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
-	local processId = utils.formatAddress(msg.Tags["Process-Id"] or msg.From)
+	local processId = utils.formatAddress(msg.Tags["Process-Id"] or msg.formattedFrom)
 	local timestamp = tonumber(msg.Timestamp)
 	local fundFrom = msg.Tags["Fund-From"]
 
@@ -1521,7 +1521,7 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 end)
 
 addEventingHandler(ActionMap.CancelWithdrawal, utils.hasMatchingTag("Action", ActionMap.CancelWithdrawal), function(msg)
-	local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From)
+	local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.formattedFrom)
 	local checkAssertions = function()
 		assert(utils.isValidAOAddress(gatewayAddress), "Invalid gateway address")
 		assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
@@ -1595,7 +1595,7 @@ addEventingHandler(
 	ActionMap.InstantWithdrawal,
 	utils.hasMatchingTag("Action", ActionMap.InstantWithdrawal),
 	function(msg)
-		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From) -- if not provided, use sender
+		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.formattedFrom) -- if not provided, use sender
 		local vaultId = utils.formatAddress(msg.Tags["Vault-Id"])
 		local timestamp = tonumber(msg.Timestamp)
 		msg.ioEvent:addField("Target-Formatted", target)
@@ -1842,7 +1842,7 @@ addEventingHandler(
 
 		-- TODO: we could standardize this on our prepended handler to inject and ensure formatted addresses and converted values
 		local observerAddress = msg.Tags["Observer-Address"] or gateway.observerAddress
-		local formattedAddress = utils.formatAddress(msg.From)
+		local formattedAddress = utils.formatAddress(msg.formattedFrom)
 		local formattedObserverAddress = utils.formatAddress(observerAddress)
 		local timestamp = tonumber(msg.Timestamp)
 		local status, result = pcall(
@@ -1900,7 +1900,7 @@ addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", Action
 	end
 
 	local status, reassignmentOrError =
-		pcall(arns.reassignName, name, utils.formatAddress(msg.From), tonumber(msg.Timestamp), newProcessId)
+		pcall(arns.reassignName, name, utils.formatAddress(msg.formattedFrom), tonumber(msg.Timestamp), newProcessId)
 	if not status then
 		ao.send({
 			Target = msg.formattedFrom,
@@ -1970,7 +1970,7 @@ addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", Ac
 			Error = "Invalid-" .. ActionMap.SaveObservations,
 			Data = json.encode(error),
 		})
-	end, epochs.saveObservations, utils.formatAddress(msg.From), reportTxId, failedGateways, msg.Timestamp)
+	end, epochs.saveObservations, utils.formatAddress(msg.formattedFrom), reportTxId, failedGateways, msg.Timestamp)
 	if not shouldContinue2 then
 		return
 	end
@@ -2339,7 +2339,7 @@ addEventingHandler(ActionMap.Gateways, Handlers.utils.hasMatchingTag("Action", A
 end)
 
 addEventingHandler(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", ActionMap.Gateway), function(msg)
-	local gatewayAddress = utils.formatAddress(msg.Tags.Address or msg.From)
+	local gatewayAddress = utils.formatAddress(msg.Tags.Address or msg.formattedFrom)
 
 	local gateway = gar.getGateway(gatewayAddress)
 	ao.send({
@@ -2359,7 +2359,7 @@ addEventingHandler(ActionMap.Balances, Handlers.utils.hasMatchingTag("Action", A
 end)
 
 addEventingHandler(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMap.Balance), function(msg)
-	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From)
+	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.formattedFrom)
 	local balance = balances.getBalance(target)
 
 	-- must adhere to token.lua spec for arconnect compatibility
@@ -2622,7 +2622,7 @@ addEventingHandler(ActionMap.Vaults, utils.hasMatchingTag("Action", ActionMap.Va
 end)
 
 addEventingHandler(ActionMap.Vault, utils.hasMatchingTag("Action", ActionMap.Vault), function(msg)
-	local address = utils.formatAddress(msg.Tags.Address or msg.From)
+	local address = utils.formatAddress(msg.Tags.Address or msg.formattedFrom)
 	local vaultId = msg.Tags["Vault-Id"]
 	local vault = vaults.getVault(address, vaultId)
 	if not vault then
@@ -2733,7 +2733,7 @@ addEventingHandler("paginatedDelegates", utils.hasMatchingTag("Action", "Paginat
 			})
 		end,
 		gar.getPaginatedDelegates,
-		utils.formatAddress(msg.Tags.Address or msg.From),
+		utils.formatAddress(msg.Tags.Address or msg.formattedFrom),
 		page.cursor,
 		page.limit,
 		page.sortBy or "startTimestamp",
@@ -2761,7 +2761,7 @@ addEventingHandler(
 				})
 			end,
 			gar.getPaginatedAllowedDelegates,
-			utils.formatAddress(msg.Tags.Address or msg.From),
+			utils.formatAddress(msg.Tags.Address or msg.formattedFrom),
 			page.cursor,
 			page.limit,
 			page.sortOrder
@@ -2783,9 +2783,9 @@ addEventingHandler(
 addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.ReleaseName), function(msg)
 	-- validate the name and process id exist, then create the auction using the auction function
 	local name = string.lower(msg.Tags.Name)
-	local processId = utils.formatAddress(msg.From)
+	local processId = utils.formatAddress(msg.formattedFrom)
 	local record = arns.getRecord(name)
-	local initiator = utils.formatAddress(msg.Tags.Initiator or msg.From)
+	local initiator = utils.formatAddress(msg.Tags.Initiator or msg.formattedFrom)
 	local timestamp = tonumber(msg.Timestamp)
 
 	local checkAssertions = function()
@@ -2978,7 +2978,7 @@ end)
 addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.AuctionBid), function(msg)
 	local name = string.lower(msg.Tags.Name)
 	local bidAmount = msg.Tags.Quantity and tonumber(msg.Tags.Quantity) or nil -- if nil, we use the current bid price
-	local bidder = utils.formatAddress(msg.From)
+	local bidder = utils.formatAddress(msg.formattedFrom)
 	local processId = utils.formatAddress(msg.Tags["Process-Id"])
 	local timestamp = tonumber(msg.Timestamp)
 	local type = msg.Tags["Purchase-Type"] or "permabuy"
