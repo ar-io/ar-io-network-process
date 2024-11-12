@@ -9,8 +9,8 @@ constants.defaultundernameLimit = 10
 constants.totalTokenSupply = 1000000000 * 1000000 -- 1 billion tokens
 constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.10 -- the minimum penalty rate for an expedited withdrawal (10% of the amount being withdrawn)
 constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.50 -- the maximum penalty rate for an expedited withdrawal (50% of the amount being withdrawn)
-constants.oneTokenInBaseUnits = 1000000
-constants.MINIUMUM_WITHDRAWAL_AMOUNT = constants.oneTokenInBaseUnits -- the minimum amount that can be withdrawn from the GAR
+constants.mIOPerIO = 1000000
+constants.minimumWithdrawalAmount = constants.mIOPerIO -- the minimum amount that can be withdrawn from the GAR
 
 -- ARNS
 constants.DEFAULT_UNDERNAME_COUNT = 10
