@@ -1331,10 +1331,10 @@ describe('GatewayRegistry', async () => {
         fetchedGateways.push(...items);
         if (!cursor) break;
       }
-
-      fetchedGateways.forEach((g) => {
-        assert([STUB_ADDRESS, secondGatewayAddress].includes(g.gatewayAddress));
-      });
+      assert.deepEqual(
+        fetchedGateways.map((g) => g.gatewayAddress),
+        [STUB_ADDRESS, secondGatewayAddress],
+      );
     });
   });
 

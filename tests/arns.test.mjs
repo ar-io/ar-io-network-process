@@ -16,7 +16,6 @@ import {
   STUB_MESSAGE_ID,
   STUB_OPERATOR_ADDRESS,
   STUB_TIMESTAMP,
-  validGatewayTags,
 } from '../tools/constants.mjs';
 
 // EIP55-formatted test address
@@ -1537,6 +1536,7 @@ describe('ArNS', async () => {
       // create gateways
       const { memory: join1Memory } = await joinNetwork({
         address: joinedGateway,
+        quantity: 200_000_000_000,
       });
 
       // TODO: Join failing gateway -- Submit an observation with another joined gateway that marks the gateway as failing
