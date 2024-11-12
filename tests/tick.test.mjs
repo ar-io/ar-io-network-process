@@ -10,6 +10,11 @@ import {
   PROCESS_ID,
   STUB_TIMESTAMP,
 } from '../tools/constants.mjs';
+import { getBaseRegistrationFee, getDemandFactor } from './helpers.mjs';
+
+const genesisEpochStart = 1722837600000 + 1;
+const epochDurationMs = 60 * 1000 * 60 * 24; // 24 hours
+const distributionDelayMs = 60 * 1000 * 40; // 40 minutes (~ 20 arweave blocks)
 
 describe('Tick', async () => {
   const { handle: originalHandle, memory: startMemory } =
@@ -660,41 +665,33 @@ describe('Tick', async () => {
     });
   });
 
-  it('should reset to baseRegistrationFee when demandFactor is 0.5 for consecutive epochs', async () => {
-    const genesisEpochStart = 1722837600000 + 1;
-    const epochDurationMs = 60 * 1000 * 60 * 24; // 24 hours
-    const distributionDelayMs = 60 * 1000 * 40; // 40 minutes (~ 20 arweave blocks)
-
-    const zeroEpochTick = await handle(
+  it('should increase demandFactor but not yet baseRegistrationFee when records are bought within an epoch', async () => {
+    const genesisEpochTick = await handle(
       {
         Tags: [{ name: 'Action', value: 'Tick' }],
         Timestamp: genesisEpochStart,
       },
       startMemory,
     );
+    const genesisFee = await getBaseRegistrationFee(genesisEpochTick.Memory);
+    assert.equal(genesisFee, 600_000_000);
 
-    const getRegistrationFeesResult = await handle(
-      {
-        Tags: [{ name: 'Action', value: 'Get-Registration-Fees' }],
-      },
-      zeroEpochTick.Memory,
+    const zeroTickDemandFactorResult = await getDemandFactor(
+      genesisEpochTick.Memory,
     );
-    const baseFeeAtZeroEpoch = JSON.parse(
-      getRegistrationFeesResult.Messages[0].Data,
-    )['9']['lease']['1'];
-    assert.equal(baseFeeAtZeroEpoch, 600_000_000);
+    assert.equal(zeroTickDemandFactorResult, 1);
 
     const fundedUser = 'funded-user-'.padEnd(43, '1');
     const transferMemory = await transfer({
       recipient: fundedUser,
       quantity: 100_000_000_000_000,
-      memory: zeroEpochTick.Memory,
+      memory: genesisEpochTick.Memory,
     });
 
     // Buy records in this epoch
     let buyRecordMemory = transferMemory;
     for (let i = 0; i < 10; i++) {
-      const buyRecordResult = await handle(
+      const { Memory } = await handle(
         {
           Tags: [
             { name: 'Action', value: 'Buy-Record' },
@@ -704,8 +701,28 @@ describe('Tick', async () => {
         },
         buyRecordMemory,
       );
-      buyRecordMemory = buyRecordResult.Memory;
+      buyRecordMemory = Memory;
     }
+
+    // Tick to the half way through the first epoch
+    const firstEpochMidTimestamp = genesisEpochStart + epochDurationMs / 2;
+    const firstEpochMidTick = await handle(
+      {
+        Tags: [{ name: 'Action', value: 'Tick' }],
+        Timestamp: firstEpochMidTimestamp,
+      },
+      buyRecordMemory,
+    );
+    const feeDuringFirstEpoch = await getBaseRegistrationFee(
+      firstEpochMidTick.Memory,
+    );
+
+    assert.equal(feeDuringFirstEpoch, 600_000_000);
+    const firstEpochDemandFactorResult = await getDemandFactor(
+      firstEpochMidTick.Memory,
+    );
+    assert.equal(firstEpochDemandFactorResult, 1);
+
     // Tick to the end of the first epoch
     const firstEpochEndTimestamp =
       genesisEpochStart + epochDurationMs + distributionDelayMs + 1;
@@ -716,22 +733,36 @@ describe('Tick', async () => {
       },
       buyRecordMemory,
     );
-
-    const registrationFeesResultAfterFirstEpoch = await handle(
-      {
-        Tags: [{ name: 'Action', value: 'Get-Registration-Fees' }],
-      },
+    const feeAfterFirstEpochEnd = await getBaseRegistrationFee(
       firstEpochEndTick.Memory,
     );
-    const baseFeeAfterFirstEpoch = JSON.parse(
-      registrationFeesResultAfterFirstEpoch.Messages[0].Data,
-    )['9']['lease']['1'];
-    assert.equal(baseFeeAfterFirstEpoch, 630_000_000);
 
-    let tickMemory = firstEpochEndTick.Memory;
-    // Tick to the fifth epoch,
+    assert.equal(feeAfterFirstEpochEnd, 630_000_000);
+
+    const firstEpochEndDemandFactorResult = await getDemandFactor(
+      firstEpochEndTick.Memory,
+    );
+    assert.equal(firstEpochEndDemandFactorResult, 1.0500000000000000444);
+  });
+
+  it('should reset to baseRegistrationFee when demandFactor is 0.5 for consecutive epochs', async () => {
+    const zeroEpochTick = await handle(
+      {
+        Tags: [{ name: 'Action', value: 'Tick' }],
+        Timestamp: genesisEpochStart,
+      },
+      startMemory,
+    );
+
+    const baseFeeAtZeroEpoch = await getBaseRegistrationFee(
+      zeroEpochTick.Memory,
+    );
+    assert.equal(baseFeeAtZeroEpoch, 600_000_000);
+
+    let tickMemory = zeroEpochTick.Memory;
+    // Tick to the forth epoch,
     for (let i = 0; i < 4; i++) {
-      const epochTimestamp = firstEpochEndTimestamp + epochDurationMs * (i + 1);
+      const epochTimestamp = genesisEpochStart + (epochDurationMs + 1) * i;
       const { Memory } = await handle(
         {
           Tags: [
@@ -746,15 +777,8 @@ describe('Tick', async () => {
       tickMemory = Memory;
     }
 
-    const registrationFeesResultAfterFifthEpoch = await handle(
-      {
-        Tags: [{ name: 'Action', value: 'Get-Registration-Fees' }],
-      },
-      tickMemory,
-    );
-    const baseFeeAfterFifthEpoch = JSON.parse(
-      registrationFeesResultAfterFifthEpoch.Messages[0].Data,
-    )['9']['lease']['1'];
-    assert.equal(baseFeeAfterFifthEpoch, 593_042_026); // Should this be back to the original base fee?
+    const baseFeeAfterConsecutiveTicksWithNoPurchases =
+      await getBaseRegistrationFee(tickMemory);
+    assert.equal(baseFeeAfterConsecutiveTicksWithNoPurchases, 573_402_975);
   });
 });

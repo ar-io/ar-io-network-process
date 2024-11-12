@@ -132,3 +132,25 @@ export const setUpStake = async ({
     result: stakeResult,
   };
 };
+
+export const getBaseRegistrationFee = async (memory) => {
+  const result = await handle(
+    {
+      Tags: [{ name: 'Action', value: 'Get-Registration-Fees' }],
+    },
+    memory,
+  );
+  assertNoResultError(result);
+  return JSON.parse(result.Messages[0].Data)['9']['lease']['1'];
+};
+
+export const getDemandFactor = async (memory) => {
+  const result = await handle(
+    {
+      Tags: [{ name: 'Action', value: 'Demand-Factor' }],
+    },
+    memory,
+  );
+  assertNoResultError(result);
+  return result.Messages[0].Data;
+};
