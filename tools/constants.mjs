@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 export const PROCESS_ID = ''.padEnd(43, '0');
 export const PROCESS_OWNER = ''.padEnd(43, '1');
 export const STUB_ADDRESS = ''.padEnd(43, '2');
+export const STUB_OPERATOR_ADDRESS = ''.padEnd(43, 'E');
 export const INITIAL_PROTOCOL_BALANCE = 50_000_000_000_000; // 50M IO
 export const INITIAL_OWNER_BALANCE = 950_000_000_000_000; // 950M IO
 export const STUB_TIMESTAMP = 21600000; // 01-01-1970 00:00:00
@@ -59,12 +60,14 @@ export const DEFAULT_HANDLE_OPTIONS = {
   'Hash-Chain': STUB_HASH_CHAIN,
 };
 
+export const INITIAL_OPERATOR_STAKE = '100000000000'; // 100K IO
+
 export const validGatewayTags = [
   { name: 'Action', value: 'Join-Network' },
   { name: 'Label', value: 'test-gateway' },
   { name: 'Note', value: 'test-note' },
   { name: 'FQDN', value: 'test-fqdn' },
-  { name: 'Operator-Stake', value: `${100_000_000_000}` }, // 100K IO
+  { name: 'Operator-Stake', value: `${INITIAL_OPERATOR_STAKE}` }, // 100K IO
   { name: 'Port', value: '443' },
   { name: 'Protocol', value: 'https' },
   { name: 'Allow-Delegated-Staking', value: 'true' },

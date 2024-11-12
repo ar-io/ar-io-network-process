@@ -86,6 +86,14 @@ describe("utils", function()
 			end
 			assert.are.same(30, utils.reduce(input, reducer, 0))
 		end)
+
+		it("should provide a numeric index in the reducer function for any kind of table", function()
+			local reducer = function(acc, _, value, i)
+				return acc + value + i
+			end
+			assert.are.same(45, utils.reduce({ foo = 2, bar = 4, baz = 6, oof = 8, rab = 10 }, reducer, 0))
+			assert.are.same(12, utils.reduce({ 1, 2, 3 }, reducer, 0))
+		end)
 	end)
 
 	describe("map", function()
@@ -457,6 +465,143 @@ describe("utils", function()
 		end)
 	end)
 
+	describe("sortTableByFields", function()
+		local nestedTableData = {
+			{ name = "Alice", details = { age = 30, score = 85 } },
+			{ name = "Bob", details = { age = 25, score = 92 } },
+			{ name = "Alice", details = { age = 22, score = 90 } },
+			{ name = "Charlie", details = { age = 30, score = 88 } },
+		}
+
+		it("sorts a number-indexed table of simple values in ascending order", function()
+			local simpleValues = { 5, 2, 9, 1, 4 }
+			local sortedData = utils.sortTableByFields(simpleValues, { { field = nil, order = "asc" } })
+			local expectedData = { 1, 2, 4, 5, 9 }
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("sorts a number-indexed table of simple values in descending order", function()
+			local simpleValues = { 5, 2, 9, 1, 4 }
+			local sortedData = utils.sortTableByFields(simpleValues, { { field = nil, order = "desc" } })
+			local expectedData = { 9, 5, 4, 2, 1 }
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("handles an empty table gracefully", function()
+			local simpleValues = {}
+			local sortedData = utils.sortTableByFields(simpleValues, { { field = nil, order = "asc" } })
+			local expectedData = {}
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("handles a table with identical values", function()
+			local simpleValues = { 3, 3, 3, 3 }
+			local sortedData = utils.sortTableByFields(simpleValues, { { field = nil, order = "asc" } })
+			local expectedData = { 3, 3, 3, 3 }
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("handles a table with nil values, placing them at the end", function()
+			local simpleValues = { 7, nil, 2, nil, 5 }
+			local sortedData = utils.sortTableByFields(simpleValues, { { field = nil, order = "asc" } })
+			local expectedData = { 2, 5, 7, nil, nil }
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("sorts by a single top-level field in ascending order", function()
+			local sortedData = utils.sortTableByFields(nestedTableData, { { field = "name", order = "asc" } })
+			local expectedData = {
+				{ name = "Alice", details = { age = 30, score = 85 } },
+				{ name = "Alice", details = { age = 22, score = 90 } },
+				{ name = "Bob", details = { age = 25, score = 92 } },
+				{ name = "Charlie", details = { age = 30, score = 88 } },
+			}
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("sorts by a single top-level field in descending order", function()
+			local sortedData = utils.sortTableByFields(nestedTableData, { { field = "name", order = "desc" } })
+			local expectedData = {
+				{ name = "Charlie", details = { age = 30, score = 88 } },
+				{ name = "Bob", details = { age = 25, score = 92 } },
+				{ name = "Alice", details = { age = 22, score = 90 } }, -- if this does not sort stably, implement a merge sort
+				{ name = "Alice", details = { age = 30, score = 85 } },
+			}
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("sorts by a single nested field in ascending order", function()
+			local sortedData = utils.sortTableByFields(nestedTableData, { { field = "details.age", order = "asc" } })
+			local expectedData = {
+				{ name = "Alice", details = { age = 22, score = 90 } },
+				{ name = "Bob", details = { age = 25, score = 92 } },
+				{ name = "Alice", details = { age = 30, score = 85 } },
+				{ name = "Charlie", details = { age = 30, score = 88 } },
+			}
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("sorts by a single nested field in descending order", function()
+			local sortedData = utils.sortTableByFields(nestedTableData, { { field = "details.age", order = "desc" } })
+			local expectedData = {
+				{ name = "Alice", details = { age = 30, score = 85 } },
+				{ name = "Charlie", details = { age = 30, score = 88 } },
+				{ name = "Bob", details = { age = 25, score = 92 } },
+				{ name = "Alice", details = { age = 22, score = 90 } },
+			}
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("sorts by multiple fields with different orders for each field", function()
+			local sortedData = utils.sortTableByFields(nestedTableData, {
+				{ field = "name", order = "asc" },
+				{ field = "details.age", order = "desc" },
+			})
+			local expectedData = {
+				{ name = "Alice", details = { age = 30, score = 85 } },
+				{ name = "Alice", details = { age = 22, score = 90 } },
+				{ name = "Bob", details = { age = 25, score = 92 } },
+				{ name = "Charlie", details = { age = 30, score = 88 } },
+			}
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("sorts by multiple nested fields", function()
+			local sortedData = utils.sortTableByFields(nestedTableData, {
+				{ field = "details.age", order = "asc" },
+				{ field = "details.score", order = "asc" },
+			})
+			local expectedData = {
+				{ name = "Alice", details = { age = 22, score = 90 } },
+				{ name = "Bob", details = { age = 25, score = 92 } },
+				{ name = "Alice", details = { age = 30, score = 85 } },
+				{ name = "Charlie", details = { age = 30, score = 88 } },
+			}
+			assert.are.same(expectedData, sortedData)
+		end)
+
+		it("handles nil fields gracefully, placing them at the end", function()
+			-- Add an entry with a nil field to test nil handling
+			local dataWithNil = {
+				{ name = "Alice", details = { age = 30, score = 85 } },
+				{ name = "Bob", details = { age = 25, score = 92 } },
+				{ name = "Alice", details = { age = 22, score = 90 } },
+				{ name = "Charlie", details = { age = 30, score = 88 } },
+				{ name = "Derek", details = { age = nil, score = 70 } },
+			}
+
+			local sortedData = utils.sortTableByFields(dataWithNil, { { field = "details.age", order = "asc" } })
+			local expectedData = {
+				{ name = "Alice", details = { age = 22, score = 90 } },
+				{ name = "Bob", details = { age = 25, score = 92 } },
+				{ name = "Charlie", details = { age = 30, score = 88 } }, -- if this does not sort stably, implement a merge sort
+				{ name = "Alice", details = { age = 30, score = 85 } },
+				{ name = "Derek", details = { age = nil, score = 70 } },
+			}
+			assert.are.same(expectedData, sortedData)
+		end)
+	end)
+
 	describe("getTableKeys", function()
 		it("should return the keys of a table", function()
 			local input = { foo = "bar", baz = "qux" }
@@ -473,6 +618,74 @@ describe("utils", function()
 
 		it("should return an empty table for a nil table", function()
 			local result = utils.getTableKeys(nil)
+			assert.are.same({}, result)
+		end)
+	end)
+
+	describe("filterArray", function()
+		it("should filter an array based on a predicate", function()
+			local input = { 1, 2, 3, 4, 5 }
+			local predicate = function(value)
+				return value % 2 == 0
+			end
+			local result = utils.filterArray(input, predicate)
+			assert.are.same({ 2, 4 }, result)
+		end)
+
+		it("should return an empty table for an empty input table", function()
+			local input = {}
+			local predicate = function(value)
+				return value % 2 == 0
+			end
+			local result = utils.filterArray(input, predicate)
+			assert.are.same({}, result)
+		end)
+
+		it("should return an empty table for a nil input table", function()
+			local predicate = function(value)
+				return value % 2 == 0
+			end
+			local result = utils.filterArray(nil, predicate)
+			assert.are.same({}, result)
+		end)
+
+		it("should return an empty table for a nil predicate", function()
+			local input = { 1, 2, 3, 4, 5 }
+			local result = utils.filterArray(input, nil)
+			assert.are.same({}, result)
+		end)
+	end)
+
+	describe("filterDictionary", function()
+		it("should filter a dictionary based on a predicate", function()
+			local input = { foo = 1, bar = 2, baz = 3, qux = 4, quux = 5 }
+			local predicate = function(_, value)
+				return value % 2 == 0
+			end
+			local result = utils.filterDictionary(input, predicate)
+			assert.are.same({ bar = 2, qux = 4 }, result)
+		end)
+
+		it("should return an empty table for an empty input table", function()
+			local input = {}
+			local predicate = function(_, value)
+				return value % 2 == 0
+			end
+			local result = utils.filterDictionary(input, predicate)
+			assert.are.same({}, result)
+		end)
+
+		it("should return an empty table for a nil input table", function()
+			local predicate = function(_, value)
+				return value % 2 == 0
+			end
+			local result = utils.filterDictionary(nil, predicate)
+			assert.are.same({}, result)
+		end)
+
+		it("should return an empty table for a nil predicate", function()
+			local input = { foo = 1, bar = 2, baz = 3, qux = 4, quux = 5 }
+			local result = utils.filterDictionary(input, nil)
 			assert.are.same({}, result)
 		end)
 	end)
