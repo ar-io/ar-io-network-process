@@ -258,9 +258,7 @@ function gar.updateGatewaySettings(from, updatedSettings, updatedServices, obser
 		error("The minimum delegated stake must be at least " .. gar.getSettings().operators.minStake .. " IO")
 	end
 
-	local gateways = gar.getGateways()
-
-	for gatewayAddress, existingGateway in pairs(gateways) do
+	for gatewayAddress, existingGateway in pairs(gar.getGatewaysUnsafe()) do
 		if existingGateway.observerAddress == observerAddress and gatewayAddress ~= from then
 			error("Invalid observer wallet. The provided observer wallet is correlated with another gateway.")
 		end
@@ -535,10 +533,9 @@ function gar.isGatewayActiveBeforeTimestamp(startTimestamp, gateway)
 	return didStartBeforeEpoch and isNotLeaving
 end
 function gar.getActiveGatewaysBeforeTimestamp(startTimestamp)
-	local gateways = gar.getGateways()
 	local activeGatewayAddresses = {}
 	-- use pairs as gateways is a map
-	for address, gateway in pairs(gateways) do
+	for address, gateway in pairs(gar.getGatewaysUnsafe()) do
 		if gar.isGatewayActiveBeforeTimestamp(startTimestamp, gateway) then
 			table.insert(activeGatewayAddresses, address)
 		end
