@@ -32,7 +32,8 @@ local gar = require("gar")
 local demand = require("demand")
 local epochs = require("epochs")
 local vaults = require("vaults")
-local tick = require("tick")
+local prune = require("prune")
+local primaryNames = require("primary_names")
 
 local ActionMap = {
 	-- reads
@@ -327,7 +328,7 @@ end, function(msg)
 		lastKnownWithdrawSupply = LastKnownWithdrawSupply,
 		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
 	}
-	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
+	local status, resultOrError = pcall(prune.pruneState, msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -3126,25 +3127,24 @@ addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap
 end)
 
 --- PRIMARY NAMES
-local primaryNames = require("primary_names")
 addEventingHandler("releasePrimaryName", utils.hasMatchingTag("Action", ActionMap.ReleasePrimaryName), function(msg)
-	local name = string.lower(msg.Tags.Name)
-	local owner = utils.formatAddress(msg.From)
-	local shouldContinue, removedNames = eventingPcall(msg.ioEvent, function(error)
+	local name = msg.Tags.Name and string.lower(msg.Tags.Name)
+	local from = utils.formatAddress(msg.From)
+	local shouldContinue, releasedNameAndOwner = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-" .. ActionMap.ReleasePrimaryName .. "-Notice", Error = "Bad-Input" },
 			Data = tostring(error),
 		})
-	end, primaryNames.releasePrimaryName, owner, name)
-	if not shouldContinue or not removedNames then
+	end, primaryNames.releasePrimaryName, name, from)
+	if not shouldContinue or not releasedNameAndOwner then
 		return
 	end
 
 	ao.send({
 		Target = msg.From,
 		Action = ActionMap.ReleasePrimaryName .. "-Notice",
-		Data = json.encode(removedNames),
+		Data = json.encode(releasedNameAndOwner),
 	})
 end)
 
@@ -3157,78 +3157,75 @@ addEventingHandler(
 		local from = utils.formatAddress(msg.From) -- the process that is creating the claim
 		local timestamp = tonumber(msg.Timestamp)
 
-		local shouldContinue, claim = eventingPcall(msg.ioEvent, function(error)
+		local shouldContinue, primaryNameClaim = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
-				Target = msg.From,
+				Target = from,
 				Tags = { Action = "Invalid-" .. ActionMap.CreatePrimaryNameClaim .. "-Notice", Error = "Bad-Input" },
 				Data = tostring(error),
 			})
 		end, primaryNames.createNameClaim, name, recipient, from, timestamp)
-		if not shouldContinue or not claim then
+		if not shouldContinue or not primaryNameClaim then
 			return
 		end
 
 		ao.send({
-			Target = msg.From,
+			Target = from,
 			Action = ActionMap.CreatePrimaryNameClaim .. "-Notice",
-			Data = json.encode(claim),
+			Data = json.encode(primaryNameClaim),
 		})
 		ao.send({
 			Target = recipient,
 			Action = ActionMap.CreatePrimaryNameClaim .. "-Notice",
-			Data = json.encode(claim),
+			Data = json.encode(primaryNameClaim),
 		})
 	end
 )
 
 addEventingHandler("claimPrimaryName", utils.hasMatchingTag("Action", ActionMap.ClaimPrimaryName), function(msg)
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
-	local recipient = utils.formatAddress(msg.From) -- the recipient of the primary name
+	local from = utils.formatAddress(msg.From) -- the recipient of the primary name
 	local timestamp = tonumber(msg.Timestamp)
-	local shouldContinue, primaryNameAndClaim = eventingPcall(msg.ioEvent, function(error)
+	local shouldContinue, claimPrimaryNameResult = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-" .. ActionMap.ClaimPrimaryName .. "-Notice", Error = "Bad-Input" },
 			Data = tostring(error),
 		})
-	end, primaryNames.claimPrimaryName, name, recipient, timestamp)
-	if not shouldContinue or not primaryNameAndClaim then
+	end, primaryNames.claimPrimaryName, name, from, timestamp)
+	if not shouldContinue or not claimPrimaryNameResult then
 		return
 	end
 
-	-- -- send two notices, one to the owner and one to the from
+	-- send two notices, one to the owner and one to the initiator
 	ao.send({
-		Target = primaryNameAndClaim.claim.processId,
+		Target = claimPrimaryNameResult.claim.initiator,
 		Action = ActionMap.ClaimPrimaryName .. "-Notice",
-		Data = json.encode(primaryNameAndClaim.primaryName),
+		Data = json.encode(claimPrimaryNameResult),
 	})
 	ao.send({
-		Target = recipient,
+		Target = claimPrimaryNameResult.primaryName.owner,
 		Action = ActionMap.ClaimPrimaryName .. "-Notice",
-		Data = json.encode(primaryNameAndClaim.primaryName),
+		Data = json.encode(claimPrimaryNameResult),
 	})
 end)
 
-addEventingHandler("getPrimaryName", utils.hasMatchingTag("Action", ActionMap.PrimaryName), function(msg)
+--- Handles forward and reverse resolutions (e.g. name -> address and address -> name)
+addEventingHandler("getPrimaryNameData", utils.hasMatchingTag("Action", ActionMap.PrimaryName), function(msg)
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
 	local address = msg.Tags.Address and utils.formatAddress(msg.Tags.Address) or utils.formatAddress(msg.From)
-	local primaryName = primaryNames.getPrimaryName(name) or primaryNames.getPrimaryNameForAddress(address)
-	if not primaryName then
+	local primaryNameData = name and primaryNames.getPrimaryNameDataWithOwnerFromName(name)
+		or address and primaryNames.getPrimaryNameDataWithOwnerFromAddress(address)
+	if not primaryNameData then
 		return ao.send({
 			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.PrimaryName .. "-Notice",
-				Error = "Primary-Name-Not-Found",
-				Name = name,
-				Owner = address,
-			},
+			Tags = { Action = "Invalid-" .. ActionMap.PrimaryName .. "-Notice", Error = "Primary-Name-Not-Found" },
 		})
 	end
 	return ao.send({
 		Target = msg.From,
 		Action = ActionMap.PrimaryName .. "-Notice",
-		Tags = { Owner = primaryName.owner, ["Primary-Name"] = name },
-		Data = json.encode(primaryName),
+		Tags = { Owner = primaryNameData.owner, Name = primaryNameData.name },
+		Data = json.encode(primaryNameData),
 	})
 end)
 

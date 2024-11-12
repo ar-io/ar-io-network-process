@@ -13,7 +13,7 @@ local primaryNames = require("primary_names")
 ---@field prunedVaults table<string, Vault>
 ---@field pruneGatewaysResult table<string, table>
 ---@field prunedEpochs table<string, Epoch>
----@field prunedPrimaryNames table<string, PrimaryNameWithOwner[]>
+---@field prunedPrimaryNamesAndOwners table<string, RemovedPrimaryName[]>
 ---@field prunedPrimaryNameClaims table<string, PrimaryNameClaim[]>
 
 --- Prunes the state
@@ -24,14 +24,14 @@ local primaryNames = require("primary_names")
 function tick.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 	local prunedRecords, newGracePeriodRecords = arns.pruneRecords(timestamp, lastGracePeriodEntryEndTimestamp)
 	-- for all the pruned records, create auctions and remove primary name claims
-	local prunedPrimaryNames = {}
+	local prunedPrimaryNamesAndOwners = {}
 	for name, _ in pairs(prunedRecords) do
 		-- remove primary names
-		local removedPrimaryNames = primaryNames.removePrimaryNamesForArNSName(name)
-		if #removedPrimaryNames > 0 then
-			prunedPrimaryNames[name] = removedPrimaryNames
+		local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNamesForBaseName(name)
+		if #removedPrimaryNamesAndOwners > 0 then
+			prunedPrimaryNamesAndOwners[name] = removedPrimaryNamesAndOwners
 		end
-		-- create auction
+		-- create auction for records that have finally expired
 		arns.createAuction(name, timestamp, ao.id)
 	end
 	local prunedPrimaryNameClaims = primaryNames.prunePrimaryNameClaims(timestamp)
@@ -48,7 +48,7 @@ function tick.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 		prunedVaults = prunedVaults,
 		pruneGatewaysResult = pruneGatewaysResult,
 		prunedEpochs = prunedEpochs,
-		prunedPrimaryNames = prunedPrimaryNames,
+		prunedPrimaryNamesAndOwners = prunedPrimaryNamesAndOwners,
 		prunedPrimaryNameClaims = prunedPrimaryNameClaims,
 	}
 end

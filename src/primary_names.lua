@@ -1,59 +1,71 @@
 local arns = require("arns")
 local balances = require("balances")
 local utils = require("utils")
-
-PrimaryNames = PrimaryNames or {}
-PrimaryNameClaims = PrimaryNameClaims or {}
+local primaryNames = {}
 
 local PRIMARY_NAME_COST = 100000000 -- 100 IO
----@class PrimaryNames table<string, PrimaryName>
+
+---@alias WalletAddress string
+---@alias ArNSName string
+
+---@class PrimaryNames
+---@field owners table<WalletAddress, PrimaryName> - map indexed by owner address containing the primary name and all metadata, used for reverse lookups
+---@field names table<ArNSName, WalletAddress> - map indexed by primary name containing the owner address, used for reverse lookups
+---@field claims table<ArNSName, PrimaryNameClaim> - map indexed by primary name containing the claim, used for pruning expired claims
+
+PrimaryNames = PrimaryNames or {
+	owners = {},
+	names = {},
+	claims = {},
+}
 
 ---@class PrimaryName
----@field name string
+---@field name ArNSName
+---@field baseName ArNSName
 ---@field startTimestamp number
 
 ---@class PrimaryNameWithOwner
----@field name string
----@field owner string
+---@field name ArNSName
+---@field baseName ArNSName
+---@field owner WalletAddress
 ---@field startTimestamp number
 
-local primaryNames = {}
-
 ---@class PrimaryNameClaim
----@field name string -- the name being claimed
----@field recipient string -- the owner of the primary name the claim is for
----@field processId string -- the process id that made the claim
+---@field name ArNSName -- the name being claimed
+---@field baseName ArNSName -- the base name, identified when creating the name claim
+---@field recipient WalletAddress -- the owner of the primary name the claim is for
+---@field initiator WalletAddress -- the process id that made the claim
 ---@field startTimestamp number -- the timestamp of the claim
 ---@field endTimestamp number -- the timestamp of the claim expiration
 
 --- Creates a transient claim for a primary name. This is done by the ANT process that owns the base name. The assigned owner of the name must claim it within 30 days.
 --- @param name string -- the name being claimed, this could be an undername provided by the ant
 --- @param recipient string -- the recipient of the primary name
---- @param from string -- the process id that is claiming the primary name for the owner
+--- @param initiator string -- the address that is creating the primary name claim, e.g. the ANT process id
 --- @param timestamp number -- the timestamp of the claim
 --- @return PrimaryNameClaim
-function primaryNames.createNameClaim(name, recipient, from, timestamp)
-	local rootName = name:match("[^_]+$") or name
+function primaryNames.createNameClaim(name, recipient, initiator, timestamp)
+	local baseName = name:match("[^_]+$") or name
 
 	--- check the primary name is not already owned
 	--- TODO: this could be o(1) with a lookup table
-	local primaryNameOwned = primaryNames.findPrimaryNameOwner(name)
-	assert(not primaryNameOwned, "Primary name is already owned")
+	local primaryNameOwner = primaryNames.getAddressForPrimaryName(baseName)
+	assert(not primaryNameOwner, "Primary name is already owned")
 
-	local record = arns.getRecord(rootName)
-	assert(record, "ArNS record '" .. rootName .. "' does not exist")
-	assert(record.processId == from, "Caller is not the process id that owns the base name")
+	local record = arns.getRecord(baseName)
+	assert(record, "ArNS record '" .. baseName .. "' does not exist")
+	assert(record.processId == initiator, "Caller is not the process id that owns the base name")
 
 	--- TODO: should we allow overrides of existing name claims or throw an error? I favor allowing overrides, if the ant wants to modify an existing claim it jsut resubmits
 	local claim = {
 		name = name,
 		recipient = recipient,
-		processId = from,
-		rootName = rootName,
+		initiator = initiator,
+		baseName = baseName,
 		startTimestamp = timestamp,
 		endTimestamp = timestamp + 30 * 24 * 60 * 60 * 1000, -- 30 days
 	}
-	PrimaryNameClaims[name] = claim
+	PrimaryNames.claims[name] = claim
 	return claim
 end
 
@@ -61,123 +73,138 @@ end
 --- @param name string
 --- @return PrimaryNameClaim|nil
 function primaryNames.getPrimaryNameClaim(name)
-	return utils.deepCopy(PrimaryNameClaims[name])
+	return utils.deepCopy(PrimaryNames.claims[name])
 end
+
+---@class ClaimPrimaryNameResult
+---@field primaryName PrimaryNameWithOwner
+---@field claim PrimaryNameClaim
 
 --- Action taken by the owner of a primary name. This is who pays for the primary name.
 --- @param name string -- the name being claimed, this could be an undername provided by the ant
---- @param recipient string -- the process id that is claiming the primary name for the owner
+--- @param from string -- the process id that is claiming the primary name for the owner
 --- @param timestamp number -- the timestamp of the claim
---- @return PrimaryName
-function primaryNames.claimPrimaryName(name, recipient, timestamp)
+--- @return ClaimPrimaryNameResult
+function primaryNames.claimPrimaryName(name, from, timestamp)
 	local claim = primaryNames.getPrimaryNameClaim(name)
 	assert(claim, "Primary name claim for '" .. name .. "' does not exist")
-	assert(claim.recipient == recipient, "Primary name claim for '" .. name .. "' is not for " .. recipient)
+	assert(claim.recipient == from, "Primary name claim for '" .. name .. "' is not for " .. from)
 	assert(claim.endTimestamp > timestamp, "Primary name claim for '" .. name .. "' has expired")
 
 	-- validate the owner has the balance to claim the name
-	assert(
-		balances.walletHasSufficientBalance(recipient, PRIMARY_NAME_COST),
-		"Insufficient balance to claim primary name"
-	)
+	assert(balances.walletHasSufficientBalance(from, PRIMARY_NAME_COST), "Insufficient balance to claim primary name")
 
 	-- assert the process id in the initial claim still owns the name
 	local record = arns.getRecord(name)
 	assert(record, "ArNS record '" .. name .. "' does not exist")
-	assert(record.processId == claim.processId, "Name is no longer owned by the process id that made the initial claim")
+	assert(record.processId == claim.initiator, "Name is no longer owned by the address that made the initial claim")
 
 	-- transfer the primary name cost from the owner to the treasury
-	balances.transfer(ao.id, recipient, PRIMARY_NAME_COST)
-
-	local newPrimaryName = {
-		name = name,
-		startTimestamp = timestamp,
-	}
+	-- TODO: apply funding sources here
+	balances.transfer(ao.id, from, PRIMARY_NAME_COST)
 
 	-- set the primary name
-	PrimaryNames[recipient] = newPrimaryName
+	local newPrimaryName = primaryNames.setPrimaryNameFromClaim(from, claim, timestamp)
 	return {
 		primaryName = newPrimaryName,
 		claim = claim,
 	}
 end
 
---- Find the owner of a primary name, returns nil if the name is not owned
---- @param name string  - the name to find the owner of
---- @return string|nil - the owner of the name, or nil if the name is not owned
-function primaryNames.findPrimaryNameOwner(name)
-	for owner, primaryName in pairs(PrimaryNames) do
-		if primaryName.name == name then
-			return owner
-		end
-	end
-end
-
---- Release a primary name for the owner
---- @param from string - the wallet address releasing its primary name
---- @param name string - the name being released
+--- Update the primary name maps and return the primary name. Removes the claim from the claims map.
+--- @param owner string
+--- @param claim PrimaryNameClaim
+--- @param startTimestamp number
 --- @return PrimaryNameWithOwner
-function primaryNames.releasePrimaryName(from, name)
-	local existingOwner = primaryNames.findPrimaryNameOwner(name)
-	local existingPrimaryName = utils.deepCopy(PrimaryNames[existingOwner])
-	assert(existingOwner == from, "Primary name is not owned by " .. from)
-	assert(existingPrimaryName, "Primary name is not owned and cannot be released")
-	PrimaryNames[from] = nil
+function primaryNames.setPrimaryNameFromClaim(owner, claim, startTimestamp)
+	PrimaryNames.names[claim.name] = owner
+	PrimaryNames.owners[owner] = {
+		name = claim.name,
+		baseName = claim.baseName,
+		startTimestamp = startTimestamp,
+	}
+	PrimaryNames.claims[claim.name] = nil
 	return {
-		name = existingPrimaryName.name,
-		owner = existingOwner,
-		startTimestamp = existingPrimaryName.startTimestamp,
+		name = claim.name,
+		owner = owner,
+		startTimestamp = startTimestamp,
+		baseName = claim.baseName,
 	}
 end
 
---- Get a primary name
+--- @class RemovedPrimaryNameResult
+--- @field releasedName PrimaryName
+--- @field releasedOwner WalletAddress
+
+--- Release a primary name
+--- @param name ArNSName -- the name being released
+--- @param from WalletAddress -- the address that is releasing the primary name
+--- @return RemovedPrimaryNameResult
+function primaryNames.releasePrimaryName(name, from)
+	--- assert the from is the current owner of the name
+	assert(PrimaryNames.names[name] == from, "Caller is not the owner of the primary name")
+
+	local releasedOwner = PrimaryNames.names[name]
+	local releasedName = utils.deepCopy(PrimaryNames.owners[from])
+	PrimaryNames.claims[name] = nil -- should never happen, but cleanup anyway
+	PrimaryNames.names[name] = nil
+	PrimaryNames.owners[from] = nil
+	return {
+		releasedName = releasedName,
+		releasedOwner = releasedOwner,
+	}
+end
+
+--- Get the address for a primary name, allowing for forward lookups (e.g. "foo.bar" -> "0x123")
 --- @param name string
+--- @return string
+function primaryNames.getAddressForPrimaryName(name)
+	return PrimaryNames.names[name]
+end
+
+--- Get the name data for an address, allowing for reverse lookups (e.g. "0x123" -> "foo.bar")
+--- @param address string
 --- @return PrimaryNameWithOwner|nil
-function primaryNames.getPrimaryName(name)
-	local owner = primaryNames.findPrimaryNameOwner(name)
-	if not owner then
+function primaryNames.getPrimaryNameDataWithOwnerFromAddress(address)
+	local nameData = PrimaryNames.owners[address]
+	if not nameData then
 		return nil
 	end
-	local primaryName = PrimaryNames[owner]
-	if not primaryName then
+	return {
+		owner = address,
+		name = nameData.name,
+		startTimestamp = nameData.startTimestamp,
+		baseName = nameData.baseName,
+	}
+end
+
+--- Complete name resolution, returning the owner and name data for a name
+--- @param name string
+--- @return PrimaryNameWithOwner|nil
+function primaryNames.getPrimaryNameDataWithOwnerFromName(name)
+	local owner = primaryNames.getAddressForPrimaryName(name)
+	local nameData = primaryNames.getPrimaryNameDataWithOwnerFromAddress(owner)
+	if not owner or not nameData then
 		return nil
 	end
 	return {
 		name = name,
 		owner = owner,
-		startTimestamp = primaryName.startTimestamp,
-	}
-end
-
---- Get a primary name for a given address
---- @param address string
---- @return PrimaryNameWithOwner|nil
-function primaryNames.getPrimaryNameForAddress(address)
-	local primaryName = utils.deepCopy(PrimaryNames[address])
-	if not primaryName then
-		return nil
-	end
-	return {
-		name = primaryName.name,
-		owner = address,
-		startTimestamp = primaryName.startTimestamp,
+		startTimestamp = nameData.startTimestamp,
+		baseName = nameData.baseName,
 	}
 end
 
 ---Finds all primary names with a given apex name
---- @param name string
+--- @param baseName string -- the base name to find primary names for (e.g. "test" to find "undername_test")
 --- @return PrimaryNameWithOwner[]
-function primaryNames.findPrimaryNamesForArNSName(name)
+function primaryNames.findPrimaryNamesForBaseName(baseName)
 	local primaryNamesForArNSName = {}
-	local unsafePrimaryNames = PrimaryNames
-	for owner, primaryName in pairs(unsafePrimaryNames) do
-		local undername = primaryName.name
-		if undername:match("_" .. name .. "$") or undername == name then
-			table.insert(primaryNamesForArNSName, {
-				name = undername,
-				owner = owner,
-				startTimestamp = primaryName.startTimestamp,
-			})
+	local unsafePrimaryNames = PrimaryNames.names -- TODO: unsafe copy
+	for name, _ in pairs(unsafePrimaryNames) do
+		local nameData = primaryNames.getPrimaryNameDataWithOwnerFromName(name)
+		if nameData and nameData.baseName == baseName then
+			table.insert(primaryNamesForArNSName, nameData)
 		end
 	end
 	-- sort by name length
@@ -187,15 +214,22 @@ function primaryNames.findPrimaryNamesForArNSName(name)
 	return primaryNamesForArNSName
 end
 
+---@class RemovedPrimaryName
+---@field owner WalletAddress
+---@field name ArNSName
+
 --- Remove all primary names with a given apex name
---- @param name string
---- @return string[]
-function primaryNames.removePrimaryNamesForArNSName(name)
+--- @param baseName string
+--- @return RemovedPrimaryName[]
+function primaryNames.removePrimaryNamesForBaseName(baseName)
 	local removedNames = {}
-	local primaryNamesForArNSName = primaryNames.findPrimaryNamesForArNSName(name)
-	for _, nameForArNSName in pairs(primaryNamesForArNSName) do
-		PrimaryNames[nameForArNSName.owner] = nil
-		table.insert(removedNames, nameForArNSName.name)
+	local primaryNamesForBaseName = primaryNames.findPrimaryNamesForBaseName(baseName)
+	for _, nameForBaseName in pairs(primaryNamesForBaseName) do
+		local releasedNameAndOwner = primaryNames.releasePrimaryName(nameForBaseName.name, nameForBaseName.owner)
+		table.insert(removedNames, {
+			owner = releasedNameAndOwner.releasedOwner,
+			name = releasedNameAndOwner.releasedName.name,
+		})
 	end
 	return removedNames
 end
@@ -209,7 +243,7 @@ end
 function primaryNames.getPaginatedPrimaryNames(cursor, limit, sortBy, sortOrder)
 	local primaryNamesArray = {}
 	local cursorField = "name"
-	for owner, primaryName in ipairs(PrimaryNames) do
+	for owner, primaryName in ipairs(PrimaryNames.owners) do
 		table.insert(primaryNamesArray, {
 			name = primaryName.name,
 			owner = owner,
@@ -224,10 +258,10 @@ end
 --- @return table<string, PrimaryNameClaim> the names of the claims that were pruned
 function primaryNames.prunePrimaryNameClaims(timestamp)
 	local prunedNameClaims = {}
-	-- unsafe access to primary name claims
-	for name, claim in pairs(PrimaryNameClaims) do
+	local unsafeClaims = PrimaryNames.claims or {} -- unsafe access to primary name claims
+	for name, claim in pairs(unsafeClaims) do
 		if claim.endTimestamp <= timestamp then
-			PrimaryNameClaims[name] = nil
+			PrimaryNames.claims[name] = nil
 			prunedNameClaims[name] = claim
 		end
 	end

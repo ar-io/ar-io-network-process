@@ -142,6 +142,8 @@ describe('primary names', function () {
       memory: createClaimResult.Memory,
     });
 
+    assertNoResultError(claimPrimaryNameResult);
+
     // there should be two messages, one to the ant and one to the owner
     assert.equal(claimPrimaryNameResult.Messages.length, 2);
     assert.equal(claimPrimaryNameResult.Messages[0].Target, processId);
@@ -158,8 +160,20 @@ describe('primary names', function () {
       claimPrimaryNameResult.Messages[0].Data,
     );
     assert.deepStrictEqual(primaryNameSetResult, {
-      name: 'test-name',
-      startTimestamp: 1234567890,
+      claim: {
+        baseName: 'test-name',
+        endTimestamp: 3826567890,
+        initiator: processId,
+        name: 'test-name',
+        recipient,
+        startTimestamp: 1234567890,
+      },
+      primaryName: {
+        name: 'test-name',
+        owner: recipient,
+        startTimestamp: 1234567890,
+        baseName: 'test-name',
+      },
     });
 
     // now fetch the primary name using the owner address
@@ -176,6 +190,7 @@ describe('primary names', function () {
       name: 'test-name',
       owner: recipient,
       startTimestamp: 1234567890,
+      baseName: 'test-name',
     });
 
     // reverse lookup the owner of the primary name
@@ -189,6 +204,7 @@ describe('primary names', function () {
       name: 'test-name',
       owner: recipient,
       startTimestamp: 1234567890,
+      baseName: 'test-name',
     });
   });
 

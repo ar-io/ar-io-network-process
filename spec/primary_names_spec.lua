@@ -2,8 +2,11 @@ local primaryNames = require("primary_names")
 
 describe("Primary Names", function()
 	before_each(function()
-		_G.PrimaryNames = {}
-		_G.PrimaryNameClaims = {}
+		_G.PrimaryNames = {
+			owners = {},
+			names = {},
+			claims = {},
+		}
 		_G.Balances = {}
 		_G.NameRegistry = {
 			records = {},
@@ -30,10 +33,16 @@ describe("Primary Names", function()
 
 		it("should fail if the primary name is already owned", function()
 			_G.PrimaryNames = {
-				["owner"] = {
-					name = "test",
-					startTimestamp = 1234567890,
+				owners = {
+					["owner"] = {
+						name = "test",
+						startTimestamp = 1234567890,
+					},
 				},
+				names = {
+					["test"] = "owner",
+				},
+				claims = {},
 			}
 			local status, err = pcall(primaryNames.createNameClaim, "test", "recipient", "processId", 1234567890)
 			assert.is_false(status)
@@ -52,8 +61,8 @@ describe("Primary Names", function()
 				startTimestamp = 1234567890,
 				endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
 				recipient = "recipient",
-				processId = "processId",
-				rootName = "test",
+				initiator = "processId",
+				baseName = "test",
 			}, primaryNameClaim)
 		end)
 	end)
@@ -66,7 +75,7 @@ describe("Primary Names", function()
 		end)
 
 		it("should fail if the primary name claim has expired", function()
-			_G.PrimaryNameClaims = {
+			_G.PrimaryNames.claims = {
 				["test"] = {
 					recipient = "recipient",
 					processId = "processId",
@@ -80,7 +89,7 @@ describe("Primary Names", function()
 		end)
 
 		it("should fail if the the recipient of the name does not have sufficient balance", function()
-			_G.PrimaryNameClaims = {
+			_G.PrimaryNames.claims = {
 				["test"] = {
 					recipient = "recipient",
 					startTimestamp = 1234567890,
@@ -99,10 +108,12 @@ describe("Primary Names", function()
 					processId = "processId",
 				},
 			}
-			_G.PrimaryNameClaims = {
+			_G.PrimaryNames.claims = {
 				["test"] = {
+					name = "test",
 					recipient = "recipient",
-					processId = "processId",
+					baseName = "test",
+					initiator = "processId",
 					startTimestamp = 1234567890,
 					endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
 				},
@@ -110,100 +121,171 @@ describe("Primary Names", function()
 			_G.Balances = {
 				["recipient"] = 100000000,
 			}
-			local claimedName = primaryNames.claimPrimaryName("test", "recipient", 1234567890)
+			local claimedNameAndOwner = primaryNames.claimPrimaryName("test", "recipient", 1234567890)
 			assert.are.same({
-				name = "test",
-				startTimestamp = 1234567890,
-			}, claimedName.primaryName)
+				primaryName = {
+					name = "test",
+					owner = "recipient",
+					startTimestamp = 1234567890,
+					baseName = "test",
+				},
+				claim = {
+					name = "test",
+					recipient = "recipient",
+					startTimestamp = 1234567890,
+					baseName = "test",
+					initiator = "processId",
+					endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
+				},
+			}, claimedNameAndOwner)
 			assert.are.same({
-				["recipient"] = { name = "test", startTimestamp = 1234567890 },
-			}, _G.PrimaryNames)
+				["recipient"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
+			}, _G.PrimaryNames.owners)
+			assert.are.same({
+				["test"] = "recipient",
+			}, _G.PrimaryNames.names)
 			assert.are.equal(0, _G.Balances["recipient"])
 		end)
 	end)
 
-	describe("findPrimaryNameOwner", function()
+	describe("getAddressForPrimaryName", function()
 		it("should return nil if the name is not owned", function()
-			assert.is_nil(primaryNames.findPrimaryNameOwner("test"))
+			assert.is_nil(primaryNames.getAddressForPrimaryName("test"))
 		end)
 
 		it("should return the owner if the name is owned", function()
 			_G.PrimaryNames = {
-				["owner"] = { name = "test", startTimestamp = 1234567890 },
+				owners = {
+					["owner"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
+				},
+				names = {
+					["test"] = "owner",
+				},
 			}
-			assert.are.same("owner", primaryNames.findPrimaryNameOwner("test"))
+			assert.are.same("owner", primaryNames.getAddressForPrimaryName("test"))
 		end)
 	end)
 
 	describe("releasePrimaryName", function()
-		it("should fail if the name is not owned", function()
+		it("should fail if the caller is not the owner of the primary name", function()
 			local status, err = pcall(primaryNames.releasePrimaryName, "test", "owner")
 			assert.is_false(status)
-			assert.match("Primary name is not owned", err)
+			assert.match("Caller is not the owner of the primary name", err)
 		end)
 
 		it("should release the primary name", function()
 			_G.PrimaryNames = {
-				["owner"] = { name = "test", startTimestamp = 1234567890 },
+				owners = {
+					["owner"] = { name = "test", startTimestamp = 1234567890 },
+				},
+				names = {
+					["test"] = "owner",
+				},
+				claims = {},
 			}
-			local releasedName = primaryNames.releasePrimaryName("owner", "test")
-			assert.are.same(nil, _G.PrimaryNames["owner"])
+			local releasedNameAndOwner = primaryNames.releasePrimaryName("test", "owner")
+			assert.are.same(nil, _G.PrimaryNames.owners["owner"])
+			assert.are.same(nil, _G.PrimaryNames.names["test"])
 			assert.are.same({
-				name = "test",
-				owner = "owner",
-				startTimestamp = 1234567890,
-			}, releasedName)
+				releasedName = {
+					name = "test",
+					startTimestamp = 1234567890,
+				},
+				releasedOwner = "owner",
+			}, releasedNameAndOwner)
 		end)
 	end)
 
-	describe("getPrimaryName", function()
+	describe("getPrimaryNameDataWithOwnerFromAddress", function()
 		it("should return nil if the name is not owned", function()
-			assert.is_nil(primaryNames.getPrimaryName("test"))
+			assert.is_nil(primaryNames.getPrimaryNameDataWithOwnerFromAddress("test"))
 		end)
 
 		it("should return the primary name if the name is owned", function()
 			_G.PrimaryNames = {
-				["owner"] = { name = "test", startTimestamp = 1234567890 },
+				owners = {
+					["owner"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
+				},
+				names = {
+					["test"] = "owner",
+				},
 			}
 			assert.are.same(
-				{ name = "test", owner = "owner", startTimestamp = 1234567890 },
-				primaryNames.getPrimaryName("test")
+				{ name = "test", owner = "owner", startTimestamp = 1234567890, baseName = "test" },
+				primaryNames.getPrimaryNameDataWithOwnerFromAddress("owner")
 			)
 		end)
 	end)
 
-	describe("findPrimaryNamesWithApexName", function()
+	describe("findPrimaryNamesForBaseName", function()
 		it("should return all primary names with the given apex name", function()
 			_G.PrimaryNames = {
-				["owner"] = { name = "undername_test", startTimestamp = 1234567890 },
-				["owner2"] = { name = "undername2_test", startTimestamp = 1234567890 },
-				["owner3"] = { name = "test", startTimestamp = 1234567890 },
-				["owner4"] = { name = "test2", startTimestamp = 1234567890 },
-				["owner5"] = { name = "test3", startTimestamp = 1234567890 },
+				owners = {
+					["owner"] = { name = "undername_test", startTimestamp = 1234567890, baseName = "test" },
+					["owner2"] = { name = "undername2_test", startTimestamp = 1234567890, baseName = "test" },
+					["owner3"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
+					["owner4"] = { name = "test2", startTimestamp = 1234567890, baseName = "test2" },
+					["owner5"] = { name = "test3", startTimestamp = 1234567890, baseName = "test3" },
+				},
+				names = {
+					["test"] = "owner3",
+					["undername_test"] = "owner",
+					["undername2_test"] = "owner2",
+					["test2"] = "owner4",
+					["test3"] = "owner5",
+				},
 			}
-			local primaryNamesForApexName = primaryNames.findPrimaryNamesForArNSName("test")
+			local allPrimaryNamesForArNSName = primaryNames.findPrimaryNamesForBaseName("test")
 			assert.are.same({
-				{ name = "test", owner = "owner3", startTimestamp = 1234567890 },
-				{ name = "undername_test", owner = "owner", startTimestamp = 1234567890 },
-				{ name = "undername2_test", owner = "owner2", startTimestamp = 1234567890 },
-			}, primaryNamesForApexName)
+				{ name = "test", owner = "owner3", startTimestamp = 1234567890, baseName = "test" },
+				{ name = "undername_test", owner = "owner", startTimestamp = 1234567890, baseName = "test" },
+				{ name = "undername2_test", owner = "owner2", startTimestamp = 1234567890, baseName = "test" },
+			}, allPrimaryNamesForArNSName)
 		end)
 	end)
 
-	describe("removePrimaryNamesForArNSName", function()
+	describe("removePrimaryNamesForBaseName", function()
 		it("should remove all primary names with the given apex name", function()
 			_G.PrimaryNames = {
-				["owner"] = { name = "undername_test", startTimestamp = 1234567890 },
-				["owner2"] = { name = "undername2_test", startTimestamp = 1234567890 },
-				["owner3"] = { name = "test", startTimestamp = 1234567890 },
-				["owner4"] = { name = "test2", startTimestamp = 1234567890 },
-				["owner5"] = { name = "test3", startTimestamp = 1234567890 },
+				owners = {
+					["owner"] = { name = "undername_test", startTimestamp = 1234567890, baseName = "test" },
+					["owner2"] = { name = "undername2_test", startTimestamp = 1234567890, baseName = "test" },
+					["owner3"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
+					["owner4"] = { name = "test2", startTimestamp = 1234567890, baseName = "test2" },
+					["owner5"] = { name = "test3", startTimestamp = 1234567890, baseName = "test3" },
+				},
+				names = {
+					["test"] = "owner3",
+					["undername_test"] = "owner",
+					["undername2_test"] = "owner2",
+					["test2"] = "owner4",
+					["test3"] = "owner5",
+				},
+				claims = {},
 			}
-			local removedNames = primaryNames.removePrimaryNamesForArNSName("test")
-			assert.are.same({ "test", "undername_test", "undername2_test" }, removedNames)
+			local removedNamesAndOwners = primaryNames.removePrimaryNamesForBaseName("test")
 			assert.are.same({
-				["owner4"] = { name = "test2", startTimestamp = 1234567890 },
-				["owner5"] = { name = "test3", startTimestamp = 1234567890 },
+				owner = "owner3",
+				name = "test",
+			}, removedNamesAndOwners[1])
+			assert.are.same({
+				owner = "owner",
+				name = "undername_test",
+			}, removedNamesAndOwners[2])
+			assert.are.same({
+				owner = "owner2",
+				name = "undername2_test",
+			}, removedNamesAndOwners[3])
+			assert.are.same({
+				owners = {
+					["owner4"] = { name = "test2", startTimestamp = 1234567890, baseName = "test2" },
+					["owner5"] = { name = "test3", startTimestamp = 1234567890, baseName = "test3" },
+				},
+				names = {
+					["test2"] = "owner4",
+					["test3"] = "owner5",
+				},
+				claims = {},
 			}, _G.PrimaryNames)
 		end)
 	end)

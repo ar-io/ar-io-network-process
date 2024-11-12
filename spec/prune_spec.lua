@@ -1,4 +1,4 @@
-local tick = require("tick")
+local tick = require("prune")
 
 describe("prune", function()
 	before_each(function()
@@ -20,17 +20,22 @@ describe("prune", function()
 				},
 			},
 		}
-		_G.PrimaryNameClaims = {
-			["test-primary-name-claim"] = {
-				recipient = "test-primary-name-owner",
-				endTimestamp = 1000000,
-			},
-		}
 		_G.PrimaryNames = {
-			["test-primary-name-owner"] = {
-				name = "test-record",
-				baseName = "test-record",
-				startTimestamp = 1000000,
+			owners = {
+				["test-primary-name-owner"] = {
+					name = "test-record",
+					baseName = "test-record",
+					startTimestamp = 1000000,
+				},
+			},
+			names = {
+				["test-record"] = "test-primary-name-owner",
+			},
+			claims = {
+				["test-primary-name-claim"] = {
+					endTimestamp = 1000000,
+					recipient = "test-primary-name-owner",
+				},
 			},
 		}
 	end)
@@ -63,7 +68,17 @@ describe("prune", function()
 					},
 				},
 			}, _G.NameRegistry.auctions)
-			assert.are.same({}, _G.PrimaryNames)
+			--- check that the primary names and owners were also pruned
+			assert.are.same({
+				["test-record"] = {
+					{
+						name = "test-record",
+						owner = "test-primary-name-owner",
+					},
+				},
+			}, result.prunedPrimaryNamesAndOwners)
+			assert.are.same({}, _G.PrimaryNames.owners)
+			assert.are.same({}, _G.PrimaryNames.names)
 		end
 	)
 
@@ -97,5 +112,6 @@ describe("prune", function()
 				recipient = "test-primary-name-owner",
 			},
 		}, result.prunedPrimaryNameClaims)
+		assert.are.same({}, _G.PrimaryNames.claims)
 	end)
 end)
