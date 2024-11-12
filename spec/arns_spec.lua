@@ -1310,6 +1310,16 @@ describe("arns", function()
 					remainingBalance = 0,
 					protocolBalance = 2500000000,
 					df = demand.getDemandFactorInfo(),
+					fundingPlan = {
+						address = testAddressArweave,
+						balance = 2500000000,
+						stakes = {},
+						shortfall = 0,
+					},
+					fundingResult = {
+						totalFunded = 2500000000,
+						newWithdrawVaults = {},
+					},
 				}, updatedRecord)
 			end)
 

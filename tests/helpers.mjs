@@ -5,6 +5,10 @@ import {
   DEFAULT_HANDLE_OPTIONS,
   STUB_ADDRESS,
   PROCESS_OWNER,
+  STUB_OPERATOR_ADDRESS,
+  STUB_TIMESTAMP,
+  PROCESS_OWNER,
+  validGatewayTags,
 } from '../tools/constants.mjs';
 
 const initialOperatorStake = 100_000_000_000;
@@ -51,4 +55,81 @@ export const transfer = async ({
   );
   assertNoResultError(transferResult);
   return transferResult.Memory;
+};
+
+export const joinNetwork = async ({
+  memory,
+  timestamp = STUB_TIMESTAMP,
+  address,
+  tags = validGatewayTags,
+}) => {
+  // give them the join network token amount
+  const transferMemory = await transfer({
+    recipient: address,
+    quantity: 100_000_000_000,
+    memory,
+  });
+  const joinNetworkResult = await handle(
+    {
+      From: address,
+      Owner: address,
+      Tags: tags,
+      Timestamp: timestamp,
+    },
+    transferMemory,
+  );
+  assertNoResultError(joinNetworkResult);
+  return {
+    memory: joinNetworkResult.Memory,
+    result: joinNetworkResult,
+  };
+};
+
+export const setUpStake = async ({
+  memory,
+  timestamp = STUB_TIMESTAMP,
+  gatewayAddress = STUB_OPERATOR_ADDRESS,
+  gatewayTags = validGatewayTags,
+  stakerAddress = STUB_ADDRESS,
+  transferQty,
+  stakeQty,
+  additionalStakingTags = [],
+}) => {
+  // Send IO to the user to delegate stake
+  memory = await transfer({
+    recipient: stakerAddress,
+    quantity: transferQty,
+    memory,
+    cast: true,
+  });
+
+  // Stake a gateway for the user to delegate to
+  const joinNetworkResult = await joinNetwork({
+    memory,
+    address: gatewayAddress,
+    tags: gatewayTags,
+    timestamp: timestamp - 1,
+  });
+  assertNoResultError(joinNetworkResult);
+  memory = joinNetworkResult.memory;
+
+  const stakeResult = await handle(
+    {
+      From: stakerAddress,
+      Owner: stakerAddress,
+      Tags: [
+        { name: 'Action', value: 'Delegate-Stake' },
+        { name: 'Quantity', value: `${stakeQty}` },
+        { name: 'Address', value: gatewayAddress },
+        ...additionalStakingTags,
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  );
+  assertNoResultError(stakeResult);
+  return {
+    memory: stakeResult.Memory,
+    result: stakeResult,
+  };
 };

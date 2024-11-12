@@ -1,5 +1,5 @@
 import { createAosLoader, assertNoResultError } from './utils.mjs';
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
 import {
   DEFAULT_HANDLE_OPTIONS,
@@ -380,8 +380,12 @@ describe('Vaults', async () => {
   });
 
   describe('getPaginatedVaults', () => {
-    it('should get paginated vaults', async () => {
-      const vaultId1 = 'unique-id-1-'.padEnd(43, 'a');
+    let paginatedVaultMemory = startMemory; // save the memory
+    const vaultId1 = 'unique-id-1-'.padEnd(43, 'a');
+    const secondVaulter = 'unique-second-address-'.padEnd(43, 'a');
+    const vaultId2 = 'unique-id-2-'.padEnd(43, 'a');
+
+    before(async () => {
       const { memory: updatedMemory } = await createVault({
         quantity: 500,
         lockLengthMs: 1209600000,
@@ -389,28 +393,29 @@ describe('Vaults', async () => {
         messageId: vaultId1,
       });
 
-      const secondVaulter = 'unique-second-address-'.padEnd(43, 'a');
       const transferResult = await handle(
         {
           Tags: [
             { name: 'Action', value: 'Transfer' },
             { name: 'Recipient', value: secondVaulter },
-            { name: 'Quantity', value: 500 },
+            { name: 'Quantity', value: 600 },
             { name: 'Cast', value: true },
           ],
         },
         updatedMemory,
       );
 
-      const vaultId2 = 'unique-id-2-'.padEnd(43, 'a');
       const { memory: updatedMemory2 } = await createVault({
-        quantity: 500,
+        quantity: 600,
         lockLengthMs: 1209600000,
         memory: transferResult.Memory,
         from: secondVaulter,
         messageId: vaultId2,
       });
+      paginatedVaultMemory = updatedMemory2;
+    });
 
+    it('should get paginated vaults', async () => {
       let cursor = '';
       let fetchedVaults = [];
       while (true) {
@@ -422,7 +427,7 @@ describe('Vaults', async () => {
               { name: 'Limit', value: '1' },
             ],
           },
-          updatedMemory2,
+          paginatedVaultMemory,
         );
 
         // parse items, nextCursor
@@ -442,23 +447,66 @@ describe('Vaults', async () => {
       assert.deepEqual(fetchedVaults, [
         {
           address: secondVaulter,
-          vault: {
-            [vaultId2]: {
-              balance: 500,
-              startTimestamp: 21600000,
-              endTimestamp: 1231200000,
-            },
-          },
+          vaultId: vaultId2,
+          balance: 600,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
         },
         {
           address: PROCESS_OWNER,
-          vault: {
-            [vaultId1]: {
-              balance: 500,
-              startTimestamp: 21600000,
-              endTimestamp: 1231200000,
-            },
+          vaultId: vaultId1,
+          balance: 500,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
+        },
+      ]);
+    });
+
+    it('should get paginated vaults sorted by ascending balance', async () => {
+      let cursor = '';
+      let fetchedVaults = [];
+      while (true) {
+        const paginatedVaults = await handle(
+          {
+            Tags: [
+              { name: 'Action', value: 'Paginated-Vaults' },
+              { name: 'Cursor', value: cursor },
+              { name: 'Limit', value: '1' },
+              { name: 'Sort-By', value: 'balance' },
+              { name: 'Sort-Order', value: 'asc' },
+            ],
           },
+          paginatedVaultMemory,
+        );
+
+        // parse items, nextCursor
+        const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
+          JSON.parse(paginatedVaults.Messages?.[0]?.Data);
+
+        assert.equal(totalItems, 2);
+        assert.equal(items.length, 1);
+        assert.equal(sortBy, 'balance');
+        assert.equal(sortOrder, 'asc');
+        assert.equal(hasMore, !!nextCursor);
+        cursor = nextCursor;
+        fetchedVaults.push(...items);
+        if (!cursor) break;
+      }
+
+      assert.deepEqual(fetchedVaults, [
+        {
+          address: PROCESS_OWNER,
+          vaultId: vaultId1,
+          balance: 500,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
+        },
+        {
+          address: secondVaulter,
+          vaultId: vaultId2,
+          balance: 600,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
         },
       ]);
     });

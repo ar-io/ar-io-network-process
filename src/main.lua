@@ -140,7 +140,42 @@ local function addRecordResultFields(ioEvent, result)
 		})
 	end
 
-	-- TODO: Add funding plan info?
+	ioEvent:addFieldsWithPrefixIfExist(result.fundingPlan, "FP-", { "balance" })
+	local fundingPlanVaultsCount = 0
+	local fundingPlanStakesAmount = utils.reduce(
+		result.fundingPlan and result.fundingPlan.stakes or {},
+		function(acc, _, delegation)
+			return acc
+				+ delegation.delegatedStake
+				+ utils.reduce(delegation.vaults, function(acc2, _, vaultAmount)
+					fundingPlanVaultsCount = fundingPlanVaultsCount + 1
+					return acc2 + vaultAmount
+				end, 0)
+		end,
+		0
+	)
+	if fundingPlanStakesAmount > 0 then
+		ioEvent:addField("FP-Stakes-Amount", fundingPlanStakesAmount)
+	end
+	if fundingPlanVaultsCount > 0 then
+		ioEvent:addField("FP-Vaults-Count", fundingPlanVaultsCount)
+	end
+	local newWithdrawVaultsTallies = utils.reduce(
+		result.fundingResult and result.fundingResult.newWithdrawVaults or {},
+		function(acc, _, newWithdrawVault)
+			acc.totalBalance = acc.totalBalance
+				+ utils.reduce(newWithdrawVault, function(acc2, _, vault)
+					acc.count = acc.count + 1
+					return acc2 + vault.balance
+				end, 0)
+			return acc
+		end,
+		{ count = 0, totalBalance = 0 }
+	)
+	if newWithdrawVaultsTallies.count > 0 then
+		ioEvent:addField("New-Withdraw-Vaults-Count", newWithdrawVaultsTallies.count)
+		ioEvent:addField("New-Withdraw-Vaults-Total-Balance", newWithdrawVaultsTallies.totalBalance)
+	end
 end
 
 local function addAuctionResultFields(ioEvent, result)
@@ -791,7 +826,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = ActionMap.BuyRecord .. "-Notice", Name = name },
-		Data = json.encode({
+		Data = json.encode(fundFrom and result or {
 			name = name,
 			startTimestamp = record.startTimestamp,
 			endTimestamp = record.endTimestamp,
@@ -803,9 +838,11 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 end)
 
 addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.UpgradeName), function(msg)
+	local fundFrom = msg.Tags["Fund-From"]
 	local checkAssertions = function()
 		assert(type(msg.Tags.Name) == "string", "Invalid name")
 		assert(msg.Timestamp, "Timestamp is required")
+		assertValidFundFrom(fundFrom)
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -832,7 +869,7 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 			},
 			Data = tostring(error),
 		})
-	end, arns.upgradeRecord, from, name, timestamp)
+	end, arns.upgradeRecord, from, name, timestamp, msg.Id, fundFrom)
 	if not shouldContinue2 then
 		return
 	end
@@ -848,7 +885,7 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 	ao.send({
 		Target = from,
 		Tags = { Action = ActionMap.UpgradeName .. "-Notice", Name = name },
-		Data = json.encode({
+		Data = json.encode(fundFrom and result or {
 			name = name,
 			startTimestamp = record.startTimestamp,
 			endTimestamp = record.endTimestamp,
@@ -923,7 +960,7 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = ActionMap.ExtendLease .. "-Notice", Name = string.lower(msg.Tags.Name) },
-		Data = json.encode(recordResult),
+		Data = json.encode(fundFrom and result or recordResult),
 	})
 end)
 
@@ -998,7 +1035,7 @@ addEventingHandler(
 				Action = ActionMap.IncreaseUndernameLimit .. "-Notice",
 				Name = string.lower(msg.Tags.Name),
 			},
-			Data = json.encode(recordResult),
+			Data = json.encode(fundFrom and result or recordResult),
 		})
 	end
 )
@@ -1062,6 +1099,7 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 		return
 	end
 	local tokenCost = tokenCostResult.tokenCost
+	local discounts = tokenCostResult.discounts
 
 	local shouldContinue3, fundingPlan = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
@@ -1074,17 +1112,16 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 		return
 	end
 
+	local data = {
+		tokenCost = tokenCost,
+		fundingPlan = fundFrom and fundingPlan or nil,
+		discounts = discounts,
+	}
+
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(tokenCost) },
-		Data = fundFrom
-				and json.encode({
-					tokenCost = tokenCost,
-					fundingPlan = fundingPlan,
-					discounts = tokenCostResult.discounts,
-				})
-			-- maintain backwards compatibility with the previous response format
-			or json.encode(tokenCost),
+		Data = json.encode(data),
 	})
 end)
 
@@ -2595,8 +2632,13 @@ end)
 
 addEventingHandler("paginatedGateways", utils.hasMatchingTag("Action", "Paginated-Gateways"), function(msg)
 	local page = utils.parsePaginationTags(msg)
-	local status, result =
-		pcall(gar.getPaginatedGateways, page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
+	local status, result = pcall(
+		gar.getPaginatedGateways,
+		page.cursor,
+		page.limit,
+		page.sortBy or "startTimestamp",
+		page.sortOrder or "desc"
+	)
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -2627,7 +2669,7 @@ end)
 
 addEventingHandler("paginatedVaults", utils.hasMatchingTag("Action", "Paginated-Vaults"), function(msg)
 	local page = utils.parsePaginationTags(msg)
-	local status, result = pcall(vaults.getPaginatedVaults, page.cursor, page.limit, page.sortOrder)
+	local status, result = pcall(vaults.getPaginatedVaults, page.cursor, page.limit, page.sortOrder, page.sortBy)
 
 	if not status then
 		ao.send({
