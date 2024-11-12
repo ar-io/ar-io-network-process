@@ -140,7 +140,43 @@ local function addRecordResultFields(ioEvent, result)
 		})
 	end
 
-	-- TODO: Add funding plan info?
+	-- ioEvent:addFieldsIfExist(result, { "fundingPlan", "appliedPlan" })
+	ioEvent:addFieldsWithPrefixIfExist(result.fundingPlan, "FP-", { "balance" })
+	local fundingPlanVaultsCount = 0
+	local fundingPlanStakesAmount = utils.reduce(
+		result.fundingPlan and result.fundingPlan.stakes or {},
+		function(acc, _, delegation)
+			return acc
+				+ delegation.delegatedStake
+				+ utils.reduce(delegation.vaults, function(acc2, _, vaultAmount)
+					fundingPlanVaultsCount = fundingPlanVaultsCount + 1
+					return acc2 + vaultAmount
+				end, 0)
+		end,
+		0
+	)
+	if fundingPlanStakesAmount > 0 then
+		ioEvent:addField("FP-Stakes-Amount", fundingPlanStakesAmount)
+	end
+	if fundingPlanVaultsCount > 0 then
+		ioEvent:addField("FP-Vaults-Count", fundingPlanVaultsCount)
+	end
+	local newWithdrawVaultsTallies = utils.reduce(
+		result.appliedPlan and result.appliedPlan.newWithdrawVaults or {},
+		function(acc, _, newWithdrawVault)
+			acc.totalBalance = acc.totalBalance
+				+ utils.reduce(newWithdrawVault, function(acc2, _, vault)
+					acc.count = acc.count + 1
+					return acc2 + vault.balance
+				end, 0)
+			return acc
+		end,
+		{ count = 0, totalBalance = 0 }
+	)
+	if newWithdrawVaultsTallies.count > 0 then
+		ioEvent:addField("New-Withdraw-Vaults-Count", newWithdrawVaultsTallies.count)
+		ioEvent:addField("New-Withdraw-Vaults-Total-Balance", newWithdrawVaultsTallies.totalBalance)
+	end
 end
 
 local function addAuctionResultFields(ioEvent, result)
