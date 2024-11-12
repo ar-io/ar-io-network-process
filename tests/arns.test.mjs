@@ -1515,57 +1515,6 @@ describe('ArNS', async () => {
   // TODO: add several error scenarios
 
   describe('ArNS Discount Eligible Gateways', () => {
-    // TODO: pull these helpers from utils
-    const transfer = async ({
-      recipient = STUB_ADDRESS,
-      quantity = initialOperatorStake,
-      memory = startMemory,
-    } = {}) => {
-      const transferResult = await handle(
-        {
-          From: PROCESS_OWNER,
-          Owner: PROCESS_OWNER,
-          Tags: [
-            { name: 'Action', value: 'Transfer' },
-            { name: 'Recipient', value: recipient },
-            { name: 'Quantity', value: quantity },
-            { name: 'Cast', value: false },
-          ],
-        },
-        memory,
-      );
-      assertNoResultError(transferResult);
-      return transferResult.Memory;
-    };
-
-    const joinNetwork = async ({
-      memory = startMemory,
-      timestamp = STUB_TIMESTAMP,
-      address,
-      tags = validGatewayTags,
-    }) => {
-      // give them twice the join network token amount to ensure they have enough to join the network perform arns purchase
-      const transferMemory = await transfer({
-        recipient: address,
-        quantity: 200_000_000_000,
-        memory,
-      });
-      const joinNetworkResult = await handle(
-        {
-          From: address,
-          Owner: address,
-          Tags: tags,
-          Timestamp: timestamp,
-        },
-        transferMemory,
-      );
-      assertNoResultError(joinNetworkResult);
-      return {
-        memory: joinNetworkResult.Memory,
-        result: joinNetworkResult,
-      };
-    };
-
     const getBalances = async ({ memory }) => {
       const result = await handle(
         {
