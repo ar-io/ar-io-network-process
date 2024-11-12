@@ -3,6 +3,7 @@ local utils = require("utils")
 local constants = require("constants")
 local balances = require("balances")
 local demand = require("demand")
+local gar = require("gar")
 local arns = {}
 local Auction = require("auctions")
 
@@ -19,8 +20,11 @@ NameRegistry = NameRegistry or {
 --- @param from string The address of the sender
 --- @param timestamp number The current timestamp
 --- @param processId string The process id
+--- @param msgId string The current message id
+--- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stakes". Default "balance"
 --- @return table The updated record
-function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
+function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, msgId, fundFrom)
+	fundFrom = fundFrom or "balance"
 	arns.assertValidBuyRecord(name, years, purchaseType, processId)
 	if purchaseType == nil then
 		purchaseType = "lease" -- set to lease by default
@@ -36,7 +40,8 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 	local totalRegistrationFee =
 		arns.calculateRegistrationFee(purchaseType, baseRegistrationFee, numYears, demand.getDemandFactor())
 
-	assert(balances.getBalance(from) >= totalRegistrationFee, "Insufficient balance")
+	local fundingPlan = gar.getFundingPlan(from, totalRegistrationFee, fundFrom)
+	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
 
 	local record = arns.getRecord(name)
 	local isPermabuy = record ~= nil and record.type == "permabuy"
@@ -57,8 +62,10 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 	}
 
 	-- Register the leased or permanently owned name
+	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, timestamp)
+	assert(fundingResult.totalFunded == totalRegistrationFee, "Funding plan application failed")
 	-- Transfer tokens to the protocol balance
-	balances.transfer(ao.id, from, totalRegistrationFee)
+	balances.increaseBalance(ao.id, totalRegistrationFee)
 	arns.addRecord(name, newRecord)
 	demand.tallyNamePurchase(totalRegistrationFee)
 	return {
@@ -70,6 +77,8 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		recordsCount = utils.lengthOfTable(NameRegistry.records),
 		reservedRecordsCount = utils.lengthOfTable(NameRegistry.reserved),
 		df = demand.getDemandFactorInfo(),
+		fundingPlan = fundingPlan,
+		fundingResult = fundingResult,
 	}
 end
 
@@ -94,23 +103,30 @@ function arns.getPaginatedRecords(cursor, limit, sortBy, sortOrder)
 	return utils.paginateTableWithCursor(recordsArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
-function arns.extendLease(from, name, years, currentTimestamp)
+---@param from string The address of the sender
+---@param name string The name of the record
+---@param years number The number of years to extend the lease
+---@param currentTimestamp number The current timestamp
+---@param msgId string The current message id
+---@param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stakes". Default "balance"
+function arns.extendLease(from, name, years, currentTimestamp, msgId, fundFrom)
+	fundFrom = fundFrom or "balance"
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
 	-- throw error if invalid
 	arns.assertValidExtendLease(record, currentTimestamp, years)
 	local baseRegistrationFee = demand.baseFeeForNameLength(#name)
 	local totalExtensionFee = arns.calculateExtensionFee(baseRegistrationFee, years, demand.getDemandFactor())
-
-	if balances.getBalance(from) < totalExtensionFee then
-		error("Insufficient balance")
-	end
+	local fundingPlan = gar.getFundingPlan(from, totalExtensionFee, fundFrom)
+	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
+	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
+	assert(fundingResult.totalFunded == totalExtensionFee, "Funding plan application failed")
 
 	-- modify the record with the new end timestamp
 	arns.modifyRecordEndTimestamp(name, record.endTimestamp + constants.oneYearMs * years)
 
 	-- Transfer tokens to the protocol balance
-	balances.transfer(ao.id, from, totalExtensionFee)
+	balances.increaseBalance(ao.id, totalExtensionFee)
 	demand.tallyNamePurchase(totalExtensionFee)
 	return {
 		record = arns.getRecord(name),
@@ -119,6 +135,8 @@ function arns.extendLease(from, name, years, currentTimestamp)
 		remainingBalance = balances.getBalance(from),
 		protocolBalance = balances.getBalance(ao.id),
 		df = demand.getDemandFactorInfo(),
+		fundingPlan = fundingPlan,
+		fundingResult = fundingResult,
 	}
 end
 
@@ -127,7 +145,9 @@ function arns.calculateExtensionFee(baseFee, years, demandFactor)
 	return math.floor(demandFactor * extensionFee)
 end
 
-function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
+function arns.increaseundernameLimit(from, name, qty, currentTimestamp, msgId, fundFrom)
+	fundFrom = fundFrom or "balance"
+
 	-- validate record can increase undernames
 	local record = arns.getRecord(name)
 
@@ -151,15 +171,15 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
 		error("Invalid undername cost")
 	end
 
-	if balances.getBalance(from) < additionalUndernameCost then
-		error("Insufficient balance")
-	end
+	local fundingPlan = gar.getFundingPlan(from, additionalUndernameCost, fundFrom)
+	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
+	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
 
 	-- update the record with the new undername count
 	arns.modifyRecordundernameLimit(name, qty)
 
 	-- Transfer tokens to the protocol balance
-	balances.transfer(ao.id, from, additionalUndernameCost)
+	balances.increaseBalance(ao.id, additionalUndernameCost)
 	demand.tallyNamePurchase(additionalUndernameCost)
 	return {
 		record = arns.getRecord(name),
@@ -170,6 +190,8 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
 		recordsCount = utils.lengthOfTable(NameRegistry.records),
 		reservedRecordsCount = utils.lengthOfTable(NameRegistry.reserved),
 		df = demand.getDemandFactorInfo(),
+		fundingPlan = fundingPlan,
+		fundingResult = fundingResult,
 	}
 end
 
@@ -494,8 +516,11 @@ end
 --- @param from string The address of the sender
 --- @param name string The name of the record
 --- @param currentTimestamp number The current timestamp
+--- @param msgId string The current message id
+--- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stakes". Default "balance"
 --- @return table The upgraded record with name and record fields
-function arns.upgradeRecord(from, name, currentTimestamp)
+function arns.upgradeRecord(from, name, currentTimestamp, msgId, fundFrom)
+	fundFrom = fundFrom or "balance"
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
 	assert(currentTimestamp, "Timestamp is required")
@@ -505,14 +530,15 @@ function arns.upgradeRecord(from, name, currentTimestamp)
 	local demandFactor = demand.getDemandFactor()
 	local upgradeCost = arns.calculatePermabuyFee(baseFee, demandFactor)
 
-	assert(balances.walletHasSufficientBalance(from, upgradeCost), "Insufficient balance")
+	local fundingPlan = gar.getFundingPlan(from, upgradeCost, fundFrom)
+	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
+	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
+	balances.increaseBalance(ao.id, upgradeCost)
+	demand.tallyNamePurchase(upgradeCost)
 
 	record.endTimestamp = nil
 	record.type = "permabuy"
 	record.purchasePrice = upgradeCost
-
-	balances.transfer(ao.id, from, upgradeCost)
-	demand.tallyNamePurchase(upgradeCost)
 
 	NameRegistry.records[name] = record
 	return {
@@ -523,6 +549,8 @@ function arns.upgradeRecord(from, name, currentTimestamp)
 		remainingBalance = balances.getBalance(from),
 		protocolBalance = balances.getBalance(ao.id),
 		df = demand.getDemandFactorInfo(),
+		fundingPlan = fundingPlan,
+		fundingResult = fundingResult,
 	}
 end
 

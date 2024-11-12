@@ -1,18 +1,20 @@
-import { createAosLoader } from './utils.mjs';
+import {
+  assertNoResultError,
+  handle,
+  joinNetwork,
+  startMemory,
+  transfer,
+} from './helpers.mjs';
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
 import {
-  AO_LOADER_HANDLER_ENV,
-  DEFAULT_HANDLE_OPTIONS,
   STUB_TIMESTAMP,
   STUB_MESSAGE_ID,
   STUB_ADDRESS,
-  PROCESS_OWNER,
   validGatewayTags,
   PROCESS_ID,
 } from '../tools/constants.mjs';
 
-const initialOperatorStake = 100_000_000_000;
 const delegatorAddress = 'delegator-address-'.padEnd(43, 'x');
 
 describe('GatewayRegistry', async () => {
@@ -21,49 +23,7 @@ describe('GatewayRegistry', async () => {
   const STUB_ADDRESS_8 = ''.padEnd(43, '8');
   const STUB_ADDRESS_9 = ''.padEnd(43, '9');
 
-  const { handle: originalHandle, memory: startMemory } =
-    await createAosLoader();
   let sharedMemory = startMemory; // memory we'll use across unique tests;
-
-  async function handle(options = {}, mem = sharedMemory) {
-    return originalHandle(
-      mem,
-      {
-        ...DEFAULT_HANDLE_OPTIONS,
-        ...options,
-      },
-      AO_LOADER_HANDLER_ENV,
-    );
-  }
-
-  function assertNoResultError(result) {
-    const errorTag = result.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(errorTag, undefined);
-  }
-
-  const transfer = async ({
-    recipient = STUB_ADDRESS,
-    quantity = initialOperatorStake,
-    memory = sharedMemory,
-  } = {}) => {
-    const transferResult = await handle(
-      {
-        From: PROCESS_OWNER,
-        Owner: PROCESS_OWNER,
-        Tags: [
-          { name: 'Action', value: 'Transfer' },
-          { name: 'Recipient', value: recipient },
-          { name: 'Quantity', value: quantity },
-          { name: 'Cast', value: false },
-        ],
-      },
-      memory,
-    );
-    assertNoResultError(transferResult);
-    return transferResult.Memory;
-  };
 
   const delegateStake = async ({
     memory,
@@ -173,34 +133,6 @@ describe('GatewayRegistry', async () => {
     return {
       result: delegatesResult,
       memory: delegatesResult.Memory,
-    };
-  };
-
-  const joinNetwork = async ({
-    memory,
-    timestamp = STUB_TIMESTAMP,
-    address,
-    tags = validGatewayTags,
-  }) => {
-    // give them the join network token amount
-    const transferMemory = await transfer({
-      recipient: address,
-      quantity: 100_000_000_000,
-      memory,
-    });
-    const joinNetworkResult = await handle(
-      {
-        From: address,
-        Owner: address,
-        Tags: tags,
-        Timestamp: timestamp,
-      },
-      transferMemory,
-    );
-    assertNoResultError(joinNetworkResult);
-    return {
-      memory: joinNetworkResult.Memory,
-      result: joinNetworkResult,
     };
   };
 
@@ -1372,6 +1304,7 @@ describe('GatewayRegistry', async () => {
       const { memory: addGatewayMemory2 } = await joinNetwork({
         address: secondGatewayAddress,
         memory: sharedMemory,
+        timestamp: STUB_TIMESTAMP - 1,
       });
       let cursor;
       let fetchedGateways = [];
