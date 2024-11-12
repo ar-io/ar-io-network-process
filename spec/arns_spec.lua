@@ -36,7 +36,8 @@ describe("arns", function()
 				function()
 					local demandBefore = demand.getCurrentPeriodRevenue()
 					local purchasesBefore = demand.getCurrentPeriodPurchases()
-					local result = arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId)
+					local result =
+						arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId, "msgId")
 
 					assert.are.same({
 						purchasePrice = 600000000,
@@ -246,8 +247,15 @@ describe("arns", function()
 					type = "lease",
 					undernameLimit = 10,
 				}
-				local status, error =
-					pcall(arns.increaseundernameLimit, testAddress, "test-name", 1, timestamp + constants.oneYearMs + 1)
+				local status, error = pcall(
+					arns.increaseundernameLimit,
+					testAddress,
+					"test-name",
+					1,
+					timestamp + constants.oneYearMs + 1,
+					"msg-id",
+					"balance"
+				)
 				assert.is_false(status)
 				assert.match("Name must be active to increase undername limit", error)
 			end)
@@ -263,7 +271,8 @@ describe("arns", function()
 				}
 				local demandBefore = demand.getCurrentPeriodRevenue()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
-				local status, result = pcall(arns.increaseundernameLimit, testAddress, "test-name", 50, timestamp)
+				local status, result =
+					pcall(arns.increaseundernameLimit, testAddress, "test-name", 50, timestamp, "msg-id")
 				local expectation = {
 					endTimestamp = timestamp + constants.oneYearMs,
 					processId = testProcessId,
@@ -277,8 +286,8 @@ describe("arns", function()
 				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
 
 				assert.is.equal(
-					_G.Balances[testAddress],
 					startBalance - 25000000,
+					_G.Balances[testAddress],
 					"Balance should be reduced by the purchase price"
 				)
 
@@ -399,6 +408,17 @@ describe("arns", function()
 
 				assert.are.equal(demandBefore + 400000000, demand.getCurrentPeriodRevenue())
 				assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
+
+				assert.are.same({
+					address = testAddress,
+					balance = 400000000,
+					stakes = {},
+					shortfall = 0,
+				}, result.fundingPlan)
+				assert.are.same({
+					totalFunded = 400000000,
+					newWithdrawVaults = {},
+				}, result.fundingResult)
 			end)
 
 			it("should throw an error when trying to extend beyond 5 years [" .. addressType .. "]", function()

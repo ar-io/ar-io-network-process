@@ -94,6 +94,12 @@ local ActionMap = {
 	AuctionPrices = "Auction-Prices",
 	AllowDelegates = "Allow-Delegates",
 	DisallowDelegates = "Disallow-Delegates",
+	-- PRIMARY NAMES
+	ReleasePrimaryName = "Release-Primary-Name",
+	CreatePrimaryNameClaim = "Create-Primary-Name-Claim",
+	ClaimPrimaryName = "Claim-Primary-Name",
+	GetPrimaryNames = "Get-Primary-Names",
+	PrimaryName = "Primary-Name",
 }
 
 -- Low fidelity trackers
@@ -139,6 +145,8 @@ local function addRecordResultFields(ioEvent, result)
 			"purchasesThisPeriod",
 		})
 	end
+
+	-- TODO: Add funding plan info?
 end
 
 local function addAuctionResultFields(ioEvent, result)
@@ -237,6 +245,14 @@ local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
 			ioEvent:addField("Invariant-Slashed-Gateways", invariantSlashedGateways)
 		end
 	end
+end
+
+local function assertValidFundFrom(fundFrom)
+	if fundFrom == nil then
+		return
+	end
+	local validFundFrom = utils.createLookupTable({ "any", "balance", "stake" })
+	assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stake")
 end
 
 local function addEventingHandler(handlerName, pattern, handleFn)
@@ -717,6 +733,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	local from = utils.formatAddress(msg.From)
 	local processId = utils.formatAddress(msg.Tags["Process-Id"] or msg.From)
 	local timestamp = tonumber(msg.Timestamp)
+	local fundFrom = msg.Tags["Fund-From"]
 
 	local checkAssertions = function()
 		assert(
@@ -736,6 +753,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 				"Invalid years. Must be integer between 1 and 5"
 			)
 		end
+		assertValidFundFrom(fundFrom)
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -760,7 +778,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 			},
 			Data = tostring(error),
 		})
-	end, arns.buyRecord, name, purchaseType, years, from, timestamp, processId)
+	end, arns.buyRecord, name, purchaseType, years, from, timestamp, processId, msg.Id, fundFrom)
 	if not shouldContinue2 then
 		return
 	end
@@ -775,6 +793,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 
 	msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
 
+	-- TODO: Send back fundingPlan and fundingResult as well?
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = ActionMap.BuyRecord .. "-Notice", Name = name },
@@ -848,12 +867,14 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 end)
 
 addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.ExtendLease), function(msg)
+	local fundFrom = msg.Tags["Fund-From"]
 	local checkAssertions = function()
 		assert(type(msg.Tags.Name) == "string", "Invalid name")
 		assert(
 			tonumber(msg.Tags.Years) > 0 and tonumber(msg.Tags.Years) < 5 and utils.isInteger(tonumber(msg.Tags.Years)),
 			"Invalid years. Must be integer between 1 and 5"
 		)
+		assertValidFundFrom(fundFrom)
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -870,16 +891,26 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 		return
 	end
 
-	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.ExtendLease .. "-Notice",
-				Error = "Invalid-" .. ActionMap.ExtendLease,
-			},
-			Data = tostring(error),
-		})
-	end, arns.extendLease, msg.From, string.lower(msg.Tags.Name), tonumber(msg.Tags.Years), msg.Timestamp)
+	local shouldContinue2, result = eventingPcall(
+		msg.ioEvent,
+		function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Invalid-" .. ActionMap.ExtendLease .. "-Notice",
+					Error = "Invalid-" .. ActionMap.ExtendLease,
+				},
+				Data = tostring(error),
+			})
+		end,
+		arns.extendLease,
+		msg.From,
+		string.lower(msg.Tags.Name),
+		tonumber(msg.Tags.Years),
+		msg.Timestamp,
+		msg.Id,
+		fundFrom
+	)
 	if not shouldContinue2 then
 		return
 	end
@@ -906,6 +937,7 @@ addEventingHandler(
 	ActionMap.IncreaseUndernameLimit,
 	utils.hasMatchingTag("Action", ActionMap.IncreaseUndernameLimit),
 	function(msg)
+		local fundFrom = msg.Tags["Fund-From"]
 		local checkAssertions = function()
 			assert(type(msg.Tags.Name) == "string", "Invalid name")
 			assert(
@@ -914,6 +946,7 @@ addEventingHandler(
 					and utils.isInteger(msg.Tags.Quantity),
 				"Invalid quantity. Must be an integer value greater than 0 and less than 9990"
 			)
+			assertValidFundFrom(fundFrom)
 		end
 
 		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -946,7 +979,9 @@ addEventingHandler(
 			msg.From,
 			string.lower(msg.Tags.Name),
 			tonumber(msg.Tags.Quantity),
-			msg.Timestamp
+			msg.Timestamp,
+			msg.Id,
+			fundFrom
 		)
 		if not shouldContinue2 then
 			return
@@ -974,15 +1009,16 @@ addEventingHandler(
 )
 
 addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.TokenCost), function(msg)
+	local fundFrom = msg.Tags["Fund-From"]
 	local checkAssertions = function()
+		local intentType = msg.Tags.Intent
+		local validIntents =
+			utils.createLookupTable({ ActionMap.BuyRecord, ActionMap.ExtendLease, ActionMap.IncreaseUndernameLimit })
 		assert(
-			type(msg.Tags.Intent) == "string",
-			-- assert is one of those three interactions
-			msg.Tags.Intent == ActionMap.BuyRecord
-				or msg.Tags.Intent == ActionMap.ExtendLease
-				or msg.Tags.Intent == ActionMap.IncreaseUndernameLimit,
+			type(intentType) == "string",
+			validIntents[intentType],
 			"Intent must be valid registry interaction (e.g. BuyRecord, ExtendLease, IncreaseUndernameLimit). Provided intent: "
-				.. (msg.Tags.Intent or "nil")
+				.. (intentType or "nil")
 		)
 		-- if years is provided, assert it is a number and integer between 1 and 5
 		if msg.Tags.Years then
@@ -993,40 +1029,64 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 		if msg.Tags.Quantity then
 			assert(utils.isInteger(tonumber(msg.Tags.Quantity)), "Invalid quantity. Must be integer greater than 0")
 		end
+		assertValidFundFrom(fundFrom)
 	end
 
-	local inputStatus, inputResult = pcall(checkAssertions)
-
-	if not inputStatus then
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
-	local status, result = pcall(arns.getTokenCost, {
-		intent = msg.Tags.Intent,
-		name = string.lower(msg.Tags.Name),
-		years = tonumber(msg.Tags.Years) or 1,
-		quantity = tonumber(msg.Tags.Quantity),
-		purchaseType = msg.Tags["Purchase-Type"] or "lease",
-		currentTimestamp = tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp),
-	})
-	if not status then
+	local shouldContinue2, tokenCost = eventingPcall(
+		msg.ioEvent,
+		function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Invalid-Token-Cost" },
+				Data = tostring(error),
+			})
+		end,
+		arns.getTokenCost,
+		{
+			intent = msg.Tags.Intent,
+			name = string.lower(msg.Tags.Name),
+			years = tonumber(msg.Tags.Years) or 1,
+			quantity = tonumber(msg.Tags.Quantity),
+			purchaseType = msg.Tags["Purchase-Type"] or "lease",
+			currentTimestamp = tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp),
+		}
+	)
+	if not shouldContinue2 then
+		return
+	end
+
+	local shouldContinue3, fundingPlan = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Invalid-Token-Cost" },
-			Data = tostring(result),
+			Data = tostring(error),
 		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(result) },
-			Data = json.encode(result),
-		})
+	end, gar.getFundingPlan, msg.From, tokenCost, fundFrom)
+	if not shouldContinue3 then
+		return
 	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(tokenCost) },
+		Data = fundFrom and json.encode({
+				tokenCost = tokenCost,
+				fundingPlan = fundingPlan,
+			})
+			-- maintain backwards compatibility with the previous response format
+			or json.encode(tokenCost),
+	})
 end)
 
 addEventingHandler(
@@ -3021,6 +3081,139 @@ addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap
 		Target = msg.From,
 		Tags = { Action = ActionMap.DisallowDelegates .. "-Notice" },
 		Data = json.encode(result and result.removedDelegates or {}),
+	})
+end)
+
+--- PRIMARY NAMES
+local primaryNames = require("primary_names")
+addEventingHandler("releasePrimaryName", utils.hasMatchingTag("Action", ActionMap.ReleasePrimaryName), function(msg)
+	local name = string.lower(msg.Tags.Name)
+	local owner = utils.formatAddress(msg.From)
+	local shouldContinue, removedNames = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.ReleasePrimaryName .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, primaryNames.releasePrimaryName, owner, name)
+	if not shouldContinue or not removedNames then
+		return
+	end
+
+	ao.send({
+		Target = msg.From,
+		Action = ActionMap.ReleasePrimaryName .. "-Notice",
+		Data = json.encode(removedNames),
+	})
+end)
+
+addEventingHandler(
+	"createPrimaryNameClaim",
+	utils.hasMatchingTag("Action", ActionMap.CreatePrimaryNameClaim),
+	function(msg)
+		local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
+		local recipient = utils.formatAddress(msg.Recipient) -- the recipient of the primary name
+		local from = utils.formatAddress(msg.From) -- the process that is creating the claim
+		local timestamp = tonumber(msg.Timestamp)
+
+		local shouldContinue, claim = eventingPcall(msg.ioEvent, function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-" .. ActionMap.CreatePrimaryNameClaim .. "-Notice", Error = "Bad-Input" },
+				Data = tostring(error),
+			})
+		end, primaryNames.createNameClaim, name, recipient, from, timestamp)
+		if not shouldContinue or not claim then
+			return
+		end
+
+		ao.send({
+			Target = msg.From,
+			Action = ActionMap.CreatePrimaryNameClaim .. "-Notice",
+			Data = json.encode(claim),
+		})
+		ao.send({
+			Target = recipient,
+			Action = ActionMap.CreatePrimaryNameClaim .. "-Notice",
+			Data = json.encode(claim),
+		})
+	end
+)
+
+addEventingHandler("claimPrimaryName", utils.hasMatchingTag("Action", ActionMap.ClaimPrimaryName), function(msg)
+	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
+	local recipient = utils.formatAddress(msg.From) -- the recipient of the primary name
+	local timestamp = tonumber(msg.Timestamp)
+	local shouldContinue, primaryNameAndClaim = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.ClaimPrimaryName .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, primaryNames.claimPrimaryName, name, recipient, timestamp)
+	if not shouldContinue or not primaryNameAndClaim then
+		return
+	end
+
+	-- -- send two notices, one to the owner and one to the from
+	ao.send({
+		Target = primaryNameAndClaim.claim.processId,
+		Action = ActionMap.ClaimPrimaryName .. "-Notice",
+		Data = json.encode(primaryNameAndClaim.primaryName),
+	})
+	ao.send({
+		Target = recipient,
+		Action = ActionMap.ClaimPrimaryName .. "-Notice",
+		Data = json.encode(primaryNameAndClaim.primaryName),
+	})
+end)
+
+addEventingHandler("getPrimaryName", utils.hasMatchingTag("Action", ActionMap.PrimaryName), function(msg)
+	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
+	local address = msg.Tags.Address and utils.formatAddress(msg.Tags.Address) or utils.formatAddress(msg.From)
+	local primaryName = primaryNames.getPrimaryName(name) or primaryNames.getPrimaryNameForAddress(address)
+	if not primaryName then
+		return ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Invalid-" .. ActionMap.PrimaryName .. "-Notice",
+				Error = "Primary-Name-Not-Found",
+				Name = name,
+				Owner = address,
+			},
+		})
+	end
+	return ao.send({
+		Target = msg.From,
+		Action = ActionMap.PrimaryName .. "-Notice",
+		Tags = { Owner = primaryName.owner, ["Primary-Name"] = name },
+		Data = json.encode(primaryName),
+	})
+end)
+
+addEventingHandler("getPaginatedPrimaryNames", utils.hasMatchingTag("Action", ActionMap.GetPrimaryNames), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local status, result = pcall(
+		primaryNames.getPaginatedPrimaryNames,
+		page.cursor,
+		page.limit,
+		page.sortBy or "name",
+		page.sortOrder or "asc"
+	)
+
+	if not status or not result then
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.GetPrimaryNames .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+		return
+	end
+
+	return ao.send({
+		Target = msg.From,
+		Action = ActionMap.GetPrimaryNames .. "-Notice",
+		Data = json.encode(result),
 	})
 end)
 

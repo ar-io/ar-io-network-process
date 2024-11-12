@@ -3,6 +3,7 @@ local utils = require("utils")
 local constants = require("constants")
 local balances = require("balances")
 local demand = require("demand")
+local gar = require("gar")
 local arns = {}
 local Auction = require("auctions")
 
@@ -38,8 +39,11 @@ NameRegistry = NameRegistry or {
 --- @param from string The address of the sender
 --- @param timestamp number The current timestamp
 --- @param processId string The process id
+--- @param msgId string The current message id
+--- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
 --- @return Record The updated record
-function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
+function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, msgId, fundFrom)
+	fundFrom = fundFrom or "balance"
 	arns.assertValidBuyRecord(name, years, purchaseType, processId)
 	if purchaseType == nil then
 		purchaseType = "lease" -- set to lease by default
@@ -55,7 +59,8 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 	local totalRegistrationFee =
 		arns.calculateRegistrationFee(purchaseType, baseRegistrationFee, numYears, demand.getDemandFactor())
 
-	assert(balances.getBalance(from) >= totalRegistrationFee, "Insufficient balance")
+	local fundingPlan = gar.getFundingPlan(from, totalRegistrationFee, fundFrom)
+	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
 
 	local record = arns.getRecord(name)
 	local isPermabuy = record ~= nil and record.type == "permabuy"
@@ -76,8 +81,10 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 	}
 
 	-- Register the leased or permanently owned name
+	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, timestamp)
+	assert(fundingResult.totalFunded == totalRegistrationFee, "Funding plan application failed")
 	-- Transfer tokens to the protocol balance
-	balances.transfer(ao.id, from, totalRegistrationFee)
+	balances.increaseBalance(ao.id, totalRegistrationFee)
 	arns.addRecord(name, newRecord)
 	demand.tallyNamePurchase(totalRegistrationFee)
 	return {
@@ -89,6 +96,8 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId)
 		recordsCount = utils.lengthOfTable(NameRegistry.records),
 		reservedRecordsCount = utils.lengthOfTable(NameRegistry.reserved),
 		df = demand.getDemandFactorInfo(),
+		fundingPlan = fundingPlan,
+		fundingResult = fundingResult,
 	}
 end
 
@@ -122,29 +131,31 @@ function arns.getPaginatedRecords(cursor, limit, sortBy, sortOrder)
 	return utils.paginateTableWithCursor(recordsArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
---- Extends the lease for a record
---- @param from string The address of the sender
---- @param name string The name of the record
---- @param years number The number of years to extend the lease by
---- @param currentTimestamp number The current timestamp
+---@param from string The address of the sender
+---@param name string The name of the record
+---@param years number The number of years to extend the lease
+---@param currentTimestamp number The current timestamp
+---@param msgId string The current message id
+---@param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
 --- @return Record The updated record
-function arns.extendLease(from, name, years, currentTimestamp)
+function arns.extendLease(from, name, years, currentTimestamp, msgId, fundFrom)
+	fundFrom = fundFrom or "balance"
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
 	-- throw error if invalid
 	arns.assertValidExtendLease(record, currentTimestamp, years)
 	local baseRegistrationFee = demand.baseFeeForNameLength(#name)
 	local totalExtensionFee = arns.calculateExtensionFee(baseRegistrationFee, years, demand.getDemandFactor())
-
-	if balances.getBalance(from) < totalExtensionFee then
-		error("Insufficient balance")
-	end
+	local fundingPlan = gar.getFundingPlan(from, totalExtensionFee, fundFrom)
+	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
+	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
+	assert(fundingResult.totalFunded == totalExtensionFee, "Funding plan application failed")
 
 	-- modify the record with the new end timestamp
 	arns.modifyRecordEndTimestamp(name, record.endTimestamp + constants.oneYearMs * years)
 
 	-- Transfer tokens to the protocol balance
-	balances.transfer(ao.id, from, totalExtensionFee)
+	balances.increaseBalance(ao.id, totalExtensionFee)
 	demand.tallyNamePurchase(totalExtensionFee)
 	return {
 		record = arns.getRecord(name),
@@ -153,6 +164,8 @@ function arns.extendLease(from, name, years, currentTimestamp)
 		remainingBalance = balances.getBalance(from),
 		protocolBalance = balances.getBalance(ao.id),
 		df = demand.getDemandFactorInfo(),
+		fundingPlan = fundingPlan,
+		fundingResult = fundingResult,
 	}
 end
 
@@ -172,7 +185,8 @@ end
 --- @param qty number The quantity to increase the undername limit by
 --- @param currentTimestamp number The current timestamp
 --- @return Record The updated record
-function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
+function arns.increaseundernameLimit(from, name, qty, currentTimestamp, msgId, fundFrom)
+	fundFrom = fundFrom or "balance"
 	-- validate record can increase undernames
 	local record = arns.getRecord(name)
 
@@ -196,15 +210,15 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
 		error("Invalid undername cost")
 	end
 
-	if balances.getBalance(from) < additionalUndernameCost then
-		error("Insufficient balance")
-	end
+	local fundingPlan = gar.getFundingPlan(from, additionalUndernameCost, fundFrom)
+	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
+	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
 
 	-- update the record with the new undername count
 	arns.modifyRecordundernameLimit(name, qty)
 
 	-- Transfer tokens to the protocol balance
-	balances.transfer(ao.id, from, additionalUndernameCost)
+	balances.increaseBalance(ao.id, additionalUndernameCost)
 	demand.tallyNamePurchase(additionalUndernameCost)
 	return {
 		record = arns.getRecord(name),
@@ -215,6 +229,8 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp)
 		recordsCount = utils.lengthOfTable(NameRegistry.records),
 		reservedRecordsCount = utils.lengthOfTable(NameRegistry.reserved),
 		df = demand.getDemandFactorInfo(),
+		fundingPlan = fundingPlan,
+		fundingResult = fundingResult,
 	}
 end
 
@@ -755,6 +771,7 @@ end
 function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 	lastGracePeriodEntryEndTimestamp = lastGracePeriodEntryEndTimestamp or 0
 	local prunedRecords = {}
+	local removedPrimaryNameClaims = {}
 	local newGracePeriodRecords = {}
 	-- identify any records that are leases and that have expired, account for a one week grace period in seconds
 	for name, record in pairs(arns.getRecords()) do
@@ -762,14 +779,17 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 			if currentTimestamp >= record.endTimestamp + constants.gracePeriodMs then
 				-- lease is outside the grade period. start a dutch auction. it will get pruned out if it expires with no bids
 				prunedRecords[name] = record
+				-- create the auction and remove primary name claims
 				arns.createAuction(name, currentTimestamp, ao.id)
+				-- TODO; there is a circular dependency here. primary names needs to know about auctions and auctions needs to know about primary names
+				-- removedPrimaryNameClaims = primaryNames.removePrimaryNamesForArNSName(name)
 			elseif record.endTimestamp > lastGracePeriodEntryEndTimestamp then
 				-- lease is newly recognized as being within the grace period
 				newGracePeriodRecords[name] = record
 			end
 		end
 	end
-	return prunedRecords, newGracePeriodRecords
+	return prunedRecords, newGracePeriodRecords, removedPrimaryNameClaims
 end
 
 --- Prunes auctions that have expired
