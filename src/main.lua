@@ -1112,11 +1112,17 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 		return
 	end
 
-	local data = {
-		tokenCost = tokenCost,
-		fundingPlan = fundFrom and fundingPlan or nil,
-		discounts = discounts,
-	}
+	local data
+	if fundFrom ~= nil or discounts ~= nil then
+		data = {
+			tokenCost = tokenCost,
+			fundingPlan = fundFrom and fundingPlan or nil,
+			discounts = discounts,
+		}
+	else
+		-- Return backwards compatible tokenCost if no fundFrom or discounts
+		data = tokenCost
+	end
 
 	ao.send({
 		Target = msg.From,

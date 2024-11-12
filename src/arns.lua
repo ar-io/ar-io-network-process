@@ -599,9 +599,6 @@ function arns.upgradeRecord(from, name, currentTimestamp, msgId, fundFrom)
 	record.type = "permabuy"
 	record.purchasePrice = upgradeCost
 
-	balances.transfer(ao.id, from, upgradeCost)
-	demand.tallyNamePurchase(upgradeCost)
-
 	NameRegistry.records[name] = record
 	return {
 		name = name,

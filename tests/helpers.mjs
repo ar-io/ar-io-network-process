@@ -7,7 +7,6 @@ import {
   PROCESS_OWNER,
   STUB_OPERATOR_ADDRESS,
   STUB_TIMESTAMP,
-  PROCESS_OWNER,
   validGatewayTags,
 } from '../tools/constants.mjs';
 

@@ -1,6 +1,12 @@
 import { assertNoResultError } from './utils.mjs';
 import { describe, it, before } from 'node:test';
-import { handle, startMemory, transfer } from './helpers.mjs';
+import {
+  handle,
+  startMemory,
+  transfer,
+  joinNetwork,
+  setUpStake,
+} from './helpers.mjs';
 import assert from 'node:assert';
 import {
   PROCESS_ID,
@@ -1630,8 +1636,15 @@ describe('ArNS', async () => {
         arnsDiscountMemory,
       );
 
-      const tokenCost = JSON.parse(result.Messages[0].Data);
+      const { tokenCost, discounts } = JSON.parse(result.Messages[0].Data);
       assert.equal(tokenCost, baseLeasePrice * 0.8);
+      assert.deepEqual(discounts, [
+        {
+          discountedCost: baseLeasePrice * 0.2,
+          multiplier: 0.2,
+          name: 'ArNS Discount',
+        },
+      ]);
     });
 
     describe('with a buy record', () => {

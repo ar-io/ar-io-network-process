@@ -1294,7 +1294,7 @@ describe("arns", function()
 					undernameLimit = 10,
 				}
 				_G.Balances[testAddressArweave] = 2500000000
-				local updatedRecord = arns.upgradeRecord(testAddressArweave, "upgrade-name", 1000000)
+				local updatedRecord = arns.upgradeRecord(testAddressArweave, "upgrade-name", 1000000, "msgId")
 				assert.are.same({
 					name = "upgrade-name",
 					record = {
@@ -1339,7 +1339,7 @@ describe("arns", function()
 				}
 				_G.Balances[stubRandomAddress] = 2500000000
 				assert(gar.isEligibleForArNSDiscount(stubRandomAddress))
-				local updatedRecord = arns.upgradeRecord(stubRandomAddress, "upgrade-name", 1000000)
+				local updatedRecord = arns.upgradeRecord(stubRandomAddress, "upgrade-name", 1000000, "msgId")
 
 				local expectedCost = 2500000000 - (math.floor(2500000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
 
@@ -1358,6 +1358,16 @@ describe("arns", function()
 					remainingBalance = 500000000,
 					protocolBalance = expectedCost,
 					df = demand.getDemandFactorInfo(),
+					fundingPlan = {
+						address = stubRandomAddress,
+						balance = expectedCost,
+						stakes = {},
+						shortfall = 0,
+					},
+					fundingResult = {
+						totalFunded = expectedCost,
+						newWithdrawVaults = {},
+					},
 				}, updatedRecord)
 			end)
 
