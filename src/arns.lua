@@ -651,14 +651,16 @@ end
 --- @param initiator string The address of the initiator of the auction
 --- @return Auction|nil The auction instance
 function arns.createAuction(name, timestamp, initiator)
-	assert(arns.getRecord(name), "Name is not registered. Auctions can only be created for registered names.")
+	if arns.getRecord(name) then
+		arns.removeRecord(name)
+	end
+	assert(not arns.getRecord(name), "Name is registered. Auctions can only be created for unregistered names.")
+	assert(not arns.getReservedName(name), "Name is reserved. Auctions can only be created for unregistered names.")
 	assert(not arns.getAuction(name), "Auction already exists for name")
 	local baseFee = demand.baseFeeForNameLength(#name)
 	local demandFactor = demand.getDemandFactor()
 	local auction = Auction:new(name, timestamp, demandFactor, baseFee, initiator, arns.calculateRegistrationFee)
 	NameRegistry.auctions[name] = auction
-	-- ensure the name is removed from the registry
-	arns.removeRecord(name)
 	return auction
 end
 
@@ -765,31 +767,26 @@ end
 
 --- Prunes records that have expired
 --- @param currentTimestamp number The current timestamp
---- @param lastGracePeriodEntryEndTimestamp number|nil The end timestamp of the last known record to have entered its grace period
---- @return Record[] # The pruned records
---- @return Record[] # The new grace period records
+--- @param lastGracePeriodEntryEndTimestamp number The end timestamp of the last known record to have entered its grace period
+--- @return table<string, Record> # The pruned records
+--- @return table<string, Record> # The records that have entered their grace period
 function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 	lastGracePeriodEntryEndTimestamp = lastGracePeriodEntryEndTimestamp or 0
 	local prunedRecords = {}
-	local removedPrimaryNameClaims = {}
 	local newGracePeriodRecords = {}
 	-- identify any records that are leases and that have expired, account for a one week grace period in seconds
 	for name, record in pairs(arns.getRecords()) do
-		if record.type == "lease" and currentTimestamp > record.endTimestamp then
-			if currentTimestamp >= record.endTimestamp + constants.gracePeriodMs then
-				-- lease is outside the grade period. start a dutch auction. it will get pruned out if it expires with no bids
-				prunedRecords[name] = record
-				-- create the auction and remove primary name claims
-				arns.createAuction(name, currentTimestamp, ao.id)
-				-- TODO; there is a circular dependency here. primary names needs to know about auctions and auctions needs to know about primary names
-				-- removedPrimaryNameClaims = primaryNames.removePrimaryNamesForArNSName(name)
-			elseif record.endTimestamp > lastGracePeriodEntryEndTimestamp then
-				-- lease is newly recognized as being within the grace period
-				newGracePeriodRecords[name] = record
-			end
+		if arns.recordExpired(record, currentTimestamp) then
+			prunedRecords[name] = record
+			NameRegistry.records[name] = nil
+		elseif
+			arns.recordInGracePeriod(record, currentTimestamp)
+			and record.endTimestamp > lastGracePeriodEntryEndTimestamp
+		then
+			newGracePeriodRecords[name] = record
 		end
 	end
-	return prunedRecords, newGracePeriodRecords, removedPrimaryNameClaims
+	return prunedRecords, newGracePeriodRecords
 end
 
 --- Prunes auctions that have expired

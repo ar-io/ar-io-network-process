@@ -659,7 +659,7 @@ describe("arns", function()
 	end)
 
 	describe("pruneRecords", function()
-		it("should prune records and create auctions for expired leased records", function()
+		it("should prune records older than the grace period", function()
 			local currentTimestamp = 2000000000
 
 			_G.NameRegistry = {
@@ -729,23 +729,6 @@ describe("arns", function()
 			}, _G.NameRegistry.records)
 			assert.are.same({
 				["expired-record"] = {
-					startTimestamp = 2000000000,
-					endTimestamp = 3209600000, -- plus 14 days
-					initiator = _G.ao.id,
-					baseFee = 400000000,
-					demandFactor = 1,
-					registrationFeeCalculator = arns.calculateRegistrationFee,
-					name = "expired-record",
-					settings = {
-						decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14),
-						scalingExponent = 190,
-						startPriceMultiplier = 50,
-						durationMs = 60 * 1000 * 60 * 24 * 14,
-					},
-				},
-			}, _G.NameRegistry.auctions)
-			assert.are.same({
-				["expired-record"] = {
 					endTimestamp = currentTimestamp - constants.gracePeriodMs - 1, -- expired and past the grace period
 					processId = "expired-process-id",
 					purchasePrice = 400000000,
@@ -787,39 +770,6 @@ describe("arns", function()
 					undernameLimit = 10,
 				},
 			}, _G.NameRegistry.records)
-			-- grace period record now joins the auction list and is pruned
-			assert.are.same({
-				["expired-record"] = {
-					startTimestamp = 2000000000,
-					endTimestamp = 3209600000, -- plus 14 days
-					initiator = _G.ao.id,
-					baseFee = 400000000,
-					demandFactor = 1,
-					registrationFeeCalculator = arns.calculateRegistrationFee,
-					name = "expired-record",
-					settings = {
-						decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14),
-						scalingExponent = 190,
-						startPriceMultiplier = 50,
-						durationMs = 60 * 1000 * 60 * 24 * 14,
-					},
-				},
-				["grace-period-record"] = {
-					baseFee = 400000000,
-					demandFactor = 1.0,
-					startTimestamp = currentTimestamp,
-					endTimestamp = currentTimestamp + 1209600000, -- plus 14 days
-					initiator = "test",
-					name = "grace-period-record",
-					registrationFeeCalculator = arns.calculateRegistrationFee,
-					settings = {
-						decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14),
-						scalingExponent = 190,
-						startPriceMultiplier = 50,
-						durationMs = 60 * 1000 * 60 * 24 * 14,
-					},
-				},
-			}, _G.NameRegistry.auctions)
 			assert.are.same({
 				["grace-period-record"] = {
 					endTimestamp = 790400010,
@@ -957,11 +907,13 @@ describe("arns", function()
 				assert.match("Auction already exists", error)
 			end)
 
-			it("should throw an error if the name is not registered", function()
-				_G.NameRegistry.records["test-name"] = nil
+			it("should throw an error if the name is reserved", function()
+				_G.NameRegistry.reserved["test-name"] = {
+					endTimestamp = 1000000,
+				}
 				local status, error = pcall(arns.createAuction, "test-name", 1000000, "test-initiator")
 				assert.is_false(status)
-				assert.match("Name is not registered", error)
+				assert.match("Name is reserved. Auctions can only be created for unregistered names.", error)
 			end)
 		end)
 

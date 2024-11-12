@@ -2728,7 +2728,6 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 			Error = "Auction-Creation-Error",
 			Data = tostring(error),
 		})
-		return
 	end, arns.createAuction, name, timestamp, initiator)
 
 	if not status or not auctionData then

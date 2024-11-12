@@ -221,16 +221,17 @@ end
 
 --- Prune expired primary name claims
 --- @param timestamp number
---- @return string[] the names of the claims that were pruned
+--- @return table<string, PrimaryNameClaim> the names of the claims that were pruned
 function primaryNames.prunePrimaryNameClaims(timestamp)
-	local prunedNames = {}
+	local prunedNameClaims = {}
+	-- unsafe access to primary name claims
 	for name, claim in pairs(PrimaryNameClaims) do
-		if claim.endTimestamp < timestamp then
+		if claim.endTimestamp <= timestamp then
 			PrimaryNameClaims[name] = nil
-			table.insert(prunedNames, name)
+			prunedNameClaims[name] = claim
 		end
 	end
-	return prunedNames
+	return prunedNameClaims
 end
 
 return primaryNames
