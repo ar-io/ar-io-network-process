@@ -1286,20 +1286,21 @@ function planExcessStakesDrawdown(fundingPlan)
 	)
 
 	-- simulate drawing down excess stakes until the remaining balance is satisfied OR excess stakes are exhausted
-	local gatewayIndex, nextGateway = next(gatewaysInfo)
-	while fundingPlan.shortfall > 0 and nextGateway do
-		local excessStake = nextGateway.delegate.excessStake
+	for _, gatewayInfo in pairs(gatewaysInfo) do
+		if fundingPlan.shortfall == 0 then
+			break
+		end
+		local excessStake = gatewayInfo.delegate.excessStake
 		local stakeToDraw = math.min(excessStake, fundingPlan.shortfall)
-		fundingPlan["stakes"][nextGateway.delegate.gatewayAddress] = {
+		fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress] = {
 			delegatedStake = stakeToDraw,
 			vaults = {}, -- set up vault spend tracking now while we're passing through
 		}
 		fundingPlan.shortfall = fundingPlan.shortfall - stakeToDraw
-		nextGateway.delegate.delegatedStake = nextGateway.delegate.delegatedStake - stakeToDraw
-		-- maintain consistency
-		nextGateway.delegate.excessStake = excessStake - stakeToDraw
-		nextGateway.totalDelegatedStake = nextGateway.totalDelegatedStake - stakeToDraw
-		gatewayIndex, nextGateway = next(gatewaysInfo, gatewayIndex)
+		gatewayInfo.delegate.delegatedStake = gatewayInfo.delegate.delegatedStake - stakeToDraw
+		-- maintain consistency for future re-sorting of the gatewayInfos based on theoretical updated state
+		gatewayInfo.delegate.excessStake = excessStake - stakeToDraw
+		gatewayInfo.totalDelegatedStake = gatewayInfo.totalDelegatedStake - stakeToDraw
 	end
 	return gatewaysInfo
 end
@@ -1307,6 +1308,7 @@ end
 function planVaultsDrawdown(fundingPlan, gatewaysInfo)
 	-- simulate drawing down vaults until the remaining balance is satisfied OR vaults are exhausted
 	local vaults = utils.sortTableByFields(
+		-- flatten the vaults across all gateways so we can sort them together
 		utils.reduce(gatewaysInfo, function(acc, _, gatewayInfo)
 			for vaultId, vault in pairs(gatewayInfo.delegate.vaults) do
 				table.insert(acc, {
@@ -1326,21 +1328,22 @@ function planVaultsDrawdown(fundingPlan, gatewaysInfo)
 		}
 	)
 
-	local vaultIndex, nextVault = next(vaults)
-	while fundingPlan.shortfall > 0 and nextVault do
-		local balance = nextVault.balance
+	for _, vault in pairs(vaults) do
+		if fundingPlan.shortfall == 0 then
+			break
+		end
+		local balance = vault.balance
 		local balanceToDraw = math.min(balance, fundingPlan.shortfall)
-		local gatewayAddress = nextVault.gatewayAddress
+		local gatewayAddress = vault.gatewayAddress
 		if not fundingPlan["stakes"][gatewayAddress] then
 			fundingPlan["stakes"][gatewayAddress] = {
 				delegatedStake = 0,
 				vaults = {},
 			}
 		end
-		fundingPlan["stakes"][gatewayAddress].vaults[nextVault.vaultId] = balanceToDraw
+		fundingPlan["stakes"][gatewayAddress].vaults[vault.vaultId] = balanceToDraw
 		fundingPlan.shortfall = fundingPlan.shortfall - balanceToDraw
-		nextVault.balance = balance - balanceToDraw
-		vaultIndex, nextVault = next(vaults, vaultIndex)
+		vault.balance = balance - balanceToDraw
 	end
 end
 
@@ -1361,16 +1364,17 @@ function planMinimumStakesDrawdown(fundingPlan, gatewaysInfo)
 		},
 	})
 
-	local index, nextGatewayInfo = next(gatewaysInfo)
-	while fundingPlan.shortfall > 0 and nextGatewayInfo do
-		local stakeToDraw = math.min(nextGatewayInfo.delegate.delegatedStake, fundingPlan.shortfall)
-		fundingPlan["stakes"][nextGatewayInfo.delegate.gatewayAddress].delegatedStake = fundingPlan["stakes"][nextGatewayInfo.delegate.gatewayAddress].delegatedStake
+	for _, gatewayInfo in pairs(gatewaysInfo) do
+		if fundingPlan.shortfall == 0 then
+			break
+		end
+		local stakeToDraw = math.min(gatewayInfo.delegate.delegatedStake, fundingPlan.shortfall)
+		fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress].delegatedStake = fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress].delegatedStake
 			+ stakeToDraw
 		fundingPlan.shortfall = fundingPlan.shortfall - stakeToDraw
 		-- not needed after this, but keep track
-		nextGatewayInfo.delegate.delegatedStake = nextGatewayInfo.delegate.delegatedStake - stakeToDraw
-		nextGatewayInfo.totalDelegatedStake = nextGatewayInfo.totalDelegatedStake - stakeToDraw
-		index, nextGatewayInfo = next(gatewaysInfo, index)
+		gatewayInfo.delegate.delegatedStake = gatewayInfo.delegate.delegatedStake - stakeToDraw
+		gatewayInfo.totalDelegatedStake = gatewayInfo.totalDelegatedStake - stakeToDraw
 	end
 end
 

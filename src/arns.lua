@@ -32,6 +32,16 @@ NameRegistry = NameRegistry or {
 --- @field target string|nil The address of the target of the reserved record
 --- @field timestamp number|nil The timestamp of the reserved record
 
+--- @class BuyRecordResponse
+--- @field record Record The updated record
+--- @field totalRegistrationFee number The total registration fee
+--- @field baseRegistrationFee number The base registration fee
+--- @field remainingBalance number The remaining balance
+--- @field protocolBalance number The protocol balance
+--- @field df table The demand factor info
+--- @field fundingPlan table The funding plan
+--- @field fundingResult table The funding result
+
 --- Buys a record
 --- @param name string The name of the record
 --- @param purchaseType string The purchase type (lease/permabuy)
@@ -41,7 +51,7 @@ NameRegistry = NameRegistry or {
 --- @param processId string The process id
 --- @param msgId string The current message id
 --- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
---- @return Record The updated record
+--- @return BuyRecordResponse The response
 function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
 	arns.assertValidBuyRecord(name, years, purchaseType, processId)
@@ -131,13 +141,23 @@ function arns.getPaginatedRecords(cursor, limit, sortBy, sortOrder)
 	return utils.paginateTableWithCursor(recordsArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
----@param from string The address of the sender
----@param name string The name of the record
----@param years number The number of years to extend the lease
----@param currentTimestamp number The current timestamp
----@param msgId string The current message id
----@param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
---- @return Record The updated record
+--- @class ExtendLeaseResponse
+--- @field record Record The updated record
+--- @field totalExtensionFee number The total extension fee
+--- @field baseRegistrationFee number The base registration fee
+--- @field remainingBalance number The remaining balance
+--- @field protocolBalance number The protocol balance
+--- @field df table The demand factor info
+--- @field fundingPlan table The funding plan
+--- @field fundingResult table The funding result
+
+--- Extends the lease for a record
+--- @param from string The address of the sender
+--- @param name string The name of the record
+--- @param years number The number of years to extend the lease
+--- @param currentTimestamp number The current timestamp
+--- @param msgId string The current message id
+--- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
 function arns.extendLease(from, name, years, currentTimestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
 	local record = arns.getRecord(name)
@@ -179,12 +199,24 @@ function arns.calculateExtensionFee(baseFee, years, demandFactor)
 	return math.floor(demandFactor * extensionFee)
 end
 
+--- @class IncreaseUndernameResponse
+--- @field record Record The updated record
+--- @field additionalUndernameCost number The additional undername cost
+--- @field baseRegistrationFee number The base registration fee
+--- @field remainingBalance number The remaining balance
+--- @field protocolBalance number The protocol balance
+--- @field df table The demand factor info
+--- @field fundingPlan table The funding plan
+--- @field fundingResult table The funding result
+
 --- Increases the undername limit for a record
 --- @param from string The address of the sender
 --- @param name string The name of the record
 --- @param qty number The quantity to increase the undername limit by
 --- @param currentTimestamp number The current timestamp
---- @return Record The updated record
+--- @param msgId string The current message id
+--- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
+--- @return IncreaseUndernameResponse The response
 function arns.increaseundernameLimit(from, name, qty, currentTimestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
 	-- validate record can increase undernames
@@ -480,13 +512,13 @@ function arns.getRegistrationFees()
 	return fees
 end
 
----@class IntendedAction
----@field purchaseType string|nil The type of purchase (lease/permabuy)
----@field years number|nil The number of years for lease
----@field quantity number|nil The quantity for increasing undername limit
----@field name string The name of the record
----@field intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name)
----@field currentTimestamp number The current timestamp
+--- @class IntendedAction
+--- @field purchaseType string|nil The type of purchase (lease/permabuy)
+--- @field years number|nil The number of years for lease
+--- @field quantity number|nil The quantity for increasing undername limit
+--- @field name string The name of the record
+--- @field intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name)
+--- @field currentTimestamp number The current timestamp
 
 --- Gets the token cost for an intended action
 --- @param intendedAction IntendedAction The intended action with fields:
