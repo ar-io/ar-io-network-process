@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 export const PROCESS_ID = ''.padEnd(43, '0');
 export const PROCESS_OWNER = ''.padEnd(43, '1');
 export const STUB_ADDRESS = ''.padEnd(43, '2');
+export const STUB_OPERATOR_ADDRESS = ''.padEnd(43, 'E');
 export const INITIAL_PROTOCOL_BALANCE = 50_000_000_000_000; // 50M IO
 export const INITIAL_OWNER_BALANCE = 950_000_000_000_000; // 950M IO
 export const STUB_TIMESTAMP = 21600000; // 01-01-1970 00:00:00
