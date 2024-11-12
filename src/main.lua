@@ -712,7 +712,7 @@ end)
 
 addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRecord), function(msg)
 	local name = string.lower(msg.Tags.Name)
-	local purchaseType = string.lower(msg.Tags["Purchase-Type"])
+	local purchaseType = msg.Tags["Purchase-Type"] and string.lower(msg.Tags["Purchase-Type"]) or "lease"
 	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
 	local from = utils.formatAddress(msg.From)
 	local processId = utils.formatAddress(msg.Tags["Process-Id"] or msg.From)
@@ -2563,6 +2563,22 @@ addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginate
 		})
 	else
 		ao.send({ Target = msg.From, Action = "Balances-Notice", Data = json.encode(result) })
+	end
+end)
+
+addEventingHandler("paginatedVaults", utils.hasMatchingTag("Action", "Paginated-Vaults"), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local status, result = pcall(vaults.getPaginatedVaults, page.cursor, page.limit, page.sortOrder, page.sortBy)
+
+	if not status then
+		ao.send({
+			Target = msg.From,
+			Action = "Invalid-Vaults-Notice",
+			Error = "Pagination-Error",
+			Data = json.encode(result),
+		})
+	else
+		ao.send({ Target = msg.From, Action = "Vaults-Notice", Data = json.encode(result) })
 	end
 end)
 

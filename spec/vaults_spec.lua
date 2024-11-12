@@ -304,4 +304,124 @@ describe("vaults", function()
 			assert.are.equal(1300, _G.Balances["owner2"]) -- 1000 + 300 from expired vault
 		end)
 	end)
+
+	describe("Reading vaults", function()
+		local address1 = "a-test-this-is-valid-arweave-wallet-address"
+		local address2 = "b-test-this-is-valid-arweave-wallet-address"
+		before_each(function()
+			-- Setup test vaults
+			_G.Vaults = {
+				[address1] = {
+					["uniqueMsgId"] = {
+						balance = 100,
+						startTimestamp = 0,
+						endTimestamp = 1000,
+					},
+				},
+				[address2] = {
+					["uniqueMsgId"] = {
+						balance = 200,
+						startTimestamp = 0,
+						endTimestamp = 1000,
+					},
+				},
+			}
+		end)
+
+		describe("getVault", function()
+			it("should return the vault", function()
+				local returnedVault = vaults.getVault(address1, "uniqueMsgId")
+				assert.are.same({
+					balance = 100,
+					startTimestamp = 0,
+					endTimestamp = 1000,
+				}, returnedVault)
+			end)
+
+			it("should return nil if the vault does not exist", function()
+				local returnedVault = vaults.getVault(address1, "nonExistentId")
+				assert.is_nil(returnedVault)
+			end)
+		end)
+
+		describe("getVaults", function()
+			it("should return all vaults", function()
+				local returnedVaults = vaults.getVaults()
+				assert.are.same({
+					[address1] = {
+						["uniqueMsgId"] = {
+							balance = 100,
+							startTimestamp = 0,
+							endTimestamp = 1000,
+						},
+					},
+					[address2] = {
+						["uniqueMsgId"] = {
+							balance = 200,
+							startTimestamp = 0,
+							endTimestamp = 1000,
+						},
+					},
+				}, returnedVaults)
+			end)
+		end)
+
+		describe("getPaginatedVaults", function()
+			it("should return paginated vaults", function()
+				local returnedVaults = vaults.getPaginatedVaults(nil, 10, "asc")
+
+				assert(returnedVaults.limit, 10)
+				assert(returnedVaults.sortBy, "address")
+				assert(returnedVaults.sortOrder, "asc")
+				assert.is_false(returnedVaults.hasMore)
+				assert(returnedVaults.totalItems, 2)
+
+				local expectedVault1 = {
+					address = address1,
+					vaultId = "uniqueMsgId",
+					balance = 100,
+					startTimestamp = 0,
+					endTimestamp = 1000,
+				}
+				local vault1 = returnedVaults.items[1]
+				assert.same(expectedVault1, vault1)
+
+				local expectedVault2 = {
+					address = address2,
+					vaultId = "uniqueMsgId",
+					balance = 200,
+					startTimestamp = 0,
+					endTimestamp = 1000,
+				}
+				local vault2 = returnedVaults.items[2]
+				assert.same(expectedVault2, vault2)
+			end)
+
+			it("should return paginated vaults sorted by balance", function()
+				local returnedVaults = vaults.getPaginatedVaults(nil, 10, "asc", "balance")
+
+				assert(returnedVaults.limit, 10)
+				assert(returnedVaults.sortBy, "balance")
+				assert(returnedVaults.sortOrder, "asc")
+				assert.is_false(returnedVaults.hasMore)
+				assert(returnedVaults.totalItems, 2)
+
+				assert.same({
+					address = address1,
+					vaultId = "uniqueMsgId",
+					balance = 100,
+					startTimestamp = 0,
+					endTimestamp = 1000,
+				}, returnedVaults.items[1])
+
+				assert.same({
+					address = address2,
+					vaultId = "uniqueMsgId",
+					balance = 200,
+					startTimestamp = 0,
+					endTimestamp = 1000,
+				}, returnedVaults.items[2])
+			end)
+		end)
+	end)
 end)

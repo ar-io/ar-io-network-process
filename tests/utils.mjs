@@ -6,6 +6,7 @@ import {
   DEFAULT_HANDLE_OPTIONS,
   BUNDLED_SOURCE_CODE,
 } from '../tools/constants.mjs';
+import assert from 'node:assert';
 
 /**
  * Loads the aos wasm binary and returns the handle function with program memory
@@ -29,4 +30,11 @@ export async function createAosLoader() {
     handle,
     memory: evalRes.Memory,
   };
+}
+
+export function assertNoResultError(result) {
+  const errorTag = result.Messages?.[0]?.Tags?.find(
+    (tag) => tag.name === 'Error',
+  );
+  assert.strictEqual(errorTag, undefined);
 }

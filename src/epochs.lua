@@ -233,19 +233,17 @@ function epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
 	end
 
 	local epochHash = utils.getHashFromBase64URL(hashchain)
-	local prescribedNames = {}
+	local prescribedNamesLookup = {}
 	local hash = epochHash
-	while #prescribedNames < epochs.getSettings().prescribedNameCount do
+	while utils.lengthOfTable(prescribedNamesLookup) < epochs.getSettings().prescribedNameCount do
 		local hashString = crypto.utils.array.toString(hash)
 		local random = crypto.random(nil, nil, hashString) % #activeArNSNames
 
 		for i = 0, #activeArNSNames do
-			local index = (random + i) % #activeArNSNames
-			local alreadyPrescribed = utils.findInArray(prescribedNames, function(name)
-				return name == activeArNSNames[index]
-			end)
+			local index = (random + i) % #activeArNSNames + 1
+			local alreadyPrescribed = prescribedNamesLookup[activeArNSNames[index]] ~= nil
 			if not alreadyPrescribed then
-				table.insert(prescribedNames, activeArNSNames[index])
+				prescribedNamesLookup[activeArNSNames[index]] = true
 				break
 			end
 		end
@@ -254,6 +252,8 @@ function epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
 		local newHash = crypto.utils.stream.fromArray(hash)
 		hash = crypto.digest.sha2_256(newHash).asBytes()
 	end
+
+	local prescribedNames = utils.getTableKeys(prescribedNamesLookup)
 
 	-- sort them by name
 	table.sort(prescribedNames, function(a, b)
@@ -300,16 +300,13 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 
 	-- get our prescribed observers, using the hashchain as entropy
 	local hash = epochHash
-	local prescribedObserversAddresses = {}
-	while #prescribedObserversAddresses < epochs.getSettings().maxObservers do
+	local prescribedObserversAddressesLookup = {}
+	while utils.lengthOfTable(prescribedObserversAddressesLookup) < epochs.getSettings().maxObservers do
 		local hashString = crypto.utils.array.toString(hash)
 		local random = crypto.random(nil, nil, hashString) / 0xffffffff
 		local cumulativeNormalizedCompositeWeight = 0
-		for i = 1, #filteredObservers do
-			local observer = filteredObservers[i]
-			local alreadyPrescribed = utils.findInArray(prescribedObserversAddresses, function(address)
-				return address == observer.gatewayAddress
-			end)
+		for _, observer in ipairs(filteredObservers) do
+			local alreadyPrescribed = prescribedObserversAddressesLookup[observer.gatewayAddress]
 
 			-- add only if observer has not already been prescribed
 			if not alreadyPrescribed then
@@ -318,7 +315,7 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 					+ observer.normalizedCompositeWeight
 				-- if the random value is less than the cumulative weight, we have found our observer
 				if random <= cumulativeNormalizedCompositeWeight then
-					table.insert(prescribedObserversAddresses, observer.gatewayAddress)
+					prescribedObserversAddressesLookup[observer.gatewayAddress] = true
 					break
 				end
 			end
@@ -328,12 +325,12 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 		hash = crypto.digest.sha2_256(newHash).asBytes()
 	end
 	local prescribedObservers = {}
-	-- use ipairs as prescribedObserversAddresses is an array
-	for _, address in ipairs(prescribedObserversAddresses) do
-		local index = utils.findInArray(filteredObservers, function(observer)
-			return observer.gatewayAddress == address
-		end)
-		table.insert(prescribedObservers, filteredObservers[index])
+	local filteredObserversAddressMap = utils.reduce(filteredObservers, function(acc, _, observer)
+		acc[observer.gatewayAddress] = observer
+		return acc
+	end, {})
+	for address, _ in pairs(prescribedObserversAddressesLookup) do
+		table.insert(prescribedObservers, filteredObserversAddressMap[address])
 		table.sort(prescribedObservers, function(a, b)
 			return a.normalizedCompositeWeight > b.normalizedCompositeWeight
 		end)
@@ -562,6 +559,10 @@ function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObserv
 	local totalEligibleRewards = math.floor(balances.getBalance(ao.id) * epochs.getSettings().rewardPercentage)
 	local eligibleGatewayReward = math.floor(totalEligibleRewards * 0.90 / #activeGatewayAddresses) -- TODO: make these setting variables
 	local eligibleObserverReward = math.floor(totalEligibleRewards * 0.10 / #prescribedObservers) -- TODO: make these setting variables
+	local prescribedObserversLookup = utils.reduce(prescribedObservers, function(acc, _, observer)
+		acc[observer.observerAddress] = true
+		return acc
+	end, {})
 	-- compute for each gateway what their potential rewards are and for their delegates
 	local potentialRewards = {}
 	-- use ipairs as activeGatewayAddresses is an array
@@ -570,10 +571,7 @@ function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObserv
 		if gateway ~= nil then
 			local potentialReward = eligibleGatewayReward -- start with the gateway reward
 			-- it it is a prescribed observer for the epoch, it is eligible for the observer reward
-			local observerIndex = utils.findInArray(prescribedObservers, function(prescribedObserver)
-				return prescribedObserver.observerAddress == gateway.observerAddress
-			end)
-			if observerIndex then
+			if prescribedObserversLookup[gateway.observerAddress] then
 				potentialReward = potentialReward + eligibleObserverReward -- add observer reward if it is a prescribed observer
 			end
 			-- if any delegates are present, distribute the rewards to the delegates
@@ -639,7 +637,14 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 
 	-- NOTE: these should match what was computed at the beginning of the epoch - use that instead of this
 	local activeGatewayAddresses = epochs.getEligibleRewardsForEpoch(epochIndex)
-	local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
+	local prescribedObserversLookup = utils.reduce(
+		epochs.getPrescribedObserversForEpoch(epochIndex),
+		function(acc, _, observer)
+			acc[observer.observerAddress] = true
+			return acc
+		end,
+		{}
+	)
 	local totalObservationsSubmitted = utils.lengthOfTable(epoch.observations.reports) or 0
 
 	-- get the eligible rewards for the epoch
@@ -658,11 +663,9 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 			local failed = #observersMarkedFailed > (totalObservationsSubmitted / 2) -- more than 50% of observerations submitted marked gateway as failed
 
 			-- if prescribed, we'll update the prescribed stats as well - find if the observer address is in prescribed observers
-			local observerIndex = utils.findInArray(prescribedObservers, function(prescribedObserver)
-				return prescribedObserver.observerAddress == gateway.observerAddress
-			end)
+			local isPrescribed = prescribedObserversLookup[gateway.observerAddress]
 
-			local observationSubmitted = observerIndex and epoch.observations.reports[gateway.observerAddress] ~= nil
+			local observationSubmitted = isPrescribed and epoch.observations.reports[gateway.observerAddress] ~= nil
 
 			local updatedStats = {
 				totalEpochCount = gateway.stats.totalEpochCount + 1,
@@ -670,7 +673,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 				failedConsecutiveEpochs = failed and gateway.stats.failedConsecutiveEpochs + 1 or 0,
 				passedConsecutiveEpochs = failed and 0 or gateway.stats.passedConsecutiveEpochs + 1,
 				passedEpochCount = failed and gateway.stats.passedEpochCount or gateway.stats.passedEpochCount + 1,
-				prescribedEpochCount = observerIndex and gateway.stats.prescribedEpochCount + 1
+				prescribedEpochCount = isPrescribed and gateway.stats.prescribedEpochCount + 1
 					or gateway.stats.prescribedEpochCount,
 				observedEpochCount = observationSubmitted and gateway.stats.observedEpochCount + 1
 					or gateway.stats.observedEpochCount,
@@ -688,7 +691,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 			-- 4. Gateway failed and was not prescribed -- it gets no reward
 			local earnedRewardForGatewayAndDelegates = 0
 			if not failed then
-				if observerIndex then
+				if isPrescribed then
 					if observationSubmitted then
 						-- 1. gateway passed and was prescribed and submittied an observation - it gets full reward
 						earnedRewardForGatewayAndDelegates =
@@ -702,7 +705,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 					earnedRewardForGatewayAndDelegates = math.floor(totalEligibleGatewayReward)
 				end
 			else
-				if observerIndex then
+				if isPrescribed then
 					if observationSubmitted then
 						-- 3. gateway failed and was prescribed and did submit an observation -- it gets the observer reward
 						earnedRewardForGatewayAndDelegates = math.floor(totalElgibleObserverReward)

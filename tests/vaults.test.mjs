@@ -1,9 +1,10 @@
-import { createAosLoader } from './utils.mjs';
-import { describe, it } from 'node:test';
+import { createAosLoader, assertNoResultError } from './utils.mjs';
+import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
 import {
   DEFAULT_HANDLE_OPTIONS,
   AO_LOADER_HANDLER_ENV,
+  PROCESS_OWNER,
 } from '../tools/constants.mjs';
 
 describe('Vaults', async () => {
@@ -21,6 +22,40 @@ describe('Vaults', async () => {
       AO_LOADER_HANDLER_ENV,
     );
   }
+
+  const createVault = async ({
+    memory,
+    quantity,
+    lockLengthMs,
+    from = PROCESS_OWNER,
+    messageId,
+  }) => {
+    const createVaultResult = await handle(
+      {
+        Id: messageId,
+        From: from,
+        Owner: from,
+        Tags: [
+          {
+            name: 'Action',
+            value: 'Create-Vault',
+          },
+          {
+            name: 'Quantity',
+            value: quantity.toString(),
+          },
+          {
+            name: 'Lock-Length',
+            value: lockLengthMs.toString(),
+          },
+        ],
+      },
+      memory,
+    );
+
+    assertNoResultError(createVaultResult);
+    return { result: createVaultResult, memory: createVaultResult.Memory };
+  };
 
   describe('createVault', () => {
     it('should create a vault', async () => {
@@ -341,6 +376,139 @@ describe('Vaults', async () => {
         vaultData.endTimestamp,
         createdVaultData.startTimestamp + lockLengthMs,
       );
+    });
+  });
+
+  describe('getPaginatedVaults', () => {
+    let paginatedVaultMemory = startMemory; // save the memory
+    const vaultId1 = 'unique-id-1-'.padEnd(43, 'a');
+    const secondVaulter = 'unique-second-address-'.padEnd(43, 'a');
+    const vaultId2 = 'unique-id-2-'.padEnd(43, 'a');
+
+    before(async () => {
+      const { memory: updatedMemory } = await createVault({
+        quantity: 500,
+        lockLengthMs: 1209600000,
+        memory: startMemory,
+        messageId: vaultId1,
+      });
+
+      const transferResult = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Transfer' },
+            { name: 'Recipient', value: secondVaulter },
+            { name: 'Quantity', value: 600 },
+            { name: 'Cast', value: true },
+          ],
+        },
+        updatedMemory,
+      );
+
+      const { memory: updatedMemory2 } = await createVault({
+        quantity: 600,
+        lockLengthMs: 1209600000,
+        memory: transferResult.Memory,
+        from: secondVaulter,
+        messageId: vaultId2,
+      });
+      paginatedVaultMemory = updatedMemory2;
+    });
+
+    it('should get paginated vaults', async () => {
+      let cursor = '';
+      let fetchedVaults = [];
+      while (true) {
+        const paginatedVaults = await handle(
+          {
+            Tags: [
+              { name: 'Action', value: 'Paginated-Vaults' },
+              { name: 'Cursor', value: cursor },
+              { name: 'Limit', value: '1' },
+            ],
+          },
+          paginatedVaultMemory,
+        );
+
+        // parse items, nextCursor
+        const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
+          JSON.parse(paginatedVaults.Messages?.[0]?.Data);
+
+        assert.equal(totalItems, 2);
+        assert.equal(items.length, 1);
+        assert.equal(sortBy, 'address');
+        assert.equal(sortOrder, 'desc');
+        assert.equal(hasMore, !!nextCursor);
+        cursor = nextCursor;
+        fetchedVaults.push(...items);
+        if (!cursor) break;
+      }
+
+      assert.deepEqual(fetchedVaults, [
+        {
+          address: secondVaulter,
+          vaultId: vaultId2,
+          balance: 600,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
+        },
+        {
+          address: PROCESS_OWNER,
+          vaultId: vaultId1,
+          balance: 500,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
+        },
+      ]);
+    });
+
+    it('should get paginated vaults sorted by ascending balance', async () => {
+      let cursor = '';
+      let fetchedVaults = [];
+      while (true) {
+        const paginatedVaults = await handle(
+          {
+            Tags: [
+              { name: 'Action', value: 'Paginated-Vaults' },
+              { name: 'Cursor', value: cursor },
+              { name: 'Limit', value: '1' },
+              { name: 'Sort-By', value: 'balance' },
+              { name: 'Sort-Order', value: 'asc' },
+            ],
+          },
+          paginatedVaultMemory,
+        );
+
+        // parse items, nextCursor
+        const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
+          JSON.parse(paginatedVaults.Messages?.[0]?.Data);
+
+        assert.equal(totalItems, 2);
+        assert.equal(items.length, 1);
+        assert.equal(sortBy, 'balance');
+        assert.equal(sortOrder, 'asc');
+        assert.equal(hasMore, !!nextCursor);
+        cursor = nextCursor;
+        fetchedVaults.push(...items);
+        if (!cursor) break;
+      }
+
+      assert.deepEqual(fetchedVaults, [
+        {
+          address: PROCESS_OWNER,
+          vaultId: vaultId1,
+          balance: 500,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
+        },
+        {
+          address: secondVaulter,
+          vaultId: vaultId2,
+          balance: 600,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
+        },
+      ]);
     });
   });
 });
