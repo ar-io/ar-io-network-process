@@ -1435,9 +1435,11 @@ function gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
 				startTimestamp = currentTimestamp,
 				endTimestamp = currentTimestamp + gar.getSettings().delegates.withdrawLengthMs,
 			}
-			delegate.delegatedStake = 0
 			gateway.totalDelegatedStake = gateway.totalDelegatedStake - delegate.delegatedStake
-			appliedPlan.newWithdrawVaults[gatewayAddress] = utils.deepCopy(delegate.vaults[msgId])
+			delegate.delegatedStake = 0
+			appliedPlan.newWithdrawVaults[gatewayAddress] = {
+				[msgId] = utils.deepCopy(delegate.vaults[msgId]),
+			}
 		end
 
 		-- TODO: ensure delegates with 0 stake and no vaults are pruned

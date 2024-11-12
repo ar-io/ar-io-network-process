@@ -2568,11 +2568,11 @@ describe("gar", function()
 				},
 			}
 			_G.GatewayRegistry["gateway-2"] = {
-				totalDelegatedStake = 42, -- 40 of this will get drawn down
+				totalDelegatedStake = 41, -- 40 of this will get drawn down
 				vaults = {},
 				delegates = {
 					["test-address-1"] = {
-						delegatedStake = 42, -- 40 of this will get drawn down
+						delegatedStake = 41, -- 40 of this will get drawn down, with the last mIO forced to a withdraw vault
 						vaults = {
 							["vault-3"] = {
 								balance = 10, -- this will not be drawn down
@@ -2610,7 +2610,15 @@ describe("gar", function()
 			local result = gar.applyFundingPlan(fundingPlan, "stub-msg-id", 12345)
 			assert.are.same({
 				totalFunded = 210,
-				newWithdrawVaults = {},
+				newWithdrawVaults = {
+					["gateway-2"] = {
+						["stub-msg-id"] = {
+							balance = 1,
+							startTimestamp = 12345,
+							endTimestamp = 12345 + gar.getSettings().delegates.withdrawLengthMs,
+						},
+					},
+				},
 			}, result)
 			assert.equals(0, _G.Balances["test-address-1"])
 			assert.are.same({
@@ -2638,17 +2646,22 @@ describe("gar", function()
 				},
 			}, _G.GatewayRegistry["gateway-1"])
 			assert.are.same({
-				totalDelegatedStake = 2,
+				totalDelegatedStake = 0,
 				vaults = {},
 				delegates = {
 					["test-address-1"] = {
-						delegatedStake = 2,
+						delegatedStake = 0,
 						vaults = {
 							-- untouched
 							["vault-3"] = {
 								balance = 10,
 								startTimestamp = 0,
 								endTimestamp = 999,
+							},
+							["stub-msg-id"] = {
+								balance = 1,
+								startTimestamp = 12345,
+								endTimestamp = 12345 + gar.getSettings().delegates.withdrawLengthMs,
 							},
 						},
 					},
