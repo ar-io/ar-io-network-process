@@ -360,11 +360,6 @@ function arns.calculateUndernameCost(baseFee, increaseQty, registrationType, yea
 	local undernamePercentageFee = registrationType == "lease" and constants.UNDERNAME_LEASE_FEE_PERCENTAGE
 		or constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE
 	local totalFeeForQtyAndYears = baseFee * undernamePercentageFee * increaseQty * years
-	print("baseFee" .. baseFee)
-	print("undernamePercentageFee" .. undernamePercentageFee)
-	print("increaseQty" .. increaseQty)
-	print("years" .. years)
-	print("totalFeeForQtyAndYears" .. totalFeeForQtyAndYears)
 	return math.floor(demandFactor * totalFeeForQtyAndYears)
 end
 
