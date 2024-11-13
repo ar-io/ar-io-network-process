@@ -1041,26 +1041,34 @@ addEventingHandler(
 	end
 )
 
+function assertTokenCostTags(msg)
+	local intentType = msg.Tags.Intent
+	local validIntents = utils.createLookupTable({
+		ActionMap.BuyRecord,
+		ActionMap.ExtendLease,
+		ActionMap.IncreaseUndernameLimit,
+		ActionMap.UpgradeName,
+	})
+	assert(
+		type(intentType) == "string",
+		validIntents[intentType],
+		"Intent must be valid registry interaction (e.g. BuyRecord, ExtendLease, IncreaseUndernameLimit). Provided intent: "
+			.. (intentType or "nil")
+	)
+	-- if years is provided, assert it is a number and integer between 1 and 5
+	if msg.Tags.Years then
+		assert(utils.isInteger(tonumber(msg.Tags.Years)), "Invalid years. Must be integer between 1 and 5")
+	end
+
+	-- if quantity provided must be a number and integer greater than 0
+	if msg.Tags.Quantity then
+		assert(utils.isInteger(tonumber(msg.Tags.Quantity)), "Invalid quantity. Must be integer greater than 0")
+	end
+end
+
 addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.TokenCost), function(msg)
 	local checkAssertions = function()
-		local intentType = msg.Tags.Intent
-		local validIntents =
-			utils.createLookupTable({ ActionMap.BuyRecord, ActionMap.ExtendLease, ActionMap.IncreaseUndernameLimit })
-		assert(
-			type(intentType) == "string",
-			validIntents[intentType],
-			"Intent must be valid registry interaction (e.g. BuyRecord, ExtendLease, IncreaseUndernameLimit). Provided intent: "
-				.. (intentType or "nil")
-		)
-		-- if years is provided, assert it is a number and integer between 1 and 5
-		if msg.Tags.Years then
-			assert(utils.isInteger(tonumber(msg.Tags.Years)), "Invalid years. Must be integer between 1 and 5")
-		end
-
-		-- if quantity provided must be a number and integer greater than 0
-		if msg.Tags.Quantity then
-			assert(utils.isInteger(tonumber(msg.Tags.Quantity)), "Invalid quantity. Must be integer greater than 0")
-		end
+		assertTokenCostTags(msg)
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -1112,27 +1120,7 @@ addEventingHandler(
 	function(msg)
 		local fundFrom = msg.Tags["Fund-From"]
 		local checkAssertions = function()
-			local intentType = msg.Tags.Intent
-			local validIntents = utils.createLookupTable({
-				ActionMap.BuyRecord,
-				ActionMap.ExtendLease,
-				ActionMap.IncreaseUndernameLimit,
-			})
-			assert(
-				type(intentType) == "string",
-				validIntents[intentType],
-				"Intent must be valid registry interaction (e.g. BuyRecord, ExtendLease, IncreaseUndernameLimit). Provided intent: "
-					.. (intentType or "nil")
-			)
-			-- if years is provided, assert it is a number and integer between 1 and 5
-			if msg.Tags.Years then
-				assert(utils.isInteger(tonumber(msg.Tags.Years)), "Invalid years. Must be integer between 1 and 5")
-			end
-
-			-- if quantity provided must be a number and integer greater than 0
-			if msg.Tags.Quantity then
-				assert(utils.isInteger(tonumber(msg.Tags.Quantity)), "Invalid quantity. Must be integer greater than 0")
-			end
+			assertTokenCostTags(msg)
 			assertValidFundFrom(fundFrom)
 		end
 
