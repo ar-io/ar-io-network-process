@@ -462,7 +462,7 @@ end
 
 ---@class Discount
 ---@field name string The name of the discount
----@field discountedCost number The discounted cost
+---@field discountTotal number The discounted cost
 ---@field multiplier number The multiplier for the discount
 
 ---@class TokenCostResult
@@ -527,14 +527,14 @@ function arns.getTokenCost(intendedAction)
 
 	-- if the address is eligible for the ArNS discount, apply the discount
 	if gar.isEligibleForArNSDiscount(intendedAction.from) then
-		local discountedCost = math.floor(tokenCost * constants.ARNS_DISCOUNT_PERCENTAGE)
+		local discountTotal = math.floor(tokenCost * constants.ARNS_DISCOUNT_PERCENTAGE)
 		local discount = {
 			name = "ArNS Discount",
-			discountedCost = discountedCost,
+			discountTotal = discountTotal,
 			multiplier = constants.ARNS_DISCOUNT_PERCENTAGE,
 		}
 		table.insert(discounts, discount)
-		tokenCost = tokenCost - discountedCost
+		tokenCost = tokenCost - discountTotal
 	end
 
 	-- if token Cost is less than 0, throw an error

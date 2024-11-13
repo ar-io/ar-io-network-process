@@ -1578,7 +1578,7 @@ describe('ArNS', async () => {
       assert.equal(tokenCost, baseLeasePrice * 0.8);
       assert.deepEqual(discounts, [
         {
-          discountedCost: baseLeasePrice * 0.2,
+          discountTotal: baseLeasePrice * 0.2,
           multiplier: 0.2,
           name: 'ArNS Discount',
         },

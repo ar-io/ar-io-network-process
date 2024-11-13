@@ -117,14 +117,14 @@ describe("arns", function()
 
 					local demandBefore = demand.getCurrentPeriodRevenue()
 					local purchasesBefore = demand.getCurrentPeriodPurchases()
-					local discountedCost = 600000000 - (math.floor(600000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+					local discountTotal = 600000000 - (math.floor(600000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
 
 					local status, buyRecordResult =
 						pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
 
 					assert.is_true(status)
 					assert.are.same({
-						purchasePrice = discountedCost,
+						purchasePrice = discountTotal,
 						type = "lease",
 						undernameLimit = 10,
 						processId = testProcessId,
@@ -133,7 +133,7 @@ describe("arns", function()
 					}, buyRecordResult.record)
 					assert.are.same({
 						["test-name"] = {
-							purchasePrice = discountedCost,
+							purchasePrice = discountTotal,
 							type = "lease",
 							undernameLimit = 10,
 							processId = testProcessId,
@@ -141,9 +141,9 @@ describe("arns", function()
 							endTimestamp = timestamp + constants.oneYearMs * 1,
 						},
 					}, _G.NameRegistry.records)
-					assert.are.equal(startBalance - discountedCost, _G.Balances[testAddress])
-					assert.are.equal(discountedCost, _G.Balances[_G.ao.id])
-					assert.are.equal(demandBefore + discountedCost, demand.getCurrentPeriodRevenue())
+					assert.are.equal(startBalance - discountTotal, _G.Balances[testAddress])
+					assert.are.equal(discountTotal, _G.Balances[_G.ao.id])
+					assert.are.equal(demandBefore + discountTotal, demand.getCurrentPeriodRevenue())
 					assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 				end
 			)
@@ -416,21 +416,21 @@ describe("arns", function()
 				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
 
-				local discountedCost = 25000000 - (math.floor(25000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+				local discountTotal = 25000000 - (math.floor(25000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
 
 				assert.is.equal(
 					_G.Balances[testAddress],
-					startBalance - discountedCost,
+					startBalance - discountTotal,
 					"Balance should be reduced by the purchase price"
 				)
 
 				assert.is.equal(
 					_G.Balances[_G.ao.id],
-					discountedCost,
+					discountTotal,
 					"Protocol balance should be increased by the purchase price"
 				)
 
-				assert.are.equal(demandBefore + discountedCost, demand.getCurrentPeriodRevenue())
+				assert.are.equal(demandBefore + discountTotal, demand.getCurrentPeriodRevenue())
 				assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 			end)
 		end)
@@ -610,21 +610,21 @@ describe("arns", function()
 					},
 				}, _G.NameRegistry.records)
 
-				local discountedCost = 400000000 - (math.floor(400000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+				local discountTotal = 400000000 - (math.floor(400000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
 
 				assert.is.equal(
 					_G.Balances[testAddress],
-					startBalance - discountedCost,
+					startBalance - discountTotal,
 					"Balance should be reduced by the purchase price"
 				)
 
 				assert.is.equal(
 					_G.Balances[_G.ao.id],
-					discountedCost,
+					discountTotal,
 					"Protocol balance should be increased by the discounted price"
 				)
 
-				assert.are.equal(demandBefore + discountedCost, demand.getCurrentPeriodRevenue())
+				assert.are.equal(demandBefore + discountTotal, demand.getCurrentPeriodRevenue())
 				assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 			end)
 		end)
@@ -810,8 +810,8 @@ describe("arns", function()
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
 
-			local discountedCost = expectedCost - (math.floor(expectedCost * constants.ARNS_DISCOUNT_PERCENTAGE))
-			assert.are.equal(discountedCost, arns.getTokenCost(intendedAction).tokenCost)
+			local discountTotal = expectedCost - (math.floor(expectedCost * constants.ARNS_DISCOUNT_PERCENTAGE))
+			assert.are.equal(discountTotal, arns.getTokenCost(intendedAction).tokenCost)
 		end)
 
 		it("should not apply discount on a gateway that is found but does not meet the requirements", function()
