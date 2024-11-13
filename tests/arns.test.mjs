@@ -7,6 +7,8 @@ import {
   joinNetwork,
   setUpStake,
   getBalances,
+  baseLeasePrice,
+  basePermabuyPrice,
 } from './helpers.mjs';
 import assert from 'node:assert';
 import {
@@ -134,8 +136,6 @@ describe('ArNS', async () => {
     };
   };
 
-  const basePermabuyPrice = 2500000000;
-  const baseLeasePrice = 600000000;
   describe('Buy-Record', () => {
     it('should buy a record with an Arweave address', async () => {
       await runBuyRecord({ sender: STUB_ADDRESS });

@@ -12,6 +12,9 @@ import {
 
 const initialOperatorStake = 100_000_000_000;
 
+export const basePermabuyPrice = 2_500_000_000;
+export const baseLeasePrice = 600_000_000;
+
 const { handle: originalHandle, memory } = await createAosLoader();
 export const startMemory = memory;
 
