@@ -1605,7 +1605,7 @@ describe("gar", function()
 				operatorStake = gar.getSettings().operators.minStake - slashAmount,
 				totalDelegatedStake = 123,
 				slashings = {
-					[123456] = slashAmount,
+					["123456"] = slashAmount, -- must be stringified timestamp to avoid encoding issues
 				},
 				vaults = {},
 				delegates = {},
