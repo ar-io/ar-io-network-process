@@ -1121,8 +1121,8 @@ function gar.isEligibleForArNSDiscount(from)
 	local tenureWeight = gateway.weights.tenureWeight or 0
 	local gatewayPerformanceRatio = gateway.weights.gatewayRewardRatioWeight or 0
 
-	return tenureWeight >= constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR
-		and gatewayPerformanceRatio >= constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR
+	return tenureWeight >= constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD
+		and gatewayPerformanceRatio >= constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD
 end
 
 --- Remove delegate addresses from the allowedDelegatesLookup table in the gateway's settings

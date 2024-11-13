@@ -461,7 +461,7 @@ function arns.getRegistrationFees()
 end
 
 ---@class Discount
----@field discountName string The name of the discount
+---@field name string The name of the discount
 ---@field discountedCost number The discounted cost
 ---@field multiplier number The multiplier for the discount
 

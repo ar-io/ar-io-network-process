@@ -109,8 +109,8 @@ describe("arns", function()
 				function()
 					_G.GatewayRegistry[testAddress] = testGateway
 					_G.GatewayRegistry[testAddress].weights = {
-						tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
-						gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+						tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+						gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 					}
 					local result = gar.isEligibleForArNSDiscount(testAddress)
 					assert.is_true(result)
@@ -388,8 +388,8 @@ describe("arns", function()
 			it("should apply ArNS discount for increasing undername limit for eligible gateways", function()
 				_G.GatewayRegistry[testAddress] = testGateway
 				_G.GatewayRegistry[testAddress].weights = {
-					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
-					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 				}
 				assert.is_true(gar.isEligibleForArNSDiscount(testAddress))
 
@@ -572,8 +572,8 @@ describe("arns", function()
 			it("should apply ArNS discount to eligible gateways for extending leases", function()
 				_G.GatewayRegistry[testAddress] = testGateway
 				_G.GatewayRegistry[testAddress].weights = {
-					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
-					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 				}
 				local result = gar.isEligibleForArNSDiscount(testAddress)
 				assert.is_true(result)
@@ -792,8 +792,8 @@ describe("arns", function()
 		it("should return the correct token cost for an ArNS discount eligible address", function()
 			_G.GatewayRegistry[stubRandomAddress] = testGateway
 			_G.GatewayRegistry[stubRandomAddress].weights = {
-				tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
-				gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+				tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+				gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 			}
 			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
 			assert.is_true(result)
@@ -1326,8 +1326,8 @@ describe("arns", function()
 			it("should apply the ArNS discount to the upgrade cost", function()
 				_G.GatewayRegistry[stubRandomAddress] = testGateway
 				_G.GatewayRegistry[stubRandomAddress].weights = {
-					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
-					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 				}
 				_G.NameRegistry.records["upgrade-name"] = {
 					endTimestamp = 1000000,
@@ -1478,8 +1478,8 @@ describe("arns", function()
 			it("should apply ArNS discount on auction bids for eligible gateways", function()
 				_G.GatewayRegistry[testAddressArweave] = testGateway
 				_G.GatewayRegistry[testAddressArweave].weights = {
-					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
-					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 				}
 				assert(gar.isEligibleForArNSDiscount(testAddressArweave))
 				local startTimestamp = 1000000
