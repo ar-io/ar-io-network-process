@@ -59,15 +59,18 @@ describe('primary names', function () {
   };
 
   const claimPrimaryName = async ({ name, recipient, timestamp, memory }) => {
-    const claimPrimaryNameResult = await handle({
-      From: recipient,
-      Owner: recipient,
-      Timestamp: timestamp,
-      Tags: [
-        { name: 'Action', value: 'Claim-Primary-Name' },
-        { name: 'Name', value: name },
-      ],
-    });
+    const claimPrimaryNameResult = await handle(
+      {
+        From: recipient,
+        Owner: recipient,
+        Timestamp: timestamp,
+        Tags: [
+          { name: 'Action', value: 'Claim-Primary-Name' },
+          { name: 'Name', value: name },
+        ],
+      },
+      memory,
+    );
     assertNoResultError(claimPrimaryNameResult);
     return {
       result: claimPrimaryNameResult,
