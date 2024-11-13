@@ -59,7 +59,7 @@ local ActionMap = {
 	ReservedNames = "Reserved-Names",
 	ReservedName = "Reserved-Name",
 	TokenCost = "Token-Cost",
-	GetCostDetailsForAction = "Get-Cost-Details-For-Action",
+	CostDetails = "Get-Cost-Details-For-Action",
 	GetRegistrationFees = "Get-Registration-Fees",
 	-- GATEWAY REGISTRY READ APIS
 	Gateway = "Gateway",
@@ -1050,11 +1050,11 @@ function assertTokenCostTags(msg)
 		ActionMap.UpgradeName,
 	})
 	assert(
-		type(intentType) == "string",
-		validIntents[intentType],
-		"Intent must be valid registry interaction (e.g. BuyRecord, ExtendLease, IncreaseUndernameLimit). Provided intent: "
+		intentType and type(intentType) == "string" and validIntents[intentType],
+		"Intent must be valid registry interaction (e.g. BuyRecord, ExtendLease, IncreaseUndernameLimit, UpgradeName). Provided intent: "
 			.. (intentType or "nil")
 	)
+	assert(msg.Tags.Name, "Name is required")
 	-- if years is provided, assert it is a number and integer between 1 and 5
 	if msg.Tags.Years then
 		assert(utils.isInteger(tonumber(msg.Tags.Years)), "Invalid years. Must be integer between 1 and 5")
@@ -1074,7 +1074,7 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Bad-Input" },
+			Tags = { Action = "Invalid-" .. ActionMap.TokenCost .. "-Notice", Error = "Bad-Input" },
 			Data = tostring(error),
 		})
 	end, checkAssertions)
@@ -1087,7 +1087,10 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 		function(error)
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Invalid-Token-Cost" },
+				Tags = {
+					Action = "Invalid-" .. ActionMap.TokenCost .. "-Notice",
+					Error = "Invalid-" .. ActionMap.TokenCost,
+				},
 				Data = tostring(error),
 			})
 		end,
@@ -1102,96 +1105,68 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 			from = msg.From,
 		}
 	)
-	if not shouldContinue2 then
+	if not shouldContinue2 or not tokenCostResult then
 		return
 	end
 	local tokenCost = tokenCostResult.tokenCost
 
 	ao.send({
 		Target = msg.From,
-		Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(tokenCost) },
+		Tags = { Action = ActionMap.TokenCost .. "-Notice", ["Token-Cost"] = tostring(tokenCost) },
 		Data = json.encode(tokenCost),
 	})
 end)
 
-addEventingHandler(
-	ActionMap.GetCostDetailsForAction,
-	utils.hasMatchingTag("Action", ActionMap.GetCostDetailsForAction),
-	function(msg)
-		local fundFrom = msg.Tags["Fund-From"]
-		local checkAssertions = function()
-			assertTokenCostTags(msg)
-			assertValidFundFrom(fundFrom)
-		end
+addEventingHandler(ActionMap.CostDetails, utils.hasMatchingTag("Action", ActionMap.CostDetails), function(msg)
+	local fundFrom = msg.Tags["Fund-From"]
+	local checkAssertions = function()
+		assertTokenCostTags(msg)
+		assertValidFundFrom(fundFrom)
+	end
 
-		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Invalid-Get-Cost-Details-For-Action-Notice", Error = "Bad-Input" },
-				Data = tostring(error),
-			})
-		end, checkAssertions)
-		if not shouldContinue then
-			return
-		end
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.CostDetails .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
 
-		local shouldContinue2, tokenCostResult = eventingPcall(
-			msg.ioEvent,
-			function(error)
-				ao.send({
-					Target = msg.From,
-					Tags = {
-						Action = "Invalid-Get-Cost-Details-For-Action-Notice",
-						Error = "Invalid-Get-Cost-Details-For-Action",
-					},
-					Data = tostring(error),
-				})
-			end,
-			arns.getTokenCost,
-			{
-				intent = msg.Tags.Intent,
-				name = string.lower(msg.Tags.Name),
-				years = tonumber(msg.Tags.Years) or 1,
-				quantity = tonumber(msg.Tags.Quantity),
-				purchaseType = msg.Tags["Purchase-Type"] or "lease",
-				currentTimestamp = tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp),
-				from = msg.From,
-			}
-		)
-		if not shouldContinue2 or tokenCostResult == nil then
-			return
-		end
-		local tokenCost = tokenCostResult.tokenCost
-		local discounts = tokenCostResult.discounts
-
-		local shouldContinue3, fundingPlan = eventingPcall(msg.ioEvent, function(error)
+	local shouldContinue2, tokenCostAndFundingPlan = eventingPcall(
+		msg.ioEvent,
+		function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = {
-					Action = "Invalid-Get-Cost-Details-For-Action-Notice",
-					Error = "Invalid-Get-Cost-Details-For-Action",
+					Action = "Invalid-" .. ActionMap.CostDetails .. "-Notice",
+					Error = "Invalid-" .. ActionMap.CostDetails,
 				},
 				Data = tostring(error),
 			})
-		end, gar.getFundingPlan, msg.From, tokenCost, fundFrom)
-		if not shouldContinue3 then
-			return
-		end
-
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Get-Cost-Details-For-Action-Notice",
-				["Get-Cost-Details-For-Action"] = tostring(tokenCost),
-			},
-			Data = json.encode({
-				tokenCost = tokenCost,
-				fundingPlan = fundFrom and fundingPlan or nil,
-				discounts = discounts,
-			}),
-		})
+		end,
+		arns.getTokenCostAndFundingPlanForIntent,
+		msg.Tags.Intent,
+		string.lower(msg.Tags.Name),
+		tonumber(msg.Tags.Years) or 1,
+		tonumber(msg.Tags.Quantity),
+		msg.Tags["Purchase-Type"] or "lease",
+		tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp),
+		msg.From,
+		fundFrom
+	)
+	if not shouldContinue2 or tokenCostAndFundingPlan == nil then
+		return
 	end
-)
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = ActionMap.CostDetails .. "-Notice" },
+		Data = json.encode(tokenCostAndFundingPlan),
+	})
+end)
 
 addEventingHandler(
 	ActionMap.GetRegistrationFees,
