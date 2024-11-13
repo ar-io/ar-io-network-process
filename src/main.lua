@@ -1139,7 +1139,7 @@ addEventingHandler(
 		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Bad-Input" },
+				Tags = { Action = "Invalid-Get-Cost-Details-For-Action-Notice", Error = "Bad-Input" },
 				Data = tostring(error),
 			})
 		end, checkAssertions)
@@ -1152,7 +1152,10 @@ addEventingHandler(
 			function(error)
 				ao.send({
 					Target = msg.From,
-					Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Invalid-Token-Cost" },
+					Tags = {
+						Action = "Invalid-Get-Cost-Details-For-Action-Notice",
+						Error = "Invalid-Get-Cost-Details-For-Action",
+					},
 					Data = tostring(error),
 				})
 			end,
@@ -1176,7 +1179,10 @@ addEventingHandler(
 		local shouldContinue3, fundingPlan = eventingPcall(msg.ioEvent, function(error)
 			ao.send({
 				Target = msg.From,
-				Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Invalid-Token-Cost" },
+				Tags = {
+					Action = "Invalid-Get-Cost-Details-For-Action-Notice",
+					Error = "Invalid-Get-Cost-Details-For-Action",
+				},
 				Data = tostring(error),
 			})
 		end, gar.getFundingPlan, msg.From, tokenCost, fundFrom)
@@ -1186,7 +1192,10 @@ addEventingHandler(
 
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(tokenCost) },
+			Tags = {
+				Action = "Get-Cost-Details-For-Action-Notice",
+				["Get-Cost-Details-For-Action"] = tostring(tokenCost),
+			},
 			Data = json.encode({
 				tokenCost = tokenCost,
 				fundingPlan = fundFrom and fundingPlan or nil,
