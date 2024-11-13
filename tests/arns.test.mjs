@@ -1526,7 +1526,7 @@ describe('ArNS', async () => {
       const { memory: join1Memory } = await joinNetwork({
         address: joinedGateway,
         quantity: 200_000_000_000,
-        timestamp: firstEpochTimestamp,
+        timestamp: firstEpochTimestamp - 1000 * 60 * 60 * 24 * 365, // 365 days before the first epoch
       });
 
       // TODO: Join failing gateway -- Submit an observation with another joined gateway that marks the gateway as failing
