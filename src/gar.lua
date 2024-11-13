@@ -324,6 +324,10 @@ function gar.getGateway(address)
 	return utils.deepCopy(GatewayRegistry[address])
 end
 
+function gar.getGatewayUnsafe(address)
+	return GatewayRegistry[address]
+end
+
 -- TODO: Add a getGatewaysProps function that omits lots of heavy data like vaults and delegates
 --- Gets all gateways
 ---@return table All gateway objects
@@ -1113,7 +1117,7 @@ function gar.allowDelegates(delegates, gatewayAddress)
 end
 
 function gar.isEligibleForArNSDiscount(from)
-	local gateway = gar.getGateway(from)
+	local gateway = gar.getGatewayUnsafe(from)
 	if gateway == nil or gateway.weights == nil then
 		return false
 	end
