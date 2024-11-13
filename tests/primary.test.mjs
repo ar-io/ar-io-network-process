@@ -33,15 +33,15 @@ describe('primary names', function () {
 
   const createNameClaim = async ({
     name,
-    owner,
+    caller,
     recipient,
     timestamp,
     memory,
   }) => {
     const createNameClaimResult = await handle(
       {
-        From: owner,
-        Owner: owner,
+        From: caller,
+        Owner: caller,
         Timestamp: timestamp,
         Tags: [
           { name: 'Action', value: 'Create-Primary-Name-Claim' },
@@ -58,11 +58,19 @@ describe('primary names', function () {
     };
   };
 
-  const claimPrimaryName = async ({ name, recipient, timestamp, memory }) => {
+  const claimPrimaryName = async ({ name, caller, timestamp, memory }) => {
+    if (caller !== STUB_ADDRESS) {
+      const transferMemory = await transfer({
+        recipient: caller,
+        quantity: 100000000, // primary name cost
+        memory,
+      });
+      memory = transferMemory;
+    }
     const claimPrimaryNameResult = await handle(
       {
-        From: recipient,
-        Owner: recipient,
+        From: caller,
+        Owner: caller,
         Timestamp: timestamp,
         Tags: [
           { name: 'Action', value: 'Claim-Primary-Name' },
@@ -78,11 +86,30 @@ describe('primary names', function () {
     };
   };
 
-  const revokeClaims = async ({ initiator, names, memory }) => {
+  const removePrimaryNames = async ({ names, caller, memory }) => {
+    const removePrimaryNamesResult = await handle(
+      {
+        From: caller,
+        Owner: caller,
+        Tags: [
+          { name: 'Action', value: 'Remove-Primary-Names' },
+          { name: 'Names', value: names.join(',') },
+        ],
+      },
+      memory,
+    );
+    assertNoResultError(removePrimaryNamesResult);
+    return {
+      result: removePrimaryNamesResult,
+      memory: removePrimaryNamesResult.Memory,
+    };
+  };
+
+  const revokeClaims = async ({ caller, names, memory }) => {
     const revokeClaimsResult = await handle(
       {
-        From: initiator,
-        Owner: initiator,
+        From: caller,
+        Owner: caller,
         Tags: [
           { name: 'Action', value: 'Revoke-Claims' },
           { name: 'Names', value: names.join(',') },
@@ -139,24 +166,17 @@ describe('primary names', function () {
       processId,
     });
 
-    // give balance to the owner
-    const transferMemory = await transfer({
-      recipient,
-      quantity: 100000000, // the cost of a primary name
-      memory: buyRecordMemory,
-    });
-
     const { result: createClaimResult } = await createNameClaim({
       name: 'test-name',
-      owner: processId,
+      caller: processId,
       recipient, // the process creates the claim, the recipient approves it
       timestamp: 1234567890,
-      memory: transferMemory,
+      memory: buyRecordMemory,
     });
 
     const { result: claimPrimaryNameResult } = await claimPrimaryName({
       name: 'test-name',
-      recipient,
+      caller: recipient,
       timestamp: 1234567890,
       memory: createClaimResult.Memory,
     });
@@ -237,14 +257,14 @@ describe('primary names', function () {
     // create a primary name claim
     const { result: createClaimResult } = await createNameClaim({
       name: 'test-name',
-      owner: processId,
+      caller: processId,
       recipient,
       timestamp: 1234567890,
       memory: buyRecordMemory,
     });
     // revoke the claim
     const { result: revokeClaimsResult } = await revokeClaims({
-      initiator: processId,
+      caller: processId,
       names: ['test-name'],
       memory: createClaimResult.Memory,
     });
@@ -278,6 +298,64 @@ describe('primary names', function () {
       name: 'test-name',
       recipient,
       startTimestamp: 1234567890,
+    });
+  });
+
+  it('should allow removing a primary named by the owner or the owner of the base record', async function () {
+    const processId = ''.padEnd(43, 'a');
+    const recipient = ''.padEnd(43, 'b');
+    const { memory: buyRecordMemory } = await buyRecord({
+      name: 'test-name',
+      processId,
+    });
+    // create a primary name claim
+    const { result: createClaimResult } = await createNameClaim({
+      name: 'test-name',
+      caller: processId,
+      recipient,
+      timestamp: 1234567890,
+      memory: buyRecordMemory,
+    });
+    // claim the primary name
+    const { result: claimPrimaryNameResult } = await claimPrimaryName({
+      name: 'test-name',
+      caller: recipient,
+      timestamp: 1234567890,
+      memory: createClaimResult.Memory,
+    });
+
+    console.log(claimPrimaryNameResult);
+    // remove the primary name by the owner
+    const { result: removePrimaryNameResult } = await removePrimaryNames({
+      names: ['test-name'],
+      caller: processId,
+      memory: claimPrimaryNameResult.Memory,
+    });
+
+    console.log(removePrimaryNameResult);
+
+    // assert no error
+    assertNoResultError(removePrimaryNameResult);
+    // assert 2 messages sent - one to the owner and one to the recipient
+    assert.equal(removePrimaryNameResult.Messages.length, 2);
+    assert.equal(removePrimaryNameResult.Messages[0].Target, processId);
+    assert.equal(removePrimaryNameResult.Messages[1].Target, recipient);
+    const removedPrimaryNameData = JSON.parse(
+      removePrimaryNameResult.Messages[0].Data,
+    );
+    assert.deepStrictEqual(removedPrimaryNameData, [
+      {
+        owner: recipient,
+        name: 'test-name',
+      },
+    ]);
+    // assert 2 messages sent - one to the owner and one to the recipient
+    const removedPrimaryNameDataForRecipient = JSON.parse(
+      removePrimaryNameResult.Messages[1].Data,
+    );
+    assert.deepStrictEqual(removedPrimaryNameDataForRecipient, {
+      owner: recipient,
+      name: 'test-name',
     });
   });
 

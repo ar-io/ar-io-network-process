@@ -132,26 +132,42 @@ function primaryNames.setPrimaryNameFromClaim(owner, claim, startTimestamp)
 	}
 end
 
+--- Remove primary names
+--- @param names string[]
+--- @param from string
+--- @return RemovedPrimaryNameResult[]
+function primaryNames.removePrimaryNames(names, from)
+	local removedPrimaryNamesAndOwners = {}
+	for _, name in pairs(names) do
+		local removedPrimaryNameAndOwner = primaryNames.removePrimaryName(name, from)
+		table.insert(removedPrimaryNamesAndOwners, removedPrimaryNameAndOwner)
+	end
+	return removedPrimaryNamesAndOwners
+end
+
 --- @class RemovedPrimaryNameResult
 --- @field releasedName PrimaryName
 --- @field releasedOwner WalletAddress
 
 --- Release a primary name
 --- @param name ArNSName -- the name being released
---- @param from WalletAddress -- the address that is releasing the primary name
+--- @param from WalletAddress -- the address that is releasing the primary name, or the owner of the base name
 --- @return RemovedPrimaryNameResult
-function primaryNames.releasePrimaryName(name, from)
+function primaryNames.removePrimaryName(name, from)
 	--- assert the from is the current owner of the name
-	assert(PrimaryNames.names[name] == from, "Caller is not the owner of the primary name")
+	local primaryName = primaryNames.getPrimaryNameDataWithOwnerFromName(name)
+	assert(primaryName, "Primary name '" .. name .. "' does not exist")
+	assert(
+		primaryName.owner == from or arns.getRecord(primaryName.baseName).processId == from,
+		"Caller is not the owner of the primary name, or the owner of the " .. primaryName.baseName .. " record"
+	)
 
-	local releasedOwner = PrimaryNames.names[name]
-	local releasedName = utils.deepCopy(PrimaryNames.owners[from])
 	PrimaryNames.claims[name] = nil -- should never happen, but cleanup anyway
 	PrimaryNames.names[name] = nil
-	PrimaryNames.owners[from] = nil
+	PrimaryNames.owners[primaryName.owner] = nil
 	return {
-		releasedName = releasedName,
-		releasedOwner = releasedOwner,
+		name = name,
+		owner = primaryName.owner,
 	}
 end
 
@@ -224,12 +240,9 @@ end
 function primaryNames.removePrimaryNamesForBaseName(baseName)
 	local removedNames = {}
 	local primaryNamesForBaseName = primaryNames.getPrimaryNamesForBaseName(baseName)
-	for _, nameForBaseName in pairs(primaryNamesForBaseName) do
-		local releasedNameAndOwner = primaryNames.releasePrimaryName(nameForBaseName.name, nameForBaseName.owner)
-		table.insert(removedNames, {
-			owner = releasedNameAndOwner.releasedOwner,
-			name = releasedNameAndOwner.releasedName.name,
-		})
+	for _, nameData in pairs(primaryNamesForBaseName) do
+		local removedName = primaryNames.removePrimaryName(nameData.name, nameData.owner)
+		table.insert(removedNames, removedName)
 	end
 	return removedNames
 end

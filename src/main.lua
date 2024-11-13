@@ -96,7 +96,7 @@ local ActionMap = {
 	AllowDelegates = "Allow-Delegates",
 	DisallowDelegates = "Disallow-Delegates",
 	-- PRIMARY NAMES
-	ReleasePrimaryName = "Release-Primary-Name",
+	RemovePrimaryNames = "Remove-Primary-Names",
 	CreatePrimaryNameClaim = "Create-Primary-Name-Claim",
 	RevokeClaims = "Revoke-Claims",
 	ClaimPrimaryName = "Claim-Primary-Name",
@@ -3150,25 +3150,36 @@ addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap
 end)
 
 --- PRIMARY NAMES
-addEventingHandler("releasePrimaryName", utils.hasMatchingTag("Action", ActionMap.ReleasePrimaryName), function(msg)
-	local name = msg.Tags.Name and string.lower(msg.Tags.Name)
+addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap.RemovePrimaryNames), function(msg)
+	local names = msg.Tags.Names and utils.splitAndTrimString(msg.Tags.Names, ",") or nil
 	local from = utils.formatAddress(msg.From)
-	local shouldContinue, releasedNameAndOwner = eventingPcall(msg.ioEvent, function(error)
+	-- TODO: names must be provided
+	local shouldContinue, removedPrimaryNamesAndOwners = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.ReleasePrimaryName .. "-Notice", Error = "Bad-Input" },
+			Tags = { Action = "Invalid-" .. ActionMap.RemovePrimaryNames .. "-Notice", Error = "Bad-Input" },
 			Data = tostring(error),
 		})
-	end, primaryNames.releasePrimaryName, name, from)
-	if not shouldContinue or not releasedNameAndOwner then
+	end, primaryNames.removePrimaryNames, names, from)
+	if not shouldContinue or not removedPrimaryNamesAndOwners then
 		return
 	end
 
 	ao.send({
 		Target = msg.From,
-		Action = ActionMap.ReleasePrimaryName .. "-Notice",
-		Data = json.encode(releasedNameAndOwner),
+		Action = ActionMap.RemovePrimaryNames .. "-Notice",
+		Data = json.encode(removedPrimaryNamesAndOwners),
 	})
+
+	-- send messages to the previous owners of the primary names
+	for _, removedPrimaryNameAndOwner in pairs(removedPrimaryNamesAndOwners) do
+		ao.send({
+			Target = removedPrimaryNameAndOwner.owner,
+			Action = ActionMap.RemovePrimaryNames .. "-Notice",
+			Tags = { Name = removedPrimaryNameAndOwner.name },
+			Data = json.encode(removedPrimaryNameAndOwner),
+		})
+	end
 end)
 
 addEventingHandler(

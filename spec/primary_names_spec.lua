@@ -166,33 +166,78 @@ describe("Primary Names", function()
 		end)
 	end)
 
-	describe("releasePrimaryName", function()
-		it("should fail if the caller is not the owner of the primary name", function()
-			local status, err = pcall(primaryNames.releasePrimaryName, "test", "owner")
+	describe("removePrimaryName", function()
+		it("should fail if the primary name does not exist", function()
+			local status, err = pcall(primaryNames.removePrimaryName, "test", "owner")
+			assert.is_false(status)
+			assert.match("Primary name 'test' does not exist", err)
+		end)
+
+		it("should fail if the caller is not the owner of the primary name or the owner of the base name", function()
+			_G.NameRegistry.records = {
+				["test"] = {
+					processId = "base-name-owner",
+				},
+			}
+			_G.PrimaryNames = {
+				owners = {
+					["owner"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
+				},
+				names = {
+					["test"] = "owner",
+				},
+			}
+			local status, err = pcall(primaryNames.removePrimaryName, "test", "owner2")
 			assert.is_false(status)
 			assert.match("Caller is not the owner of the primary name", err)
 		end)
 
-		it("should release the primary name", function()
+		it("should remove the primary name when the caller is the owner of the primary name", function()
+			_G.NameRegistry.records = {
+				["test"] = {
+					processId = "base-name-owner",
+				},
+			}
 			_G.PrimaryNames = {
 				owners = {
-					["owner"] = { name = "test", startTimestamp = 1234567890 },
+					["owner"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
 				},
 				names = {
 					["test"] = "owner",
 				},
 				claims = {},
 			}
-			local releasedNameAndOwner = primaryNames.releasePrimaryName("test", "owner")
+			local releasedNameAndOwner = primaryNames.removePrimaryName("test", "owner")
 			assert.are.same(nil, _G.PrimaryNames.owners["owner"])
 			assert.are.same(nil, _G.PrimaryNames.names["test"])
 			assert.are.same({
-				releasedName = {
-					name = "test",
-					startTimestamp = 1234567890,
-				},
-				releasedOwner = "owner",
+				name = "test",
+				owner = "owner",
 			}, releasedNameAndOwner)
+		end)
+
+		it("should remove the primary name when the caller is the owner of the base name", function()
+			_G.NameRegistry.records = {
+				["test"] = {
+					processId = "base-name-owner",
+				},
+			}
+			_G.PrimaryNames = {
+				owners = {
+					["owner"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
+				},
+				names = {
+					["test"] = "owner",
+				},
+				claims = {},
+			}
+			local removedNameAndOwner = primaryNames.removePrimaryName("test", "base-name-owner")
+			assert.are.same(nil, _G.PrimaryNames.owners["owner"])
+			assert.are.same(nil, _G.PrimaryNames.names["test"])
+			assert.are.same({
+				name = "test",
+				owner = "owner",
+			}, removedNameAndOwner)
 		end)
 	end)
 
@@ -244,8 +289,51 @@ describe("Primary Names", function()
 		end)
 	end)
 
+	describe("removePrimaryNames", function()
+		it("should remove all primary names for the given names when from is owner of the base name", function()
+			_G.NameRegistry.records = {
+				["test"] = {
+					processId = "base-name-owner",
+				},
+			}
+			_G.PrimaryNames = {
+				owners = {
+					["primary-name-owner"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
+					["primary-name-owner2"] = {
+						name = "undername_test",
+						startTimestamp = 1234567890,
+						baseName = "test",
+					},
+					["primary-name-owner3"] = {
+						name = "undername2_test",
+						startTimestamp = 1234567890,
+						baseName = "test",
+					},
+				},
+				names = {
+					["test"] = "primary-name-owner",
+					["undername_test"] = "primary-name-owner2",
+					["undername2_test"] = "primary-name-owner3",
+				},
+				claims = {},
+			}
+			local removedPrimaryNamesAndOwners =
+				primaryNames.removePrimaryNames({ "test", "undername_test", "undername2_test" }, "base-name-owner")
+			assert.are.same({
+				{ name = "test", owner = "primary-name-owner" },
+				{ name = "undername_test", owner = "primary-name-owner2" },
+				{ name = "undername2_test", owner = "primary-name-owner3" },
+			}, removedPrimaryNamesAndOwners)
+		end)
+	end)
+
 	describe("removePrimaryNamesForBaseName", function()
 		it("should remove all primary names with the given apex name", function()
+			_G.NameRegistry.records = {
+				["test"] = {
+					processId = "base-name-owner",
+				},
+			}
 			_G.PrimaryNames = {
 				owners = {
 					["owner"] = { name = "undername_test", startTimestamp = 1234567890, baseName = "test" },
