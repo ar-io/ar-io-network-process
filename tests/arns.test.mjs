@@ -1588,6 +1588,7 @@ describe('ArNS', async () => {
 
     describe('with a buy record', () => {
       let buyRecordResult;
+      const buyRecordEndTimestamp = 1751524800000;
       before(async () => {
         buyRecordResult = await handle(
           {
@@ -1614,7 +1615,7 @@ describe('ArNS', async () => {
           processId: ''.padEnd(43, 'a'),
           purchasePrice: baseLeasePrice * 0.8,
           startTimestamp: afterDistributionTimestamp,
-          endTimestamp: 1751524800000,
+          endTimestamp: buyRecordEndTimestamp,
           name: 'great-name',
           undernameLimit: 10,
         });
@@ -1717,7 +1718,7 @@ describe('ArNS', async () => {
         assert.deepEqual(record, {
           processId: ''.padEnd(43, 'a'),
           purchasePrice: baseLeasePrice * 0.8,
-          endTimestamp: 1751524800000,
+          endTimestamp: buyRecordEndTimestamp,
           startTimestamp: afterDistributionTimestamp,
           undernameLimit: 30,
           type: 'lease',
@@ -1732,6 +1733,84 @@ describe('ArNS', async () => {
           balancesAfter[joinedGateway],
           balancesBefore[joinedGateway] - expectedCost,
         );
+      });
+
+      describe('when the record has been expired', () => {
+        let expiredRecordMemory;
+        const expiredRecordTimestamp =
+          buyRecordEndTimestamp + 1000 * 60 * 60 * 24 * 14 + 1; // 14 days after the record has expired
+        before(async () => {
+          const tickResult = await handle(
+            {
+              Tags: [{ name: 'Action', value: 'Tick' }],
+              Timestamp: expiredRecordTimestamp,
+            },
+            buyRecordResult.Memory,
+          );
+          expiredRecordMemory = tickResult.Memory;
+        });
+
+        const baseAuctionPrice = 30_000_000_000;
+        it('should show ArNS discount on auctionPrices', async () => {
+          const result = await handle(
+            {
+              From: joinedGateway,
+              Owner: joinedGateway,
+              Tags: [
+                { name: 'Action', value: 'Auction-Prices' },
+                { name: 'Name', value: 'great-name' },
+                { name: 'Purchase-Type', value: 'lease' },
+              ],
+              Timestamp: expiredRecordTimestamp,
+            },
+            expiredRecordMemory,
+          );
+
+          const { currentPrice, discounts } = JSON.parse(
+            result.Messages[0].Data,
+          );
+          assert.equal(currentPrice, baseAuctionPrice);
+          assert.deepEqual(discounts, [
+            {
+              name: 'ArNS Discount',
+              multiplier: 0.2,
+            },
+          ]);
+        });
+
+        it('should include ArNS discount on submitAuctionBid', async () => {
+          const transferMemory = await transfer({
+            recipient: joinedGateway,
+            quantity: baseAuctionPrice,
+            timestamp: expiredRecordTimestamp - 1,
+            memory: expiredRecordMemory,
+          });
+          const result = await handle(
+            {
+              From: joinedGateway,
+              Owner: joinedGateway,
+              Tags: [
+                { name: 'Action', value: 'Auction-Bid' },
+                { name: 'Name', value: 'great-name' },
+                { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+                { name: 'Purchase-Type', value: 'lease' },
+              ],
+              Timestamp: expiredRecordTimestamp,
+            },
+            transferMemory,
+          );
+
+          const record = JSON.parse(result.Messages[0].Data);
+          assert.deepEqual(record, {
+            name: 'great-name',
+            processId: ''.padEnd(43, 'a'),
+            purchasePrice: baseAuctionPrice * 0.8,
+            startTimestamp: expiredRecordTimestamp,
+            undernameLimit: 10,
+            type: 'lease',
+            endTimestamp: 1784270400001,
+          });
+        });
       });
     });
   });
