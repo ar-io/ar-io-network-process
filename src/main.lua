@@ -58,7 +58,6 @@ local ActionMap = {
 	Records = "Records",
 	ReservedNames = "Reserved-Names",
 	ReservedName = "Reserved-Name",
-	--- @deprecated -- use getCostDetailsForAction
 	TokenCost = "Token-Cost",
 	GetCostDetailsForAction = "Get-Cost-Details-For-Action",
 	GetRegistrationFees = "Get-Registration-Fees",
@@ -1043,7 +1042,6 @@ addEventingHandler(
 )
 
 addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.TokenCost), function(msg)
-	local fundFrom = msg.Tags["Fund-From"]
 	local checkAssertions = function()
 		local intentType = msg.Tags.Intent
 		local validIntents =
@@ -1063,7 +1061,6 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 		if msg.Tags.Quantity then
 			assert(utils.isInteger(tonumber(msg.Tags.Quantity)), "Invalid quantity. Must be integer greater than 0")
 		end
-		assertValidFundFrom(fundFrom)
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -1102,26 +1099,10 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 	end
 	local tokenCost = tokenCostResult.tokenCost
 
-	local shouldContinue3, fundingPlan = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Invalid-Token-Cost" },
-			Data = tostring(error),
-		})
-	end, gar.getFundingPlan, msg.From, tokenCost, fundFrom)
-	if not shouldContinue3 then
-		return
-	end
-
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(tokenCost) },
-		Data = fundFrom and json.encode({
-				tokenCost = tokenCost,
-				fundingPlan = fundingPlan,
-			})
-			-- maintain backwards compatibility with the previous response format
-			or json.encode(tokenCost),
+		Data = json.encode(tokenCost),
 	})
 end)
 
