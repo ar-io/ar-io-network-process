@@ -58,7 +58,9 @@ local ActionMap = {
 	Records = "Records",
 	ReservedNames = "Reserved-Names",
 	ReservedName = "Reserved-Name",
+	--- @deprecated -- use getCostDetailsForAction
 	TokenCost = "Token-Cost",
+	GetCostDetailsForAction = "Get-Cost-Details-For-Action",
 	GetRegistrationFees = "Get-Registration-Fees",
 	-- GATEWAY REGISTRY READ APIS
 	Gateway = "Gateway",
@@ -1099,7 +1101,6 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 		return
 	end
 	local tokenCost = tokenCostResult.tokenCost
-	local discounts = tokenCostResult.discounts
 
 	local shouldContinue3, fundingPlan = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
@@ -1112,24 +1113,107 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 		return
 	end
 
-	local data
-	if fundFrom ~= nil or discounts ~= nil then
-		data = {
-			tokenCost = tokenCost,
-			fundingPlan = fundFrom and fundingPlan or nil,
-			discounts = discounts,
-		}
-	else
-		-- Return backwards compatible tokenCost if no fundFrom or discounts
-		data = tokenCost
-	end
-
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(tokenCost) },
-		Data = json.encode(data),
+		Data = fundFrom and json.encode({
+				tokenCost = tokenCost,
+				fundingPlan = fundingPlan,
+			})
+			-- maintain backwards compatibility with the previous response format
+			or json.encode(tokenCost),
 	})
 end)
+
+addEventingHandler(
+	ActionMap.GetCostDetailsForAction,
+	utils.hasMatchingTag("Action", ActionMap.GetCostDetailsForAction),
+	function(msg)
+		local fundFrom = msg.Tags["Fund-From"]
+		local checkAssertions = function()
+			local intentType = msg.Tags.Intent
+			local validIntents = utils.createLookupTable({
+				ActionMap.BuyRecord,
+				ActionMap.ExtendLease,
+				ActionMap.IncreaseUndernameLimit,
+			})
+			assert(
+				type(intentType) == "string",
+				validIntents[intentType],
+				"Intent must be valid registry interaction (e.g. BuyRecord, ExtendLease, IncreaseUndernameLimit). Provided intent: "
+					.. (intentType or "nil")
+			)
+			-- if years is provided, assert it is a number and integer between 1 and 5
+			if msg.Tags.Years then
+				assert(utils.isInteger(tonumber(msg.Tags.Years)), "Invalid years. Must be integer between 1 and 5")
+			end
+
+			-- if quantity provided must be a number and integer greater than 0
+			if msg.Tags.Quantity then
+				assert(utils.isInteger(tonumber(msg.Tags.Quantity)), "Invalid quantity. Must be integer greater than 0")
+			end
+			assertValidFundFrom(fundFrom)
+		end
+
+		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Bad-Input" },
+				Data = tostring(error),
+			})
+		end, checkAssertions)
+		if not shouldContinue then
+			return
+		end
+
+		local shouldContinue2, tokenCostResult = eventingPcall(
+			msg.ioEvent,
+			function(error)
+				ao.send({
+					Target = msg.From,
+					Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Invalid-Token-Cost" },
+					Data = tostring(error),
+				})
+			end,
+			arns.getTokenCost,
+			{
+				intent = msg.Tags.Intent,
+				name = string.lower(msg.Tags.Name),
+				years = tonumber(msg.Tags.Years) or 1,
+				quantity = tonumber(msg.Tags.Quantity),
+				purchaseType = msg.Tags["Purchase-Type"] or "lease",
+				currentTimestamp = tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp),
+				from = msg.From,
+			}
+		)
+		if not shouldContinue2 or tokenCostResult == nil then
+			return
+		end
+		local tokenCost = tokenCostResult.tokenCost
+		local discounts = tokenCostResult.discounts
+
+		local shouldContinue3, fundingPlan = eventingPcall(msg.ioEvent, function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Invalid-Token-Cost" },
+				Data = tostring(error),
+			})
+		end, gar.getFundingPlan, msg.From, tokenCost, fundFrom)
+		if not shouldContinue3 then
+			return
+		end
+
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(tokenCost) },
+			Data = json.encode({
+				tokenCost = tokenCost,
+				fundingPlan = fundFrom and fundingPlan or nil,
+				discounts = discounts,
+			}),
+		})
+	end
+)
 
 addEventingHandler(
 	ActionMap.GetRegistrationFees,

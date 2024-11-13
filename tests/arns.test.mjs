@@ -1560,7 +1560,7 @@ describe('ArNS', async () => {
       const result = await handle(
         {
           Tags: [
-            { name: 'Action', value: 'Token-Cost' },
+            { name: 'Action', value: 'Get-Cost-Details-For-Action' },
             { name: 'Intent', value: 'Buy-Record' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },

@@ -337,7 +337,7 @@ end
 ---Calculates the registration fee for a given purchase type, base fee, years, and demand factor
 --- @param purchaseType string The purchase type (lease/permabuy)
 --- @param baseFee number The base fee for the name
---- @param years number The number of years, may be empty for permabuy
+--- @param years number|nil The number of years, may be empty for permabuy
 --- @param demandFactor number The demand factor
 --- @return number The registration fee
 function arns.calculateRegistrationFee(purchaseType, baseFee, years, demandFactor)
