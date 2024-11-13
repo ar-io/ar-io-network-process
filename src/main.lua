@@ -973,9 +973,9 @@ addEventingHandler(
 		local fundFrom = msg.Tags["Fund-From"]
 		local checkAssertions = function()
 			assert(type(msg.Tags.Name) == "string", "Invalid name")
-			assert(msg.Tags.Quantity, "Must provide a quantity")
 			assert(
-				tonumber(msg.Tags.Quantity) > 0
+				msg.Tags.Quantity
+					and tonumber(msg.Tags.Quantity) > 0
 					and tonumber(msg.Tags.Quantity) < 9990
 					and utils.isInteger(msg.Tags.Quantity),
 				"Invalid quantity. Must be an integer value greater than 0 and less than 9990"
