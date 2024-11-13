@@ -2989,6 +2989,17 @@ addEventingHandler("auctionPrices", utils.hasMatchingTag("Action", ActionMap.Auc
 
 	local currentPrice = auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
 	local prices = auction:computePricesForAuction(type, years, intervalMs)
+
+	local isEligibleForArNSDiscount = gar.isEligibleForArNSDiscount(msg.From)
+	local discounts = {}
+
+	if isEligibleForArNSDiscount then
+		table.insert(discounts, {
+			name = constants.ARNS_DISCOUNT_NAME,
+			multiplier = constants.ARNS_DISCOUNT_PERCENTAGE,
+		})
+	end
+
 	local jsonPrices = {}
 	for k, v in pairs(prices) do
 		jsonPrices[tostring(k)] = v
@@ -3003,6 +3014,7 @@ addEventingHandler("auctionPrices", utils.hasMatchingTag("Action", ActionMap.Auc
 			years = years,
 			prices = jsonPrices,
 			currentPrice = currentPrice,
+			discounts = discounts,
 		}),
 	})
 end)

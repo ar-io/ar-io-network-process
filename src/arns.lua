@@ -527,7 +527,7 @@ function arns.getTokenCost(intendedAction)
 	if gar.isEligibleForArNSDiscount(intendedAction.from) then
 		local discountTotal = math.floor(tokenCost * constants.ARNS_DISCOUNT_PERCENTAGE)
 		local discount = {
-			name = "ArNS Discount",
+			name = constants.ARNS_DISCOUNT_NAME,
 			discountTotal = discountTotal,
 			multiplier = constants.ARNS_DISCOUNT_PERCENTAGE,
 		}
@@ -696,19 +696,21 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 		timestamp >= auction.startTimestamp and timestamp <= auction.endTimestamp,
 		"Bid timestamp is outside of auction start and end timestamps"
 	)
+	print("timestamp" .. timestamp)
 	local requiredBid = auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
 	local floorPrice = auction:floorPrice(type, years) -- useful for analytics, used by getPriceForAuctionAtTimestamp
 	local startPrice = auction:startPrice(type, years) -- useful for analytics, used by getPriceForAuctionAtTimestamp
 	local requiredOrBidAmount = bidAmount or requiredBid
-	assert(requiredOrBidAmount >= requiredBid, "Bid amount is less than the required bid of " .. requiredBid)
 
-	local finalBidAmount = math.min(requiredOrBidAmount, requiredBid)
+	local finalBidAmount = requiredBid
 
 	-- check if bidder is eligible for ArNS discount
 	if gar.isEligibleForArNSDiscount(bidder) then
 		local discount = math.floor(finalBidAmount * constants.ARNS_DISCOUNT_PERCENTAGE)
 		finalBidAmount = finalBidAmount - discount
 	end
+
+	assert(requiredOrBidAmount >= requiredBid, "Bid amount is less than the required bid of " .. requiredBid)
 
 	-- check the balance of the bidder
 	assert(balances.walletHasSufficientBalance(bidder, finalBidAmount), "Insufficient balance")
