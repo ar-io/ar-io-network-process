@@ -432,7 +432,6 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 			"Invalid quantity. Must be integer greater than 0"
 		)
 	end
-	print("from: " .. msg.From)
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
