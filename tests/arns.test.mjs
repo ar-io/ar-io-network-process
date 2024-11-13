@@ -6,6 +6,7 @@ import {
   transfer,
   joinNetwork,
   setUpStake,
+  getBalances,
 } from './helpers.mjs';
 import assert from 'node:assert';
 import {
@@ -1514,18 +1515,6 @@ describe('ArNS', async () => {
   // TODO: add several error scenarios
 
   describe('ArNS Discount Eligible Gateways', () => {
-    const getBalances = async ({ memory }) => {
-      const result = await handle(
-        {
-          Tags: [{ name: 'Action', value: 'Balances' }],
-        },
-        memory,
-      );
-
-      const balances = JSON.parse(result.Messages?.[0]?.Data);
-      return balances;
-    };
-
     const joinedGateway = 'joined-unique-gateway-'.padEnd(43, '0');
     const firstEpochTimestamp = 1719900000000;
     const afterDistributionTimestamp =

@@ -33,6 +33,18 @@ export function assertNoResultError(result) {
   assert.strictEqual(errorTag, undefined);
 }
 
+export const getBalances = async ({ memory }) => {
+  const result = await handle(
+    {
+      Tags: [{ name: 'Action', value: 'Balances' }],
+    },
+    memory,
+  );
+
+  const balances = JSON.parse(result.Messages?.[0]?.Data);
+  return balances;
+};
+
 export const transfer = async ({
   recipient = STUB_ADDRESS,
   quantity = initialOperatorStake,

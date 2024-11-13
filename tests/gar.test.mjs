@@ -4,6 +4,7 @@ import {
   joinNetwork,
   startMemory,
   transfer,
+  getBalances,
 } from './helpers.mjs';
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
@@ -57,18 +58,6 @@ describe('GatewayRegistry', async () => {
       result: delegateResult,
       memory: delegateResult.Memory,
     };
-  };
-
-  const getBalances = async ({ memory }) => {
-    const result = await handle(
-      {
-        Tags: [{ name: 'Action', value: 'Balances' }],
-      },
-      memory,
-    );
-
-    const balances = JSON.parse(result.Messages?.[0]?.Data);
-    return balances;
   };
 
   const getGateway = async ({
