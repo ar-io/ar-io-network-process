@@ -433,7 +433,7 @@ function arns.getMaxAllowedYearsExtensionForRecord(record, currentTimestamp)
 end
 
 --- Gets the registration fees for all name lengths and years
---- @return table A table containing registration fees for each name length, with the following structure:
+--- @return table registrationFees A table containing registration fees for each name length, with the following structure:
 ---   - [nameLength]: table The fees for names of this length
 ---     - lease: table Lease fees by year
 ---       - ["1"]: number Cost for 1 year lease
@@ -460,17 +460,8 @@ function arns.getRegistrationFees()
 	return fees
 end
 
----@class IntendedAction
----@field purchaseType string|nil The type of purchase (lease/permabuy)
----@field years number|nil The number of years for lease
----@field quantity number|nil The quantity for increasing undername limit
----@field name string The name of the record
----@field intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name)
----@field currentTimestamp number The current timestamp
----@field from string|nil The target address of the intended action
-
 ---@class Discount
----@field name string The name of the discount
+---@field discountName string The name of the discount
 ---@field discountedCost number The discounted cost
 ---@field multiplier number The multiplier for the discount
 
@@ -478,16 +469,17 @@ end
 ---@field tokenCost number The token cost in mIO of the intended action
 ---@field discounts table|nil The discounts applied to the token cost
 
---- Gets the token cost for an intended action
---- @param intendedAction IntendedAction The intended action with fields:
----   - purchaseType string|nil The type of purchase (lease/permabuy)
----   - years number|nil The number of years for lease
----   - quantity number|nil The quantity for increasing undername limit
----   - name string The name of the record
----   - intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name)
----   - currentTimestamp number The current timestamp
----   - from string|nil The target address of the intended action
---- @return TokenCostResult The token cost in mIO of the intended action
+--- @class IntendedAction
+--- @field purchaseType string|nil The type of purchase (lease/permabuy)
+--- @field years number|nil The number of years for lease
+--- @field quantity number|nil The quantity for increasing undername limit
+--- @field name string The name of the record
+--- @field intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name)
+--- @field currentTimestamp number The current timestamp
+--- @field from string|nil The target address of the intended action
+
+--- @param intendedAction IntendedAction The intended action to get token cost for
+--- @return TokenCostResult tokenCostResult The token cost result of the intended action
 function arns.getTokenCost(intendedAction)
 	local tokenCost = 0
 	local purchaseType = intendedAction.purchaseType
@@ -504,6 +496,8 @@ function arns.getTokenCost(intendedAction)
 	if intent == "Buy-Record" then
 		-- stub the process id as it is not required for this intent
 		local processId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+		assert(years, "Years is required")
+		assert(purchaseType, "Purchase type is required")
 		arns.assertValidBuyRecord(name, years, purchaseType, processId)
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
 	elseif intent == "Extend-Lease" then
