@@ -900,6 +900,24 @@ describe("arns", function()
 		end)
 	end)
 
+	describe("getCostDetailsForAction", function()
+		it("should match getTokenCost logic but with { tokenCost: number, discounts: table } shape", function()
+			local baseFee = 500000000
+			local years = 2
+			local demandFactor = 0.974
+			local expectedCost = math.floor((years * baseFee * 0.20) + baseFee) * demandFactor
+			local intendedAction = {
+				intent = "Buy-Record",
+				purchaseType = "lease",
+				years = 2,
+				name = "test-name",
+				currentTimestamp = timestamp,
+			}
+			_G.DemandFactor.currentDemandFactor = demandFactor
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
+		end)
+	end)
+
 	describe("pruneRecords", function()
 		it("should prune records and create auctions for expired leased records", function()
 			local currentTimestamp = 2000000000
