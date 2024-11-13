@@ -696,7 +696,6 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 		timestamp >= auction.startTimestamp and timestamp <= auction.endTimestamp,
 		"Bid timestamp is outside of auction start and end timestamps"
 	)
-	print("timestamp" .. timestamp)
 	local requiredBid = auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
 	local floorPrice = auction:floorPrice(type, years) -- useful for analytics, used by getPriceForAuctionAtTimestamp
 	local startPrice = auction:startPrice(type, years) -- useful for analytics, used by getPriceForAuctionAtTimestamp
