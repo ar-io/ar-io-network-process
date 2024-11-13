@@ -1118,7 +1118,7 @@ end
 
 function gar.isEligibleForArNSDiscount(from)
 	local gateway = gar.getGatewayUnsafe(from)
-	if gateway == nil or gateway.weights == nil then
+	if gateway == nil or gateway.weights == nil or gar.isGatewayLeaving(gateway) then
 		return false
 	end
 
