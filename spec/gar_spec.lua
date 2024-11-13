@@ -2057,6 +2057,7 @@ describe("gar", function()
 				tenureWeight = 1,
 				gatewayRewardRatioWeight = 0.85,
 			}
+			_G.GatewayRegistry[stubRandomAddress].status = "joined"
 			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
 			assert.is_true(result)
 		end)
