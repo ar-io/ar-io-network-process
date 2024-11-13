@@ -857,7 +857,8 @@ function gar.slashOperatorStake(address, slashAmount, currentTimestamp)
 
 	gateway.operatorStake = gateway.operatorStake - slashAmount
 	gateway.slashings = gateway.slashings or {}
-	gateway.slashings[currentTimestamp] = slashAmount
+	-- TODO: consider using message id as the key instead of timestamp
+	gateway.slashings[tostring(currentTimestamp)] = slashAmount
 	balances.increaseBalance(ao.id, slashAmount)
 	GatewayRegistry[address] = gateway
 	-- TODO: send slash notice to gateway address

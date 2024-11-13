@@ -304,19 +304,19 @@ end, function(msg)
 			msg.ioEvent:addField("Pruned-Records-Count", prunedRecordsCount)
 			msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
 		end
-		local newGracePeriodRecordsCount = utils.lengthOfTable(resultOrError.newGracePeriodRecords or {})
-		if newGracePeriodRecordsCount > 0 then
-			local newGracePeriodRecordNames = {}
-			for name, record in pairs(resultOrError.newGracePeriodRecords) do
-				table.insert(newGracePeriodRecordNames, name)
-				if record.endTimestamp > LastGracePeriodEntryEndTimestamp then
-					LastGracePeriodEntryEndTimestamp = record.endTimestamp
-				end
-			end
-			msg.ioEvent:addField("New-Grace-Period-Records", newGracePeriodRecordNames)
-			msg.ioEvent:addField("New-Grace-Period-Records-Count", newGracePeriodRecordsCount)
-			msg.ioEvent:addField("Last-Grace-Period-Entry-End-Timestamp", LastGracePeriodEntryEndTimestamp)
-		end
+		-- local newGracePeriodRecordsCount = utils.lengthOfTable(resultOrError.newGracePeriodRecords or {})
+		-- if newGracePeriodRecordsCount > 0 then
+		-- 	local newGracePeriodRecordNames = {}
+		-- 	for name, record in pairs(resultOrError.newGracePeriodRecords) do
+		-- 		table.insert(newGracePeriodRecordNames, name)
+		-- 		if record.endTimestamp > LastGracePeriodEntryEndTimestamp then
+		-- 			LastGracePeriodEntryEndTimestamp = record.endTimestamp
+		-- 		end
+		-- 	end
+		-- 	msg.ioEvent:addField("New-Grace-Period-Records", newGracePeriodRecordNames)
+		-- 	msg.ioEvent:addField("New-Grace-Period-Records-Count", newGracePeriodRecordsCount)
+		-- 	msg.ioEvent:addField("Last-Grace-Period-Entry-End-Timestamp", LastGracePeriodEntryEndTimestamp)
+		-- end
 		local prunedAuctions = resultOrError.prunedAuctions or {}
 		local prunedAuctionsCount = utils.lengthOfTable(prunedAuctions)
 		if prunedAuctionsCount > 0 then
