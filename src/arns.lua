@@ -496,8 +496,6 @@ function arns.getTokenCost(intendedAction)
 	if intent == "Buy-Record" then
 		-- stub the process id as it is not required for this intent
 		local processId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-		assert(years, "Years is required")
-		assert(purchaseType, "Purchase type is required")
 		arns.assertValidBuyRecord(name, years, purchaseType, processId)
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
 	elseif intent == "Extend-Lease" then
