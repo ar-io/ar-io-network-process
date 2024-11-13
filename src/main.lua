@@ -99,7 +99,7 @@ local ActionMap = {
 	ReleasePrimaryName = "Release-Primary-Name",
 	CreatePrimaryNameClaim = "Create-Primary-Name-Claim",
 	ClaimPrimaryName = "Claim-Primary-Name",
-	GetPrimaryNames = "Get-Primary-Names",
+	PrimaryNames = "Primary-Names",
 	PrimaryName = "Primary-Name",
 }
 
@@ -3229,7 +3229,7 @@ addEventingHandler("getPrimaryNameData", utils.hasMatchingTag("Action", ActionMa
 	})
 end)
 
-addEventingHandler("getPaginatedPrimaryNames", utils.hasMatchingTag("Action", ActionMap.GetPrimaryNames), function(msg)
+addEventingHandler("getPaginatedPrimaryNames", utils.hasMatchingTag("Action", ActionMap.PrimaryNames), function(msg)
 	local page = utils.parsePaginationTags(msg)
 	local status, result = pcall(
 		primaryNames.getPaginatedPrimaryNames,
@@ -3242,7 +3242,7 @@ addEventingHandler("getPaginatedPrimaryNames", utils.hasMatchingTag("Action", Ac
 	if not status or not result then
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.GetPrimaryNames .. "-Notice", Error = "Bad-Input" },
+			Tags = { Action = "Invalid-" .. ActionMap.PrimaryNames .. "-Notice", Error = "Bad-Input" },
 			Data = tostring(error),
 		})
 		return
@@ -3250,7 +3250,7 @@ addEventingHandler("getPaginatedPrimaryNames", utils.hasMatchingTag("Action", Ac
 
 	return ao.send({
 		Target = msg.From,
-		Action = ActionMap.GetPrimaryNames .. "-Notice",
+		Action = ActionMap.PrimaryNames .. "-Notice",
 		Data = json.encode(result),
 	})
 end)

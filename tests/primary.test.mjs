@@ -59,18 +59,15 @@ describe('primary names', function () {
   };
 
   const claimPrimaryName = async ({ name, recipient, timestamp, memory }) => {
-    const claimPrimaryNameResult = await handle(
-      {
-        From: recipient,
-        Owner: recipient,
-        Timestamp: timestamp,
-        Tags: [
-          { name: 'Action', value: 'Claim-Primary-Name' },
-          { name: 'Name', value: name },
-        ],
-      },
-      memory,
-    );
+    const claimPrimaryNameResult = await handle({
+      From: recipient,
+      Owner: recipient,
+      Timestamp: timestamp,
+      Tags: [
+        { name: 'Action', value: 'Claim-Primary-Name' },
+        { name: 'Name', value: name },
+      ],
+    });
     assertNoResultError(claimPrimaryNameResult);
     return {
       result: claimPrimaryNameResult,
@@ -212,7 +209,7 @@ describe('primary names', function () {
     it('should return all primary names', async function () {
       const getPaginatedPrimaryNamesResult = await handle({
         Tags: [
-          { name: 'Action', value: 'Get-Primary-Names' },
+          { name: 'Action', value: 'Primary-Names' },
           { name: 'Limit', value: 10 },
           { name: 'Sort-By', value: 'owner' },
           { name: 'Sort-Order', value: 'asc' },
