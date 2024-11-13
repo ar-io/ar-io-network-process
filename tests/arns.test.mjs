@@ -418,7 +418,7 @@ describe('ArNS', async () => {
           From: STUB_ADDRESS,
           Owner: STUB_ADDRESS,
           Tags: [
-            { name: 'Action', value: 'Token-Cost' },
+            { name: 'Action', value: 'Get-Cost-Details-For-Action' },
             { name: 'Intent', value: 'Buy-Record' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
