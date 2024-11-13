@@ -760,8 +760,9 @@ describe('Tick', async () => {
     assert.equal(baseFeeAtZeroEpoch, 600_000_000);
 
     let tickMemory = zeroEpochTick.Memory;
-    // Tick to the forth epoch,
-    for (let i = 0; i < 4; i++) {
+
+    // Tick to the epoch where demandFactor is 0.5
+    for (let i = 0; i <= 49; i++) {
       const epochTimestamp = genesisEpochStart + (epochDurationMs + 1) * i;
       const { Memory } = await handle(
         {
@@ -773,12 +774,24 @@ describe('Tick', async () => {
         },
         tickMemory,
       );
-
       tickMemory = Memory;
+
+      if (i === 45) {
+        const demandFactor = await getDemandFactor(tickMemory);
+        assert.equal(demandFactor, 0.50655939255251769548);
+      }
+
+      if ([46, 47, 48].includes(i)) {
+        const demandFactor = await getDemandFactor(tickMemory);
+        assert.equal(demandFactor, 0.5);
+      }
     }
 
+    const demandFactorAfterFeeAdjustment = await getDemandFactor(tickMemory);
     const baseFeeAfterConsecutiveTicksWithNoPurchases =
       await getBaseRegistrationFee(tickMemory);
-    assert.equal(baseFeeAfterConsecutiveTicksWithNoPurchases, 573_402_975);
+
+    assert.equal(demandFactorAfterFeeAdjustment, 1);
+    assert.equal(baseFeeAfterConsecutiveTicksWithNoPurchases, 300_000_000);
   });
 });
