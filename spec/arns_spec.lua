@@ -867,17 +867,6 @@ describe("arns", function()
 	end)
 
 	describe("auctions", function()
-		before_each(function()
-			_G.NameRegistry.records["test-name"] = {
-				endTimestamp = nil,
-				processId = "test-process-id",
-				purchasePrice = 600000000,
-				startTimestamp = 0,
-				type = "permabuy",
-				undernameLimit = 10,
-			}
-		end)
-
 		describe("createAuction", function()
 			it("should create an auction and remove any existing record", function()
 				local auction = arns.createAuction("test-name", 1000000, "test-initiator")
@@ -914,6 +903,20 @@ describe("arns", function()
 				local status, error = pcall(arns.createAuction, "test-name", 1000000, "test-initiator")
 				assert.is_false(status)
 				assert.match("Name is reserved. Auctions can only be created for unregistered names.", error)
+			end)
+
+			it("should throw an error if the name is registered", function()
+				_G.NameRegistry.records["test-name"] = {
+					endTimestamp = nil,
+					processId = "test-process-id",
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "permabuy",
+					undernameLimit = 10,
+				}
+				local status, error = pcall(arns.createAuction, "test-name", 1000000, "test-initiator")
+				assert.is_false(status)
+				assert.match("Name is registered. Auctions can only be created for unregistered names.", error)
 			end)
 		end)
 

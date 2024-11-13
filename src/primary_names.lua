@@ -198,7 +198,7 @@ end
 ---Finds all primary names with a given apex name
 --- @param baseName string -- the base name to find primary names for (e.g. "test" to find "undername_test")
 --- @return PrimaryNameWithOwner[]
-function primaryNames.findPrimaryNamesForBaseName(baseName)
+function primaryNames.getPrimaryNamesForBaseName(baseName)
 	local primaryNamesForArNSName = {}
 	local unsafePrimaryNames = PrimaryNames.names -- TODO: unsafe copy
 	for name, _ in pairs(unsafePrimaryNames) do
@@ -223,7 +223,7 @@ end
 --- @return RemovedPrimaryName[]
 function primaryNames.removePrimaryNamesForBaseName(baseName)
 	local removedNames = {}
-	local primaryNamesForBaseName = primaryNames.findPrimaryNamesForBaseName(baseName)
+	local primaryNamesForBaseName = primaryNames.getPrimaryNamesForBaseName(baseName)
 	for _, nameForBaseName in pairs(primaryNamesForBaseName) do
 		local releasedNameAndOwner = primaryNames.releasePrimaryName(nameForBaseName.name, nameForBaseName.owner)
 		table.insert(removedNames, {

@@ -2749,6 +2749,11 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 		assert(record, "Record not found")
 		assert(record.type == "permabuy", "Only permabuy names can be released")
 		assert(record.processId == processId, "Process-Id mismatch")
+		-- TODO: throw an error here instead of allowing release and force removal of primary names? I tend to favor the protection for primary name owners.
+		assert(
+			#primaryNames.getPrimaryNamesForBaseName(name) == 0,
+			"Primary names are associated with this name. They must be removed before releasing the name."
+		)
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -2764,22 +2769,37 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 		return
 	end
 
+	-- Removes the record and primary names, then create the auction
+	---@param releasedName string
+	---@param releaseTimestamp number
+	---@param releasedInitiator string
+	local removeRecordsAndCreateAuction = function(releasedName, releaseTimestamp, releasedInitiator)
+		local removedRecord = arns.removeRecord(releasedName)
+		local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNamesForBaseName(releasedName) -- NOTE: this should be empty if there are no primary names allowed before release
+		local auction = arns.createAuction(releasedName, releaseTimestamp, releasedInitiator)
+		return {
+			removedRecord = removedRecord,
+			removedPrimaryNamesAndOwners = removedPrimaryNamesAndOwners,
+			auction = auction,
+		}
+	end
+
 	-- we should be able to create the auction here
-	local status, auctionData = eventingPcall(msg.ioEvent, function(error)
+	local status, createAuctionDataOrError = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
 			Error = "Auction-Creation-Error",
 			Data = tostring(error),
 		})
-	end, arns.createAuction, name, timestamp, initiator)
+	end, removeRecordsAndCreateAuction, name, timestamp, initiator)
 
-	if not status or not auctionData then
+	if not status or not createAuctionDataOrError then
 		ao.send({
 			Target = msg.From,
 			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
 			Error = "Auction-Creation-Error",
-			Data = tostring(auctionData),
+			Data = tostring(createAuctionDataOrError),
 		})
 		return
 	end
@@ -2787,7 +2807,9 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	-- add the auction result fields
 	addAuctionResultFields(msg.ioEvent, {
 		name = name,
-		auction = auctionData,
+		auction = createAuctionDataOrError.auction,
+		removedRecord = createAuctionDataOrError.removedRecord,
+		removedPrimaryNamesAndOwners = createAuctionDataOrError.removedPrimaryNamesAndOwners,
 	})
 
 	-- note: no change to token supply here - only on auction bids
@@ -2796,12 +2818,12 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 
 	local auction = {
 		name = name,
-		startTimestamp = auctionData.startTimestamp,
-		endTimestamp = auctionData.endTimestamp,
-		initiator = auctionData.initiator,
-		baseFee = auctionData.baseFee,
-		demandFactor = auctionData.demandFactor,
-		settings = auctionData.settings,
+		startTimestamp = createAuctionDataOrError.auction.startTimestamp,
+		endTimestamp = createAuctionDataOrError.auction.endTimestamp,
+		initiator = createAuctionDataOrError.auction.initiator,
+		baseFee = createAuctionDataOrError.auction.baseFee,
+		demandFactor = createAuctionDataOrError.auction.demandFactor,
+		settings = createAuctionDataOrError.auction.settings,
 	}
 
 	-- send to the initiator and the process that released the name

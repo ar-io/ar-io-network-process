@@ -217,7 +217,7 @@ describe("Primary Names", function()
 		end)
 	end)
 
-	describe("findPrimaryNamesForBaseName", function()
+	describe("getPrimaryNamesForBaseName", function()
 		it("should return all primary names with the given apex name", function()
 			_G.PrimaryNames = {
 				owners = {
@@ -235,7 +235,7 @@ describe("Primary Names", function()
 					["test3"] = "owner5",
 				},
 			}
-			local allPrimaryNamesForArNSName = primaryNames.findPrimaryNamesForBaseName("test")
+			local allPrimaryNamesForArNSName = primaryNames.getPrimaryNamesForBaseName("test")
 			assert.are.same({
 				{ name = "test", owner = "owner3", startTimestamp = 1234567890, baseName = "test" },
 				{ name = "undername_test", owner = "owner", startTimestamp = 1234567890, baseName = "test" },

@@ -689,9 +689,6 @@ end
 --- @param initiator string The address of the initiator of the auction
 --- @return Auction|nil The auction instance
 function arns.createAuction(name, timestamp, initiator)
-	if arns.getRecord(name) then
-		arns.removeRecord(name)
-	end
 	assert(not arns.getRecord(name), "Name is registered. Auctions can only be created for unregistered names.")
 	assert(not arns.getReservedName(name), "Name is reserved. Auctions can only be created for unregistered names.")
 	assert(not arns.getAuction(name), "Auction already exists for name")
