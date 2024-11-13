@@ -3124,6 +3124,7 @@ end)
 
 addEventingHandler("paginatedDelegations", utils.hasMatchingTag("Action", "Paginated-Delegations"), function(msg)
 	local address = utils.formatAddress(msg.Tags.Address or msg.From)
+	local page = utils.parsePaginationTags(msg)
 	local function checkAssertions()
 		assert(utils.isValidAOAddress(address), "Invalid address.")
 	end
@@ -3144,7 +3145,7 @@ addEventingHandler("paginatedDelegations", utils.hasMatchingTag("Action", "Pagin
 			Tags = { Action = "Invalid-" .. ActionMap.Delegations .. "-Notice", Error = "Pagination-Error" },
 			Data = tostring(error),
 		})
-	end, gar.getDelegations, address)
+	end, gar.getPaginatedDelegations, address, page.cursor, page.limit, page.sortBy, page.sortOrder)
 	if not shouldContinue2 then
 		return
 	end
