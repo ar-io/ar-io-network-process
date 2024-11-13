@@ -324,8 +324,9 @@ function utils.findInArray(array, predicate)
 end
 
 --- Deep copies a table
---- @param original table The table to copy
---- @return table|nil The deep copy of the table or nil if the original is nil
+--- @generic T: table|nil
+--- @param original T The table to copy
+--- @return T The deep copy of the table or nil if the original is nil
 function utils.deepCopy(original)
 	if not original then
 		return nil
