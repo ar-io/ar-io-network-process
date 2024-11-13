@@ -211,7 +211,7 @@ function primaryNames.getPrimaryNameDataWithOwnerFromName(name)
 	}
 end
 
----Finds all primary names with a given apex name
+---Finds all primary names with a given base  name
 --- @param baseName string -- the base name to find primary names for (e.g. "test" to find "undername_test")
 --- @return PrimaryNameWithOwner[]
 function primaryNames.getPrimaryNamesForBaseName(baseName)
@@ -234,7 +234,7 @@ end
 ---@field owner WalletAddress
 ---@field name ArNSName
 
---- Remove all primary names with a given apex name
+--- Remove all primary names with a given base  name
 --- @param baseName string
 --- @return RemovedPrimaryName[]
 function primaryNames.removePrimaryNamesForBaseName(baseName)

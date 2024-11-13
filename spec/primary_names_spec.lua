@@ -263,7 +263,7 @@ describe("Primary Names", function()
 	end)
 
 	describe("getPrimaryNamesForBaseName", function()
-		it("should return all primary names with the given apex name", function()
+		it("should return all primary names with the given base  name", function()
 			_G.PrimaryNames = {
 				owners = {
 					["owner"] = { name = "undername_test", startTimestamp = 1234567890, baseName = "test" },
@@ -328,7 +328,7 @@ describe("Primary Names", function()
 	end)
 
 	describe("removePrimaryNamesForBaseName", function()
-		it("should remove all primary names with the given apex name", function()
+		it("should remove all primary names with the given base  name", function()
 			_G.NameRegistry.records = {
 				["test"] = {
 					processId = "base-name-owner",
