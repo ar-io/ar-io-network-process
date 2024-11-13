@@ -98,6 +98,7 @@ local ActionMap = {
 	-- PRIMARY NAMES
 	ReleasePrimaryName = "Release-Primary-Name",
 	CreatePrimaryNameClaim = "Create-Primary-Name-Claim",
+	RevokeClaims = "Revoke-Claims",
 	ClaimPrimaryName = "Claim-Primary-Name",
 	PrimaryNames = "Primary-Names",
 	PrimaryName = "Primary-Name",
@@ -3207,6 +3208,40 @@ addEventingHandler("claimPrimaryName", utils.hasMatchingTag("Action", ActionMap.
 		Action = ActionMap.ClaimPrimaryName .. "-Notice",
 		Data = json.encode(claimPrimaryNameResult),
 	})
+end)
+
+-- revoke all claims for a given initiator
+addEventingHandler("revokeClaims", utils.hasMatchingTag("Action", ActionMap.RevokeClaims), function(msg)
+	local initiator = utils.formatAddress(msg.From)
+	local names = msg.Tags["Names"] and utils.splitAndTrimString(msg.Tags["Names"], ",") or nil
+	local shouldContinue, revokedClaimsArray = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Invalid-" .. ActionMap.RevokeClaims .. "-Notice",
+				Error = "Bad-Input",
+			},
+			Data = tostring(error),
+		})
+	end, primaryNames.revokeClaimsForInitiator, initiator, names)
+	if not shouldContinue or not revokedClaimsArray then
+		return
+	end
+
+	ao.send({
+		Target = initiator,
+		Action = ActionMap.RevokeClaims .. "-Notice",
+		Data = json.encode(revokedClaimsArray),
+	})
+
+	-- TODO: send messages to the recipients of the claims? we could index on unique recipients and send one per recipient to avoid multiple messages
+	for _, revokedClaim in ipairs(revokedClaimsArray) do
+		ao.send({
+			Target = revokedClaim.recipient,
+			Action = ActionMap.RevokeClaims .. "-Notice",
+			Data = json.encode(revokedClaim),
+		})
+	end
 end)
 
 --- Handles forward and reverse resolutions (e.g. name -> address and address -> name)

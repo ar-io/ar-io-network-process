@@ -234,6 +234,23 @@ function primaryNames.removePrimaryNamesForBaseName(baseName)
 	return removedNames
 end
 
+--- Revoke claims created by a given process id
+--- @param initiator string -- the process id to revoke claims for, validated against the initiator of the claims
+--- @param names string[] -- the names to revoke claims for, if nil all claims for the initiator will be revoked
+--- @return PrimaryNameClaim[]
+function primaryNames.revokeClaimsForInitiator(initiator, names)
+	local revokedClaims = {}
+	names = names or utils.keys(PrimaryNames.claims)
+	for _, name in pairs(names) do
+		local claim = utils.deepCopy(PrimaryNames.claims[name])
+		if claim and claim.initiator == initiator then
+			PrimaryNames.claims[name] = nil
+			table.insert(revokedClaims, claim)
+		end
+	end
+	return revokedClaims
+end
+
 --- Get paginated primary names
 --- @param cursor string|nil
 --- @param limit number

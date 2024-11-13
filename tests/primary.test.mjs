@@ -78,6 +78,25 @@ describe('primary names', function () {
     };
   };
 
+  const revokeClaims = async ({ initiator, names, memory }) => {
+    const revokeClaimsResult = await handle(
+      {
+        From: initiator,
+        Owner: initiator,
+        Tags: [
+          { name: 'Action', value: 'Revoke-Claims' },
+          { name: 'Names', value: names.join(',') },
+        ],
+      },
+      memory,
+    );
+    assertNoResultError(revokeClaimsResult);
+    return {
+      result: revokeClaimsResult,
+      memory: revokeClaimsResult.Memory,
+    };
+  };
+
   const getPrimaryNameForAddress = async ({ address, memory }) => {
     const getPrimaryNameResult = await handle(
       {
@@ -205,6 +224,60 @@ describe('primary names', function () {
       owner: recipient,
       startTimestamp: 1234567890,
       baseName: 'test-name',
+    });
+  });
+
+  it('should allow revoking claims for an initiator', async function () {
+    const processId = ''.padEnd(43, 'a');
+    const recipient = ''.padEnd(43, 'b');
+    const { memory: buyRecordMemory } = await buyRecord({
+      name: 'test-name',
+      processId,
+    });
+    // create a primary name claim
+    const { result: createClaimResult } = await createNameClaim({
+      name: 'test-name',
+      owner: processId,
+      recipient,
+      timestamp: 1234567890,
+      memory: buyRecordMemory,
+    });
+    // revoke the claim
+    const { result: revokeClaimsResult } = await revokeClaims({
+      initiator: processId,
+      names: ['test-name'],
+      memory: createClaimResult.Memory,
+    });
+
+    // assert no error
+    assertNoResultError(revokeClaimsResult);
+    // assert 2 messages sent - one to the initiator and one to the recipient
+    assert.equal(revokeClaimsResult.Messages.length, 2);
+    assert.equal(revokeClaimsResult.Messages[0].Target, processId);
+    assert.equal(revokeClaimsResult.Messages[1].Target, recipient);
+    // assert the claim was revoked
+    const revokedClaimsData = JSON.parse(revokeClaimsResult.Messages[0].Data);
+    assert.deepStrictEqual(revokedClaimsData, [
+      {
+        baseName: 'test-name',
+        endTimestamp: 3826567890,
+        initiator: processId,
+        name: 'test-name',
+        recipient,
+        startTimestamp: 1234567890,
+      },
+    ]);
+    // assert the claim was sent to the recipient
+    const recipientRevokedClaimsData = JSON.parse(
+      revokeClaimsResult.Messages[1].Data,
+    );
+    assert.deepStrictEqual(recipientRevokedClaimsData, {
+      baseName: 'test-name',
+      endTimestamp: 3826567890,
+      initiator: processId,
+      name: 'test-name',
+      recipient,
+      startTimestamp: 1234567890,
     });
   });
 
