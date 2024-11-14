@@ -158,3 +158,33 @@ export const setUpStake = async ({
     result: stakeResult,
   };
 };
+
+export const getBaseRegistrationFeeForName = async ({
+  memory,
+  timestamp,
+  name = 'great-nam',
+}) => {
+  const result = await handle(
+    {
+      Tags: [{ name: 'Action', value: 'Get-Registration-Fees' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  );
+  assertNoResultError(result);
+  return JSON.parse(result.Messages[0].Data)[name.length.toString()]['lease'][
+    '1'
+  ];
+};
+
+export const getDemandFactor = async ({ memory, timestamp }) => {
+  const result = await handle(
+    {
+      Tags: [{ name: 'Action', value: 'Demand-Factor' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  );
+  assertNoResultError(result);
+  return result.Messages[0].Data;
+};
