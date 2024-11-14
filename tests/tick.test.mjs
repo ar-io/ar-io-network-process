@@ -10,7 +10,7 @@ import {
   PROCESS_ID,
   STUB_TIMESTAMP,
 } from '../tools/constants.mjs';
-import { getBaseRegistrationFee, getDemandFactor } from './helpers.mjs';
+import { getBaseRegistrationFeeForName, getDemandFactor } from './helpers.mjs';
 
 const genesisEpochStart = 1722837600000 + 1;
 const epochDurationMs = 60 * 1000 * 60 * 24; // 24 hours
@@ -671,7 +671,7 @@ describe('Tick', async () => {
       },
       startMemory,
     );
-    const genesisFee = await getBaseRegistrationFee({
+    const genesisFee = await getBaseRegistrationFeeForName({
       memory: genesisEpochTick.Memory,
       timestamp: genesisEpochStart,
     });
@@ -715,7 +715,7 @@ describe('Tick', async () => {
       },
       buyRecordMemory,
     );
-    const feeDuringFirstEpoch = await getBaseRegistrationFee({
+    const feeDuringFirstEpoch = await getBaseRegistrationFeeForName({
       memory: firstEpochMidTick.Memory,
       timestamp: firstEpochMidTimestamp + 1,
     });
@@ -737,7 +737,7 @@ describe('Tick', async () => {
       },
       buyRecordMemory,
     );
-    const feeAfterFirstEpochEnd = await getBaseRegistrationFee({
+    const feeAfterFirstEpochEnd = await getBaseRegistrationFeeForName({
       memory: firstEpochEndTick.Memory,
       timestamp: firstEpochEndTimestamp + 1,
     });
@@ -760,7 +760,7 @@ describe('Tick', async () => {
       startMemory,
     );
 
-    const baseFeeAtZeroEpoch = await getBaseRegistrationFee({
+    const baseFeeAtZeroEpoch = await getBaseRegistrationFeeForName({
       memory: zeroEpochTick.Memory,
       timestamp: genesisEpochStart,
     });
@@ -806,7 +806,7 @@ describe('Tick', async () => {
       timestamp: afterTimestamp,
     });
     const baseFeeAfterConsecutiveTicksWithNoPurchases =
-      await getBaseRegistrationFee({
+      await getBaseRegistrationFeeForName({
         memory: tickMemory,
         timestamp: afterTimestamp,
       });
