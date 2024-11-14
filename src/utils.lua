@@ -39,8 +39,8 @@ end
 --- Slices a table
 --- @param tbl table The table to slice
 --- @param first number The first index to slice from
---- @param last number The last index to slice to
---- @param step number The step to slice by
+--- @param last number|nil The last index to slice to
+--- @param step number|nil The step to slice by
 --- @return table slicedTable - the sliced table
 function utils.slice(tbl, first, last, step)
 	local sliced = {}
@@ -65,7 +65,7 @@ function utils.parsePaginationTags(msg)
 	local cursor = msg.Tags.Cursor
 	local limit = tonumber(msg.Tags["Limit"]) or 100
 	local sortOrder = msg.Tags["Sort-Order"] and string.lower(msg.Tags["Sort-Order"]) or "desc"
-	local sortBy = msg.Tags["Sort-By"] and msg.Tags["Sort-By"]
+	local sortBy = msg.Tags["Sort-By"]
 	return {
 		cursor = cursor,
 		limit = limit,

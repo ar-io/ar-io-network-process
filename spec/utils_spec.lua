@@ -689,4 +689,34 @@ describe("utils", function()
 			assert.are.same({}, result)
 		end)
 	end)
+
+	describe("parsePaginationTags", function()
+		it("should parse pagination tags", function()
+			local tags = {
+				Tags = { Cursor = "1", Limit = "10", ["Sort-By"] = "name", ["Sort-Order"] = "asc" },
+			}
+			local result = utils.parsePaginationTags(tags)
+			assert.are.same({ cursor = "1", limit = 10, sortBy = "name", sortOrder = "asc" }, result)
+		end)
+
+		it("should handle missing tags gracefully", function()
+			local tags = { Tags = {} }
+			local result = utils.parsePaginationTags(tags)
+			assert.are.same({ cursor = nil, limit = 100, sortBy = nil, sortOrder = "desc" }, result)
+		end)
+	end)
+
+	describe("slice", function()
+		it("should slice a table from a given index to a given index by a given step", function()
+			local input = { 1, 2, 3, 4, 5 }
+			local result = utils.slice(input, 2, 4)
+			assert.are.same({ 2, 3, 4 }, result)
+		end)
+
+		it("should slice a table from a given index to the end by a given step", function()
+			local input = { 1, 2, 3, 4, 5 }
+			local result = utils.slice(input, 2, nil, 2)
+			assert.are.same({ 2, 4 }, result)
+		end)
+	end)
 end)
