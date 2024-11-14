@@ -324,15 +324,12 @@ describe('primary names', function () {
       memory: createClaimResult.Memory,
     });
 
-    console.log(claimPrimaryNameResult);
     // remove the primary name by the owner
     const { result: removePrimaryNameResult } = await removePrimaryNames({
       names: ['test-name'],
       caller: processId,
       memory: claimPrimaryNameResult.Memory,
     });
-
-    console.log(removePrimaryNameResult);
 
     // assert no error
     assertNoResultError(removePrimaryNameResult);

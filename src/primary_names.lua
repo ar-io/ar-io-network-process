@@ -56,7 +56,7 @@ function primaryNames.createNameClaim(name, recipient, initiator, timestamp)
 	assert(record, "ArNS record '" .. baseName .. "' does not exist")
 	assert(record.processId == initiator, "Caller is not the process id that owns the base name")
 
-	--- TODO: should we allow overrides of existing name claims or throw an error? I favor allowing overrides, if the ant wants to modify an existing claim it jsut resubmits
+	--- TODO: allow overrides of existing name claims or throw an error? I favor allowing overrides, if the ant wants to modify an existing claim it just resubmits the claim for the name
 	local claim = {
 		name = name,
 		recipient = recipient,
@@ -69,11 +69,27 @@ function primaryNames.createNameClaim(name, recipient, initiator, timestamp)
 	return claim
 end
 
---- Get a primary name claim
+--- Get a primary name claim, safely deep copying the claim
 --- @param name string
 --- @return PrimaryNameClaim|nil primaryNameClaim - the claim found, or nil if it does not exist
 function primaryNames.getPrimaryNameClaim(name)
-	return utils.deepCopy(PrimaryNames.claims[name])
+	return utils.deepCopy(primaryNames.getUnsafePrimaryNameClaims()[name])
+end
+
+--- Unsafe access to the primary name claims
+--- @return table<string, PrimaryNameClaim> primaryNameClaims - the primary name claims
+function primaryNames.getUnsafePrimaryNameClaims()
+	return PrimaryNames.claims or {}
+end
+
+function primaryNames.getUnsafePrimaryNames()
+	return PrimaryNames.names or {}
+end
+
+--- Unsafe access to the primary name owners
+--- @return table<string, PrimaryName> primaryNames - the primary names
+function primaryNames.getUnsafePrimaryNameOwners()
+	return PrimaryNames.owners or {}
 end
 
 ---@class ClaimPrimaryNameResult
@@ -216,8 +232,7 @@ end
 --- @return PrimaryNameWithOwner[] primaryNamesForArNSName - the primary names with owner data
 function primaryNames.getPrimaryNamesForBaseName(baseName)
 	local primaryNamesForArNSName = {}
-	local unsafePrimaryNames = PrimaryNames.names -- TODO: unsafe copy
-	for name, _ in pairs(unsafePrimaryNames) do
+	for name, _ in pairs(primaryNames.getUnsafePrimaryNames()) do
 		local nameData = primaryNames.getPrimaryNameDataWithOwnerFromName(name)
 		if nameData and nameData.baseName == baseName then
 			table.insert(primaryNamesForArNSName, nameData)
@@ -253,9 +268,9 @@ end
 --- @return PrimaryNameClaim[] revokedClaims - the claims that were revoked
 function primaryNames.revokeClaimsForInitiator(initiator, names)
 	local revokedClaims = {}
-	names = names or utils.keys(PrimaryNames.claims)
+	names = names or utils.keys(primaryNames.getUnsafePrimaryNameClaims())
 	for _, name in pairs(names) do
-		local claim = utils.deepCopy(PrimaryNames.claims[name])
+		local claim = primaryNames.getPrimaryNameClaim(name)
 		if claim and claim.initiator == initiator then
 			PrimaryNames.claims[name] = nil
 			table.insert(revokedClaims, claim)
@@ -273,7 +288,7 @@ end
 function primaryNames.getPaginatedPrimaryNames(cursor, limit, sortBy, sortOrder)
 	local primaryNamesArray = {}
 	local cursorField = "name"
-	for owner, primaryName in ipairs(PrimaryNames.owners) do
+	for owner, primaryName in ipairs(primaryNames.getUnsafePrimaryNameOwners()) do
 		table.insert(primaryNamesArray, {
 			name = primaryName.name,
 			owner = owner,
@@ -288,8 +303,7 @@ end
 --- @return table<string, PrimaryNameClaim> prunedNameClaims - the names of the claims that were pruned
 function primaryNames.prunePrimaryNameClaims(timestamp)
 	local prunedNameClaims = {}
-	local unsafeClaims = PrimaryNames.claims or {} -- unsafe access to primary name claims
-	for name, claim in pairs(unsafeClaims) do
+	for name, claim in pairs(primaryNames.getUnsafePrimaryNameClaims()) do
 		if claim.endTimestamp <= timestamp then
 			PrimaryNames.claims[name] = nil
 			prunedNameClaims[name] = claim
