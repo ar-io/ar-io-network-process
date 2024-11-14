@@ -159,10 +159,11 @@ export const setUpStake = async ({
   };
 };
 
-export const getBaseRegistrationFee = async (memory) => {
+export const getBaseRegistrationFee = async ({ memory, timestamp }) => {
   const result = await handle(
     {
       Tags: [{ name: 'Action', value: 'Get-Registration-Fees' }],
+      Timestamp: timestamp,
     },
     memory,
   );
@@ -170,10 +171,11 @@ export const getBaseRegistrationFee = async (memory) => {
   return JSON.parse(result.Messages[0].Data)['9']['lease']['1'];
 };
 
-export const getDemandFactor = async (memory) => {
+export const getDemandFactor = async ({ memory, timestamp }) => {
   const result = await handle(
     {
       Tags: [{ name: 'Action', value: 'Demand-Factor' }],
+      Timestamp: timestamp,
     },
     memory,
   );

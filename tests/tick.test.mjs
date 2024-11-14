@@ -1,5 +1,5 @@
 import { createAosLoader } from './utils.mjs';
-import { describe, it } from 'node:test';
+import { after, describe, it } from 'node:test';
 import assert from 'node:assert';
 import {
   AO_LOADER_HANDLER_ENV,
@@ -671,12 +671,16 @@ describe('Tick', async () => {
       },
       startMemory,
     );
-    const genesisFee = await getBaseRegistrationFee(genesisEpochTick.Memory);
+    const genesisFee = await getBaseRegistrationFee({
+      memory: genesisEpochTick.Memory,
+      timestamp: genesisEpochStart,
+    });
     assert.equal(genesisFee, 600_000_000);
 
-    const zeroTickDemandFactorResult = await getDemandFactor(
-      genesisEpochTick.Memory,
-    );
+    const zeroTickDemandFactorResult = await getDemandFactor({
+      memory: genesisEpochTick.Memory,
+      timestamp: genesisEpochStart,
+    });
     assert.equal(zeroTickDemandFactorResult, 1);
 
     const fundedUser = 'funded-user-'.padEnd(43, '1');
@@ -711,14 +715,16 @@ describe('Tick', async () => {
       },
       buyRecordMemory,
     );
-    const feeDuringFirstEpoch = await getBaseRegistrationFee(
-      firstEpochMidTick.Memory,
-    );
+    const feeDuringFirstEpoch = await getBaseRegistrationFee({
+      memory: firstEpochMidTick.Memory,
+      timestamp: firstEpochMidTimestamp + 1,
+    });
 
     assert.equal(feeDuringFirstEpoch, 600_000_000);
-    const firstEpochDemandFactorResult = await getDemandFactor(
-      firstEpochMidTick.Memory,
-    );
+    const firstEpochDemandFactorResult = await getDemandFactor({
+      memory: firstEpochMidTick.Memory,
+      timestamp: firstEpochMidTimestamp + 1,
+    });
     assert.equal(firstEpochDemandFactorResult, 1);
 
     // Tick to the end of the first epoch
@@ -731,15 +737,17 @@ describe('Tick', async () => {
       },
       buyRecordMemory,
     );
-    const feeAfterFirstEpochEnd = await getBaseRegistrationFee(
-      firstEpochEndTick.Memory,
-    );
+    const feeAfterFirstEpochEnd = await getBaseRegistrationFee({
+      memory: firstEpochEndTick.Memory,
+      timestamp: firstEpochEndTimestamp + 1,
+    });
 
     assert.equal(feeAfterFirstEpochEnd, 630_000_000);
 
-    const firstEpochEndDemandFactorResult = await getDemandFactor(
-      firstEpochEndTick.Memory,
-    );
+    const firstEpochEndDemandFactorResult = await getDemandFactor({
+      memory: firstEpochEndTick.Memory,
+      timestamp: firstEpochEndTimestamp + 1,
+    });
     assert.equal(firstEpochEndDemandFactorResult, 1.0500000000000000444);
   });
 
@@ -752,9 +760,10 @@ describe('Tick', async () => {
       startMemory,
     );
 
-    const baseFeeAtZeroEpoch = await getBaseRegistrationFee(
-      zeroEpochTick.Memory,
-    );
+    const baseFeeAtZeroEpoch = await getBaseRegistrationFee({
+      memory: zeroEpochTick.Memory,
+      timestamp: genesisEpochStart,
+    });
     assert.equal(baseFeeAtZeroEpoch, 600_000_000);
 
     let tickMemory = zeroEpochTick.Memory;
@@ -775,19 +784,32 @@ describe('Tick', async () => {
       tickMemory = Memory;
 
       if (i === 45) {
-        const demandFactor = await getDemandFactor(tickMemory);
+        const demandFactor = await getDemandFactor({
+          memory: tickMemory,
+          timestamp: epochTimestamp,
+        });
         assert.equal(demandFactor, 0.50655939255251769548);
       }
 
       if ([46, 47, 48].includes(i)) {
-        const demandFactor = await getDemandFactor(tickMemory);
+        const demandFactor = await getDemandFactor({
+          memory: tickMemory,
+          timestamp: epochTimestamp,
+        });
         assert.equal(demandFactor, 0.5);
       }
     }
 
-    const demandFactorAfterFeeAdjustment = await getDemandFactor(tickMemory);
+    const afterTimestamp = genesisEpochStart + (epochDurationMs + 1) * 50;
+    const demandFactorAfterFeeAdjustment = await getDemandFactor({
+      memory: tickMemory,
+      timestamp: afterTimestamp,
+    });
     const baseFeeAfterConsecutiveTicksWithNoPurchases =
-      await getBaseRegistrationFee(tickMemory);
+      await getBaseRegistrationFee({
+        memory: tickMemory,
+        timestamp: afterTimestamp,
+      });
 
     assert.equal(demandFactorAfterFeeAdjustment, 1);
     assert.equal(baseFeeAfterConsecutiveTicksWithNoPurchases, 300_000_000);
