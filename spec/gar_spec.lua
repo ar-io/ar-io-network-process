@@ -1605,7 +1605,7 @@ describe("gar", function()
 				operatorStake = gar.getSettings().operators.minStake - slashAmount,
 				totalDelegatedStake = 123,
 				slashings = {
-					[123456] = slashAmount,
+					["123456"] = slashAmount, -- must be stringified timestamp to avoid encoding issues
 				},
 				vaults = {},
 				delegates = {},
@@ -2669,5 +2669,156 @@ describe("gar", function()
 				},
 			}, _G.GatewayRegistry["gateway-2"])
 		end)
+	end)
+
+	describe("getPaginatedDelegations", function()
+		local gateway1 = utils.deepCopy(testGateway)
+		local gateway2 = utils.deepCopy(testGateway)
+		gateway1.delegates = {
+			["test-user"] = {
+				delegatedStake = 1,
+				startTimestamp = 2,
+				vaults = {
+					["vault_id_1"] = {
+						balance = 1000,
+						startTimestamp = 4,
+						endTimestamp = 1000,
+					},
+				},
+			},
+			["other-address"] = {
+				delegatedStake = 2,
+				startTimestamp = 100,
+				vaults = {
+					["vault_id_2"] = {
+						balance = 2000,
+						startTimestamp = 103,
+						endTimestamp = 1001,
+					},
+				},
+			},
+		}
+		gateway2.delegates = {
+			["test-user"] = {
+				delegatedStake = 3,
+				startTimestamp = 0,
+				vaults = {
+					["vault_id_3"] = {
+						balance = 3000,
+						startTimestamp = 1,
+						endTimestamp = 1002,
+					},
+				},
+			},
+		}
+		local expectedStakeA = {
+			type = "stake",
+			gatewayAddress = stubRandomAddress,
+			balance = 3,
+			startTimestamp = 0,
+			delegationId = stubRandomAddress .. "_0",
+		}
+		local expectedStakeB = {
+			type = "vault",
+			vaultId = "vault_id_3",
+			gatewayAddress = stubRandomAddress,
+			balance = 3000,
+			startTimestamp = 1,
+			endTimestamp = 1002,
+			delegationId = stubRandomAddress .. "_1",
+		}
+		local expectedStakeC = {
+			type = "stake",
+			gatewayAddress = stubGatewayAddress,
+			balance = 1,
+			startTimestamp = 2,
+			delegationId = stubGatewayAddress .. "_2",
+		}
+		local expectedStakeD = {
+			type = "vault",
+			vaultId = "vault_id_1",
+			gatewayAddress = stubGatewayAddress,
+			balance = 1000,
+			startTimestamp = 4,
+			endTimestamp = 1000,
+			delegationId = stubGatewayAddress .. "_4",
+		}
+
+		before_each(function()
+			_G.GatewayRegistry = {
+				[stubGatewayAddress] = gateway1,
+				[stubRandomAddress] = gateway2,
+			}
+		end)
+
+		it(
+			"should return paginated delegatations of stakes and vaults sorted by startTimestamp in ascending order (oldest first)",
+			function()
+				local delegations = gar.getPaginatedDelegations("test-user", nil, 3, "startTimestamp", "asc")
+				assert.are.same({
+					limit = 3,
+					sortBy = "startTimestamp",
+					sortOrder = "asc",
+					hasMore = true,
+					nextCursor = stubGatewayAddress .. "_2",
+					totalItems = 4,
+					items = {
+						[1] = expectedStakeA,
+						[2] = expectedStakeB,
+						[3] = expectedStakeC,
+					},
+				}, delegations)
+				-- get the next page
+				local nextDelegations =
+					gar.getPaginatedDelegations("test-user", delegations.nextCursor, 3, "startTimestamp", "asc")
+				assert.are.same({
+					limit = 3,
+					sortBy = "startTimestamp",
+					sortOrder = "asc",
+					hasMore = false,
+					nextCursor = nil,
+					totalItems = 4,
+					items = {
+						[1] = expectedStakeD,
+					},
+				}, nextDelegations)
+				--
+			end
+		)
+
+		it(
+			"should return paginated delegatations of stakes and vaults sorted by balance in descending order",
+			function()
+				local delegations = gar.getPaginatedDelegations("test-user", nil, 3, "balance", "desc")
+				assert.are.same({
+					limit = 3,
+					sortBy = "balance",
+					sortOrder = "desc",
+					hasMore = true,
+					nextCursor = stubRandomAddress .. "_0",
+					totalItems = 4,
+					items = {
+						[1] = expectedStakeB,
+						[2] = expectedStakeD,
+						[3] = expectedStakeA,
+					},
+				}, delegations)
+				-- get the next page
+				local nextDelegations =
+					gar.getPaginatedDelegations("test-user", delegations.nextCursor, 3, "balance", "desc")
+				assert.are.same({
+					limit = 3,
+					sortBy = "balance",
+					sortOrder = "desc",
+					hasMore = false,
+					nextCursor = nil,
+					totalItems = 4,
+					items = {
+						[1] = expectedStakeC,
+					},
+				}, nextDelegations)
+				--
+			end
+		)
 	end)
 end)

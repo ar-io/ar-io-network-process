@@ -95,6 +95,7 @@ local ActionMap = {
 	AuctionPrices = "Auction-Prices",
 	AllowDelegates = "Allow-Delegates",
 	DisallowDelegates = "Disallow-Delegates",
+	Delegations = "Delegations",
 	-- PRIMARY NAMES
 	RemovePrimaryNames = "Remove-Primary-Names",
 	CreatePrimaryNameClaim = "Create-Primary-Name-Claim",
@@ -1365,8 +1366,8 @@ addEventingHandler(
 				msg.Tags.Quantity
 					and tonumber(msg.Tags.Quantity)
 					and utils.isInteger(tonumber(msg.Tags.Quantity))
-					and tonumber(msg.Tags.Quantity) > 0,
-				"Invalid quantity. Must be integer greater than 0"
+					and tonumber(msg.Tags.Quantity) > constants.minimumWithdrawalAmount,
+				"Invalid quantity. Must be integer greater than " .. constants.minimumWithdrawalAmount
 			)
 			if msg.Tags.Instant ~= nil then
 				assert(
@@ -1667,8 +1668,10 @@ addEventingHandler(
 		local checkAssertions = function()
 			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
 			assert(
-				msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(msg.Tags.Quantity),
-				"Invalid quantity. Must be integer greater than 0"
+				msg.Tags.Quantity
+					and tonumber(msg.Tags.Quantity) > constants.minimumWithdrawalAmount
+					and utils.isInteger(msg.Tags.Quantity),
+				"Invalid quantity. Must be integer greater than " .. constants.minimumWithdrawalAmount
 			)
 			if msg.Tags.Instant ~= nil then
 				assert(
@@ -2045,8 +2048,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.
 	totalSupply = totalSupply + protocolBalance + circulatingSupply
 
 	-- tally supply stashed in gateways and delegates
-	local gateways = gar.getGateways()
-	for _, gateway in pairs(gateways) do
+	for _, gateway in pairs(gar.getGatewaysUnsafe()) do
 		totalSupply = totalSupply + gateway.operatorStake + gateway.totalDelegatedStake
 		stakedSupply = stakedSupply + gateway.operatorStake
 		delegatedSupply = delegatedSupply + gateway.totalDelegatedStake
@@ -3146,6 +3148,41 @@ addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap
 		Target = msg.From,
 		Tags = { Action = ActionMap.DisallowDelegates .. "-Notice" },
 		Data = json.encode(result and result.removedDelegates or {}),
+	})
+end)
+
+addEventingHandler("paginatedDelegations", utils.hasMatchingTag("Action", "Paginated-Delegations"), function(msg)
+	local address = utils.formatAddress(msg.Tags.Address or msg.From)
+	local page = utils.parsePaginationTags(msg)
+	local function checkAssertions()
+		assert(utils.isValidAOAddress(address), "Invalid address.")
+	end
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.Delegations .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
+
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.Delegations .. "-Notice", Error = "Pagination-Error" },
+			Data = tostring(error),
+		})
+	end, gar.getPaginatedDelegations, address, page.cursor, page.limit, page.sortBy, page.sortOrder)
+	if not shouldContinue2 then
+		return
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = ActionMap.Delegations .. "-Notice" },
+		Data = json.encode(result),
 	})
 end)
 

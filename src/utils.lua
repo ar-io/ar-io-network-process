@@ -184,12 +184,12 @@ end
 --- @field totalItems number The total number of items
 --- @field sortBy string|nil The field to sort by, nil if sorting by the primitive items themselves
 --- @field sortOrder string The order to sort by
---- @field nextCursor string|nil The cursor to the next page
+--- @field nextCursor string|number|nil The cursor to the next page
 --- @field hasMore boolean Whether there is a next page
 
 --- Paginate a table with a cursor
 --- @param tableArray table The table to paginate
---- @param cursor string|nil The cursor to paginate from (optional)
+--- @param cursor string|number|nil The cursor to paginate from (optional)
 --- @param cursorField string|nil The field to use as the cursor or nil for lists of primitives
 --- @param limit number The limit of items to return
 --- @param sortBy string|nil The field to sort by. Nil if sorting by the primitive items themselves.
