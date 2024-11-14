@@ -1204,26 +1204,26 @@ function gar.getFundingPlan(address, quantity, sourcesPreference)
 
 	planBalanceDrawdown(fundingPlan, sourcesPreference)
 
-	-- if the remaining quantity is 0 or there are no more sources, return early
+	-- early return if possible. Otherwise we'll move on to using withdraw vaults
 	if fundingPlan.shortfall == 0 or sourcesPreference == "balance" then
 		return fundingPlan
 	end
 
-	local gatewaysInfo = planExcessStakesDrawdown(fundingPlan)
+	local stakingProfile = planVaultsDrawdown(fundingPlan)
 
-	-- early return if possible. Otherwise we'll move on to use delegation vaults
+	-- early return if possible. Otherwise we'll move on to use excess stakes
 	if fundingPlan.shortfall == 0 then
 		return fundingPlan
 	end
 
-	planVaultsDrawdown(fundingPlan, gatewaysInfo)
+	planExcessStakesDrawdown(fundingPlan, stakingProfile)
 
 	-- early return if possible. Otherwise we'll move on to using minimum stakes
 	if fundingPlan.shortfall == 0 then
 		return fundingPlan
 	end
 
-	planMinimumStakesDrawdown(fundingPlan, gatewaysInfo)
+	planMinimumStakesDrawdown(fundingPlan, stakingProfile)
 
 	return fundingPlan
 end
@@ -1236,20 +1236,19 @@ function planBalanceDrawdown(fundingPlan, sourcesPreference)
 	end
 end
 
-function planExcessStakesDrawdown(fundingPlan)
-	-- find all the address's delegations across the gateways
-	local gatewaysInfo = utils.sortTableByFields(
+function getStakingProfile(address)
+	return utils.sortTableByFields(
 		utils.reduce(
 			-- only consider gateways that have the address as a delegate
 			utils.filterDictionary(gar.getGatewaysUnsafe(), function(_, gateway)
-				return gateway.delegates[fundingPlan.address] ~= nil
+				return gateway.delegates[address] ~= nil
 			end),
 			-- extract only the essential gateway fields, copying tables so we don't mutate references
 			function(acc, gatewayAddress, gateway)
 				local totalEpochsGatewayPassed = gateway.stats.passedEpochCount or 0
 				local totalEpochsParticipatedIn = gateway.stats.totalEpochCount or 0
 				local gatewayRewardRatioWeight = (1 + totalEpochsGatewayPassed) / (1 + totalEpochsParticipatedIn)
-				local delegate = utils.deepCopy(gateway.delegates[fundingPlan.address])
+				local delegate = utils.deepCopy(gateway.delegates[address])
 				delegate.excessStake = math.max(0, delegate.delegatedStake - gateway.settings.minDelegatedStake)
 				delegate.gatewayAddress = gatewayAddress
 				table.insert(acc, {
@@ -1281,32 +1280,16 @@ function planExcessStakesDrawdown(fundingPlan)
 			},
 		}
 	)
-
-	-- simulate drawing down excess stakes until the remaining balance is satisfied OR excess stakes are exhausted
-	for _, gatewayInfo in pairs(gatewaysInfo) do
-		if fundingPlan.shortfall == 0 then
-			break
-		end
-		local excessStake = gatewayInfo.delegate.excessStake
-		local stakeToDraw = math.min(excessStake, fundingPlan.shortfall)
-		fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress] = {
-			delegatedStake = stakeToDraw,
-			vaults = {}, -- set up vault spend tracking now while we're passing through
-		}
-		fundingPlan.shortfall = fundingPlan.shortfall - stakeToDraw
-		gatewayInfo.delegate.delegatedStake = gatewayInfo.delegate.delegatedStake - stakeToDraw
-		-- maintain consistency for future re-sorting of the gatewayInfos based on theoretical updated state
-		gatewayInfo.delegate.excessStake = excessStake - stakeToDraw
-		gatewayInfo.totalDelegatedStake = gatewayInfo.totalDelegatedStake - stakeToDraw
-	end
-	return gatewaysInfo
 end
 
-function planVaultsDrawdown(fundingPlan, gatewaysInfo)
+function planVaultsDrawdown(fundingPlan)
+	-- find all the address's delegations across the gateways
+	local stakingProfile = getStakingProfile(fundingPlan.address)
+
 	-- simulate drawing down vaults until the remaining balance is satisfied OR vaults are exhausted
 	local vaults = utils.sortTableByFields(
 		-- flatten the vaults across all gateways so we can sort them together
-		utils.reduce(gatewaysInfo, function(acc, _, gatewayInfo)
+		utils.reduce(stakingProfile, function(acc, _, gatewayInfo)
 			for vaultId, vault in pairs(gatewayInfo.delegate.vaults) do
 				table.insert(acc, {
 					vaultId = vaultId,
@@ -1332,21 +1315,51 @@ function planVaultsDrawdown(fundingPlan, gatewaysInfo)
 		local balance = vault.balance
 		local balanceToDraw = math.min(balance, fundingPlan.shortfall)
 		local gatewayAddress = vault.gatewayAddress
-		if not fundingPlan["stakes"][gatewayAddress] then
-			fundingPlan["stakes"][gatewayAddress] = {
-				delegatedStake = 0,
-				vaults = {},
-			}
+		if balanceToDraw > 0 then
+			if not fundingPlan["stakes"][gatewayAddress] then
+				fundingPlan["stakes"][gatewayAddress] = {
+					delegatedStake = 0,
+					vaults = {},
+				}
+			end
+			fundingPlan["stakes"][gatewayAddress].vaults[vault.vaultId] = balanceToDraw
+			fundingPlan.shortfall = fundingPlan.shortfall - balanceToDraw
+			vault.balance = balance - balanceToDraw
 		end
-		fundingPlan["stakes"][gatewayAddress].vaults[vault.vaultId] = balanceToDraw
-		fundingPlan.shortfall = fundingPlan.shortfall - balanceToDraw
-		vault.balance = balance - balanceToDraw
 	end
+
+	return stakingProfile
 end
 
-function planMinimumStakesDrawdown(fundingPlan, gatewaysInfo)
+function planExcessStakesDrawdown(fundingPlan, stakingProfile)
+	-- simulate drawing down excess stakes until the remaining balance is satisfied OR excess stakes are exhausted
+	for _, gatewayInfo in pairs(stakingProfile) do
+		if fundingPlan.shortfall == 0 then
+			break
+		end
+		local excessStake = gatewayInfo.delegate.excessStake
+		local stakeToDraw = math.min(excessStake, fundingPlan.shortfall)
+		if stakeToDraw > 0 then
+			if not fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress] then
+				fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress] = {
+					delegatedStake = 0,
+					vaults = {},
+				}
+			end
+			fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress].delegatedStake = stakeToDraw
+			fundingPlan.shortfall = fundingPlan.shortfall - stakeToDraw
+			gatewayInfo.delegate.delegatedStake = gatewayInfo.delegate.delegatedStake - stakeToDraw
+			-- maintain consistency for future re-sorting of the gatewayInfos based on theoretical updated state
+			gatewayInfo.delegate.excessStake = excessStake - stakeToDraw
+			gatewayInfo.totalDelegatedStake = gatewayInfo.totalDelegatedStake - stakeToDraw
+		end
+	end
+	return stakingProfile
+end
+
+function planMinimumStakesDrawdown(fundingPlan, stakingProfile)
 	-- re-sort the gateways since their totalDelegatedStakes may have changed
-	gatewaysInfo = utils.sortTableByFields(gatewaysInfo, {
+	stakingProfile = utils.sortTableByFields(stakingProfile, {
 		{
 			order = "asc",
 			field = "gatewayRewardRatioWeight",
@@ -1361,7 +1374,7 @@ function planMinimumStakesDrawdown(fundingPlan, gatewaysInfo)
 		},
 	})
 
-	for _, gatewayInfo in pairs(gatewaysInfo) do
+	for _, gatewayInfo in pairs(stakingProfile) do
 		if fundingPlan.shortfall == 0 then
 			break
 		end
