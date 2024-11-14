@@ -542,8 +542,49 @@ function arns.getTokenCost(intendedAction)
 
 	return {
 		tokenCost = tokenCost,
-		-- if there are no discounts, set discounts to nil
-		discounts = #discounts > 0 and discounts or nil,
+		discounts = discounts,
+	}
+end
+
+---@class TokenCostAndFundingPlan
+---@field tokenCost number The token cost in mIO of the intended action
+---@field discounts table|nil The discounts applied to the token cost
+---@field fundingPlan table|nil The funding plan for the intended action
+
+--- Gets the token cost and funding plan for the given intent
+--- @param intent string The intent to get the cost and funding plan for
+--- @param name string The name to get the cost and funding plan for
+--- @param years number The number of years to get the cost and funding plan for
+--- @param quantity number The quantity to get the cost and funding plan for
+--- @param purchaseType string The purchase type to get the cost and funding plan for
+--- @param currentTimestamp number The current timestamp to get the cost and funding plan for
+--- @param from string The from address to get the cost and funding plan for
+--- @param fundFrom string The fund from address to get the cost and funding plan for
+--- @return TokenCostAndFundingPlan tokenCostAndFundingPlan The token cost and funding plan for the given intent
+function arns.getTokenCostAndFundingPlanForIntent(
+	intent,
+	name,
+	years,
+	quantity,
+	purchaseType,
+	currentTimestamp,
+	from,
+	fundFrom
+)
+	local tokenCostResult = arns.getTokenCost({
+		intent = intent,
+		name = name,
+		years = years,
+		quantity = quantity,
+		purchaseType = purchaseType,
+		currentTimestamp = currentTimestamp,
+		from = from,
+	})
+	local fundingPlan = fundFrom and gar.getFundingPlan(from, tokenCostResult.tokenCost, fundFrom)
+	return {
+		tokenCost = tokenCostResult.tokenCost,
+		fundingPlan = fundingPlan,
+		discounts = tokenCostResult.discounts,
 	}
 end
 
