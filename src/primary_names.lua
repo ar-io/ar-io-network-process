@@ -43,7 +43,7 @@ PrimaryNames = PrimaryNames or {
 --- @param recipient string -- the recipient of the primary name
 --- @param initiator string -- the address that is creating the primary name claim, e.g. the ANT process id
 --- @param timestamp number -- the timestamp of the claim
---- @return PrimaryNameClaim
+--- @return PrimaryNameClaim primaryNameClaim - the claim created
 function primaryNames.createNameClaim(name, recipient, initiator, timestamp)
 	local baseName = name:match("[^_]+$") or name
 
@@ -71,7 +71,7 @@ end
 
 --- Get a primary name claim
 --- @param name string
---- @return PrimaryNameClaim|nil
+--- @return PrimaryNameClaim|nil primaryNameClaim - the claim found, or nil if it does not exist
 function primaryNames.getPrimaryNameClaim(name)
 	return utils.deepCopy(PrimaryNames.claims[name])
 end
@@ -84,7 +84,7 @@ end
 --- @param name string -- the name being claimed, this could be an undername provided by the ant
 --- @param from string -- the process id that is claiming the primary name for the owner
 --- @param timestamp number -- the timestamp of the claim
---- @return ClaimPrimaryNameResult
+--- @return ClaimPrimaryNameResult claimPrimaryNameResult - the result of the claim
 function primaryNames.claimPrimaryName(name, from, timestamp)
 	local claim = primaryNames.getPrimaryNameClaim(name)
 	assert(claim, "Primary name claim for '" .. name .. "' does not exist")
@@ -115,7 +115,7 @@ end
 --- @param owner string
 --- @param claim PrimaryNameClaim
 --- @param startTimestamp number
---- @return PrimaryNameWithOwner
+--- @return PrimaryNameWithOwner primaryNameWithOwner - the primary name with owner data
 function primaryNames.setPrimaryNameFromClaim(owner, claim, startTimestamp)
 	PrimaryNames.names[claim.name] = owner
 	PrimaryNames.owners[owner] = {
@@ -135,7 +135,7 @@ end
 --- Remove primary names
 --- @param names string[]
 --- @param from string
---- @return RemovedPrimaryNameResult[]
+--- @return RemovedPrimaryNameResult[] removedPrimaryNameResults - the results of the name removals
 function primaryNames.removePrimaryNames(names, from)
 	local removedPrimaryNamesAndOwners = {}
 	for _, name in pairs(names) do
@@ -173,14 +173,14 @@ end
 
 --- Get the address for a primary name, allowing for forward lookups (e.g. "foo.bar" -> "0x123")
 --- @param name string
---- @return string
+--- @return string address - the address for the primary name
 function primaryNames.getAddressForPrimaryName(name)
 	return PrimaryNames.names[name]
 end
 
 --- Get the name data for an address, allowing for reverse lookups (e.g. "0x123" -> "foo.bar")
 --- @param address string
---- @return PrimaryNameWithOwner|nil
+--- @return PrimaryNameWithOwner|nil primaryNameWithOwner - the primary name with owner data, or nil if it does not exist
 function primaryNames.getPrimaryNameDataWithOwnerFromAddress(address)
 	local nameData = PrimaryNames.owners[address]
 	if not nameData then
@@ -196,7 +196,7 @@ end
 
 --- Complete name resolution, returning the owner and name data for a name
 --- @param name string
---- @return PrimaryNameWithOwner|nil
+--- @return PrimaryNameWithOwner|nil primaryNameWithOwner - the primary name with owner data, or nil if it does not exist
 function primaryNames.getPrimaryNameDataWithOwnerFromName(name)
 	local owner = primaryNames.getAddressForPrimaryName(name)
 	local nameData = primaryNames.getPrimaryNameDataWithOwnerFromAddress(owner)
@@ -213,7 +213,7 @@ end
 
 ---Finds all primary names with a given base  name
 --- @param baseName string -- the base name to find primary names for (e.g. "test" to find "undername_test")
---- @return PrimaryNameWithOwner[]
+--- @return PrimaryNameWithOwner[] primaryNamesForArNSName - the primary names with owner data
 function primaryNames.getPrimaryNamesForBaseName(baseName)
 	local primaryNamesForArNSName = {}
 	local unsafePrimaryNames = PrimaryNames.names -- TODO: unsafe copy
@@ -236,7 +236,7 @@ end
 
 --- Remove all primary names with a given base  name
 --- @param baseName string
---- @return RemovedPrimaryName[]
+--- @return RemovedPrimaryName[] removedPrimaryNames - the results of the name removals
 function primaryNames.removePrimaryNamesForBaseName(baseName)
 	local removedNames = {}
 	local primaryNamesForBaseName = primaryNames.getPrimaryNamesForBaseName(baseName)
@@ -250,7 +250,7 @@ end
 --- Revoke claims created by a given process id
 --- @param initiator string -- the process id to revoke claims for, validated against the initiator of the claims
 --- @param names string[] -- the names to revoke claims for, if nil all claims for the initiator will be revoked
---- @return PrimaryNameClaim[]
+--- @return PrimaryNameClaim[] revokedClaims - the claims that were revoked
 function primaryNames.revokeClaimsForInitiator(initiator, names)
 	local revokedClaims = {}
 	names = names or utils.keys(PrimaryNames.claims)
@@ -269,7 +269,7 @@ end
 --- @param limit number
 --- @param sortBy string
 --- @param sortOrder string
---- @return PaginatedTable<PrimaryNameWithOwner>
+--- @return PaginatedTable<PrimaryNameWithOwner> paginatedPrimaryNames - the paginated primary names
 function primaryNames.getPaginatedPrimaryNames(cursor, limit, sortBy, sortOrder)
 	local primaryNamesArray = {}
 	local cursorField = "name"
@@ -285,7 +285,7 @@ end
 
 --- Prune expired primary name claims
 --- @param timestamp number
---- @return table<string, PrimaryNameClaim> the names of the claims that were pruned
+--- @return table<string, PrimaryNameClaim> prunedNameClaims - the names of the claims that were pruned
 function primaryNames.prunePrimaryNameClaims(timestamp)
 	local prunedNameClaims = {}
 	local unsafeClaims = PrimaryNames.claims or {} -- unsafe access to primary name claims

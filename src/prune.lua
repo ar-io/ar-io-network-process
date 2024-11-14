@@ -1,4 +1,4 @@
-local tick = {}
+local prune = {}
 local arns = require("arns")
 local gar = require("gar")
 local vaults = require("vaults")
@@ -20,8 +20,8 @@ local primaryNames = require("primary_names")
 --- @param timestamp number The timestamp
 --- @param msgId string The message ID
 --- @param lastGracePeriodEntryEndTimestamp number The end timestamp of the last known record to enter grace period
---- @return PruneStateResult
-function tick.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
+--- @return PruneStateResult pruneStateResult - the result of the state pruning
+function prune.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 	local prunedRecords, newGracePeriodRecords = arns.pruneRecords(timestamp, lastGracePeriodEntryEndTimestamp)
 	-- for all the pruned records, create auctions and remove primary name claims
 	local prunedPrimaryNamesAndOwners = {}
@@ -53,4 +53,4 @@ function tick.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 	}
 end
 
-return tick
+return prune
