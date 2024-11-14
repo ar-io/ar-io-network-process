@@ -508,7 +508,7 @@ end
 --- @field permabuy number Cost for permanent purchase
 
 --- Gets the registration fees for all name lengths and years
---- @return Re registrationFees - a table containing registration fees for each name length, with the following structure:
+--- @return RegistrationFee registrationFees - a table containing registration fees for each name length, with the following structure:
 ---   - [nameLength]: table The fees for names of this length
 ---     - lease: table Lease fees by year
 ---       - ["1"]: number Cost for 1 year lease

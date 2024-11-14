@@ -48,7 +48,6 @@ function primaryNames.createNameClaim(name, recipient, initiator, timestamp)
 	local baseName = name:match("[^_]+$") or name
 
 	--- check the primary name is not already owned
-	--- TODO: this could be o(1) with a lookup table
 	local primaryNameOwner = primaryNames.getAddressForPrimaryName(baseName)
 	assert(not primaryNameOwner, "Primary name is already owned")
 
