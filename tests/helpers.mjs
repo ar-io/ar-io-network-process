@@ -36,16 +36,26 @@ export function assertNoResultError(result) {
   assert.strictEqual(errorTag, undefined);
 }
 
-export const getBalances = async ({ memory }) => {
+export const getBalances = async ({ memory, timestamp = STUB_TIMESTAMP }) => {
   const result = await handle(
     {
       Tags: [{ name: 'Action', value: 'Balances' }],
+      Timestamp: timestamp,
     },
     memory,
   );
 
   const balances = JSON.parse(result.Messages?.[0]?.Data);
   return balances;
+};
+
+export const getBalance = async ({
+  address,
+  memory,
+  timestamp = STUB_TIMESTAMP,
+}) => {
+  const balances = await getBalances({ memory, timestamp });
+  return balances[address];
 };
 
 export const transfer = async ({
