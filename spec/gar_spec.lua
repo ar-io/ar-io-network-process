@@ -2019,6 +2019,50 @@ describe("gar", function()
 		end)
 	end)
 
+	describe("isEligibleForArNSDiscount", function()
+		it("should return false if gateway is not found", function()
+			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
+			assert.is_false(result)
+		end)
+
+		it("should return false if gateway weights are not found", function()
+			_G.GatewayRegistry[stubRandomAddress] = testGateway
+			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
+			assert.is_false(result)
+		end)
+
+		it("should return false if tenureWeight is less than 1", function()
+			_G.GatewayRegistry[stubRandomAddress] = testGateway
+			_G.GatewayRegistry[stubRandomAddress].weights = {
+				tenureWeight = 0.5,
+				gatewayRewardRatioWeight = 0.85,
+			}
+			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
+			assert.is_false(result)
+		end)
+
+		it("should return false if gatewayPerformanceRatio is less than 0.85", function()
+			_G.GatewayRegistry[stubRandomAddress] = testGateway
+			_G.GatewayRegistry[stubRandomAddress].weights = {
+				tenureWeight = 1,
+				gatewayRewardRatioWeight = 0.84,
+			}
+			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
+			assert.is_false(result)
+		end)
+
+		it("should return true if gateway is eligible for ArNS discount", function()
+			_G.GatewayRegistry[stubRandomAddress] = testGateway
+			_G.GatewayRegistry[stubRandomAddress].weights = {
+				tenureWeight = 1,
+				gatewayRewardRatioWeight = 0.85,
+			}
+			_G.GatewayRegistry[stubRandomAddress].status = "joined"
+			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
+			assert.is_true(result)
+		end)
+	end)
+
 	describe("getPaginatedDelegates", function()
 		it(
 			"should return paginated delegates sorted, by defualt, by startTimestamp in descending order (newest first)",
@@ -2143,6 +2187,7 @@ describe("gar", function()
 	describe("getFundingPlan", function()
 		before_each(function()
 			_G.Balances = {}
+			_G.GatewayRegistry = {}
 		end)
 
 		it("should identify a shortfall when the user has no spending power of any kind", function()

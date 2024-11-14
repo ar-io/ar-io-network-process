@@ -4,6 +4,45 @@ local arns = require("arns")
 local demand = require("demand")
 local utils = require("utils")
 local Auction = require("auctions")
+local gar = require("gar")
+
+local stubGatewayAddress = "test-this-is-valid-arweave-wallet-address-1"
+local stubObserverAddress = "test-this-is-valid-arweave-wallet-address-2"
+local stubRandomAddress = "test-this-is-valid-arweave-wallet-address-3"
+local testSettings = {
+	fqdn = "test.com",
+	protocol = "https",
+	port = 443,
+	allowDelegatedStaking = true,
+	minDelegatedStake = 500000000,
+	autoStake = true,
+	label = "test",
+	delegateRewardShareRatio = 0,
+	properties = stubGatewayAddress,
+	allowedDelegatesLookup = {
+		["test-allowlisted-delegator-address-number-1"] = true,
+		["test-allowlisted-delegator-address-number-2"] = true,
+	},
+}
+local testGateway = {
+	operatorStake = gar.getSettings().operators.minStake,
+	totalDelegatedStake = 0,
+	vaults = {},
+	delegates = {},
+	startTimestamp = 0,
+	stats = {
+		prescribedEpochCount = 0,
+		observedEpochCount = 0,
+		totalEpochCount = 0,
+		passedEpochCount = 0,
+		failedEpochCount = 0,
+		failedConsecutiveEpochs = 0,
+		passedConsecutiveEpochs = 0,
+	},
+	settings = testSettings,
+	status = "joined",
+	observerAddress = stubObserverAddress,
+}
 
 describe("arns", function()
 	local timestamp = 0
@@ -23,6 +62,7 @@ describe("arns", function()
 			[testAddressEth] = startBalance,
 		}
 		_G.DemandFactor.currentDemandFactor = 1.0
+		_G.GatewayRegistry = {}
 	end)
 
 	for addressType, testAddress in pairs(testAddresses) do
@@ -60,6 +100,50 @@ describe("arns", function()
 					assert.are.equal(startBalance - 600000000, _G.Balances[testAddress])
 					assert.are.equal(600000000, _G.Balances[_G.ao.id])
 					assert.are.equal(demandBefore + 600000000, demand.getCurrentPeriodRevenue())
+					assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
+				end
+			)
+
+			it(
+				"should apply ArNS discount on lease buys when elgibility requirements are met[" .. addressType .. "]",
+				function()
+					_G.GatewayRegistry[testAddress] = testGateway
+					_G.GatewayRegistry[testAddress].weights = {
+						tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+						gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+					}
+					local result = gar.isEligibleForArNSDiscount(testAddress)
+					assert.is_true(result)
+
+					local demandBefore = demand.getCurrentPeriodRevenue()
+					local purchasesBefore = demand.getCurrentPeriodPurchases()
+					local discountTotal = 600000000 - (math.floor(600000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+
+					local status, buyRecordResult =
+						pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
+
+					assert.is_true(status)
+					assert.are.same({
+						purchasePrice = discountTotal,
+						type = "lease",
+						undernameLimit = 10,
+						processId = testProcessId,
+						startTimestamp = 0,
+						endTimestamp = timestamp + constants.oneYearMs * 1,
+					}, buyRecordResult.record)
+					assert.are.same({
+						["test-name"] = {
+							purchasePrice = discountTotal,
+							type = "lease",
+							undernameLimit = 10,
+							processId = testProcessId,
+							startTimestamp = 0,
+							endTimestamp = timestamp + constants.oneYearMs * 1,
+						},
+					}, _G.NameRegistry.records)
+					assert.are.equal(startBalance - discountTotal, _G.Balances[testAddress])
+					assert.are.equal(discountTotal, _G.Balances[_G.ao.id])
+					assert.are.equal(demandBefore + discountTotal, demand.getCurrentPeriodRevenue())
 					assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 				end
 			)
@@ -300,6 +384,55 @@ describe("arns", function()
 				assert.are.equal(demandBefore + 25000000, demand.getCurrentPeriodRevenue())
 				assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 			end)
+
+			it("should apply ArNS discount for increasing undername limit for eligible gateways", function()
+				_G.GatewayRegistry[testAddress] = testGateway
+				_G.GatewayRegistry[testAddress].weights = {
+					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+				}
+				assert.is_true(gar.isEligibleForArNSDiscount(testAddress))
+
+				_G.NameRegistry.records["test-name"] = {
+					endTimestamp = timestamp + constants.oneYearMs,
+					processId = testProcessId,
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}
+				local demandBefore = demand.getCurrentPeriodRevenue()
+				local purchasesBefore = demand.getCurrentPeriodPurchases()
+				local status, result = pcall(arns.increaseundernameLimit, testAddress, "test-name", 50, timestamp)
+				local expectation = {
+					endTimestamp = timestamp + constants.oneYearMs,
+					processId = testProcessId,
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 60,
+				}
+				assert.is_true(status)
+				assert.are.same(expectation, result.record)
+				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
+
+				local discountTotal = 25000000 - (math.floor(25000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+
+				assert.is.equal(
+					_G.Balances[testAddress],
+					startBalance - discountTotal,
+					"Balance should be reduced by the purchase price"
+				)
+
+				assert.is.equal(
+					_G.Balances[_G.ao.id],
+					discountTotal,
+					"Protocol balance should be increased by the purchase price"
+				)
+
+				assert.are.equal(demandBefore + discountTotal, demand.getCurrentPeriodRevenue())
+				assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
+			end)
 		end)
 
 		describe("extendLease", function()
@@ -435,9 +568,68 @@ describe("arns", function()
 				assert.is_false(status)
 				assert.match("Cannot extend lease beyond 5 years", error)
 			end)
+
+			it("should apply ArNS discount to eligible gateways for extending leases", function()
+				_G.GatewayRegistry[testAddress] = testGateway
+				_G.GatewayRegistry[testAddress].weights = {
+					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+				}
+				local result = gar.isEligibleForArNSDiscount(testAddress)
+				assert.is_true(result)
+
+				_G.NameRegistry.records["test-name"] = {
+					-- 1 year lease
+					endTimestamp = timestamp + constants.oneYearMs,
+					processId = testProcessId,
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}
+				local demandBefore = demand.getCurrentPeriodRevenue()
+				local purchasesBefore = demand.getCurrentPeriodPurchases()
+				local status, extendLeaseResult = pcall(arns.extendLease, testAddress, "test-name", 4, timestamp)
+				assert.is_true(status)
+				assert.are.same({
+					endTimestamp = timestamp + constants.oneYearMs * 5,
+					processId = testProcessId,
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}, extendLeaseResult.record)
+				assert.are.same({
+					["test-name"] = {
+						endTimestamp = timestamp + constants.oneYearMs * 5,
+						processId = testProcessId,
+						purchasePrice = 600000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 10,
+					},
+				}, _G.NameRegistry.records)
+
+				local discountTotal = 400000000 - (math.floor(400000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+
+				assert.is.equal(
+					_G.Balances[testAddress],
+					startBalance - discountTotal,
+					"Balance should be reduced by the purchase price"
+				)
+
+				assert.is.equal(
+					_G.Balances[_G.ao.id],
+					discountTotal,
+					"Protocol balance should be increased by the discounted price"
+				)
+
+				assert.are.equal(demandBefore + discountTotal, demand.getCurrentPeriodRevenue())
+				assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
+			end)
 		end)
 
-		describe("calculateLeaseFee [" .. addressType .. "]", function()
+		describe("calculateRegistrationFee [" .. addressType .. "]", function()
 			it("should return the correct fee for a lease", function()
 				local baseFee = 500000000 -- base fee is 500 IO
 				local fee = arns.calculateRegistrationFee("lease", baseFee, 1, 1)
@@ -534,7 +726,7 @@ describe("arns", function()
 				currentTimestamp = timestamp,
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
-			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
 		end)
 		it("should return the correct token cost for a buying name permanently", function()
 			local baseFee = 500000000
@@ -547,7 +739,7 @@ describe("arns", function()
 				currentTimestamp = timestamp,
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
-			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
 		end)
 		it("should return the correct token cost for increasing undername limit", function()
 			_G.NameRegistry.records["test-name"] = {
@@ -572,7 +764,7 @@ describe("arns", function()
 				currentTimestamp = constants.oneYearMs / 2,
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
-			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
 		end)
 		it("should return the token cost for extending a lease", function()
 			_G.NameRegistry.records["test-name"] = {
@@ -594,8 +786,58 @@ describe("arns", function()
 				currentTimestamp = timestamp + constants.oneYearMs,
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
-			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction))
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
 		end)
+
+		it("should return the correct token cost for an ArNS discount eligible address", function()
+			_G.GatewayRegistry[stubRandomAddress] = testGateway
+			_G.GatewayRegistry[stubRandomAddress].weights = {
+				tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+				gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+			}
+			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
+			assert.is_true(result)
+
+			local baseFee = 500000000
+			local demandFactor = 1.052
+			local expectedCost = math.floor((baseFee * 0.2 * 20) + baseFee) * demandFactor
+			local intendedAction = {
+				intent = "Buy-Record",
+				purchaseType = "permabuy",
+				name = "test-name",
+				currentTimestamp = timestamp,
+				from = stubRandomAddress,
+			}
+			_G.DemandFactor.currentDemandFactor = demandFactor
+
+			local discountTotal = expectedCost - (math.floor(expectedCost * constants.ARNS_DISCOUNT_PERCENTAGE))
+			assert.are.equal(discountTotal, arns.getTokenCost(intendedAction).tokenCost)
+		end)
+
+		it("should not apply discount on a gateway that is found but does not meet the requirements", function()
+			_G.GatewayRegistry[stubRandomAddress] = testGateway
+			_G.GatewayRegistry[stubRandomAddress].weights = {
+				tenureWeight = 0.1,
+				gatewayRewardRatioWeight = 0.1,
+			}
+			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
+			assert.is_false(result)
+
+			local baseFee = 500000000
+			local demandFactor = 1.052
+			local expectedCost = math.floor((baseFee * 0.2 * 20) + baseFee) * demandFactor
+			local intendedAction = {
+				intent = "Buy-Record",
+				purchaseType = "permabuy",
+				name = "test-name",
+				currentTimestamp = timestamp,
+				from = stubRandomAddress,
+			}
+			_G.DemandFactor.currentDemandFactor = demandFactor
+
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
+		end)
+
 		it(
 			"should throw an error if trying to increase undername limit of a leased record in the grace period",
 			function()
@@ -655,6 +897,24 @@ describe("arns", function()
 			})
 			assert.is_false(status)
 			assert.match("Name is permanently owned and cannot be extended", error)
+		end)
+	end)
+
+	describe("getCostDetailsForAction", function()
+		it("should match getTokenCost logic but with { tokenCost: number, discounts: table } shape", function()
+			local baseFee = 500000000
+			local years = 2
+			local demandFactor = 0.974
+			local expectedCost = math.floor((years * baseFee * 0.20) + baseFee) * demandFactor
+			local intendedAction = {
+				intent = "Buy-Record",
+				purchaseType = "lease",
+				years = 2,
+				name = "test-name",
+				currentTimestamp = timestamp,
+			}
+			_G.DemandFactor.currentDemandFactor = demandFactor
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
 		end)
 	end)
 
@@ -1007,7 +1267,7 @@ describe("arns", function()
 					undernameLimit = 10,
 				}
 				_G.Balances[testAddressArweave] = 2500000000
-				local updatedRecord = arns.upgradeRecord(testAddressArweave, "upgrade-name", 1000000)
+				local updatedRecord = arns.upgradeRecord(testAddressArweave, "upgrade-name", 1000000, "msgId")
 				assert.are.same({
 					name = "upgrade-name",
 					record = {
@@ -1031,6 +1291,54 @@ describe("arns", function()
 					},
 					fundingResult = {
 						totalFunded = 2500000000,
+						newWithdrawVaults = {},
+					},
+				}, updatedRecord)
+			end)
+
+			it("should apply the ArNS discount to the upgrade cost", function()
+				_G.GatewayRegistry[stubRandomAddress] = testGateway
+				_G.GatewayRegistry[stubRandomAddress].weights = {
+					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+				}
+				_G.NameRegistry.records["upgrade-name"] = {
+					endTimestamp = 1000000,
+					processId = "test-process-id",
+					purchasePrice = 1000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}
+				_G.Balances[stubRandomAddress] = 2500000000
+				assert(gar.isEligibleForArNSDiscount(stubRandomAddress))
+				local updatedRecord = arns.upgradeRecord(stubRandomAddress, "upgrade-name", 1000000, "msgId")
+
+				local expectedCost = 2500000000 - (math.floor(2500000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+
+				assert.are.same({
+					name = "upgrade-name",
+					record = {
+						endTimestamp = nil,
+						processId = "test-process-id",
+						purchasePrice = expectedCost,
+						startTimestamp = 0,
+						type = "permabuy",
+						undernameLimit = 10,
+					},
+					totalUpgradeFee = expectedCost,
+					baseRegistrationFee = 500000000,
+					remainingBalance = 500000000,
+					protocolBalance = expectedCost,
+					df = demand.getDemandFactorInfo(),
+					fundingPlan = {
+						address = stubRandomAddress,
+						balance = expectedCost,
+						stakes = {},
+						shortfall = 0,
+					},
+					fundingResult = {
+						totalFunded = expectedCost,
 						newWithdrawVaults = {},
 					},
 				}, updatedRecord)
@@ -1139,6 +1447,58 @@ describe("arns", function()
 					)
 				end
 			)
+
+			it("should apply ArNS discount on auction bids for eligible gateways", function()
+				_G.GatewayRegistry[testAddressArweave] = testGateway
+				_G.GatewayRegistry[testAddressArweave].weights = {
+					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+				}
+				assert(gar.isEligibleForArNSDiscount(testAddressArweave))
+				local startTimestamp = 1000000
+				local bidTimestamp = startTimestamp + 1000 * 60 * 2 -- 2 min into the auction
+				local demandBefore = demand.getCurrentPeriodPurchases()
+				local revenueBefore = demand.getCurrentPeriodRevenue()
+				local baseFee = 500000000
+				local permabuyAnnualFee = baseFee * constants.ANNUAL_PERCENTAGE_FEE * 20
+				local floorPrice = baseFee + permabuyAnnualFee
+				local startPrice = floorPrice * 50
+				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
+				assert(auction, "Auction should be created")
+				local result = arns.submitAuctionBid(
+					"test-name",
+					startPrice,
+					testAddressArweave,
+					bidTimestamp,
+					"test-process-id",
+					"permabuy",
+					0
+				)
+				local totalDecay = auction.settings.decayRate * (bidTimestamp - startTimestamp)
+				local expectedPrice = math.floor(startPrice * ((1 - totalDecay) ^ auction.settings.scalingExponent))
+				local discountedPrice = expectedPrice - (math.floor(expectedPrice * constants.ARNS_DISCOUNT_PERCENTAGE))
+				local expectedRecord = {
+					endTimestamp = nil,
+					processId = "test-process-id",
+					purchasePrice = discountedPrice,
+					startTimestamp = bidTimestamp,
+					type = "permabuy",
+					undernameLimit = 10,
+				}
+				local expectedInitiatorReward = math.floor(discountedPrice * 0.5)
+				local expectedProtocolReward = discountedPrice - expectedInitiatorReward
+				assert.are.equal(expectedInitiatorReward, _G.Balances["test-initiator"])
+				assert.are.equal(expectedProtocolReward, _G.Balances[_G.ao.id])
+				assert.are.equal(nil, _G.NameRegistry.auctions["test-name"])
+				assert.are.same(expectedRecord, _G.NameRegistry.records["test-name"])
+				assert.are.same(expectedRecord, result.record)
+				assert.are.equal(demandBefore + 1, demand.getCurrentPeriodPurchases(), "Purchases should increase by 1")
+				assert.are.equal(
+					revenueBefore + discountedPrice,
+					demand.getCurrentPeriodRevenue(),
+					"Revenue should increase by the bid amount"
+				)
+			end)
 
 			it("should throw an error if the auction is not found", function()
 				local status, error =
