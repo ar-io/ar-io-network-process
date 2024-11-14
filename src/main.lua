@@ -83,6 +83,7 @@ local ActionMap = {
 	UpdateGatewaySettings = "Update-Gateway-Settings",
 	SaveObservations = "Save-Observations",
 	DelegateStake = "Delegate-Stake",
+	ReDelegateStake = "Re-Delegate-Stake",
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
 	CancelWithdrawal = "Cancel-Withdrawal",
 	InstantWithdrawal = "Instant-Withdrawal",
@@ -1555,6 +1556,86 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = ActionMap.DelegateStake .. "-Notice", Gateway = msg.Tags.Target },
+		Data = json.encode(delegateResult),
+	})
+end)
+
+addEventingHandler(ActionMap.ReDelegateStake, utils.hasMatchingTag("Action", ActionMap.ReDelegateStake), function(msg)
+	local sourceAddress = msg.Tags.Source
+	local targetAddress = msg.Tags.Target
+	local delegateAddress = msg.From
+
+	local checkAssertions = function()
+		assert(utils.isValidAOAddress(sourceAddress), "Invalid source gateway address")
+		assert(utils.isValidAOAddress(targetAddress), "Invalid target gateway address")
+		assert(utils.isValidAOAddress(delegateAddress), "Invalid delegator address")
+
+		assert(
+			msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+			"Invalid quantity. Must be integer greater than 0"
+		)
+	end
+
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Invalid-" .. ActionMap.ReDelegateStake .. "-Notice",
+				Error = "Bad-Input",
+			},
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
+
+	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
+	local from = utils.formatAddress(msg.From)
+	local quantity = tonumber(msg.Tags.Quantity)
+	msg.ioEvent:addField("Target-Formatted", target)
+
+	local shouldContinue2, gateway = eventingPcall(
+		msg.ioEvent,
+		function(error)
+			ao.send({
+				Target = from,
+				Tags = {
+					Action = "Invalid-" .. ActionMap.ReDelegateStake .. "-Notice",
+					Error = tostring(error),
+				},
+				Data = tostring(error),
+			})
+		end,
+		gar.reDelegateStake,
+		{
+			sourceAddress = sourceAddress,
+			targetAddress = targetAddress,
+			delegateAddress = delegateAddress,
+			qty = quantity,
+			currentTimestamp = tonumber(msg.Timestamp),
+		},
+		tonumber(msg.Timestamp)
+	)
+	if not shouldContinue2 then
+		return
+	end
+
+	local delegateResult = {}
+	if gateway ~= nil then
+		local newStake = gateway.delegates[from].delegatedStake
+		msg.ioEvent:addField("Previous-Stake", newStake - quantity)
+		msg.ioEvent:addField("New-Stake", newStake)
+		msg.ioEvent:addField("Gateway-Total-Delegated-Stake", gateway.totalDelegatedStake)
+		delegateResult = gateway.delegates[from]
+	end
+
+	LastKnownDelegatedSupply = LastKnownDelegatedSupply + quantity
+	addSupplyData(msg.ioEvent)
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = ActionMap.ReDelegateStake .. "-Notice", Gateway = msg.Tags.Target },
 		Data = json.encode(delegateResult),
 	})
 end)

@@ -415,6 +415,209 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 	return gateway
 end
 
+-- TODO: Prune on ticks
+--- @type { [string]: { timestamp: number, redelegations: number } }
+ReDelegations = ReDelegations or {}
+
+--- Take stake from a delegate and stake it to a new delegate.
+--- This function will be called by the delegate to redelegate their stake to a new gateway.
+--- The delegated stake will be moved from the old gateway to the new gateway.
+--- It will fail if there is no or not enough delegated stake to move from the gateway.
+--- It will fail if the old gateway does not meet the minimum staking requirements after the stake is moved.
+--- It can move stake from the vaulted stake
+--- It can move stake from its own stake as long as it meets the minimum staking requirements after the stake is moved.
+---
+--- @class ReDelegateStakeParams
+--- @field delegateAddress string # The address of the delegate to redelegate stake from (required)
+--- @field sourceAddress string # The address of the gateway to redelegate stake from (required)
+--- @field targetAddress string # The address of the gateway to redelegate stake to (required)
+--- @field qty number # The amount of stake to redelegate - must be positive integer (required)
+--- @field currentTimestamp number # The current timestamp (required)
+
+--- @class ReDelegateStakeResult
+--- @field sourceGateway table # The updated gateway object that the stake was moved from
+--- @field targetGateway table # The updated gateway object that the stake was moved to
+--- @field reDelegationFee number # The fee charged for the redelegation
+--- @field feeResetTimestamp number # The timestamp when the reldelegation fee will be reset
+--- @field reDelegationsSinceFeeReset number # The number of redelegations the user has made since the last fee reset
+
+--- @param params ReDelegateStakeParams
+--- @return ReDelegateStakeResult
+function gar.reDelegateStake(params)
+	local delegateAddress = params.delegateAddress
+	local targetAddress = params.targetAddress
+	local sourceAddress = params.sourceAddress
+	local stakeToTakeFromSource = params.qty
+	local currentTimestamp = params.currentTimestamp
+
+	assert(type(stakeToTakeFromSource) == "number", "Quantity is required and must be a number")
+	assert(stakeToTakeFromSource > 0, "Quantity must be greater than 0")
+	assert(type(targetAddress) == "string", "Target address is required and must be a string")
+	assert(type(sourceAddress) == "string", "Source address is required and must be a string")
+	assert(type(delegateAddress) == "string", "Delegate address is required and must be a string")
+	assert(type(currentTimestamp) == "number", "Current timestamp is required and must be a number")
+
+	local sourceGateway = gar.getGateway(sourceAddress)
+	local targetGateway = gar.getGateway(targetAddress)
+
+	if not sourceGateway then
+		error("Source Gateway not found")
+	end
+	if not targetGateway then
+		error("Target Gateway not found")
+	end
+
+	if sourceGateway.status == "leaving" then
+		-- TODO: Should we allow redelegation from a leaving gateway?
+		error("Source Gateway is leaving the network and cannot have stake re delegated from it.")
+	end
+	if targetGateway.status == "leaving" then
+		error("Target Gateway is leaving the network and cannot have more stake delegated to it.")
+	end
+
+	if not targetGateway.settings.allowDelegatedStaking then
+		error(
+			"Target Gateway does not allow delegated staking. Only allowed delegates can delegate stake to this Gateway."
+		)
+	end
+
+	if not gar.delegateAllowedToStake(delegateAddress, targetGateway) then
+		error("This Gateway does not allow this delegate to stake.")
+	end
+
+	if delegateAddress == targetAddress then
+		error("Cannot delegate to your own gateway, use increaseOperatorStake instead.")
+	end
+
+	local previousReDelegations = ReDelegations[delegateAddress]
+
+	local redelegationFeePct = math.min(
+		previousReDelegations and previousReDelegations.redelegations >= 1 and 0.1 * previousReDelegations.redelegations
+			or 0,
+		0.6
+	)
+
+	print(redelegationFeePct .. "redelegationFeePct")
+	local redelegationFee = math.floor(stakeToTakeFromSource * redelegationFeePct)
+	local stakeToDelegate = stakeToTakeFromSource - redelegationFee
+
+	-- Assert source has enough stake to redelegate and remove the stake from the source
+	if delegateAddress == sourceAddress then
+		-- TODO: check from any existing vault
+		-- check if he gateway can afford to redelegate from itself
+
+		local maxWithdraw = sourceGateway.operatorStake - gar.getSettings().operators.minStake
+
+		if stakeToTakeFromSource > maxWithdraw then
+			error(
+				"Resulting stake is not enough to maintain the minimum operator stake of "
+					.. gar.getSettings().operators.minStake
+					.. " IO"
+			)
+		end
+
+		sourceGateway.operatorStake = sourceGateway.operatorStake - stakeToTakeFromSource
+	else
+		local existingDelegate = sourceGateway.delegates[delegateAddress]
+		-- TODO: Get existing vaulted stake from delegate
+		-- local existingVaults = existingDelegate.vaults
+
+		if not existingDelegate or existingDelegate.delegatedStake == 0 then
+			error("This delegate has no stake to redelegate.")
+		end
+
+		-- Check if the delegate has enough stake to redelegate
+		if existingDelegate.delegatedStake < stakeToTakeFromSource then
+			error("Quantity must be less than or equal to the delegated stake amount.")
+		end
+
+		-- Check if the delegate will have enough stake left after re-delegating
+		local existingStake = existingDelegate.delegatedStake
+		local requiredMinimumStake = sourceGateway.settings.minDelegatedStake
+		local maxAllowedToWithdraw = existingStake - requiredMinimumStake
+		if maxAllowedToWithdraw < stakeToTakeFromSource and stakeToTakeFromSource ~= existingStake then
+			error(
+				"Remaining delegated stake must be greater than the minimum delegated stake. Adjust the amount or re-delegate all stake."
+			)
+		end
+
+		-- If the delegate has enough stake to redelegate, move the stake. If its all the stake, remove the delegate
+		if existingDelegate.delegatedStake == stakeToTakeFromSource then
+			gar.pruneDelegateFromGateway(delegateAddress, sourceGateway)
+		else
+			sourceGateway.delegates[delegateAddress].delegatedStake = sourceGateway.delegates[delegateAddress].delegatedStake
+				- stakeToTakeFromSource
+			sourceGateway.totalDelegatedStake = sourceGateway.totalDelegatedStake - stakeToTakeFromSource
+		end
+	end
+
+	local existingTargetDelegate = targetGateway.delegates[delegateAddress]
+	local minimumStakeForGatewayAndDelegate
+	if existingTargetDelegate and existingTargetDelegate.delegatedStake ~= 0 then
+		-- It already has a stake that is not zero
+		minimumStakeForGatewayAndDelegate = 1 -- Delegate must provide at least one additional IO
+	else
+		-- Consider if the operator increases the minimum amount after you've already staked
+		minimumStakeForGatewayAndDelegate = targetGateway.settings.minDelegatedStake
+	end
+
+	-- Check if the delegate has enough stake to redelegate
+	if stakeToDelegate < minimumStakeForGatewayAndDelegate then
+		error("Quantity must be greater than the minimum delegated stake amount.")
+	end
+
+	-- The stake can now be applied to the targetGateway
+	if targetGateway.delegates[delegateAddress] == nil then
+		-- create the new delegate stake
+		targetGateway.delegates[delegateAddress] = {
+			delegatedStake = stakeToDelegate,
+			startTimestamp = currentTimestamp,
+			vaults = {},
+		}
+	else
+		-- increment the existing delegate's stake
+		targetGateway.delegates[delegateAddress].delegatedStake = targetGateway.delegates[delegateAddress].delegatedStake
+			+ stakeToDelegate
+	end
+	targetGateway.totalDelegatedStake = targetGateway.totalDelegatedStake + stakeToDelegate
+
+	-- Move redelegation fee to protocol balance
+	balances.increaseBalance(ao.id, redelegationFee)
+
+	-- Update redelegations
+	local redelegationTimestamp = previousReDelegations and previousReDelegations.timestamp or currentTimestamp
+	if not previousReDelegations then
+		ReDelegations[delegateAddress] = {
+			timestamp = redelegationTimestamp,
+			redelegations = 1,
+		}
+	else
+		ReDelegations[delegateAddress] = {
+			timestamp = redelegationTimestamp,
+			redelegations = previousReDelegations.redelegations + 1,
+		}
+	end
+
+	-- prune user from allow list, if necessary, to save memory
+	if sourceGateway.settings.allowedDelegatesLookup then
+		sourceGateway.settings.allowedDelegatesLookup[delegateAddress] = nil
+	end
+
+	-- update the gateway
+	GatewayRegistry[sourceAddress] = sourceGateway
+
+	-- update the target gateway
+	GatewayRegistry[targetAddress] = targetGateway
+
+	return {
+		sourceGateway = sourceGateway,
+		targetGateway = targetGateway,
+		reDelegationFee = redelegationFee,
+		feeResetTimestamp = redelegationTimestamp + 7 * 24 * 60 * 60 * 1000, -- 7 days
+		reDelegationsSinceFeeReset = ReDelegations[delegateAddress].redelegations,
+	}
+end
+
 --- Internal function to increase the stake of an existing delegate. This should only be called from epochs.lua
 ---@param gatewayAddress string # The gateway address to increase stake for (required)
 ---@param gateway table # The gateway object to increase stake for (required)
