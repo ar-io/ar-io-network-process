@@ -663,7 +663,7 @@ describe('Tick', async () => {
     });
   });
 
-  it('should increase demandFactor but not yet baseRegistrationFee when records are bought within an epoch', async () => {
+  it('should not increase demandFactor and baseRegistrationFee when records are bought until the end of the epoch', async () => {
     const genesisEpochTick = await handle(
       {
         Tags: [{ name: 'Action', value: 'Tick' }],
