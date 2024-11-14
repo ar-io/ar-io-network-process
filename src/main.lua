@@ -124,24 +124,7 @@ local function eventingPcall(ioEvent, onError, fnToCall, ...)
 	return status, result
 end
 
-local function addRecordResultFields(ioEvent, result)
-	ioEvent:addFieldsIfExist(
-		result,
-		{ "baseRegistrationFee", "remainingBalance", "protocolBalance", "recordsCount", "reservedRecordsCount" }
-	)
-	ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
-	if result.df ~= nil and type(result.df) == "table" then
-		ioEvent:addField("DF-Trailing-Period-Purchases", (result.df.trailingPeriodPurchases or {}))
-		ioEvent:addField("DF-Trailing-Period-Revenues", (result.df.trailingPeriodRevenues or {}))
-		ioEvent:addFieldsWithPrefixIfExist(result.df, "DF-", {
-			"currentPeriod",
-			"currentDemandFactor",
-			"consecutivePeriodsWithMinDemandFactor",
-			"revenueThisPeriod",
-			"purchasesThisPeriod",
-		})
-	end
-
+local function addResultFundingPlanFields(ioEvent, result)
 	ioEvent:addFieldsWithPrefixIfExist(result.fundingPlan, "FP-", { "balance" })
 	local fundingPlanVaultsCount = 0
 	local fundingPlanStakesAmount = utils.reduce(
@@ -180,6 +163,26 @@ local function addRecordResultFields(ioEvent, result)
 	end
 end
 
+local function addRecordResultFields(ioEvent, result)
+	ioEvent:addFieldsIfExist(
+		result,
+		{ "baseRegistrationFee", "remainingBalance", "protocolBalance", "recordsCount", "reservedRecordsCount" }
+	)
+	ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
+	if result.df ~= nil and type(result.df) == "table" then
+		ioEvent:addField("DF-Trailing-Period-Purchases", (result.df.trailingPeriodPurchases or {}))
+		ioEvent:addField("DF-Trailing-Period-Revenues", (result.df.trailingPeriodRevenues or {}))
+		ioEvent:addFieldsWithPrefixIfExist(result.df, "DF-", {
+			"currentPeriod",
+			"currentDemandFactor",
+			"consecutivePeriodsWithMinDemandFactor",
+			"revenueThisPeriod",
+			"purchasesThisPeriod",
+		})
+	end
+	addResultFundingPlanFields(ioEvent, result)
+end
+
 local function addAuctionResultFields(ioEvent, result)
 	ioEvent:addFieldsIfExist(result, {
 		"bidAmount",
@@ -199,6 +202,7 @@ local function addAuctionResultFields(ioEvent, result)
 		"baseFee",
 		"demandFactor",
 	})
+	addResultFundingPlanFields(ioEvent, result)
 end
 
 local function addSupplyData(ioEvent, supplyData)
@@ -2984,6 +2988,7 @@ addEventingHandler("auctionPrices", utils.hasMatchingTag("Action", ActionMap.Auc
 end)
 
 addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.AuctionBid), function(msg)
+	local fundFrom = msg.Tags["Fund-From"]
 	local name = string.lower(msg.Tags.Name)
 	local bidAmount = msg.Tags.Quantity and tonumber(msg.Tags.Quantity) or nil -- if nil, we use the current bid price
 	local bidder = utils.formatAddress(msg.From)
@@ -3021,6 +3026,7 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 
 		local auction = arns.getAuction(name)
 		assert(auction, "Auction not found")
+		assertValidFundFrom(fundFrom)
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -3040,7 +3046,7 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 			Tags = { Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice", Error = "Auction-Bid-Error" },
 			Data = tostring(error),
 		})
-	end, arns.submitAuctionBid, name, bidAmount, bidder, timestamp, processId, type, years)
+	end, arns.submitAuctionBid, name, bidAmount, bidder, timestamp, processId, type, years, msg.Id, fundFrom)
 	if not shouldContinue2 then
 		return
 	end
@@ -3065,6 +3071,8 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 				purchasePrice = record.purchasePrice,
 				processId = record.processId,
 				type = record.type,
+				fundingPlan = result.fundingPlan,
+				fundingResult = result.fundingResult,
 			}),
 		})
 
