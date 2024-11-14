@@ -324,6 +324,10 @@ function gar.getGateway(address)
 	return utils.deepCopy(GatewayRegistry[address])
 end
 
+function gar.getGatewayUnsafe(address)
+	return GatewayRegistry[address]
+end
+
 -- TODO: Add a getGatewaysProps function that omits lots of heavy data like vaults and delegates
 --- Gets all gateways
 ---@return table All gateway objects
@@ -532,6 +536,7 @@ function gar.isGatewayActiveBeforeTimestamp(startTimestamp, gateway)
 	local isNotLeaving = not gar.isGatewayLeaving(gateway)
 	return didStartBeforeEpoch and isNotLeaving
 end
+
 function gar.getActiveGatewaysBeforeTimestamp(startTimestamp)
 	local activeGatewayAddresses = {}
 	-- use pairs as gateways is a map
@@ -1109,6 +1114,19 @@ function gar.allowDelegates(delegates, gatewayAddress)
 		gateway = gateway,
 		addedDelegates = addedDelegates,
 	}
+end
+
+function gar.isEligibleForArNSDiscount(from)
+	local gateway = gar.getGatewayUnsafe(from)
+	if gateway == nil or gateway.weights == nil or gar.isGatewayLeaving(gateway) then
+		return false
+	end
+
+	local tenureWeight = gateway.weights.tenureWeight or 0
+	local gatewayPerformanceRatio = gateway.weights.gatewayRewardRatioWeight or 0
+
+	return tenureWeight >= constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD
+		and gatewayPerformanceRatio >= constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD
 end
 
 --- Remove delegate addresses from the allowedDelegatesLookup table in the gateway's settings

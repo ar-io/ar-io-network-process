@@ -3,9 +3,9 @@ local utils = require("utils")
 local constants = require("constants")
 local balances = require("balances")
 local demand = require("demand")
-local gar = require("gar")
 local arns = {}
 local Auction = require("auctions")
+local gar = require("gar")
 
 NameRegistry = NameRegistry or {
 	reserved = {},
@@ -37,8 +37,16 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 
 	local baseRegistrationFee = demand.baseFeeForNameLength(#name)
 
-	local totalRegistrationFee =
-		arns.calculateRegistrationFee(purchaseType, baseRegistrationFee, numYears, demand.getDemandFactor())
+	local tokenCostResult = arns.getTokenCost({
+		currentTimestamp = timestamp,
+		intent = "Buy-Record",
+		name = name,
+		purchaseType = purchaseType,
+		years = numYears,
+		from = from,
+	})
+
+	local totalRegistrationFee = tokenCostResult.tokenCost
 
 	local fundingPlan = gar.getFundingPlan(from, totalRegistrationFee, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
@@ -116,7 +124,15 @@ function arns.extendLease(from, name, years, currentTimestamp, msgId, fundFrom)
 	-- throw error if invalid
 	arns.assertValidExtendLease(record, currentTimestamp, years)
 	local baseRegistrationFee = demand.baseFeeForNameLength(#name)
-	local totalExtensionFee = arns.calculateExtensionFee(baseRegistrationFee, years, demand.getDemandFactor())
+	local tokenCostResult = arns.getTokenCost({
+		currentTimestamp = currentTimestamp,
+		intent = "Extend-Lease",
+		name = name,
+		years = years,
+		from = from,
+	})
+	local totalExtensionFee = tokenCostResult.tokenCost
+
 	local fundingPlan = gar.getFundingPlan(from, totalExtensionFee, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
@@ -166,6 +182,12 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp, msgId, f
 	local baseRegistrationFee = demand.baseFeeForNameLength(#name)
 	local additionalUndernameCost =
 		arns.calculateUndernameCost(baseRegistrationFee, qty, record.type, yearsRemaining, demand.getDemandFactor())
+
+	-- if the address is eligible for the ArNS discount, apply the discount
+	if gar.isEligibleForArNSDiscount(from) then
+		local discount = math.floor(additionalUndernameCost * constants.ARNS_DISCOUNT_PERCENTAGE)
+		additionalUndernameCost = additionalUndernameCost - discount
+	end
 
 	if additionalUndernameCost < 0 then
 		error("Invalid undername cost")
@@ -315,13 +337,14 @@ end
 ---Calculates the registration fee for a given purchase type, base fee, years, and demand factor
 --- @param purchaseType string The purchase type (lease/permabuy)
 --- @param baseFee number The base fee for the name
---- @param years number The number of years, may be empty for permabuy
+--- @param years number|nil The number of years, may be empty for permabuy
 --- @param demandFactor number The demand factor
 --- @return number The registration fee
 function arns.calculateRegistrationFee(purchaseType, baseFee, years, demandFactor)
 	assert(purchaseType == "lease" or purchaseType == "permabuy", "Invalid purchase type")
 	local registrationFee = purchaseType == "lease" and arns.calculateLeaseFee(baseFee, years, demandFactor)
 		or arns.calculatePermabuyFee(baseFee, demandFactor)
+
 	return registrationFee
 end
 
@@ -410,7 +433,7 @@ function arns.getMaxAllowedYearsExtensionForRecord(record, currentTimestamp)
 end
 
 --- Gets the registration fees for all name lengths and years
---- @return table A table containing registration fees for each name length, with the following structure:
+--- @return table registrationFees A table containing registration fees for each name length, with the following structure:
 ---   - [nameLength]: table The fees for names of this length
 ---     - lease: table Lease fees by year
 ---       - ["1"]: number Cost for 1 year lease
@@ -437,23 +460,26 @@ function arns.getRegistrationFees()
 	return fees
 end
 
----@class IntendedAction
----@field purchaseType string|nil The type of purchase (lease/permabuy)
----@field years number|nil The number of years for lease
----@field quantity number|nil The quantity for increasing undername limit
----@field name string The name of the record
----@field intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name)
----@field currentTimestamp number The current timestamp
+---@class Discount
+---@field name string The name of the discount
+---@field discountTotal number The discounted cost
+---@field multiplier number The multiplier for the discount
 
---- Gets the token cost for an intended action
---- @param intendedAction IntendedAction The intended action with fields:
----   - purchaseType string|nil The type of purchase (lease/permabuy)
----   - years number|nil The number of years for lease
----   - quantity number|nil The quantity for increasing undername limit
----   - name string The name of the record
----   - intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name)
----   - currentTimestamp number The current timestamp
---- @return number The token cost in mIO of the intended action
+---@class TokenCostResult
+---@field tokenCost number The token cost in mIO of the intended action
+---@field discounts table|nil The discounts applied to the token cost
+
+--- @class IntendedAction
+--- @field purchaseType string|nil The type of purchase (lease/permabuy)
+--- @field years number|nil The number of years for lease
+--- @field quantity number|nil The quantity for increasing undername limit
+--- @field name string The name of the record
+--- @field intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name)
+--- @field currentTimestamp number The current timestamp
+--- @field from string|nil The target address of the intended action
+
+--- @param intendedAction IntendedAction The intended action to get token cost for
+--- @return TokenCostResult tokenCostResult The token cost result of the intended action
 function arns.getTokenCost(intendedAction)
 	local tokenCost = 0
 	local purchaseType = intendedAction.purchaseType
@@ -494,11 +520,72 @@ function arns.getTokenCost(intendedAction)
 		arns.assertValidUpgradeName(record, currentTimestamp)
 		tokenCost = arns.calculatePermabuyFee(baseFee, demand.getDemandFactor())
 	end
+
+	local discounts = {}
+
+	-- if the address is eligible for the ArNS discount, apply the discount
+	if gar.isEligibleForArNSDiscount(intendedAction.from) then
+		local discountTotal = math.floor(tokenCost * constants.ARNS_DISCOUNT_PERCENTAGE)
+		local discount = {
+			name = constants.ARNS_DISCOUNT_NAME,
+			discountTotal = discountTotal,
+			multiplier = constants.ARNS_DISCOUNT_PERCENTAGE,
+		}
+		table.insert(discounts, discount)
+		tokenCost = tokenCost - discountTotal
+	end
+
 	-- if token Cost is less than 0, throw an error
 	if tokenCost < 0 then
 		error("Invalid token cost for " .. intendedAction.intent)
 	end
-	return tokenCost
+
+	return {
+		tokenCost = tokenCost,
+		discounts = discounts,
+	}
+end
+
+---@class TokenCostAndFundingPlan
+---@field tokenCost number The token cost in mIO of the intended action
+---@field discounts table|nil The discounts applied to the token cost
+---@field fundingPlan table|nil The funding plan for the intended action
+
+--- Gets the token cost and funding plan for the given intent
+--- @param intent string The intent to get the cost and funding plan for
+--- @param name string The name to get the cost and funding plan for
+--- @param years number The number of years to get the cost and funding plan for
+--- @param quantity number The quantity to get the cost and funding plan for
+--- @param purchaseType string The purchase type to get the cost and funding plan for
+--- @param currentTimestamp number The current timestamp to get the cost and funding plan for
+--- @param from string The from address to get the cost and funding plan for
+--- @param fundFrom string The fund from address to get the cost and funding plan for
+--- @return TokenCostAndFundingPlan tokenCostAndFundingPlan The token cost and funding plan for the given intent
+function arns.getTokenCostAndFundingPlanForIntent(
+	intent,
+	name,
+	years,
+	quantity,
+	purchaseType,
+	currentTimestamp,
+	from,
+	fundFrom
+)
+	local tokenCostResult = arns.getTokenCost({
+		intent = intent,
+		name = name,
+		years = years,
+		quantity = quantity,
+		purchaseType = purchaseType,
+		currentTimestamp = currentTimestamp,
+		from = from,
+	})
+	local fundingPlan = fundFrom and gar.getFundingPlan(from, tokenCostResult.tokenCost, fundFrom)
+	return {
+		tokenCost = tokenCostResult.tokenCost,
+		fundingPlan = fundingPlan,
+		discounts = tokenCostResult.discounts,
+	}
 end
 
 --- Asserts that a name is valid for upgrading
@@ -527,8 +614,13 @@ function arns.upgradeRecord(from, name, currentTimestamp, msgId, fundFrom)
 	arns.assertValidUpgradeName(record, currentTimestamp)
 
 	local baseFee = demand.baseFeeForNameLength(#name)
-	local demandFactor = demand.getDemandFactor()
-	local upgradeCost = arns.calculatePermabuyFee(baseFee, demandFactor)
+	local tokenCostResult = arns.getTokenCost({
+		currentTimestamp = currentTimestamp,
+		intent = "Upgrade-Name",
+		name = name,
+		from = from,
+	})
+	local upgradeCost = tokenCostResult.tokenCost
 
 	local fundingPlan = gar.getFundingPlan(from, upgradeCost, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
@@ -649,9 +741,16 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 	local floorPrice = auction:floorPrice(type, years) -- useful for analytics, used by getPriceForAuctionAtTimestamp
 	local startPrice = auction:startPrice(type, years) -- useful for analytics, used by getPriceForAuctionAtTimestamp
 	local requiredOrBidAmount = bidAmount or requiredBid
-	assert(requiredOrBidAmount >= requiredBid, "Bid amount is less than the required bid of " .. requiredBid)
 
-	local finalBidAmount = math.min(requiredOrBidAmount, requiredBid)
+	local finalBidAmount = requiredBid
+
+	-- check if bidder is eligible for ArNS discount
+	if gar.isEligibleForArNSDiscount(bidder) then
+		local discount = math.floor(finalBidAmount * constants.ARNS_DISCOUNT_PERCENTAGE)
+		finalBidAmount = finalBidAmount - discount
+	end
+
+	assert(requiredOrBidAmount >= requiredBid, "Bid amount is less than the required bid of " .. requiredBid)
 
 	-- check the balance of the bidder
 	assert(balances.walletHasSufficientBalance(bidder, finalBidAmount), "Insufficient balance")
