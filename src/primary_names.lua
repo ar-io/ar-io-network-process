@@ -148,7 +148,7 @@ function primaryNames.setPrimaryNameFromClaim(owner, claim, startTimestamp)
 	}
 end
 
---- Remove primary names
+--- Remove primary names, returning the results of the name removals
 --- @param names string[]
 --- @param from string
 --- @return RemovedPrimaryNameResult[] removedPrimaryNameResults - the results of the name removals

@@ -111,12 +111,13 @@ describe('primary names', function () {
         From: caller,
         Owner: caller,
         Tags: [
-          { name: 'Action', value: 'Revoke-Claims' },
+          { name: 'Action', value: 'Revoke-Primary-Name-Claims' },
           { name: 'Names', value: names.join(',') },
         ],
       },
       memory,
     );
+    console.log(revokeClaimsResult);
     assertNoResultError(revokeClaimsResult);
     return {
       result: revokeClaimsResult,
