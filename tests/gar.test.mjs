@@ -1416,4 +1416,148 @@ describe('GatewayRegistry', async () => {
       // Steps: add a gateway, create the first epoch to prescribe it, submit an observation from the gateway, tick to the epoch distribution timestamp, check the rewards were distributed correctly
     });
   });
+
+  describe('Paginated-Delegations', () => {
+    async function testPaginatedDelegations({
+      sortBy,
+      sortOrder,
+      expectedDelegations,
+    }) {
+      const userAddress = 'user-address-'.padEnd(43, 'a');
+
+      // add another gateway
+      const secondGatewayAddress = 'second-gateway-'.padEnd(43, 'a');
+      const { memory: addGatewayMemory2 } = await joinNetwork({
+        address: secondGatewayAddress,
+        memory: sharedMemory,
+        timestamp: STUB_TIMESTAMP - 1,
+      });
+
+      // Stake to both gateways
+      const { memory: stakedMemory } = await delegateStake({
+        memory: addGatewayMemory2,
+        timestamp: STUB_TIMESTAMP,
+        delegatorAddress: userAddress,
+        quantity: 1_000_000_000,
+        gatewayAddress: STUB_ADDRESS,
+      });
+      const { memory: stakedMemory2 } = await delegateStake({
+        memory: stakedMemory,
+        timestamp: STUB_TIMESTAMP + 1,
+        delegatorAddress: userAddress,
+        quantity: 600_000_000,
+        gatewayAddress: secondGatewayAddress,
+      });
+
+      // Decrease stake on first gateway to create a vault
+      const decreaseQty = 400_000_001;
+      const { memory: decreaseStakeMemory } = await decreaseDelegateStake({
+        memory: stakedMemory2,
+        timestamp: STUB_TIMESTAMP + 2,
+        delegatorAddress: userAddress,
+        decreaseQty,
+        gatewayAddress: STUB_ADDRESS,
+        messageId: 'decrease-stake-message-id',
+      });
+
+      let cursor;
+      let fetchedDelegations = [];
+      while (true) {
+        const paginatedDelegations = await handle(
+          {
+            From: userAddress,
+            Owner: userAddress,
+            Tags: [
+              { name: 'Action', value: 'Paginated-Delegations' },
+              { name: 'Limit', value: '1' },
+              { name: 'Sort-By', value: sortBy },
+              { name: 'Sort-Order', value: sortOrder },
+              ...(cursor ? [{ name: 'Cursor', value: `${cursor}` }] : []),
+            ],
+          },
+          decreaseStakeMemory,
+        );
+        const { items, nextCursor, hasMore, totalItems } = JSON.parse(
+          paginatedDelegations.Messages?.[0]?.Data,
+        );
+        assert.equal(totalItems, 3);
+        assert.equal(items.length, 1);
+        assert.equal(hasMore, !!nextCursor);
+        cursor = nextCursor;
+        fetchedDelegations.push(...items);
+        if (!cursor) break;
+      }
+      assert.deepEqual(fetchedDelegations, expectedDelegations);
+    }
+
+    it('should paginate active and vaulted stakes by ascending balance correctly', async () => {
+      await testPaginatedDelegations({
+        sortBy: 'balance',
+        sortOrder: 'asc',
+        expectedDelegations: [
+          {
+            type: 'vault',
+            gatewayAddress: '2222222222222222222222222222222222222222222',
+            startTimestamp: 21600002,
+            delegationId:
+              '2222222222222222222222222222222222222222222_21600002',
+            balance: 400000001,
+            vaultId: 'decrease-stake-message-id',
+            endTimestamp: 2613600002,
+          },
+          {
+            type: 'stake',
+            gatewayAddress: '2222222222222222222222222222222222222222222',
+            delegationId:
+              '2222222222222222222222222222222222222222222_21600000',
+            balance: 599999999,
+            startTimestamp: 21600000,
+          },
+          {
+            type: 'stake',
+            gatewayAddress: 'second-gateway-aaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            delegationId:
+              'second-gateway-aaaaaaaaaaaaaaaaaaaaaaaaaaaa_21600001',
+            balance: 600000000,
+            startTimestamp: 21600001,
+          },
+        ],
+      });
+    });
+
+    it('should paginate active and vaulted stakes by descending timestamp correctly', async () => {
+      await testPaginatedDelegations({
+        sortBy: 'startTimestamp',
+        sortOrder: 'desc',
+        expectedDelegations: [
+          {
+            type: 'vault',
+            gatewayAddress: '2222222222222222222222222222222222222222222',
+            startTimestamp: 21600002,
+            delegationId:
+              '2222222222222222222222222222222222222222222_21600002',
+            balance: 400000001,
+            vaultId: 'decrease-stake-message-id',
+            endTimestamp: 2613600002,
+          },
+          {
+            type: 'stake',
+            gatewayAddress: 'second-gateway-aaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            delegationId:
+              'second-gateway-aaaaaaaaaaaaaaaaaaaaaaaaaaaa_21600001',
+            balance: 600000000,
+            startTimestamp: 21600001,
+          },
+          {
+            type: 'stake',
+            gatewayAddress: '2222222222222222222222222222222222222222222',
+            delegationId:
+              '2222222222222222222222222222222222222222222_21600000',
+            balance: 599999999,
+            startTimestamp: 21600000,
+          },
+        ],
+      });
+    });
+  });
 });

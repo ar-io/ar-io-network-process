@@ -864,7 +864,7 @@ function gar.slashOperatorStake(address, slashAmount, currentTimestamp)
 
 	gateway.operatorStake = gateway.operatorStake - slashAmount
 	gateway.slashings = gateway.slashings or {}
-	gateway.slashings[currentTimestamp] = slashAmount
+	gateway.slashings[tostring(currentTimestamp)] = slashAmount
 	balances.increaseBalance(ao.id, slashAmount)
 	GatewayRegistry[address] = gateway
 	-- TODO: send slash notice to gateway address
@@ -1468,6 +1468,74 @@ function gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
 	end
 
 	return appliedPlan
+end
+
+--- Fetch copies of all the delegations present across all gateways for the given address
+--- @param address string The address of the delegator
+--- @return table # a table, indexed by gateway address, of all the address's delegations, including nested vaults
+function gar.getDelegations(address)
+	return utils.reduce(gar.getGatewaysUnsafe(), function(acc, gatewayAddress, gateway)
+		if gateway.delegates[address] then
+			acc[gatewayAddress] = utils.deepCopy(gateway.delegates[address])
+		end
+		return acc
+	end, {})
+end
+
+---@class Delegation
+---@field type string # The type of the object. Either "stake" or "vault"
+---@field gatewayAddress string # The address of the gateway the delegation is associated with
+---@field delegateStake number|nil # The amount of stake delegated to the gateway if type is "stake"
+---@field startTimestamp number # The start timestamp of the delegation's initial stake or the vault's creation
+---@field messageId string|nil # The message ID associated with the vault's creation if type is "vault"
+---@field balance number|nil # The balance of the vault if type is "vault"
+---@field endTimestamp number|nil # The end timestamp of the vault if type is "vault"
+---@field delegationId string # The unique ID of the delegation
+
+--- Fetch a flattened array of all the delegations (stakes and vaults) present across all gateways for the given address
+--- @param address string The address of the delegator
+--- @return Delegation[] # A table of all the address's staked and vaulted delegations
+function gar.getFlattenedDelegations(address)
+	return utils.reduce(gar.getDelegations(address), function(acc, gatewayAddress, delegation)
+		table.insert(acc, {
+			type = "stake",
+			gatewayAddress = gatewayAddress,
+			balance = delegation.delegatedStake,
+			startTimestamp = delegation.startTimestamp,
+			delegationId = gatewayAddress .. "_" .. delegation.startTimestamp,
+		})
+		for vaultId, vault in pairs(delegation.vaults) do
+			table.insert(acc, {
+				type = "vault",
+				gatewayAddress = gatewayAddress,
+				startTimestamp = vault.startTimestamp,
+				vaultId = vaultId,
+				balance = vault.balance,
+				endTimestamp = vault.endTimestamp,
+				delegationId = gatewayAddress .. "_" .. vault.startTimestamp,
+			})
+		end
+		return acc
+	end, {})
+end
+
+--- Fetch a heterogenous array of all active and vaulted delegated stakes, cursored on startTimestamp
+--- @param address string The address of the delegator
+--- @param cursor number|nil The cursor startTimestamp after which to fetch more stakes (optional)
+--- @param limit number The max number of stakes to fetch
+--- @param sortBy string The field to sort by. Default is "startTimestamp"
+--- @param sortOrder string The order to sort by, either "asc" or "desc". Default is "asc"
+--- @return PaginatedTable # A table containing the paginated stakes and pagination metadata as Delegation objects
+function gar.getPaginatedDelegations(address, cursor, limit, sortBy, sortOrder)
+	local delegationsArray = gar.getFlattenedDelegations(address)
+	return utils.paginateTableWithCursor(
+		delegationsArray,
+		cursor,
+		"delegationId",
+		limit,
+		sortBy or "startTimestamp",
+		sortOrder or "asc"
+	)
 end
 
 return gar
