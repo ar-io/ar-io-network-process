@@ -4,13 +4,16 @@ import {
   AO_LOADER_HANDLER_ENV,
   DEFAULT_HANDLE_OPTIONS,
   STUB_ADDRESS,
+  PROCESS_OWNER,
   STUB_OPERATOR_ADDRESS,
   STUB_TIMESTAMP,
-  PROCESS_OWNER,
   validGatewayTags,
 } from '../tools/constants.mjs';
 
 const initialOperatorStake = 100_000_000_000;
+
+export const basePermabuyPrice = 2_500_000_000;
+export const baseLeasePrice = 600_000_000;
 
 const { handle: originalHandle, memory } = await createAosLoader();
 export const startMemory = memory;
@@ -32,6 +35,28 @@ export function assertNoResultError(result) {
   );
   assert.strictEqual(errorTag, undefined);
 }
+
+export const getBalances = async ({ memory, timestamp = STUB_TIMESTAMP }) => {
+  const result = await handle(
+    {
+      Tags: [{ name: 'Action', value: 'Balances' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  );
+
+  const balances = JSON.parse(result.Messages?.[0]?.Data);
+  return balances;
+};
+
+export const getBalance = async ({
+  address,
+  memory,
+  timestamp = STUB_TIMESTAMP,
+}) => {
+  const balances = await getBalances({ memory, timestamp });
+  return balances[address];
+};
 
 export const transfer = async ({
   recipient = STUB_ADDRESS,
@@ -61,11 +86,12 @@ export const joinNetwork = async ({
   timestamp = STUB_TIMESTAMP,
   address,
   tags = validGatewayTags,
+  quantity = 100_000_000_000,
 }) => {
   // give them the join network token amount
   const transferMemory = await transfer({
     recipient: address,
-    quantity: 100_000_000_000,
+    quantity,
     memory,
   });
   const joinNetworkResult = await handle(

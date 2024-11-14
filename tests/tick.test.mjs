@@ -325,10 +325,8 @@ describe('Tick', async () => {
     const futureTimestamp = vaultData.endTimestamp + 1;
     const futureTick = await handle(
       {
-        Tags: [
-          { name: 'Action', value: 'Tick' },
-          { name: 'Timestamp', value: futureTimestamp.toString() },
-        ],
+        Tags: [{ name: 'Action', value: 'Tick' }],
+        Timestamp: futureTimestamp,
       },
       createVaultResult.Memory,
     );

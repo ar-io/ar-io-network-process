@@ -178,12 +178,12 @@ end
 --- @field totalItems number The total number of items
 --- @field sortBy string|nil The field to sort by, nil if sorting by the primitive items themselves
 --- @field sortOrder string The order to sort by
---- @field nextCursor string|nil The cursor to the next page
+--- @field nextCursor string|number|nil The cursor to the next page
 --- @field hasMore boolean Whether there is a next page
 
 --- Paginate a table with a cursor
 --- @param tableArray table The table to paginate
---- @param cursor string|nil The cursor to paginate from (optional)
+--- @param cursor string|number|nil The cursor to paginate from (optional)
 --- @param cursorField string|nil The field to use as the cursor or nil for lists of primitives
 --- @param limit number The limit of items to return
 --- @param sortBy string|nil The field to sort by. Nil if sorting by the primitive items themselves.
@@ -324,8 +324,9 @@ function utils.findInArray(array, predicate)
 end
 
 --- Deep copies a table
---- @param original table The table to copy
---- @return table|nil The deep copy of the table or nil if the original is nil
+--- @generic T: table|nil
+--- @param original T The table to copy
+--- @return T The deep copy of the table or nil if the original is nil
 function utils.deepCopy(original)
 	if not original then
 		return nil
