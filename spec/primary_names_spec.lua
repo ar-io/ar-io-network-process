@@ -5,7 +5,7 @@ describe("Primary Names", function()
 		_G.PrimaryNames = {
 			owners = {},
 			names = {},
-			claims = {},
+			requests = {},
 		}
 		_G.Balances = {}
 		_G.NameRegistry = {
@@ -13,25 +13,34 @@ describe("Primary Names", function()
 		}
 	end)
 
-	describe("createPrimaryNameClaim", function()
+	describe("createPrimaryNameRequest", function()
 		it("should fail if the arns record does not exist for the name", function()
-			local status, err = pcall(primaryNames.createNameClaim, "test", "recipient", "processId", 1234567890)
+			local status, err = pcall(primaryNames.createPrimaryNameRequest, "test", "processId", 1234567890)
 			assert.is_false(status)
 			assert.match("ArNS record 'test' does not exist", err)
 		end)
 
-		it("should fail if the caller is not the process id that owns the root name", function()
+		it("should fail if the caller does not have a balance", function()
 			_G.NameRegistry.records = {
 				["test"] = {
-					processId = "processId",
+					processId = "base-name-owner",
 				},
 			}
-			local status, err = pcall(primaryNames.createNameClaim, "test", "recipient", "processId2", 1234567890)
+			_G.Balances = {
+				["user-requesting-primary-name"] = 0,
+			}
+			local status, err =
+				pcall(primaryNames.createPrimaryNameRequest, "test", "user-requesting-primary-name", 1234567890)
 			assert.is_false(status)
-			assert.match("Caller is not the process id that owns the base name", err)
+			assert.match("Insufficient balance", err)
 		end)
 
 		it("should fail if the primary name is already owned", function()
+			_G.NameRegistry.records = {
+				["test"] = {
+					processId = "base-name-owner",
+				},
+			}
 			_G.PrimaryNames = {
 				owners = {
 					["owner"] = {
@@ -42,110 +51,99 @@ describe("Primary Names", function()
 				names = {
 					["test"] = "owner",
 				},
-				claims = {},
+				requests = {},
 			}
-			local status, err = pcall(primaryNames.createNameClaim, "test", "recipient", "processId", 1234567890)
+			local status, err =
+				pcall(primaryNames.createPrimaryNameRequest, "test", "user-requesting-	primary-name", 1234567890)
 			assert.is_false(status)
 			assert.match("Primary name is already owned", err)
 		end)
 
-		it("should create a primary name claim", function()
-			_G.NameRegistry.records = {
-				["test"] = {
-					processId = "processId",
-				},
-			}
-			local primaryNameClaim = primaryNames.createNameClaim("test", "recipient", "processId", 1234567890)
-			assert.are.same({
-				name = "test",
-				startTimestamp = 1234567890,
-				endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
-				recipient = "recipient",
-				initiator = "processId",
-				baseName = "test",
-			}, primaryNameClaim)
-		end)
+		it(
+			"should create a primary name request and transfer the cost from the initiator to the protocol balance",
+			function()
+				_G.Balances = {
+					["user-requesting-primary-name"] = 100000000,
+				}
+				_G.NameRegistry.records = {
+					["test"] = {
+						processId = "processId",
+					},
+				}
+				local primaryNameRequest =
+					primaryNames.createPrimaryNameRequest("test", "user-requesting-primary-name", 1234567890)
+				assert.are.same({
+					name = "test",
+					startTimestamp = 1234567890,
+					endTimestamp = 1234567890 + 7 * 24 * 60 * 60 * 1000,
+					baseName = "test",
+				}, primaryNameRequest)
+				assert.are.equal(0, _G.Balances["user-requesting-primary-name"])
+				assert.are.equal(100000000, _G.Balances[ao.id])
+			end
+		)
 	end)
 
-	describe("claimPrimaryName", function()
-		it("should fail if the primary name claim does not exist", function()
-			local status, err = pcall(primaryNames.claimPrimaryName, "test", "owner", 1234567890)
+	describe("approvePrimaryNameRequest", function()
+		it("should fail if the primary name request does not exist", function()
+			local status, err =
+				pcall(primaryNames.approvePrimaryNameRequest, "primary-name-recipient", "test", "owner", 1234567890)
 			assert.is_false(status)
-			assert.match("Primary name claim for 'test' does not exist", err)
+			assert.match("Primary name request not found", err)
 		end)
 
-		it("should fail if the primary name claim has expired", function()
-			_G.PrimaryNames.claims = {
+		it("should fail if the primary name request has expired", function()
+			_G.NameRegistry.records = {
 				["test"] = {
-					recipient = "recipient",
-					processId = "processId",
+					processId = "owner",
+				},
+			}
+			_G.PrimaryNames.requests = {
+				["primary-name-recipient"] = {
+					name = "test",
+					baseName = "test",
 					startTimestamp = 1234567890,
 					endTimestamp = 1234567890 - 1,
 				},
 			}
-			local status, err = pcall(primaryNames.claimPrimaryName, "test", "recipient", 1234567890)
+			local status, err =
+				pcall(primaryNames.approvePrimaryNameRequest, "primary-name-recipient", "test", "owner", 1234567890)
 			assert.is_false(status)
-			assert.match("Primary name claim for 'test' has expired", err)
+			assert.match("Primary name request has expired", err)
 		end)
 
-		it("should fail if the the recipient of the name does not have sufficient balance", function()
-			_G.PrimaryNames.claims = {
-				["test"] = {
-					recipient = "recipient",
-					startTimestamp = 1234567890,
-					processId = "processId",
-					endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
-				},
-			}
-			local status, err = pcall(primaryNames.claimPrimaryName, "test", "recipient", 1234567890)
-			assert.is_false(status)
-			assert.match("Insufficient balance to claim primary name", err)
-		end)
-
-		it("should claim the primary name", function()
-			_G.NameRegistry.records = {
-				["test"] = {
-					processId = "processId",
-				},
-			}
-			_G.PrimaryNames.claims = {
-				["test"] = {
+		it(
+			"should approve the primary name request and set the primary name in both the owners and names tables",
+			function()
+				_G.NameRegistry.records = {
+					["test"] = {
+						processId = "owner",
+					},
+				}
+				_G.PrimaryNames.requests = {
+					["primary-name-recipient"] = {
+						name = "test",
+						baseName = "test",
+						startTimestamp = 1234567890,
+						endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
+					},
+				}
+				local approvePrimaryNameRequestResult =
+					primaryNames.approvePrimaryNameRequest("primary-name-recipient", "test", "owner", 1234567890)
+				assert.are.same({
 					name = "test",
-					recipient = "recipient",
-					baseName = "test",
-					initiator = "processId",
-					startTimestamp = 1234567890,
-					endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
-				},
-			}
-			_G.Balances = {
-				["recipient"] = 100000000,
-			}
-			local claimedNameAndOwner = primaryNames.claimPrimaryName("test", "recipient", 1234567890)
-			assert.are.same({
-				primaryName = {
-					name = "test",
-					owner = "recipient",
+					owner = "primary-name-recipient",
 					startTimestamp = 1234567890,
 					baseName = "test",
-				},
-				claim = {
-					name = "test",
-					recipient = "recipient",
-					startTimestamp = 1234567890,
-					baseName = "test",
-					initiator = "processId",
-					endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
-				},
-			}, claimedNameAndOwner)
-			assert.are.same({
-				["recipient"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
-			}, _G.PrimaryNames.owners)
-			assert.are.same({
-				["test"] = "recipient",
-			}, _G.PrimaryNames.names)
-			assert.are.equal(0, _G.Balances["recipient"])
-		end)
+				}, approvePrimaryNameRequestResult)
+				assert.are.same({
+					["primary-name-recipient"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
+				}, _G.PrimaryNames.owners)
+				assert.are.same({
+					["test"] = "primary-name-recipient",
+				}, _G.PrimaryNames.names)
+			end
+		)
 	end)
 
 	describe("getAddressForPrimaryName", function()
@@ -205,7 +203,7 @@ describe("Primary Names", function()
 				names = {
 					["test"] = "owner",
 				},
-				claims = {},
+				requests = {},
 			}
 			local releasedNameAndOwner = primaryNames.removePrimaryName("test", "owner")
 			assert.are.same(nil, _G.PrimaryNames.owners["owner"])
@@ -229,7 +227,7 @@ describe("Primary Names", function()
 				names = {
 					["test"] = "owner",
 				},
-				claims = {},
+				requests = {},
 			}
 			local removedNameAndOwner = primaryNames.removePrimaryName("test", "base-name-owner")
 			assert.are.same(nil, _G.PrimaryNames.owners["owner"])
@@ -315,7 +313,7 @@ describe("Primary Names", function()
 					["undername_test"] = "primary-name-owner2",
 					["undername2_test"] = "primary-name-owner3",
 				},
-				claims = {},
+				requests = {},
 			}
 			local removedPrimaryNamesAndOwners =
 				primaryNames.removePrimaryNames({ "test", "undername_test", "undername2_test" }, "base-name-owner")
@@ -349,7 +347,7 @@ describe("Primary Names", function()
 					["test2"] = "owner4",
 					["test3"] = "owner5",
 				},
-				claims = {},
+				requests = {},
 			}
 			local removedNamesAndOwners = primaryNames.removePrimaryNamesForBaseName("test")
 			assert.are.same({
@@ -373,7 +371,7 @@ describe("Primary Names", function()
 					["test2"] = "owner4",
 					["test3"] = "owner5",
 				},
-				claims = {},
+				requests = {},
 			}, _G.PrimaryNames)
 		end)
 	end)

@@ -99,9 +99,8 @@ local ActionMap = {
 	Delegations = "Delegations",
 	-- PRIMARY NAMES
 	RemovePrimaryNames = "Remove-Primary-Names",
-	CreatePrimaryNameClaim = "Create-Primary-Name-Claim",
-	RevokeClaims = "Revoke-Primary-Name-Claims",
-	ClaimPrimaryName = "Claim-Primary-Name",
+	PrimaryNameRequest = "Primary-Name-Request",
+	ApprovePrimaryNameRequest = "Approve-Primary-Name-Request",
 	PrimaryNames = "Primary-Names",
 	PrimaryName = "Primary-Name",
 }
@@ -3286,125 +3285,86 @@ addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap
 	end
 end)
 
-addEventingHandler(
-	"createPrimaryNameClaim",
-	utils.hasMatchingTag("Action", ActionMap.CreatePrimaryNameClaim),
-	function(msg)
-		--- @param input table the message to check assertions and return the result
-		local checkAssertionsAndReturnResult = function(input)
-			local name = input.Tags.Name and string.lower(input.Tags.Name) or nil
-			local recipient = utils.formatAddress(input.Recipient) -- the recipient of the primary name
-			local from = utils.formatAddress(input.From) -- the process that is creating the claim
-			local timestamp = tonumber(input.Timestamp)
-			assert(name, "Name is required")
-			assert(recipient, "Recipient is required")
-			assert(from, "From is required")
-			assert(timestamp, "Timestamp is required")
-			return primaryNames.createNameClaim(name, recipient, from, timestamp)
-		end
-
-		local shouldContinue, primaryNameClaim = eventingPcall(msg.ioEvent, function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Invalid-" .. ActionMap.CreatePrimaryNameClaim .. "-Notice", Error = "Bad-Input" },
-				Data = tostring(error),
-			})
-		end, checkAssertionsAndReturnResult, msg)
-		if not shouldContinue or not primaryNameClaim then
-			return
-		end
-
-		ao.send({
-			Target = msg.From,
-			Action = ActionMap.CreatePrimaryNameClaim .. "-Notice",
-			Data = json.encode(primaryNameClaim),
-		})
-		--- TODO: should ANTs be responsible for sending notices to recipients of new claims?
-		ao.send({
-			Target = primaryNameClaim.recipient,
-			Action = ActionMap.CreatePrimaryNameClaim .. "-Notice",
-			Data = json.encode(primaryNameClaim),
-		})
-	end
-)
-
-addEventingHandler("claimPrimaryName", utils.hasMatchingTag("Action", ActionMap.ClaimPrimaryName), function(msg)
+addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMap.PrimaryNameRequest), function(msg)
 	--- @param input table the message to check assertions and return the result
 	local checkAssertionsAndReturnResult = function(input)
 		local name = input.Tags.Name and string.lower(input.Tags.Name) or nil
-		local from = utils.formatAddress(input.From) -- the recipient of the primary name
+		local initiator = utils.formatAddress(input.From) -- the process that is creating the claim
 		local timestamp = tonumber(input.Timestamp)
 		assert(name, "Name is required")
-		assert(from, "From is required")
+		assert(initiator, "Initiator is required")
 		assert(timestamp, "Timestamp is required")
-		return primaryNames.claimPrimaryName(name, from, timestamp)
+		return primaryNames.createPrimaryNameRequest(name, initiator, timestamp)
 	end
 
-	local shouldContinue, claimPrimaryNameResult = eventingPcall(msg.ioEvent, function(error)
+	local shouldContinue, primaryNameRequest = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.ClaimPrimaryName .. "-Notice", Error = "Bad-Input" },
+			Tags = { Action = "Invalid-" .. ActionMap.PrimaryNameRequest .. "-Notice", Error = "Bad-Input" },
 			Data = tostring(error),
 		})
 	end, checkAssertionsAndReturnResult, msg)
-	if not shouldContinue or not claimPrimaryNameResult then
-		return
-	end
-
-	-- send two notices, one to the owner and one to the initiator
-	ao.send({
-		Target = claimPrimaryNameResult.claim.initiator,
-		Action = ActionMap.ClaimPrimaryName .. "-Notice",
-		Data = json.encode(claimPrimaryNameResult),
-	})
-	ao.send({
-		Target = claimPrimaryNameResult.primaryName.owner,
-		Action = ActionMap.ClaimPrimaryName .. "-Notice",
-		Data = json.encode(claimPrimaryNameResult),
-	})
-end)
-
--- revoke all claims for a given initiator
-addEventingHandler("revokeClaims", utils.hasMatchingTag("Action", ActionMap.RevokeClaims), function(msg)
-	--- @param input table the message to check assertions and return the result
-	local checkAssertionsAndReturnResult = function(input)
-		local initiator = utils.formatAddress(input.From)
-		local names = input.Tags.Names and utils.splitAndTrimString(input.Tags.Names, ",") or {}
-		assert(initiator, "From is required")
-		assert(names and #names > 0, "Names are required")
-		return primaryNames.revokeClaimsForInitiator(initiator, names)
-	end
-
-	local shouldContinue, revokedClaimsArray = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.RevokeClaims .. "-Notice",
-				Error = "Bad-Input",
-			},
-			Data = tostring(error),
-		})
-	end, checkAssertionsAndReturnResult, msg)
-	if not shouldContinue or not revokedClaimsArray then
+	if not shouldContinue or not primaryNameRequest then
 		return
 	end
 
 	ao.send({
 		Target = msg.From,
-		Action = ActionMap.RevokeClaims .. "-Notice",
-		Data = json.encode(revokedClaimsArray),
+		Action = ActionMap.PrimaryNameRequest .. "-Notice",
+		Data = json.encode(primaryNameRequest),
 	})
+	--- TODO: should ANTs be responsible for sending notices to recipients of new claims?
+	ao.send({
+		Target = primaryNameRequest.initiator,
+		Action = ActionMap.PrimaryNameRequest .. "-Notice",
+		Data = json.encode(primaryNameRequest),
+	})
+end)
 
-	-- TODO: send messages to the recipients of the claims? we could index on unique recipients and send one per recipient to avoid multiple messages
-	-- OR ANTS are responsible for sending messages to the recipients of the claims
-	for _, revokedClaim in ipairs(revokedClaimsArray) do
+addEventingHandler(
+	"approvePrimaryNameRequest",
+	utils.hasMatchingTag("Action", ActionMap.ApprovePrimaryNameRequest),
+	function(msg)
+		--- @param input table the message to check assertions and return the result
+		local checkAssertionsAndReturnResult = function(input)
+			local name = input.Tags.Name and string.lower(input.Tags.Name) or nil
+			local recipient = utils.formatAddress(input.Tags.Recipient) or utils.formatAddress(input.From)
+			local from = utils.formatAddress(input.From) -- the recipient of the primary name
+			local timestamp = tonumber(input.Timestamp)
+			assert(name, "Name is required")
+			assert(recipient, "Recipient is required")
+			assert(from, "From is required")
+			assert(timestamp, "Timestamp is required")
+			return primaryNames.approvePrimaryNameRequest(recipient, name, from, timestamp)
+		end
+
+		local shouldContinue, approvedPrimaryNameResult = eventingPcall(msg.ioEvent, function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Invalid-" .. ActionMap.ApprovePrimaryNameRequest .. "-Notice",
+					Error = "Bad-Input",
+				},
+				Data = tostring(error),
+			})
+		end, checkAssertionsAndReturnResult, msg)
+		if not shouldContinue or not approvedPrimaryNameResult then
+			return
+		end
+
+		-- send two notices, one to the owner and one to the initiator
 		ao.send({
-			Target = revokedClaim.recipient,
-			Action = ActionMap.RevokeClaims .. "-Notice",
-			Data = json.encode(revokedClaim),
+			Target = msg.From,
+			Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
+			Data = json.encode(approvedPrimaryNameResult),
+		})
+		ao.send({
+			Target = approvedPrimaryNameResult.owner,
+			Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
+			Data = json.encode(approvedPrimaryNameResult),
 		})
 	end
-end)
+)
 
 --- Handles forward and reverse resolutions (e.g. name -> address and address -> name)
 addEventingHandler("getPrimaryNameData", utils.hasMatchingTag("Action", ActionMap.PrimaryName), function(msg)

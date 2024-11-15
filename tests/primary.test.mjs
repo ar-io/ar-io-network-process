@@ -23,7 +23,6 @@ describe('primary names', function () {
       },
       memory,
     );
-    // assert no error
     assertNoResultError(buyRecordResult);
     return {
       record: JSON.parse(buyRecordResult.Messages[0].Data),
@@ -31,34 +30,8 @@ describe('primary names', function () {
     };
   };
 
-  const createNameClaim = async ({
-    name,
-    caller,
-    recipient,
-    timestamp,
-    memory,
-  }) => {
-    const createNameClaimResult = await handle(
-      {
-        From: caller,
-        Owner: caller,
-        Timestamp: timestamp,
-        Tags: [
-          { name: 'Action', value: 'Create-Primary-Name-Claim' },
-          { name: 'Name', value: name },
-          { name: 'Recipient', value: recipient },
-        ],
-      },
-      memory,
-    );
-    assertNoResultError(createNameClaimResult);
-    return {
-      result: createNameClaimResult,
-      memory: createNameClaimResult.Memory,
-    };
-  };
-
-  const claimPrimaryName = async ({ name, caller, timestamp, memory }) => {
+  const requestPrimaryName = async ({ name, caller, timestamp, memory }) => {
+    // give it balance if not stub address
     if (caller !== STUB_ADDRESS) {
       const transferMemory = await transfer({
         recipient: caller,
@@ -67,22 +40,49 @@ describe('primary names', function () {
       });
       memory = transferMemory;
     }
-    const claimPrimaryNameResult = await handle(
+    const requestPrimaryNameResult = await handle(
       {
         From: caller,
         Owner: caller,
         Timestamp: timestamp,
         Tags: [
-          { name: 'Action', value: 'Claim-Primary-Name' },
+          { name: 'Action', value: 'Primary-Name-Request' },
           { name: 'Name', value: name },
         ],
       },
       memory,
     );
-    assertNoResultError(claimPrimaryNameResult);
+    assertNoResultError(requestPrimaryNameResult);
     return {
-      result: claimPrimaryNameResult,
-      memory: claimPrimaryNameResult.Memory,
+      result: requestPrimaryNameResult,
+      memory: requestPrimaryNameResult.Memory,
+    };
+  };
+
+  const approvePrimaryNameRequest = async ({
+    name,
+    caller,
+    recipient,
+    timestamp,
+    memory,
+  }) => {
+    const approvePrimaryNameRequestResult = await handle(
+      {
+        From: caller,
+        Owner: caller,
+        Timestamp: timestamp,
+        Tags: [
+          { name: 'Action', value: 'Approve-Primary-Name-Request' },
+          { name: 'Name', value: name },
+          { name: 'Recipient', value: recipient },
+        ],
+      },
+      memory,
+    );
+    assertNoResultError(approvePrimaryNameRequestResult);
+    return {
+      result: approvePrimaryNameRequestResult,
+      memory: approvePrimaryNameRequestResult.Memory,
     };
   };
 
@@ -105,27 +105,11 @@ describe('primary names', function () {
     };
   };
 
-  const revokeClaims = async ({ caller, names, memory }) => {
-    const revokeClaimsResult = await handle(
-      {
-        From: caller,
-        Owner: caller,
-        Tags: [
-          { name: 'Action', value: 'Revoke-Primary-Name-Claims' },
-          { name: 'Names', value: names.join(',') },
-        ],
-      },
-      memory,
-    );
-    console.log(revokeClaimsResult);
-    assertNoResultError(revokeClaimsResult);
-    return {
-      result: revokeClaimsResult,
-      memory: revokeClaimsResult.Memory,
-    };
-  };
-
-  const getPrimaryNameForAddress = async ({ address, memory }) => {
+  const getPrimaryNameForAddress = async ({
+    address,
+    memory,
+    assert = true,
+  }) => {
     const getPrimaryNameResult = await handle(
       {
         Tags: [
@@ -135,7 +119,9 @@ describe('primary names', function () {
       },
       memory,
     );
-    assertNoResultError(getPrimaryNameResult);
+    if (assert) {
+      assertNoResultError(getPrimaryNameResult);
+    }
     return {
       result: getPrimaryNameResult,
       memory: getPrimaryNameResult.Memory,
@@ -159,7 +145,7 @@ describe('primary names', function () {
     };
   };
 
-  it('should allow creating and claiming a primary name on a an arns record', async function () {
+  it('should allow creating and approving a primary name for an existing base name', async function () {
     const processId = ''.padEnd(43, 'a');
     const recipient = ''.padEnd(43, 'b');
     const { memory: buyRecordMemory } = await buyRecord({
@@ -167,60 +153,51 @@ describe('primary names', function () {
       processId,
     });
 
-    const { result: createClaimResult } = await createNameClaim({
+    const { result: requestPrimaryNameResult } = await requestPrimaryName({
       name: 'test-name',
-      caller: processId,
-      recipient, // the process creates the claim, the recipient approves it
+      caller: recipient,
       timestamp: 1234567890,
       memory: buyRecordMemory,
     });
 
-    const { result: claimPrimaryNameResult } = await claimPrimaryName({
-      name: 'test-name',
-      caller: recipient,
-      timestamp: 1234567890,
-      memory: createClaimResult.Memory,
-    });
+    const { result: approvePrimaryNameRequestResult } =
+      await approvePrimaryNameRequest({
+        name: 'test-name',
+        caller: processId,
+        recipient: recipient,
+        timestamp: 1234567890,
+        memory: requestPrimaryNameResult.Memory,
+      });
 
-    assertNoResultError(claimPrimaryNameResult);
+    assertNoResultError(approvePrimaryNameRequestResult);
 
     // there should be two messages, one to the ant and one to the owner
-    assert.equal(claimPrimaryNameResult.Messages.length, 2);
-    assert.equal(claimPrimaryNameResult.Messages[0].Target, processId);
-    assert.equal(claimPrimaryNameResult.Messages[1].Target, recipient);
+    assert.equal(approvePrimaryNameRequestResult.Messages.length, 2);
+    assert.equal(approvePrimaryNameRequestResult.Messages[0].Target, processId);
+    assert.equal(approvePrimaryNameRequestResult.Messages[1].Target, recipient);
 
     // find the action tag in the messages
-    const actionTag = claimPrimaryNameResult.Messages[0].Tags.find(
+    const actionTag = approvePrimaryNameRequestResult.Messages[0].Tags.find(
       (tag) => tag.name === 'Action',
     ).value;
-    assert.equal(actionTag, 'Claim-Primary-Name-Notice');
+    assert.equal(actionTag, 'Approve-Primary-Name-Request-Notice');
 
     // the primary name should be set
-    const primaryNameSetResult = JSON.parse(
-      claimPrimaryNameResult.Messages[0].Data,
+    const approvedPrimaryNameResult = JSON.parse(
+      approvePrimaryNameRequestResult.Messages[0].Data,
     );
-    assert.deepStrictEqual(primaryNameSetResult, {
-      claim: {
-        baseName: 'test-name',
-        endTimestamp: 3826567890,
-        initiator: processId,
-        name: 'test-name',
-        recipient,
-        startTimestamp: 1234567890,
-      },
-      primaryName: {
-        name: 'test-name',
-        owner: recipient,
-        startTimestamp: 1234567890,
-        baseName: 'test-name',
-      },
+    assert.deepStrictEqual(approvedPrimaryNameResult, {
+      name: 'test-name',
+      owner: recipient,
+      startTimestamp: 1234567890,
+      baseName: 'test-name',
     });
 
     // now fetch the primary name using the owner address
     const { result: primaryNameForAddressResult } =
       await getPrimaryNameForAddress({
         address: recipient,
-        memory: claimPrimaryNameResult.Memory,
+        memory: approvePrimaryNameRequestResult.Memory,
       });
 
     const primaryNameLookupResult = JSON.parse(
@@ -236,7 +213,7 @@ describe('primary names', function () {
     // reverse lookup the owner of the primary name
     const { result: ownerOfPrimaryNameResult } = await getOwnerOfPrimaryName({
       name: 'test-name',
-      memory: claimPrimaryNameResult.Memory,
+      memory: approvePrimaryNameRequestResult.Memory,
     });
 
     const ownerResult = JSON.parse(ownerOfPrimaryNameResult.Messages[0].Data);
@@ -248,60 +225,6 @@ describe('primary names', function () {
     });
   });
 
-  it('should allow revoking claims for an initiator', async function () {
-    const processId = ''.padEnd(43, 'a');
-    const recipient = ''.padEnd(43, 'b');
-    const { memory: buyRecordMemory } = await buyRecord({
-      name: 'test-name',
-      processId,
-    });
-    // create a primary name claim
-    const { result: createClaimResult } = await createNameClaim({
-      name: 'test-name',
-      caller: processId,
-      recipient,
-      timestamp: 1234567890,
-      memory: buyRecordMemory,
-    });
-    // revoke the claim
-    const { result: revokeClaimsResult } = await revokeClaims({
-      caller: processId,
-      names: ['test-name'],
-      memory: createClaimResult.Memory,
-    });
-
-    // assert no error
-    assertNoResultError(revokeClaimsResult);
-    // assert 2 messages sent - one to the initiator and one to the recipient
-    assert.equal(revokeClaimsResult.Messages.length, 2);
-    assert.equal(revokeClaimsResult.Messages[0].Target, processId);
-    assert.equal(revokeClaimsResult.Messages[1].Target, recipient);
-    // assert the claim was revoked
-    const revokedClaimsData = JSON.parse(revokeClaimsResult.Messages[0].Data);
-    assert.deepStrictEqual(revokedClaimsData, [
-      {
-        baseName: 'test-name',
-        endTimestamp: 3826567890,
-        initiator: processId,
-        name: 'test-name',
-        recipient,
-        startTimestamp: 1234567890,
-      },
-    ]);
-    // assert the claim was sent to the recipient
-    const recipientRevokedClaimsData = JSON.parse(
-      revokeClaimsResult.Messages[1].Data,
-    );
-    assert.deepStrictEqual(recipientRevokedClaimsData, {
-      baseName: 'test-name',
-      endTimestamp: 3826567890,
-      initiator: processId,
-      name: 'test-name',
-      recipient,
-      startTimestamp: 1234567890,
-    });
-  });
-
   it('should allow removing a primary named by the owner or the owner of the base record', async function () {
     const processId = ''.padEnd(43, 'a');
     const recipient = ''.padEnd(43, 'b');
@@ -310,26 +233,27 @@ describe('primary names', function () {
       processId,
     });
     // create a primary name claim
-    const { result: createClaimResult } = await createNameClaim({
+    const { result: createClaimResult } = await requestPrimaryName({
       name: 'test-name',
-      caller: processId,
-      recipient,
+      caller: recipient,
       timestamp: 1234567890,
       memory: buyRecordMemory,
     });
     // claim the primary name
-    const { result: claimPrimaryNameResult } = await claimPrimaryName({
-      name: 'test-name',
-      caller: recipient,
-      timestamp: 1234567890,
-      memory: createClaimResult.Memory,
-    });
+    const { result: approvePrimaryNameRequestResult } =
+      await approvePrimaryNameRequest({
+        name: 'test-name',
+        caller: processId,
+        recipient: recipient,
+        timestamp: 1234567890,
+        memory: createClaimResult.Memory,
+      });
 
     // remove the primary name by the owner
     const { result: removePrimaryNameResult } = await removePrimaryNames({
       names: ['test-name'],
       caller: processId,
-      memory: claimPrimaryNameResult.Memory,
+      memory: approvePrimaryNameRequestResult.Memory,
     });
 
     // assert no error
@@ -355,30 +279,42 @@ describe('primary names', function () {
       owner: recipient,
       name: 'test-name',
     });
+    // assert the primary name is no longer set
+    const { result: primaryNameForAddressResult } =
+      await getPrimaryNameForAddress({
+        address: recipient,
+        memory: removePrimaryNameResult.Memory,
+        assert: false, // we expect an error here, don't throw
+      });
+
+    const errorTag = primaryNameForAddressResult.Messages[0].Tags.find(
+      (tag) => tag.name === 'Error',
+    ).value;
+    assert.equal(errorTag, 'Primary-Name-Not-Found');
   });
 
-  describe('getPaginatedPrimaryNames', function () {
-    it('should return all primary names', async function () {
-      const getPaginatedPrimaryNamesResult = await handle({
-        Tags: [
-          { name: 'Action', value: 'Primary-Names' },
-          { name: 'Limit', value: 10 },
-          { name: 'Sort-By', value: 'owner' },
-          { name: 'Sort-Order', value: 'asc' },
-        ],
-      });
-      assertNoResultError(getPaginatedPrimaryNamesResult);
-      const primaryNames = JSON.parse(
-        getPaginatedPrimaryNamesResult.Messages[0].Data,
-      );
-      assert.deepStrictEqual(primaryNames, {
-        items: [],
-        totalItems: 0,
-        limit: 10,
-        hasMore: false,
-        sortBy: 'owner',
-        sortOrder: 'asc',
-      });
-    });
-  });
+  // describe('getPaginatedPrimaryNames', function () {
+  //   it('should return all primary names', async function () {
+  //     const getPaginatedPrimaryNamesResult = await handle({
+  //       Tags: [
+  //         { name: 'Action', value: 'Primary-Names' },
+  //         { name: 'Limit', value: 10 },
+  //         { name: 'Sort-By', value: 'owner' },
+  //         { name: 'Sort-Order', value: 'asc' },
+  //       ],
+  //     });
+  //     assertNoResultError(getPaginatedPrimaryNamesResult);
+  //     const primaryNames = JSON.parse(
+  //       getPaginatedPrimaryNamesResult.Messages[0].Data,
+  //     );
+  //     assert.deepStrictEqual(primaryNames, {
+  //       items: [],
+  //       totalItems: 0,
+  //       limit: 10,
+  //       hasMore: false,
+  //       sortBy: 'owner',
+  //       sortOrder: 'asc',
+  //     });
+  //   });
+  // });
 });

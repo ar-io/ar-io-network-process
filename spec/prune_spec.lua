@@ -31,10 +31,10 @@ describe("prune", function()
 			names = {
 				["test-record"] = "test-primary-name-owner",
 			},
-			claims = {
-				["test-primary-name-claim"] = {
+			requests = {
+				["test-primary-name-request"] = {
 					endTimestamp = 1000000,
-					recipient = "test-primary-name-owner",
+					name = "test-record",
 				},
 			},
 		}
@@ -107,11 +107,11 @@ describe("prune", function()
 		local pruneTimestamp = 1000000
 		local result = tick.pruneState(pruneTimestamp, "msgId", 0)
 		assert.are.same({
-			["test-primary-name-claim"] = {
+			["test-primary-name-request"] = {
 				endTimestamp = pruneTimestamp,
-				recipient = "test-primary-name-owner",
+				name = "test-record",
 			},
-		}, result.prunedPrimaryNameClaims)
-		assert.are.same({}, _G.PrimaryNames.claims)
+		}, result.prunedPrimaryNameRequests)
+		assert.are.same({}, _G.PrimaryNames.requests)
 	end)
 end)
