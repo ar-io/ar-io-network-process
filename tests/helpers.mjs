@@ -64,6 +64,11 @@ export const transfer = async ({
   memory = startMemory,
   cast = false,
 } = {}) => {
+  if (quantity === 0) {
+    // Nothing to do
+    return memory;
+  }
+
   const transferResult = await handle(
     {
       From: PROCESS_OWNER,

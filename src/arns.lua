@@ -729,8 +729,11 @@ end
 --- @param processId string The processId of the bid
 --- @param type string The type of the bid
 --- @param years number The number of years for the bid
---- @return table The result of the bid including the auction, bidder, bid amount, reward for initiator, reward for protocol, and record
-function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, type, years)
+--- @param msgId string The current messageId
+--- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stakes". Default "balance"
+--- @return table The result of the bid including the auction, bidder, bid amount, reward for initiator, reward for protocol, record, fundingPlan, and fundingResult
+function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, type, years, msgId, fundFrom)
+	fundFrom = fundFrom or "balance"
 	local auction = arns.getAuction(name)
 	assert(auction, "Auction not found")
 	assert(
@@ -752,8 +755,12 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 
 	assert(requiredOrBidAmount >= requiredBid, "Bid amount is less than the required bid of " .. requiredBid)
 
-	-- check the balance of the bidder
-	assert(balances.walletHasSufficientBalance(bidder, finalBidAmount), "Insufficient balance")
+	-- check the balances of the bidder
+	local fundingPlan = gar.getFundingPlan(bidder, finalBidAmount, fundFrom)
+	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
+
+	-- apply the funding plan
+	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, timestamp)
 
 	local record = {
 		processId = processId,
@@ -768,8 +775,8 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 	local rewardForInitiator = auction.initiator ~= ao.id and math.floor(finalBidAmount * 0.5) or 0
 	local rewardForProtocol = auction.initiator ~= ao.id and finalBidAmount - rewardForInitiator or finalBidAmount
 	-- reduce bidder balance by the final bid amount
-	balances.transfer(auction.initiator, bidder, rewardForInitiator)
-	balances.transfer(ao.id, bidder, rewardForProtocol)
+	balances.increaseBalance(auction.initiator, rewardForInitiator)
+	balances.increaseBalance(ao.id, rewardForProtocol)
 	arns.removeAuction(name)
 	arns.addRecord(name, record)
 	-- make sure we tally name purchase given, even though only half goes to protocol
@@ -786,6 +793,8 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 		startPrice = startPrice,
 		type = type,
 		years = years,
+		fundingPlan = fundingPlan,
+		fundingResult = fundingResult,
 	}
 end
 
