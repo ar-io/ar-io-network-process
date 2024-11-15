@@ -4,6 +4,7 @@ local utils = require("utils")
 local gar = require("gar")
 local primaryNames = {}
 
+-- TODO: Figure out how to modulate this according to market conditions since it's actual spending
 local PRIMARY_NAME_COST = 100000000 -- 100 IO
 
 --- @alias WalletAddress string
