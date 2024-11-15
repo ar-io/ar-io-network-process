@@ -2881,7 +2881,25 @@ describe("gar", function()
 		local timestamp = 12345
 		local minDelegatedStake = gar.getSettings().delegates.minStake
 		local minOperatorStake = gar.getSettings().operators.minStake
-		local testRedelgationGateway = utils.deepCopy(testGateway)
+		local testRedelgationGateway = utils.deepCopy({
+			operatorStake = gar.getSettings().operators.minStake,
+			totalDelegatedStake = 0,
+			vaults = {},
+			delegates = {},
+			startTimestamp = 0,
+			stats = {
+				prescribedEpochCount = 0,
+				observedEpochCount = 0,
+				totalEpochCount = 0,
+				passedEpochCount = 0,
+				failedEpochCount = 0,
+				failedConsecutiveEpochs = 0,
+				passedConsecutiveEpochs = 0,
+			},
+			settings = testSettings,
+			status = "joined",
+			observerAddress = stubObserverAddress,
+		})
 		testRedelgationGateway.settings.allowedDelegatesLookup = nil
 		local stubDelegation = {
 			delegatedStake = minDelegatedStake,
