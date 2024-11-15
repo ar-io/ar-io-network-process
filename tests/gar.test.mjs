@@ -68,6 +68,7 @@ describe('GatewayRegistry', async () => {
     timestamp = STUB_TIMESTAMP,
     address,
   }) => {
+    console.log('address', address);
     const gatewayResult = await handle(
       {
         Tags: [
@@ -78,6 +79,7 @@ describe('GatewayRegistry', async () => {
       },
       memory,
     );
+    console.log('gatewayResult', gatewayResult);
 
     const gateway = JSON.parse(gatewayResult.Messages?.[0]?.Data);
     return gateway;
@@ -1560,4 +1562,197 @@ describe('GatewayRegistry', async () => {
       });
     });
   });
+
+  describe('Re-Delegate-Stake', () => {
+    const reDelegateStake = async ({
+      memory,
+      delegatorAddress,
+      quantity,
+      sourceAddress,
+      targetAddress,
+      vaultId,
+      timestamp,
+    }) => {
+      const result = await handle(
+        {
+          From: delegatorAddress,
+          Owner: delegatorAddress,
+          Tags: [
+            { name: 'Action', value: 'Re-Delegate-Stake' },
+            { name: 'Source', value: sourceAddress },
+            { name: 'Target', value: targetAddress },
+            { name: 'Quantity', value: `${quantity}` },
+            ...(vaultId ? [{ name: 'Vault-Id', value: vaultId }] : []),
+          ],
+          Timestamp: timestamp,
+        },
+        memory,
+      );
+      return {
+        result,
+        memory: result.Memory,
+      };
+    };
+
+    it('should allow re-delegating stake', async () => {
+      const sourceAddress = 'source-address-'.padEnd(43, 'a');
+      const targetAddress = 'target-address-'.padEnd(43, 'b');
+      const delegatorAddress = 'delegator-address-'.padEnd(43, 'c');
+
+      const { memory: joinSourceMemory } = await joinNetwork({
+        address: sourceAddress,
+        memory: sharedMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const { memory: joinTargetMemory } = await joinNetwork({
+        address: targetAddress,
+        memory: joinSourceMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const stakeQty = 500_000_000;
+      const transferMemory = await transfer({
+        recipient: delegatorAddress,
+        quantity: stakeQty,
+        memory: joinTargetMemory,
+      });
+
+      const { memory: delegatedStakeMemory } = await delegateStake({
+        delegatorAddress,
+        quantity: stakeQty,
+        gatewayAddress: sourceAddress,
+        timestamp: STUB_TIMESTAMP,
+        memory: transferMemory,
+      });
+
+      const sourceGatewayBefore = await getGateway({
+        address: sourceAddress,
+        memory: delegatedStakeMemory,
+      });
+      assert(sourceGatewayBefore.totalDelegatedStake === stakeQty);
+      assert.deepStrictEqual(sourceGatewayBefore.delegates, {
+        [delegatorAddress]: {
+          delegatedStake: stakeQty,
+          startTimestamp: STUB_TIMESTAMP,
+          vaults: [],
+        },
+      });
+
+      const { memory: reDelegateStakeMemory, result } = await reDelegateStake({
+        memory: delegatedStakeMemory,
+        delegatorAddress,
+        quantity: stakeQty,
+        sourceAddress,
+        targetAddress,
+        timestamp: STUB_TIMESTAMP,
+      });
+
+      const targetGatewayAfter = await getGateway({
+        address: targetAddress,
+        memory: reDelegateStakeMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      assert(targetGatewayAfter.totalDelegatedStake === stakeQty);
+      assert.deepStrictEqual(targetGatewayAfter.delegates, {
+        [delegatorAddress]: {
+          delegatedStake: stakeQty,
+          startTimestamp: STUB_TIMESTAMP,
+          vaults: [],
+        },
+      });
+
+      const sourceGatewayAfter = await getGateway({
+        address: sourceAddress,
+        memory: reDelegateStakeMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      assert(sourceGatewayAfter.totalDelegatedStake === 0);
+      assert.deepStrictEqual(sourceGatewayAfter.delegates, {});
+
+      const feeResultAfterReDelegation = await handle(
+        {
+          From: delegatorAddress,
+          Owner: delegatorAddress,
+          Tags: [{ name: 'Action', value: 'Re-Delegation-Fee' }],
+          Timestamp: STUB_TIMESTAMP,
+        },
+        reDelegateStakeMemory,
+      );
+      assert.deepStrictEqual(feeResultAfterReDelegation.Messages[0].Data, {
+        reDelegationFeePct: 0.1,
+        feeResetTimestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7, // 7 days
+      });
+    });
+  });
 });
+
+const j = {
+  reDelegationsSinceFeeReset: 1,
+  sourceGateway: {
+    totalDelegatedStake: 0,
+    operatorStake: 100000000000,
+    startTimestamp: 21600000,
+    vaults: [],
+    delegates: [],
+    status: 'joined',
+    observerAddress: '2222222222222222222222222222222222222222222',
+    settings: {
+      label: 'test-gateway',
+      allowDelegatedStaking: true,
+      note: 'test-note',
+      delegateRewardShareRatio: 25,
+      port: 443,
+      protocol: 'https',
+      properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
+      minDelegatedStake: 500000000,
+      fqdn: 'test-fqdn',
+      autoStake: true,
+    },
+    stats: {
+      failedEpochCount: 0,
+      observedEpochCount: 0,
+      passedEpochCount: 0,
+      totalEpochCount: 0,
+      failedConsecutiveEpochs: 0,
+      prescribedEpochCount: 0,
+      passedConsecutiveEpochs: 0,
+    },
+  },
+  feeResetTimestamp: 626400000,
+  targetGateway: {
+    totalDelegatedStake: 500000000,
+    operatorStake: 100000000000,
+    startTimestamp: 21600000,
+    vaults: [],
+    delegates: {
+      'delegator-address-ccccccccccccccccccccccccc': {
+        delegatedStake: 500000000,
+        vaults: [],
+        startTimestamp: 21600000,
+      },
+    },
+    stats: {
+      failedEpochCount: 0,
+      observedEpochCount: 0,
+      totalEpochCount: 0,
+      passedEpochCount: 0,
+      prescribedEpochCount: 0,
+      failedConsecutiveEpochs: 0,
+      passedConsecutiveEpochs: 0,
+    },
+    settings: {
+      label: 'test-gateway',
+      allowDelegatedStaking: true,
+      note: 'test-note',
+      delegateRewardShareRatio: 25,
+      port: 443,
+      protocol: 'https',
+      autoStake: true,
+      minDelegatedStake: 500000000,
+      fqdn: 'test-fqdn',
+      properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
+    },
+    observerAddress: '2222222222222222222222222222222222222222222',
+    status: 'joined',
+  },
+  reDelegationFee: 0,
+};
