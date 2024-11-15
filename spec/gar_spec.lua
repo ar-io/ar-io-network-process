@@ -3864,7 +3864,7 @@ describe("gar", function()
 				},
 			}
 			local result = gar.getReDelegationFee(testTargetAddress)
-			assert.are.same({ reDelegationFeePct = 0.1, feeResetTimestamp = 1 + sevenDays }, result)
+			assert.are.same({ reDelegationFeePct = 10, feeResetTimestamp = 1 + sevenDays }, result)
 		end)
 
 		it("should return 0.6 if the delegator has redelegated 7 times in the last 7 epochs", function()
@@ -3875,7 +3875,7 @@ describe("gar", function()
 				},
 			}
 			local result = gar.getReDelegationFee(testTargetAddress)
-			assert.are.same({ reDelegationFeePct = 0.6, feeResetTimestamp = 1 + sevenDays }, result)
+			assert.are.same({ reDelegationFeePct = 60, feeResetTimestamp = 1 + sevenDays }, result)
 		end)
 	end)
 end)

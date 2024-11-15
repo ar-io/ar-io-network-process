@@ -15,6 +15,7 @@ function tick.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 	local prunedReserved = arns.pruneReservedNames(timestamp)
 	local prunedVaults = vaults.pruneVaults(timestamp)
 	local pruneGatewaysResult = gar.pruneGateways(timestamp, msgId)
+	local delegatorsWithFeeReset = gar.pruneReDelegationFeeData(timestamp)
 	local prunedEpochs = epochs.pruneEpochs(timestamp)
 	return {
 		prunedRecords = prunedRecords,
@@ -24,6 +25,7 @@ function tick.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 		prunedVaults = prunedVaults,
 		pruneGatewaysResult = pruneGatewaysResult,
 		prunedEpochs = prunedEpochs,
+		delegatorsWithFeeReset = delegatorsWithFeeReset,
 	}
 end
 

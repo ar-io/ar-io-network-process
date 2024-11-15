@@ -1551,9 +1551,23 @@ function gar.getPaginatedDelegations(address, cursor, limit, sortBy, sortOrder)
 	)
 end
 
--- TODO: Prune on ticks -- integrate with primary name branch
 --- @type { [string]: { timestamp: number, redelegations: number } }
 ReDelegations = ReDelegations or {}
+
+function gar.pruneReDelegationFeeData(currentTimestamp)
+	local reDelegations = gar.getReDelgations()
+
+	local delegatorsWithFeesReset = {}
+
+	ReDelegations = utils.reduce(reDelegations, function(acc, delegateAddress, reDelegationData)
+		if reDelegationData.timestamp + constants.redelegationFeeResetIntervalMs < currentTimestamp then
+			table.insert(delegatorsWithFeesReset, delegateAddress)
+			return acc
+		end
+		acc[delegateAddress] = reDelegationData
+		return acc
+	end, {})
+end
 
 function gar.getReDelgations()
 	return utils.deepCopy(ReDelegations)
@@ -1639,12 +1653,12 @@ function gar.reDelegateStake(params)
 	local previousReDelegations = gar.getReDelegation(delegateAddress)
 
 	local reDelegationFeePct = math.min(
-		previousReDelegations and previousReDelegations.redelegations >= 1 and 0.1 * previousReDelegations.redelegations
+		previousReDelegations and previousReDelegations.redelegations >= 1 and 10 * previousReDelegations.redelegations
 			or 0,
-		0.6
+		60
 	)
 
-	local redelegationFee = math.ceil(stakeToTakeFromSource * reDelegationFeePct)
+	local redelegationFee = math.ceil(stakeToTakeFromSource * (reDelegationFeePct / 100))
 	local stakeToDelegate = stakeToTakeFromSource - redelegationFee
 
 	if stakeToDelegate == 0 then
@@ -1824,9 +1838,9 @@ function gar.getReDelegationFee(delegateAddress)
 	local previousReDelegations = gar.getReDelegationUnsafe(delegateAddress)
 
 	local reDelegationFeePct = math.min(
-		previousReDelegations and previousReDelegations.redelegations >= 1 and 0.1 * previousReDelegations.redelegations
+		previousReDelegations and previousReDelegations.redelegations >= 1 and 10 * previousReDelegations.redelegations
 			or 0,
-		0.6
+		60
 	)
 
 	return {
