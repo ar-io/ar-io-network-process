@@ -134,10 +134,12 @@ local function eventingPcall(ioEvent, onError, fnToCall, ...)
 end
 
 --- @param fundingPlan FundingPlan|nil
-local function adjustSuppliesForFundingPlan(fundingPlan)
+--- @param rewardForInitiator number|nil only applies in auction bids for released names
+local function adjustSuppliesForFundingPlan(fundingPlan, rewardForInitiator)
 	if not fundingPlan then
 		return
 	end
+	rewardForInitiator = rewardForInitiator or 0
 	local totalActiveStakesUsed = utils.reduce(fundingPlan.stakes, function(acc, _, stakeSpendingPlan)
 		return acc + stakeSpendingPlan.delegatedStake
 	end, 0)
@@ -149,8 +151,7 @@ local function adjustSuppliesForFundingPlan(fundingPlan)
 	end, 0)
 	LastKnownStakedSupply = LastKnownStakedSupply - totalActiveStakesUsed
 	LastKnownWithdrawSupply = LastKnownWithdrawSupply - totalWithdrawStakesUsed
-	-- TODO: THIS CAN VARY IN THE RELEASE-NAME FLOW WHERE AN INITIATOR IS PAID OUT
-	LastKnownCirculatingSupply = LastKnownCirculatingSupply - fundingPlan.balance
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply - fundingPlan.balance + rewardForInitiator
 end
 
 local function addResultFundingPlanFields(ioEvent, result)
@@ -190,7 +191,7 @@ local function addResultFundingPlanFields(ioEvent, result)
 		ioEvent:addField("New-Withdraw-Vaults-Count", newWithdrawVaultsTallies.count)
 		ioEvent:addField("New-Withdraw-Vaults-Total-Balance", newWithdrawVaultsTallies.totalBalance)
 	end
-	adjustSuppliesForFundingPlan(result.fundingPlan)
+	adjustSuppliesForFundingPlan(result.fundingPlan, result.rewardForInitiator)
 end
 
 local function addRecordResultFields(ioEvent, result)
@@ -2871,6 +2872,7 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	end
 
 	local removeRecordsAndCreateAuction = function()
+		assert(timestamp, "Timestamp is required")
 		local removedRecord = arns.removeRecord(name)
 		local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNamesForBaseName(name) -- NOTE: this should be empty if there are no primary names allowed before release
 		local auction = arns.createAuction(name, timestamp, initiator)
