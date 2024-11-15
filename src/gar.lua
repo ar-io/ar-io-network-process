@@ -433,6 +433,7 @@ ReDelegations = ReDelegations or {}
 --- @field targetAddress string # The address of the gateway to redelegate stake to (required)
 --- @field qty number # The amount of stake to redelegate - must be positive integer (required)
 --- @field currentTimestamp number # The current timestamp (required)
+--- @field vaultId string | nil # The vault id to redelegate from (optional)
 
 --- @class ReDelegateStakeResult
 --- @field sourceGateway table # The updated gateway object that the stake was moved from
@@ -449,6 +450,7 @@ function gar.reDelegateStake(params)
 	local sourceAddress = params.sourceAddress
 	local stakeToTakeFromSource = params.qty
 	local currentTimestamp = params.currentTimestamp
+	local vaultId = params.vaultId
 
 	assert(type(stakeToTakeFromSource) == "number", "Quantity is required and must be a number")
 	assert(stakeToTakeFromSource > 0, "Quantity must be greater than 0")
@@ -499,52 +501,99 @@ function gar.reDelegateStake(params)
 
 	-- Assert source has enough stake to redelegate and remove the stake from the source
 	if delegateAddress == sourceAddress then
-		-- TODO: check from any existing vault
 		-- check if he gateway can afford to redelegate from itself
 
-		local maxWithdraw = sourceGateway.operatorStake - gar.getSettings().operators.minStake
+		if vaultId then
+			-- Get the redelegation amount from the operator vault
 
-		if stakeToTakeFromSource > maxWithdraw then
-			error(
-				"Resulting stake is not enough to maintain the minimum operator stake of "
-					.. gar.getSettings().operators.minStake
-					.. " IO"
-			)
+			local existingVault = sourceGateway.vaults[vaultId]
+			if not existingVault then
+				error("Vault not found on the operator.")
+			end
+
+			if existingVault.balance < stakeToTakeFromSource then
+				error("Quantity must be less than or equal to the vaulted stake amount.")
+			end
+
+			if existingVault.balance == stakeToTakeFromSource then
+				-- The operator vault has been emptied
+				sourceGateway.vaults[vaultId] = nil
+			else
+				-- The operator vault has been partially emptied
+				sourceGateway.vaults[delegateAddress][vaultId].balance = sourceGateway.vaults[delegateAddress][vaultId].balance
+					- stakeToTakeFromSource
+			end
+		else
+			-- Get the redelegation amount from the operator stakes
+			local maxWithdraw = sourceGateway.operatorStake - gar.getSettings().operators.minStake
+
+			if stakeToTakeFromSource > maxWithdraw then
+				error(
+					"Resulting stake is not enough to maintain the minimum operator stake of "
+						.. gar.getSettings().operators.minStake
+						.. " IO"
+				)
+			end
+
+			sourceGateway.operatorStake = sourceGateway.operatorStake - stakeToTakeFromSource
 		end
-
-		sourceGateway.operatorStake = sourceGateway.operatorStake - stakeToTakeFromSource
 	else
 		local existingDelegate = sourceGateway.delegates[delegateAddress]
-		-- TODO: Get existing vaulted stake from delegate
-		-- local existingVaults = existingDelegate.vaults
-
-		if not existingDelegate or existingDelegate.delegatedStake == 0 then
+		if not existingDelegate then
 			error("This delegate has no stake to redelegate.")
 		end
 
-		-- Check if the delegate has enough stake to redelegate
-		if existingDelegate.delegatedStake < stakeToTakeFromSource then
-			error("Quantity must be less than or equal to the delegated stake amount.")
-		end
+		if vaultId then
+			local existingVault = existingDelegate.vaults[vaultId]
+			if not existingVault then
+				error("Vault not found on the delegate.")
+			end
 
-		-- Check if the delegate will have enough stake left after re-delegating
-		local existingStake = existingDelegate.delegatedStake
-		local requiredMinimumStake = sourceGateway.settings.minDelegatedStake
-		local maxAllowedToWithdraw = existingStake - requiredMinimumStake
-		if maxAllowedToWithdraw < stakeToTakeFromSource and stakeToTakeFromSource ~= existingStake then
-			error(
-				"Remaining delegated stake must be greater than the minimum delegated stake. Adjust the amount or re-delegate all stake."
-			)
-		end
+			if existingVault.balance < stakeToTakeFromSource then
+				error("Quantity must be less than or equal to the vaulted stake amount.")
+			end
 
-		-- If the delegate has enough stake to redelegate, move the stake. If its all the stake, remove the delegate
-		if existingDelegate.delegatedStake == stakeToTakeFromSource then
-			gar.pruneDelegateFromGateway(delegateAddress, sourceGateway)
+			if existingVault.balance == stakeToTakeFromSource then
+				-- The vault has been emptied
+				sourceGateway.delegates[delegateAddress].vaults[vaultId] = nil
+
+				if
+					-- If all vaults and stake are emptied, remove the delegate
+					sourceGateway.delegates[delegateAddress].delegatedStake == 0
+					and next(sourceGateway.delegates[delegateAddress].vaults) == nil
+				then
+					gar.pruneDelegateFromGateway(delegateAddress, sourceGateway)
+				end
+			else
+				-- The vault has been partially emptied
+				sourceGateway.delegates[delegateAddress].vaults[vaultId].balance = sourceGateway.delegates[delegateAddress].vaults[vaultId].balance
+					- stakeToTakeFromSource
+			end
 		else
-			sourceGateway.delegates[delegateAddress].delegatedStake = sourceGateway.delegates[delegateAddress].delegatedStake
-				- stakeToTakeFromSource
+			-- Check if the delegate has enough stake to redelegate
+			if existingDelegate.delegatedStake < stakeToTakeFromSource then
+				error("Quantity must be less than or equal to the delegated stake amount.")
+			end
+
+			-- Check if the delegate will have enough stake left after re-delegating
+			local existingStake = existingDelegate.delegatedStake
+			local requiredMinimumStake = sourceGateway.settings.minDelegatedStake
+			local maxAllowedToWithdraw = existingStake - requiredMinimumStake
+			if maxAllowedToWithdraw < stakeToTakeFromSource and stakeToTakeFromSource ~= existingStake then
+				error(
+					"Remaining delegated stake must be greater than the minimum delegated stake. Adjust the amount or re-delegate all stake."
+				)
+			end
+
+			-- If the delegate has enough stake to redelegate, move the stake. If its all the stake, remove the delegate
+			if existingDelegate.delegatedStake == stakeToTakeFromSource then
+				gar.pruneDelegateFromGateway(delegateAddress, sourceGateway)
+			else
+				sourceGateway.delegates[delegateAddress].delegatedStake = sourceGateway.delegates[delegateAddress].delegatedStake
+					- stakeToTakeFromSource
+			end
+			sourceGateway.totalDelegatedStake = sourceGateway.totalDelegatedStake - stakeToTakeFromSource
 		end
-		sourceGateway.totalDelegatedStake = sourceGateway.totalDelegatedStake - stakeToTakeFromSource
 	end
 
 	local existingTargetDelegate = targetGateway.delegates[delegateAddress]
