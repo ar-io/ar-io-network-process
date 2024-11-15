@@ -2267,148 +2267,18 @@ describe("gar", function()
 		end)
 
 		it(
-			"should use stakes in excess of gateway minimum stake from a single gateway whether or not holding balance and funding source is 'stakes'",
-			function()
-				local expectedGatewaysRegistry = {
-					[stubGatewayAddress] = {
-						totalDelegatedStake = 1500,
-						vaults = {},
-						delegates = {
-							[stubRandomAddress] = {
-								delegatedStake = 1500,
-								vaults = {},
-							},
-						},
-						settings = {
-							minDelegatedStake = 500,
-						},
-						stats = {
-							passedEpochCount = 0,
-							totalEpochCount = 0,
-						},
-					},
-				}
-				_G.GatewayRegistry = expectedGatewaysRegistry
-				assert.are.same({
-					address = stubRandomAddress,
-					balance = 0,
-					stakes = {
-						[stubGatewayAddress] = {
-							delegatedStake = 1000,
-							vaults = {},
-						},
-					},
-					shortfall = 0,
-				}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
-				assert.are.same(expectedGatewaysRegistry, _G.GatewayRegistry)
-
-				for _, balance in pairs({ 0, 10000 }) do
-					local expectedBalances = {
-						[stubRandomAddress] = balance,
-					}
-					_G.Balances = expectedBalances
-					assert.are.same({
-						address = stubRandomAddress,
-						balance = 0,
-						stakes = {
-							[stubGatewayAddress] = {
-								delegatedStake = 1000,
-								vaults = {},
-							},
-						},
-						shortfall = 0,
-					}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
-					assert.are.same(expectedBalances, _G.Balances)
-					assert.are.same(expectedGatewaysRegistry, _G.GatewayRegistry)
-				end
-			end
-		)
-
-		it(
-			"should use stakes in excess of gateway minimum stake from multiple gateways whether or not holding balance and funding source is 'stakes'",
-			function()
-				-- TO TEST:
-				-- Excess stakes above the minimum are used first, ordered from largest excess over each gateways’ proposed minimum to smallest.
-				-- Tie broken here by ordering from worst performing gateway to best
-				-- Next tie breaker is highest total gateway stake to lowest (hurst the biggest and baddest gateway first)
-				-- Final tie breaker is gateway tenure
-				local expectedGatewaysRegistry = {
-					[stubGatewayAddress] = {
-						totalDelegatedStake = 1000,
-						vaults = {},
-						delegates = {
-							[stubRandomAddress] = {
-								delegatedStake = 800, -- 750 over minimum, but lower total delegated stake
-								vaults = {},
-							},
-						},
-						settings = {
-							minDelegatedStake = 50,
-						},
-						stats = {
-							passedEpochCount = 0,
-							totalEpochCount = 0,
-						},
-					},
-					[stubObserverAddress] = {
-						totalDelegatedStake = 1000,
-						vaults = {},
-						delegates = {
-							[stubRandomAddress] = {
-								delegatedStake = 1000, -- 300 over minimum, but higher total delegated stake
-								vaults = {},
-							},
-						},
-						settings = {
-							minDelegatedStake = 700,
-						},
-						stats = {
-							passedEpochCount = 0,
-							totalEpochCount = 0,
-						},
-					},
-				}
-				_G.GatewayRegistry = expectedGatewaysRegistry
-				for _, balance in pairs({ 0, 10000 }) do
-					local expectedBalances = {
-						[stubRandomAddress] = balance,
-					}
-					_G.Balances = expectedBalances
-
-					assert.are.same({
-						address = stubRandomAddress,
-						balance = 0,
-						stakes = {
-							[stubGatewayAddress] = {
-								delegatedStake = 750,
-								vaults = {},
-							},
-							[stubObserverAddress] = {
-								delegatedStake = 250, -- not using all available excess stake because ranked lower in ordering
-								vaults = {},
-							},
-						},
-						shortfall = 0,
-					}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
-					assert.are.same(expectedBalances, _G.Balances)
-					assert.are.same(expectedGatewaysRegistry, _G.GatewayRegistry)
-				end
-			end
-		)
-
-		it(
 			"should use vaulted stake withdrawals from multiple gateways when no excess stake is available and whether or not holding balance and funding source is 'stakes'",
 			function()
 				-- TO TEST:
-				-- Withdraw balances are used next, ordered from nearest-to-liquid to furthest from liquid.
+				-- Withdraw balances are used after balances, ordered from nearest-to-liquid to furthest from liquid.
 				-- tie broken here by smallest to largest to help the contract save memory when pruning expended vaults
 				local expectedGatewaysRegistry = {
 					[stubGatewayAddress] = {
-						totalDelegatedStake = 1000,
+						totalDelegatedStake = 1000, -- irrelevant in this case
 						vaults = {},
 						delegates = {
 							[stubRandomAddress] = {
-								delegatedStake = 50, -- lower total delegated stake
+								delegatedStake = 50, -- at the minimum so won't be used
 								vaults = {
 									["vault_id_1"] = {
 										balance = 1000, -- enough to satisfy the whole purchase but ordered lower for drawdown
@@ -2427,14 +2297,14 @@ describe("gar", function()
 						},
 					},
 					[stubObserverAddress] = {
-						totalDelegatedStake = 1000,
+						totalDelegatedStake = 1000, -- irrelevant in this case
 						vaults = {},
 						delegates = {
 							[stubRandomAddress] = {
-								delegatedStake = 700, -- higher total delegated stake
+								delegatedStake = 700, -- also minimum but otherwise irrelevant
 								vaults = {
 									["vault_id_2"] = {
-										balance = 250,
+										balance = 250, -- should draw down first
 										startTimestamp = 0,
 										endTimestamp = 1000, -- earlier end timestamp
 									},
@@ -2471,6 +2341,140 @@ describe("gar", function()
 								delegatedStake = 0,
 								vaults = {
 									["vault_id_2"] = 250, -- whole vault
+								},
+							},
+						},
+						shortfall = 0,
+					}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
+					assert.are.same(expectedBalances, _G.Balances)
+					assert.are.same(expectedGatewaysRegistry, _G.GatewayRegistry)
+				end
+			end
+		)
+
+		it(
+			"should use excess stake from a single gateway after withdraw vaults and whether or not holding balance when funding source is 'stakes'",
+			function()
+				local expectedGatewaysRegistry = {
+					[stubGatewayAddress] = {
+						totalDelegatedStake = 1500,
+						vaults = {},
+						delegates = {
+							[stubRandomAddress] = {
+								delegatedStake = 1500,
+								vaults = {
+									vault_1 = {
+										balance = 100,
+										startTimestamp = 0,
+										endTimestamp = 1001,
+									},
+								},
+							},
+						},
+						settings = {
+							minDelegatedStake = 500,
+						},
+						stats = {
+							passedEpochCount = 0,
+							totalEpochCount = 0,
+						},
+					},
+				}
+				_G.GatewayRegistry = expectedGatewaysRegistry
+
+				for _, balance in pairs({ 0, 10000 }) do
+					local expectedBalances = {
+						[stubRandomAddress] = balance,
+					}
+					_G.Balances = expectedBalances
+					assert.are.same({
+						address = stubRandomAddress,
+						balance = 0,
+						stakes = {
+							[stubGatewayAddress] = {
+								delegatedStake = 900,
+								vaults = {
+									vault_1 = 100,
+								},
+							},
+						},
+						shortfall = 0,
+					}, gar.getFundingPlan(stubRandomAddress, 1000, "stakes"))
+					assert.are.same(expectedBalances, _G.Balances)
+					assert.are.same(expectedGatewaysRegistry, _G.GatewayRegistry)
+				end
+			end
+		)
+
+		it(
+			"should use excess stake from multiple gateways after withdraw vaults and whether or not holding balance when funding source is 'stakes'",
+			function()
+				-- TO TEST:
+				-- Excess stakes above the minimum are used after withdraw vaults, ordered from largest excess over each gateways’ proposed minimum to smallest.
+				-- Tie broken here by ordering from worst performing gateway to best
+				-- Next tie breaker is highest total gateway stake to lowest (hurst the biggest and baddest gateway first)
+				-- Final tie breaker is gateway tenure
+				local expectedGatewaysRegistry = {
+					[stubGatewayAddress] = {
+						totalDelegatedStake = 1000,
+						vaults = {},
+						delegates = {
+							[stubRandomAddress] = {
+								delegatedStake = 800, -- 750 over minimum, but lower total delegated stake
+								vaults = {},
+							},
+						},
+						settings = {
+							minDelegatedStake = 50,
+						},
+						stats = {
+							passedEpochCount = 0,
+							totalEpochCount = 0,
+						},
+					},
+					[stubObserverAddress] = {
+						totalDelegatedStake = 1000,
+						vaults = {},
+						delegates = {
+							[stubRandomAddress] = {
+								delegatedStake = 1000, -- 300 over minimum, but higher total delegated stake
+								vaults = {
+									vault_1 = {
+										balance = 100, -- This will be drawn down before any excess stakes
+										startTimestamp = 0,
+										endTimestamp = 1000,
+									},
+								},
+							},
+						},
+						settings = {
+							minDelegatedStake = 700,
+						},
+						stats = {
+							passedEpochCount = 0,
+							totalEpochCount = 0,
+						},
+					},
+				}
+				_G.GatewayRegistry = expectedGatewaysRegistry
+				for _, balance in pairs({ 0, 10000 }) do
+					local expectedBalances = {
+						[stubRandomAddress] = balance,
+					}
+					_G.Balances = expectedBalances
+
+					assert.are.same({
+						address = stubRandomAddress,
+						balance = 0,
+						stakes = {
+							[stubGatewayAddress] = {
+								delegatedStake = 750,
+								vaults = {},
+							},
+							[stubObserverAddress] = {
+								delegatedStake = 150, -- not using all available excess stake because ranked lower in ordering
+								vaults = {
+									vault_1 = 100,
 								},
 							},
 						},

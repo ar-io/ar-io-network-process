@@ -924,6 +924,18 @@ describe('ArNS', async () => {
         undernameLimit: 10,
         type: 'permabuy',
       };
+      const expectedFundingResults = {
+        fundingPlan: {
+          address: 'auction-bidder-0000000000000000000000000000',
+          balance: 124975994165,
+          shortfall: 0,
+          stakes: [],
+        },
+        fundingResult: {
+          newWithdrawVaults: [],
+          totalFunded: 124975994165,
+        },
+      };
       const expectedRewardForInitiator = Math.floor(
         expectedPurchasePrice * 0.5,
       );
@@ -937,6 +949,7 @@ describe('ArNS', async () => {
       assert.deepEqual(buyRecordNoticeData, {
         name: 'test-name',
         ...expectedRecord,
+        ...expectedFundingResults,
       });
 
       // should send a debit notice
@@ -998,7 +1011,7 @@ describe('ArNS', async () => {
       assert.equal(balances[bidderAddress], 0);
     });
 
-    it('should create a lease expiration initiated auction and accept a bid', async () => {
+    const runAuctionTest = async ({ fundFrom }) => {
       const { record: initialRecord, memory } = await runBuyRecord({
         sender: STUB_ADDRESS,
         processId: ''.padEnd(43, 'a'),
@@ -1085,6 +1098,19 @@ describe('ArNS', async () => {
       );
 
       assert.equal(transferErrorTag, undefined);
+
+      let memoryToUse = transferResult.Memory;
+      if (fundFrom === 'stakes') {
+        // Stake the bidder's balance
+        const stakeResult = await setUpStake({
+          memory: transferResult.Memory,
+          transferQty: 0,
+          stakeQty: expectedPurchasePrice,
+          stakerAddress: bidderAddress,
+        });
+        memoryToUse = stakeResult.memory;
+      }
+
       const processId = 'new-name-owner-'.padEnd(43, '1');
       const submitBidResult = await handle(
         {
@@ -1096,10 +1122,11 @@ describe('ArNS', async () => {
             { name: 'Process-Id', value: processId },
             { name: 'Purchase-Type', value: 'lease' },
             { name: 'Years', value: bidYears },
+            ...(fundFrom ? [{ name: 'Fund-From', value: fundFrom }] : []),
           ],
           Timestamp: bidTimestamp,
         },
-        transferResult.Memory,
+        memoryToUse,
       );
 
       // assert no error tag
@@ -1129,6 +1156,26 @@ describe('ArNS', async () => {
         undernameLimit: 10,
         type: 'lease',
       };
+      const expectedFundingResults = {
+        fundingPlan: {
+          address: 'auction-bidder-0000000000000000000000000000',
+          balance: fundFrom === 'stakes' ? 0 : 5714077782,
+          shortfall: 0,
+          stakes:
+            fundFrom === 'stakes'
+              ? {
+                  [STUB_OPERATOR_ADDRESS]: {
+                    delegatedStake: 5714077782,
+                    vaults: [],
+                  },
+                }
+              : [],
+        },
+        fundingResult: {
+          newWithdrawVaults: [],
+          totalFunded: 5714077782,
+        },
+      };
       // the protocol gets the entire bid amount
       const expectedRewardForProtocol = expectedPurchasePrice;
 
@@ -1139,6 +1186,7 @@ describe('ArNS', async () => {
       assert.deepEqual(buyRecordNoticeData, {
         name: 'test-name',
         ...expectedRecord,
+        ...expectedFundingResults,
       });
 
       // should send a debit notice
@@ -1191,6 +1239,14 @@ describe('ArNS', async () => {
       const balances = JSON.parse(balancesResult.Messages[0].Data);
       assert.equal(balances[PROCESS_ID], expectedProtocolBalance);
       assert.equal(balances[bidderAddress], 0);
+    };
+
+    it('should create a lease expiration initiated auction and accept a bid', async () => {
+      await runAuctionTest({});
+    });
+
+    it('should create a lease expiration initiated auction and accept a bid funded by stakes', async () => {
+      await runAuctionTest({ fundFrom: 'stakes' });
     });
   });
 

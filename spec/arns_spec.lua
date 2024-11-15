@@ -1416,7 +1416,8 @@ describe("arns", function()
 						bidTimestamp,
 						"test-process-id",
 						"permabuy",
-						0
+						0,
+						"test-msg-id"
 					)
 					local totalDecay = auction.settings.decayRate * (bidTimestamp - startTimestamp)
 					local expectedPrice = math.floor(startPrice * ((1 - totalDecay) ^ auction.settings.scalingExponent))
@@ -1472,7 +1473,8 @@ describe("arns", function()
 					bidTimestamp,
 					"test-process-id",
 					"permabuy",
-					0
+					0,
+					"test-msg-id"
 				)
 				local totalDecay = auction.settings.decayRate * (bidTimestamp - startTimestamp)
 				local expectedPrice = math.floor(startPrice * ((1 - totalDecay) ^ auction.settings.scalingExponent))
@@ -1501,8 +1503,15 @@ describe("arns", function()
 			end)
 
 			it("should throw an error if the auction is not found", function()
-				local status, error =
-					pcall(arns.submitAuctionBid, "test-name-2", 1000000000, "test-bidder", 1000000, "test-process-id")
+				local status, error = pcall(
+					arns.submitAuctionBid,
+					"test-name-2",
+					1000000000,
+					"test-bidder",
+					1000000,
+					"test-process-id",
+					"test-msg-id"
+				)
 				assert.is_false(status)
 				assert.match("Auction not found", error)
 			end)
@@ -1520,7 +1529,8 @@ describe("arns", function()
 					startTimestamp,
 					"test-process-id",
 					"permabuy",
-					nil
+					nil,
+					"test-msg-id"
 				)
 				assert.is_false(status)
 				assert.match("Bid amount is less than the required bid of " .. startPrice, error)
@@ -1540,7 +1550,8 @@ describe("arns", function()
 					startTimestamp,
 					"test-process-id",
 					"permabuy",
-					nil
+					nil,
+					"test-msg-id"
 				)
 				assert.is_false(status)
 				assert.match("Insufficient balance", error)
