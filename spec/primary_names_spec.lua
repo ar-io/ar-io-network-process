@@ -73,10 +73,13 @@ describe("Primary Names", function()
 				local primaryNameRequest =
 					primaryNames.createPrimaryNameRequest("test", "user-requesting-primary-name", 1234567890)
 				assert.are.same({
-					name = "test",
-					startTimestamp = 1234567890,
-					endTimestamp = 1234567890 + 7 * 24 * 60 * 60 * 1000,
-					baseName = "test",
+					request = {
+						name = "test",
+						startTimestamp = 1234567890,
+						endTimestamp = 1234567890 + 7 * 24 * 60 * 60 * 1000,
+						baseName = "test",
+					},
+					baseNameOwner = "processId",
 				}, primaryNameRequest)
 				assert.are.equal(0, _G.Balances["user-requesting-primary-name"])
 				assert.are.equal(100000000, _G.Balances[ao.id])

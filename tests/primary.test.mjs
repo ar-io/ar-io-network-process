@@ -145,7 +145,7 @@ describe('primary names', function () {
     };
   };
 
-  it('should allow creating and approving a primary name for an existing base name', async function () {
+  it('should allow creating and approving a primary name for an existing base name when the recipient is not the base name owner', async function () {
     const processId = ''.padEnd(43, 'a');
     const recipient = ''.padEnd(43, 'b');
     const { memory: buyRecordMemory } = await buyRecord({
@@ -225,6 +225,75 @@ describe('primary names', function () {
     });
   });
 
+  it('should immediately approve a primary name for an existing base name when the caller of the request is the base name owner', async function () {
+    const processId = ''.padEnd(43, 'a');
+    const { memory: buyRecordMemory } = await buyRecord({
+      name: 'test-name',
+      processId,
+    });
+
+    const { result: requestPrimaryNameResult } = await requestPrimaryName({
+      name: 'test-name',
+      caller: processId,
+      timestamp: 1234567890,
+      memory: buyRecordMemory,
+    });
+
+    assertNoResultError(requestPrimaryNameResult);
+
+    // there should be only one message with the Approve-Primary-Name-Request-Notice action
+    assert.equal(requestPrimaryNameResult.Messages.length, 1);
+    assert.equal(requestPrimaryNameResult.Messages[0].Target, processId);
+
+    // find the action tag in the messages
+    const actionTag = requestPrimaryNameResult.Messages[0].Tags.find(
+      (tag) => tag.name === 'Action',
+    ).value;
+    assert.equal(actionTag, 'Approve-Primary-Name-Request-Notice');
+
+    // the primary name should be set
+    const approvedPrimaryNameResult = JSON.parse(
+      requestPrimaryNameResult.Messages[0].Data,
+    );
+    assert.deepStrictEqual(approvedPrimaryNameResult, {
+      name: 'test-name',
+      owner: processId,
+      startTimestamp: 1234567890,
+      baseName: 'test-name',
+    });
+
+    // now fetch the primary name using the owner address
+    const { result: primaryNameForAddressResult } =
+      await getPrimaryNameForAddress({
+        address: processId,
+        memory: requestPrimaryNameResult.Memory,
+      });
+
+    const primaryNameLookupResult = JSON.parse(
+      primaryNameForAddressResult.Messages[0].Data,
+    );
+    assert.deepStrictEqual(primaryNameLookupResult, {
+      name: 'test-name',
+      owner: processId,
+      startTimestamp: 1234567890,
+      baseName: 'test-name',
+    });
+
+    // reverse lookup the owner of the primary name
+    const { result: ownerOfPrimaryNameResult } = await getOwnerOfPrimaryName({
+      name: 'test-name',
+      memory: requestPrimaryNameResult.Memory,
+    });
+
+    const ownerResult = JSON.parse(ownerOfPrimaryNameResult.Messages[0].Data);
+    assert.deepStrictEqual(ownerResult, {
+      name: 'test-name',
+      owner: processId,
+      startTimestamp: 1234567890,
+      baseName: 'test-name',
+    });
+  });
+
   it('should allow removing a primary named by the owner or the owner of the base record', async function () {
     const processId = ''.padEnd(43, 'a');
     const recipient = ''.padEnd(43, 'b');
@@ -233,7 +302,7 @@ describe('primary names', function () {
       processId,
     });
     // create a primary name claim
-    const { result: createClaimResult } = await requestPrimaryName({
+    const { result: requestPrimaryNameResult } = await requestPrimaryName({
       name: 'test-name',
       caller: recipient,
       timestamp: 1234567890,
@@ -246,7 +315,7 @@ describe('primary names', function () {
         caller: processId,
         recipient: recipient,
         timestamp: 1234567890,
-        memory: createClaimResult.Memory,
+        memory: requestPrimaryNameResult.Memory,
       });
 
     // remove the primary name by the owner
@@ -293,28 +362,28 @@ describe('primary names', function () {
     assert.equal(errorTag, 'Primary-Name-Not-Found');
   });
 
-  // describe('getPaginatedPrimaryNames', function () {
-  //   it('should return all primary names', async function () {
-  //     const getPaginatedPrimaryNamesResult = await handle({
-  //       Tags: [
-  //         { name: 'Action', value: 'Primary-Names' },
-  //         { name: 'Limit', value: 10 },
-  //         { name: 'Sort-By', value: 'owner' },
-  //         { name: 'Sort-Order', value: 'asc' },
-  //       ],
-  //     });
-  //     assertNoResultError(getPaginatedPrimaryNamesResult);
-  //     const primaryNames = JSON.parse(
-  //       getPaginatedPrimaryNamesResult.Messages[0].Data,
-  //     );
-  //     assert.deepStrictEqual(primaryNames, {
-  //       items: [],
-  //       totalItems: 0,
-  //       limit: 10,
-  //       hasMore: false,
-  //       sortBy: 'owner',
-  //       sortOrder: 'asc',
-  //     });
-  //   });
-  // });
+  describe('getPaginatedPrimaryNames', function () {
+    it('should return all primary names', async function () {
+      const getPaginatedPrimaryNamesResult = await handle({
+        Tags: [
+          { name: 'Action', value: 'Primary-Names' },
+          { name: 'Limit', value: 10 },
+          { name: 'Sort-By', value: 'owner' },
+          { name: 'Sort-Order', value: 'asc' },
+        ],
+      });
+      assertNoResultError(getPaginatedPrimaryNamesResult);
+      const primaryNames = JSON.parse(
+        getPaginatedPrimaryNamesResult.Messages[0].Data,
+      );
+      assert.deepStrictEqual(primaryNames, {
+        items: [],
+        totalItems: 0,
+        limit: 10,
+        hasMore: false,
+        sortBy: 'owner',
+        sortOrder: 'asc',
+      });
+    });
+  });
 });

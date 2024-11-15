@@ -3316,17 +3316,29 @@ addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMa
 		return
 	end
 
-	ao.send({
-		Target = msg.From,
-		Action = ActionMap.PrimaryNameRequest .. "-Notice",
-		Data = json.encode(primaryNameRequest),
-	})
-	--- TODO: should ANTs be responsible for sending notices to recipients of new claims?
-	ao.send({
-		Target = primaryNameRequest.initiator,
-		Action = ActionMap.PrimaryNameRequest .. "-Notice",
-		Data = json.encode(primaryNameRequest),
-	})
+	--- if the from is the new owner, then send an approved notice to the from
+	if primaryNameRequest.owner and primaryNameRequest.owner == msg.From then
+		ao.send({
+			Target = msg.From,
+			Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
+			Data = json.encode(primaryNameRequest),
+		})
+		return
+	end
+
+	if primaryNameRequest.baseNameOwner and primaryNameRequest.baseNameOwner ~= msg.From then
+		--- send a notice to the from, and the base name owner
+		ao.send({
+			Target = msg.From,
+			Action = ActionMap.PrimaryNameRequest .. "-Notice",
+			Data = json.encode(primaryNameRequest),
+		})
+		ao.send({
+			Target = primaryNameRequest.baseNameOwner,
+			Action = ActionMap.PrimaryNameRequest .. "-Notice",
+			Data = json.encode(primaryNameRequest),
+		})
+	end
 end)
 
 addEventingHandler(
@@ -3360,17 +3372,20 @@ addEventingHandler(
 			return
 		end
 
-		-- send two notices, one to the owner and one to the initiator
+		--- send a notice to the from
 		ao.send({
 			Target = msg.From,
 			Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
 			Data = json.encode(approvedPrimaryNameResult),
 		})
-		ao.send({
-			Target = approvedPrimaryNameResult.owner,
-			Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
-			Data = json.encode(approvedPrimaryNameResult),
-		})
+		--- send a notice to the owner
+		if approvedPrimaryNameResult.owner ~= msg.From then
+			ao.send({
+				Target = approvedPrimaryNameResult.owner,
+				Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
+				Data = json.encode(approvedPrimaryNameResult),
+			})
+		end
 	end
 )
 

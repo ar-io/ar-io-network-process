@@ -41,7 +41,7 @@ PrimaryNames = PrimaryNames or {
 --- @param name string -- the name being requested, this could be an undername provided by the ant
 --- @param initiator string -- the address that is creating the primary name request, e.g. the ANT process id
 --- @param timestamp number -- the timestamp of the request
---- @return PrimaryNameRequest primaryNameRequest - the request created
+--- @return PrimaryNameRequest|PrimaryNameWithOwner primaryNameRequestOrWithOwner - the request created, or the primary name with owner data if the request is approved
 function primaryNames.createPrimaryNameRequest(name, initiator, timestamp)
 	local baseName = name:match("[^_]+$") or name
 
@@ -68,8 +68,18 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp)
 		startTimestamp = timestamp,
 		endTimestamp = timestamp + 7 * 24 * 60 * 60 * 1000, -- 7 days
 	}
+
+	--- if the initiator is base name owner, then just set the primary name and return
+	if record.processId == initiator then
+		local newPrimaryName = primaryNames.setPrimaryNameFromRequest(initiator, request, timestamp)
+		return newPrimaryName
+	end
+
 	PrimaryNames.requests[initiator] = request
-	return request
+	return {
+		request = request,
+		baseNameOwner = record.processId,
+	}
 end
 
 --- Get a primary name request, safely deep copying the request
