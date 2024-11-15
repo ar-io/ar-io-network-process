@@ -3292,6 +3292,7 @@ addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap
 end)
 
 addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMap.PrimaryNameRequest), function(msg)
+	local fundFrom = msg.Tags["Fund-From"]
 	local checkAssertionsAndReturnResult = function()
 		local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
 		local initiator = utils.formatAddress(msg.From) -- the process that is creating the claim
@@ -3299,7 +3300,8 @@ addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMa
 		assert(name, "Name is required")
 		assert(initiator, "Initiator is required")
 		assert(timestamp, "Timestamp is required")
-		return primaryNames.createPrimaryNameRequest(name, initiator, timestamp)
+		assertValidFundFrom(fundFrom)
+		return primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msg.Id, fundFrom)
 	end
 
 	local shouldContinue, primaryNameRequest = eventingPcall(msg.ioEvent, function(error)

@@ -1,4 +1,9 @@
-import { assertNoResultError, handle, transfer } from './helpers.mjs';
+import {
+  assertNoResultError,
+  handle,
+  setUpStake,
+  transfer,
+} from './helpers.mjs';
 import assert from 'assert';
 import { describe, it } from 'node:test';
 import { STUB_ADDRESS } from '../tools/constants.mjs';
@@ -30,7 +35,13 @@ describe('primary names', function () {
     };
   };
 
-  const requestPrimaryName = async ({ name, caller, timestamp, memory }) => {
+  const requestPrimaryName = async ({
+    name,
+    caller,
+    timestamp,
+    fundFrom,
+    memory,
+  }) => {
     // give it balance if not stub address
     if (caller !== STUB_ADDRESS) {
       const transferMemory = await transfer({
@@ -48,6 +59,7 @@ describe('primary names', function () {
         Tags: [
           { name: 'Action', value: 'Primary-Name-Request' },
           { name: 'Name', value: name },
+          ...(fundFrom ? [{ name: 'Fund-From', value: fundFrom }] : []),
         ],
       },
       memory,
@@ -145,7 +157,7 @@ describe('primary names', function () {
     };
   };
 
-  it('should allow creating and approving a primary name for an existing base name when the recipient is not the base name owner', async function () {
+  it('should allow creating and approving a primary name for an existing base name when the recipient is not the base name owner and is funding from stakes', async function () {
     const processId = ''.padEnd(43, 'a');
     const recipient = ''.padEnd(43, 'b');
     const { memory: buyRecordMemory } = await buyRecord({
@@ -153,12 +165,21 @@ describe('primary names', function () {
       processId,
     });
 
+    const stakeResult = await setUpStake({
+      memory: buyRecordMemory,
+      stakerAddress: recipient,
+      transferQty: 550000000,
+      stakeQty: 500000000,
+    });
+
     const { result: requestPrimaryNameResult } = await requestPrimaryName({
       name: 'test-name',
       caller: recipient,
       timestamp: 1234567890,
-      memory: buyRecordMemory,
+      memory: stakeResult.memory,
+      fundFrom: 'stakes',
     });
+    assertNoResultError(requestPrimaryNameResult);
 
     const { result: approvePrimaryNameRequestResult } =
       await approvePrimaryNameRequest({

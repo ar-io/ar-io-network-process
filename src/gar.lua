@@ -1396,13 +1396,22 @@ function planMinimumStakesDrawdown(fundingPlan, stakingProfile)
 		if fundingPlan.shortfall == 0 then
 			break
 		end
+
 		local stakeToDraw = math.min(gatewayInfo.delegate.delegatedStake, fundingPlan.shortfall)
-		fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress].delegatedStake = fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress].delegatedStake
-			+ stakeToDraw
-		fundingPlan.shortfall = fundingPlan.shortfall - stakeToDraw
-		-- not needed after this, but keep track
-		gatewayInfo.delegate.delegatedStake = gatewayInfo.delegate.delegatedStake - stakeToDraw
-		gatewayInfo.totalDelegatedStake = gatewayInfo.totalDelegatedStake - stakeToDraw
+		if stakeToDraw > 0 then
+			if not fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress] then
+				fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress] = {
+					delegatedStake = 0,
+					vaults = {},
+				}
+			end
+			fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress].delegatedStake = fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress].delegatedStake
+				+ stakeToDraw
+			fundingPlan.shortfall = fundingPlan.shortfall - stakeToDraw
+			-- not needed after this, but keep track
+			gatewayInfo.delegate.delegatedStake = gatewayInfo.delegate.delegatedStake - stakeToDraw
+			gatewayInfo.totalDelegatedStake = gatewayInfo.totalDelegatedStake - stakeToDraw
+		end
 	end
 end
 

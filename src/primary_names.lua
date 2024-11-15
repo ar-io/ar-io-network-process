@@ -1,6 +1,7 @@
 local arns = require("arns")
 local balances = require("balances")
 local utils = require("utils")
+local gar = require("gar")
 local primaryNames = {}
 
 local PRIMARY_NAME_COST = 100000000 -- 100 IO
@@ -41,8 +42,11 @@ PrimaryNames = PrimaryNames or {
 --- @param name string -- the name being requested, this could be an undername provided by the ant
 --- @param initiator string -- the address that is creating the primary name request, e.g. the ANT process id
 --- @param timestamp number -- the timestamp of the request
+--- @param msgId string -- the message id of the request
+--- @param fundFrom "balance"|"stakes"|"any"|nil -- the address to fund the request from. Default is "balance"
 --- @return PrimaryNameRequest|PrimaryNameWithOwner primaryNameRequestOrWithOwner - the request created, or the primary name with owner data if the request is approved
-function primaryNames.createPrimaryNameRequest(name, initiator, timestamp)
+function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId, fundFrom)
+	fundFrom = fundFrom or "balance"
 	local baseName = name:match("[^_]+$") or name
 
 	--- existing request for primary name from wallet?
@@ -56,11 +60,12 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp)
 	local record = arns.getRecord(baseName)
 	assert(record, "ArNS record '" .. baseName .. "' does not exist")
 
-	--- TODO: replace with funding plan
-	assert(balances.walletHasSufficientBalance(initiator, PRIMARY_NAME_COST), "Insufficient balance")
+	local fundingPlan = gar.getFundingPlan(initiator, PRIMARY_NAME_COST, fundFrom)
+	assert(fundingPlan and fundingPlan.shortfall == 0, "Insufficient balances")
+	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, timestamp)
 
 	--- transfer the primary name cost from the initiator to the protocol balance
-	balances.transfer(ao.id, initiator, PRIMARY_NAME_COST)
+	balances.increaseBalance(ao.id, PRIMARY_NAME_COST)
 
 	local request = {
 		name = name,
@@ -79,6 +84,8 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp)
 	return {
 		request = request,
 		baseNameOwner = record.processId,
+		fundingPlan = fundingPlan,
+		fundingResult = fundingResult,
 	}
 end
 

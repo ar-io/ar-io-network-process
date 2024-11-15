@@ -15,7 +15,8 @@ describe("Primary Names", function()
 
 	describe("createPrimaryNameRequest", function()
 		it("should fail if the arns record does not exist for the name", function()
-			local status, err = pcall(primaryNames.createPrimaryNameRequest, "test", "processId", 1234567890)
+			local status, err =
+				pcall(primaryNames.createPrimaryNameRequest, "test", "processId", 1234567890, "test-msg-id")
 			assert.is_false(status)
 			assert.match("ArNS record 'test' does not exist", err)
 		end)
@@ -29,8 +30,13 @@ describe("Primary Names", function()
 			_G.Balances = {
 				["user-requesting-primary-name"] = 0,
 			}
-			local status, err =
-				pcall(primaryNames.createPrimaryNameRequest, "test", "user-requesting-primary-name", 1234567890)
+			local status, err = pcall(
+				primaryNames.createPrimaryNameRequest,
+				"test",
+				"user-requesting-primary-name",
+				1234567890,
+				"test-msg-id"
+			)
 			assert.is_false(status)
 			assert.match("Insufficient balance", err)
 		end)
@@ -53,8 +59,13 @@ describe("Primary Names", function()
 				},
 				requests = {},
 			}
-			local status, err =
-				pcall(primaryNames.createPrimaryNameRequest, "test", "user-requesting-	primary-name", 1234567890)
+			local status, err = pcall(
+				primaryNames.createPrimaryNameRequest,
+				"test",
+				"user-requesting-	primary-name",
+				1234567890,
+				"test-msg-id"
+			)
 			assert.is_false(status)
 			assert.match("Primary name is already owned", err)
 		end)
@@ -70,8 +81,12 @@ describe("Primary Names", function()
 						processId = "processId",
 					},
 				}
-				local primaryNameRequest =
-					primaryNames.createPrimaryNameRequest("test", "user-requesting-primary-name", 1234567890)
+				local primaryNameRequest = primaryNames.createPrimaryNameRequest(
+					"test",
+					"user-requesting-primary-name",
+					1234567890,
+					"test-msg-id"
+				)
 				assert.are.same({
 					request = {
 						name = "test",
@@ -80,6 +95,16 @@ describe("Primary Names", function()
 						baseName = "test",
 					},
 					baseNameOwner = "processId",
+					fundingPlan = {
+						address = "user-requesting-primary-name",
+						balance = 100000000,
+						shortfall = 0,
+						stakes = {},
+					},
+					fundingResult = {
+						newWithdrawVaults = {},
+						totalFunded = 100000000,
+					},
 				}, primaryNameRequest)
 				assert.are.equal(0, _G.Balances["user-requesting-primary-name"])
 				assert.are.equal(100000000, _G.Balances[ao.id])
