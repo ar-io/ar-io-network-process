@@ -819,11 +819,7 @@ describe('ArNS', async () => {
       );
 
       // assert no error tag
-      const releaseNameErrorTag = releaseNameResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
-
-      assert.equal(releaseNameErrorTag, undefined);
+      assertNoResultError(releaseNameResult);
 
       // fetch the auction
       const auctionResult = await handle(

@@ -2190,11 +2190,6 @@ describe("gar", function()
 			_G.GatewayRegistry = {}
 		end)
 
-		after_each(function()
-			_G.Balances = {}
-			_G.GatewayRegistry = {}
-		end)
-
 		it("should identify a shortfall when the user has no spending power of any kind", function()
 			local fundingPlan = gar.getFundingPlan(stubRandomAddress, 1000, "any")
 			assert.are.same({
