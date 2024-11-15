@@ -1648,7 +1648,6 @@ describe('GatewayRegistry', async () => {
         memory: reDelegateStakeMemory,
         timestamp: STUB_TIMESTAMP,
       });
-      console.log('targetGatewayAfter', targetGatewayAfter);
       assert(targetGatewayAfter.totalDelegatedStake === stakeQty);
       assert.deepStrictEqual(targetGatewayAfter.delegates, {
         [delegatorAddress]: {

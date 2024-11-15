@@ -3291,9 +3291,35 @@ addEventingHandler(ActionMap.ReDelegateStake, utils.hasMatchingTag("Action", Act
 		},
 		tonumber(msg.Timestamp)
 	)
-	if not shouldContinue2 then
+	if not shouldContinue2 or not reDelegationResult then
 		return
 	end
+
+	local reDelegationFee = reDelegationResult.reDelegationFee
+	local stakeMoved = quantity - reDelegationFee
+
+	local isStakeMovingFromDelegateToOperator = delegateAddress == targetAddress
+	local isStakeMovingFromOperatorToDelegate = delegateAddress == sourceAddress
+	local isStakeMovingFromWithdrawal = vaultId ~= nil
+
+	if isStakeMovingFromDelegateToOperator then
+		if isStakeMovingFromWithdrawal then
+			LastKnownWithdrawSupply = LastKnownWithdrawSupply - stakeMoved
+		else
+			LastKnownDelegatedSupply = LastKnownDelegatedSupply - stakeMoved
+		end
+		LastKnownStakedSupply = LastKnownStakedSupply + stakeMoved
+	elseif isStakeMovingFromOperatorToDelegate then
+		if isStakeMovingFromWithdrawal then
+			LastKnownWithdrawSupply = LastKnownWithdrawSupply + stakeMoved
+		else
+			LastKnownStakedSupply = LastKnownStakedSupply - stakeMoved
+		end
+		LastKnownDelegatedSupply = LastKnownDelegatedSupply + stakeMoved
+	end
+
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply - reDelegationResult.reDelegationFee
+	addSupplyData(msg.ioEvent)
 
 	ao.send({
 		Target = msg.From,
