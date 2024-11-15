@@ -2873,10 +2873,10 @@ describe("gar", function()
 		)
 	end)
 
+	local sevenDays = 7 * 24 * 60 * 60 * 1000
 	describe("reDelegateStake", function()
 		local testReDelegatorAddress = "test-re-delegator"
 		local timestamp = 12345
-		local sevenDays = 7 * 24 * 60 * 60 * 1000
 		local minDelegatedStake = gar.getSettings().delegates.minStake
 		local minOperatorStake = gar.getSettings().operators.minStake
 		local testRedelgationGateway = utils.deepCopy(testGateway)
@@ -2995,7 +2995,7 @@ describe("gar", function()
 					[stubRandomAddress] = targetGateway,
 				}
 				_G.ReDelegations[testReDelegatorAddress] = {
-					timestamp = timestamp,
+					timestamp = 1, -- earlier timestamp
 					redelegations = 1,
 				}
 
@@ -3024,6 +3024,10 @@ describe("gar", function()
 					feeResetTimestamp = timestamp + sevenDays,
 					reDelegationsSinceFeeReset = 2,
 				}, result)
+				assert.are.same({
+					timestamp = timestamp, -- new timestamp
+					redelegations = 2,
+				}, _G.ReDelegations[testReDelegatorAddress])
 			end
 		)
 
@@ -3819,6 +3823,35 @@ describe("gar", function()
 				feeResetTimestamp = timestamp + sevenDays,
 				reDelegationsSinceFeeReset = 1,
 			}, result)
+		end)
+	end)
+
+	describe("getReDelegationFee", function()
+		it("should return 0 if the delegator has not redelegated in the last 7 epochs", function()
+			local result = gar.getReDelegationFee(stubRandomAddress)
+			assert.are.same({ reDelegationFeePct = 0 }, result)
+		end)
+
+		it("should return 0.1 if the delegator has redelegated once in the last 7 epochs", function()
+			_G.ReDelegations = {
+				[stubRandomAddress] = {
+					timestamp = 1,
+					redelegations = 1,
+				},
+			}
+			local result = gar.getReDelegationFee(stubRandomAddress)
+			assert.are.same({ reDelegationFeePct = 0.1, feeResetTimestamp = 1 + sevenDays }, result)
+		end)
+
+		it("should return 0.6 if the delegator has redelegated 7 times in the last 7 epochs", function()
+			_G.ReDelegations = {
+				[stubRandomAddress] = {
+					timestamp = 1,
+					redelegations = 7,
+				},
+			}
+			local result = gar.getReDelegationFee(stubRandomAddress)
+			assert.are.same({ reDelegationFeePct = 0.6, feeResetTimestamp = 1 + sevenDays }, result)
 		end)
 	end)
 end)
