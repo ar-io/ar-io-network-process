@@ -2382,11 +2382,7 @@ addEventingHandler(ActionMap.Gateways, Handlers.utils.hasMatchingTag("Action", A
 end)
 
 addEventingHandler(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", ActionMap.Gateway), function(msg)
-	print("Gateway action")
-	print(msg.Tags.Address)
-	print(msg.From)
 	local gateway = gar.getGateway(msg.Tags.Address or msg.From)
-
 	ao.send({
 		Target = msg.From,
 		Action = "Gateway-Notice",
