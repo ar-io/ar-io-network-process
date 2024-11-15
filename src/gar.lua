@@ -457,6 +457,10 @@ function gar.reDelegateStake(params)
 	assert(type(delegateAddress) == "string", "Delegate address is required and must be a string")
 	assert(type(currentTimestamp) == "number", "Current timestamp is required and must be a number")
 
+	if sourceAddress == targetAddress then
+		error("Source and target gateway addresses must be different.")
+	end
+
 	local sourceGateway = gar.getGateway(sourceAddress)
 	local targetGateway = gar.getGateway(targetAddress)
 
@@ -466,27 +470,16 @@ function gar.reDelegateStake(params)
 	if not targetGateway then
 		error("Target Gateway not found")
 	end
-
-	if sourceGateway.status == "leaving" then
-		-- TODO: Should we allow redelegation from a leaving gateway?
-		error("Source Gateway is leaving the network and cannot have stake re delegated from it.")
-	end
 	if targetGateway.status == "leaving" then
 		error("Target Gateway is leaving the network and cannot have more stake delegated to it.")
 	end
 
 	if not targetGateway.settings.allowDelegatedStaking then
-		error(
-			"Target Gateway does not allow delegated staking. Only allowed delegates can delegate stake to this Gateway."
-		)
+		error("Target Gateway does not allow delegated staking.")
 	end
 
 	if not gar.delegateAllowedToStake(delegateAddress, targetGateway) then
 		error("This Gateway does not allow this delegate to stake.")
-	end
-
-	if delegateAddress == targetAddress then
-		error("Cannot delegate to your own gateway, use increaseOperatorStake instead.")
 	end
 
 	local previousReDelegations = ReDelegations[delegateAddress]
@@ -497,9 +490,12 @@ function gar.reDelegateStake(params)
 		0.6
 	)
 
-	print(redelegationFeePct .. "redelegationFeePct")
-	local redelegationFee = math.floor(stakeToTakeFromSource * redelegationFeePct)
+	local redelegationFee = math.ceil(stakeToTakeFromSource * redelegationFeePct)
 	local stakeToDelegate = stakeToTakeFromSource - redelegationFee
+
+	if stakeToDelegate == 0 then
+		error("The redelegation stake amount minus the redelegation fee is too low to redelegate.")
+	end
 
 	-- Assert source has enough stake to redelegate and remove the stake from the source
 	if delegateAddress == sourceAddress then
@@ -547,8 +543,8 @@ function gar.reDelegateStake(params)
 		else
 			sourceGateway.delegates[delegateAddress].delegatedStake = sourceGateway.delegates[delegateAddress].delegatedStake
 				- stakeToTakeFromSource
-			sourceGateway.totalDelegatedStake = sourceGateway.totalDelegatedStake - stakeToTakeFromSource
 		end
+		sourceGateway.totalDelegatedStake = sourceGateway.totalDelegatedStake - stakeToTakeFromSource
 	end
 
 	local existingTargetDelegate = targetGateway.delegates[delegateAddress]
@@ -567,19 +563,24 @@ function gar.reDelegateStake(params)
 	end
 
 	-- The stake can now be applied to the targetGateway
-	if targetGateway.delegates[delegateAddress] == nil then
-		-- create the new delegate stake
-		targetGateway.delegates[delegateAddress] = {
-			delegatedStake = stakeToDelegate,
-			startTimestamp = currentTimestamp,
-			vaults = {},
-		}
+	if targetAddress == delegateAddress then
+		-- move the stake to the operator's stake
+		targetGateway.operatorStake = targetGateway.operatorStake + stakeToDelegate
 	else
-		-- increment the existing delegate's stake
-		targetGateway.delegates[delegateAddress].delegatedStake = targetGateway.delegates[delegateAddress].delegatedStake
-			+ stakeToDelegate
+		if targetGateway.delegates[delegateAddress] == nil then
+			-- create the new delegate stake
+			targetGateway.delegates[delegateAddress] = {
+				delegatedStake = stakeToDelegate,
+				startTimestamp = currentTimestamp,
+				vaults = {},
+			}
+		else
+			-- increment the existing delegate's stake
+			targetGateway.delegates[delegateAddress].delegatedStake = targetGateway.delegates[delegateAddress].delegatedStake
+				+ stakeToDelegate
+		end
+		targetGateway.totalDelegatedStake = targetGateway.totalDelegatedStake + stakeToDelegate
 	end
-	targetGateway.totalDelegatedStake = targetGateway.totalDelegatedStake + stakeToDelegate
 
 	-- Move redelegation fee to protocol balance
 	balances.increaseBalance(ao.id, redelegationFee)
