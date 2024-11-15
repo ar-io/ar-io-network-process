@@ -92,7 +92,6 @@ describe("Primary Names", function()
 						name = "test",
 						startTimestamp = 1234567890,
 						endTimestamp = 1234567890 + 7 * 24 * 60 * 60 * 1000,
-						baseName = "test",
 					},
 					baseNameOwner = "processId",
 					fundingPlan = {
@@ -129,7 +128,6 @@ describe("Primary Names", function()
 			_G.PrimaryNames.requests = {
 				["primary-name-recipient"] = {
 					name = "test",
-					baseName = "test",
 					startTimestamp = 1234567890,
 					endTimestamp = 1234567890 - 1,
 				},
@@ -151,7 +149,6 @@ describe("Primary Names", function()
 				_G.PrimaryNames.requests = {
 					["primary-name-recipient"] = {
 						name = "test",
-						baseName = "test",
 						startTimestamp = 1234567890,
 						endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
 					},
@@ -160,20 +157,18 @@ describe("Primary Names", function()
 					primaryNames.approvePrimaryNameRequest("primary-name-recipient", "test", "owner", 1234567890)
 				assert.are.same({
 					newPrimaryName = {
-						baseName = "test",
 						name = "test",
 						owner = "primary-name-recipient",
 						startTimestamp = 1234567890,
 					},
 					request = {
-						baseName = "test",
 						endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
 						name = "test",
 						startTimestamp = 1234567890,
 					},
 				}, approvePrimaryNameRequestResult)
 				assert.are.same({
-					["primary-name-recipient"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
+					["primary-name-recipient"] = { name = "test", startTimestamp = 1234567890 },
 				}, _G.PrimaryNames.owners)
 				assert.are.same({
 					["test"] = "primary-name-recipient",
@@ -190,7 +185,7 @@ describe("Primary Names", function()
 		it("should return the owner if the name is owned", function()
 			_G.PrimaryNames = {
 				owners = {
-					["owner"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
+					["owner"] = { name = "test", startTimestamp = 1234567890 },
 				},
 				names = {
 					["test"] = "owner",
@@ -215,7 +210,7 @@ describe("Primary Names", function()
 			}
 			_G.PrimaryNames = {
 				owners = {
-					["owner"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
+					["owner"] = { name = "test", startTimestamp = 1234567890 },
 				},
 				names = {
 					["test"] = "owner",
@@ -234,7 +229,7 @@ describe("Primary Names", function()
 			}
 			_G.PrimaryNames = {
 				owners = {
-					["owner"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
+					["owner"] = { name = "test", startTimestamp = 1234567890 },
 				},
 				names = {
 					["test"] = "owner",
@@ -258,7 +253,7 @@ describe("Primary Names", function()
 			}
 			_G.PrimaryNames = {
 				owners = {
-					["owner"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
+					["owner"] = { name = "test", startTimestamp = 1234567890 },
 				},
 				names = {
 					["test"] = "owner",
@@ -283,14 +278,14 @@ describe("Primary Names", function()
 		it("should return the primary name if the name is owned", function()
 			_G.PrimaryNames = {
 				owners = {
-					["owner"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
+					["owner"] = { name = "test", startTimestamp = 1234567890 },
 				},
 				names = {
 					["test"] = "owner",
 				},
 			}
 			assert.are.same(
-				{ name = "test", owner = "owner", startTimestamp = 1234567890, baseName = "test" },
+				{ name = "test", owner = "owner", startTimestamp = 1234567890 },
 				primaryNames.getPrimaryNameDataWithOwnerFromAddress("owner")
 			)
 		end)
@@ -300,11 +295,11 @@ describe("Primary Names", function()
 		it("should return all primary names with the given base  name", function()
 			_G.PrimaryNames = {
 				owners = {
-					["owner"] = { name = "undername_test", startTimestamp = 1234567890, baseName = "test" },
-					["owner2"] = { name = "undername2_test", startTimestamp = 1234567890, baseName = "test" },
-					["owner3"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
-					["owner4"] = { name = "test2", startTimestamp = 1234567890, baseName = "test2" },
-					["owner5"] = { name = "test3", startTimestamp = 1234567890, baseName = "test3" },
+					["owner"] = { name = "undername_test", startTimestamp = 1234567890 },
+					["owner2"] = { name = "undername2_test", startTimestamp = 1234567890 },
+					["owner3"] = { name = "test", startTimestamp = 1234567890 },
+					["owner4"] = { name = "test2", startTimestamp = 1234567890 },
+					["owner5"] = { name = "test3", startTimestamp = 1234567890 },
 				},
 				names = {
 					["test"] = "owner3",
@@ -316,9 +311,9 @@ describe("Primary Names", function()
 			}
 			local allPrimaryNamesForArNSName = primaryNames.getPrimaryNamesForBaseName("test")
 			assert.are.same({
-				{ name = "test", owner = "owner3", startTimestamp = 1234567890, baseName = "test" },
-				{ name = "undername_test", owner = "owner", startTimestamp = 1234567890, baseName = "test" },
-				{ name = "undername2_test", owner = "owner2", startTimestamp = 1234567890, baseName = "test" },
+				{ name = "test", owner = "owner3", startTimestamp = 1234567890 },
+				{ name = "undername_test", owner = "owner", startTimestamp = 1234567890 },
+				{ name = "undername2_test", owner = "owner2", startTimestamp = 1234567890 },
 			}, allPrimaryNamesForArNSName)
 		end)
 	end)
@@ -332,16 +327,14 @@ describe("Primary Names", function()
 			}
 			_G.PrimaryNames = {
 				owners = {
-					["primary-name-owner"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
+					["primary-name-owner"] = { name = "test", startTimestamp = 1234567890 },
 					["primary-name-owner2"] = {
 						name = "undername_test",
 						startTimestamp = 1234567890,
-						baseName = "test",
 					},
 					["primary-name-owner3"] = {
 						name = "undername2_test",
 						startTimestamp = 1234567890,
-						baseName = "test",
 					},
 				},
 				names = {
@@ -370,11 +363,11 @@ describe("Primary Names", function()
 			}
 			_G.PrimaryNames = {
 				owners = {
-					["owner"] = { name = "undername_test", startTimestamp = 1234567890, baseName = "test" },
-					["owner2"] = { name = "undername2_test", startTimestamp = 1234567890, baseName = "test" },
-					["owner3"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },
-					["owner4"] = { name = "test2", startTimestamp = 1234567890, baseName = "test2" },
-					["owner5"] = { name = "test3", startTimestamp = 1234567890, baseName = "test3" },
+					["owner"] = { name = "undername_test", startTimestamp = 1234567890 },
+					["owner2"] = { name = "undername2_test", startTimestamp = 1234567890 },
+					["owner3"] = { name = "test", startTimestamp = 1234567890 },
+					["owner4"] = { name = "test2", startTimestamp = 1234567890 },
+					["owner5"] = { name = "test3", startTimestamp = 1234567890 },
 				},
 				names = {
 					["test"] = "owner3",
@@ -400,8 +393,8 @@ describe("Primary Names", function()
 			}, removedNamesAndOwners[3])
 			assert.are.same({
 				owners = {
-					["owner4"] = { name = "test2", startTimestamp = 1234567890, baseName = "test2" },
-					["owner5"] = { name = "test3", startTimestamp = 1234567890, baseName = "test3" },
+					["owner4"] = { name = "test2", startTimestamp = 1234567890 },
+					["owner5"] = { name = "test3", startTimestamp = 1234567890 },
 				},
 				names = {
 					["test2"] = "owner4",

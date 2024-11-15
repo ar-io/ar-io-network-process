@@ -6,6 +6,7 @@ local primaryNames = {}
 
 -- TODO: Figure out how to modulate this according to market conditions since it's actual spending
 local PRIMARY_NAME_COST = 100000000 -- 100 IO
+local ONE_WEEK_IN_MS = 604800000
 
 --- @alias WalletAddress string
 --- @alias ArNSName string
@@ -23,18 +24,15 @@ PrimaryNames = PrimaryNames or {
 
 --- @class PrimaryName
 --- @field name ArNSName
---- @field baseName ArNSName
 --- @field startTimestamp number
 
 --- @class PrimaryNameWithOwner
 --- @field name ArNSName
---- @field baseName ArNSName
 --- @field owner WalletAddress
 --- @field startTimestamp number
 
 --- @class PrimaryNameRequest
 --- @field name ArNSName -- the name being requested
---- @field baseName ArNSName -- the base name, identified when creating the name request
 --- @field startTimestamp number -- the timestamp of the request
 --- @field endTimestamp number -- the timestamp of the request expiration
 
@@ -45,6 +43,10 @@ PrimaryNames = PrimaryNames or {
 --- @field fundingPlan table
 --- @field fundingResult table
 
+local function baseNameForName(name)
+	return (name or ""):match("[^_]+$") or name
+end
+
 --- Creates a transient request for a primary name. This is done by a user and must be approved by the name owner of the base name.
 --- @param name string -- the name being requested, this could be an undername provided by the ant
 --- @param initiator string -- the address that is creating the primary name request, e.g. the ANT process id
@@ -54,7 +56,7 @@ PrimaryNames = PrimaryNames or {
 --- @return CreatePrimaryNameResult # the request created, or the primary name with owner data if the request is approved
 function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
-	local baseName = name:match("[^_]+$") or name
+	local baseName = baseNameForName(name)
 
 	--- existing request for primary name from wallet?
 	local existingRequest = primaryNames.getPrimaryNameRequest(name)
@@ -76,9 +78,8 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 
 	local request = {
 		name = name,
-		baseName = baseName,
 		startTimestamp = timestamp,
-		endTimestamp = timestamp + 7 * 24 * 60 * 60 * 1000, -- 7 days
+		endTimestamp = timestamp + ONE_WEEK_IN_MS,
 	}
 
 	--- if the initiator is base name owner, then just set the primary name and return
@@ -135,10 +136,12 @@ function primaryNames.approvePrimaryNameRequest(recipient, name, from, timestamp
 	local request = primaryNames.getPrimaryNameRequest(recipient)
 	assert(request, "Primary name request not found")
 	assert(request.endTimestamp > timestamp, "Primary name request has expired")
+	assert(name == request.name, "Provided name does not match the primary name request")
 
 	-- assert the process id in the initial request still owns the name
-	local record = arns.getRecord(request.baseName)
-	assert(record, "ArNS record '" .. request.baseName .. "' does not exist")
+	local baseName = baseNameForName(request.name)
+	local record = arns.getRecord(baseName)
+	assert(record, "ArNS record '" .. baseName .. "' does not exist")
 	assert(record.processId == from, "Primary name request must be approved by the owner of the base name")
 
 	-- assert the name matches the request
@@ -161,7 +164,6 @@ function primaryNames.setPrimaryNameFromRequest(recipient, request, startTimesta
 	PrimaryNames.names[request.name] = recipient
 	PrimaryNames.owners[recipient] = {
 		name = request.name,
-		baseName = request.baseName,
 		startTimestamp = startTimestamp,
 	}
 	PrimaryNames.requests[recipient] = nil
@@ -169,7 +171,6 @@ function primaryNames.setPrimaryNameFromRequest(recipient, request, startTimesta
 		name = request.name,
 		owner = recipient,
 		startTimestamp = startTimestamp,
-		baseName = request.baseName,
 	}
 end
 
@@ -198,10 +199,11 @@ function primaryNames.removePrimaryName(name, from)
 	--- assert the from is the current owner of the name
 	local primaryName = primaryNames.getPrimaryNameDataWithOwnerFromName(name)
 	assert(primaryName, "Primary name '" .. name .. "' does not exist")
-	local record = arns.getRecord(primaryName.baseName)
+	local baseName = baseNameForName(name)
+	local record = arns.getRecord(baseName)
 	assert(
 		primaryName.owner == from or (record and record.processId == from),
-		"Caller is not the owner of the primary name, or the owner of the " .. primaryName.baseName .. " record"
+		"Caller is not the owner of the primary name, or the owner of the " .. baseName .. " record"
 	)
 
 	PrimaryNames.names[name] = nil
@@ -232,7 +234,6 @@ function primaryNames.getPrimaryNameDataWithOwnerFromAddress(address)
 		owner = address,
 		name = nameData.name,
 		startTimestamp = nameData.startTimestamp,
-		baseName = nameData.baseName,
 	}
 end
 
@@ -252,7 +253,6 @@ function primaryNames.getPrimaryNameDataWithOwnerFromName(name)
 		name = name,
 		owner = owner,
 		startTimestamp = nameData.startTimestamp,
-		baseName = nameData.baseName,
 	}
 end
 
@@ -263,7 +263,7 @@ function primaryNames.getPrimaryNamesForBaseName(baseName)
 	local primaryNamesForArNSName = {}
 	for name, _ in pairs(primaryNames.getUnsafePrimaryNames()) do
 		local nameData = primaryNames.getPrimaryNameDataWithOwnerFromName(name)
-		if nameData and nameData.baseName == baseName then
+		if nameData and baseNameForName(name) == baseName then
 			table.insert(primaryNamesForArNSName, nameData)
 		end
 	end

@@ -209,7 +209,6 @@ describe('primary names', function () {
       approvePrimaryNameRequestResult.Messages[0].Data,
     );
     const expectedNewPrimaryName = {
-      baseName: 'test-name',
       name: 'test-name',
       owner: recipient,
       startTimestamp: approvedTimestamp,
@@ -217,7 +216,6 @@ describe('primary names', function () {
     assert.deepStrictEqual(approvedPrimaryNameResult, {
       newPrimaryName: expectedNewPrimaryName,
       request: {
-        baseName: 'test-name',
         endTimestamp: 1839367890,
         name: 'test-name',
         startTimestamp: 1234567890,
@@ -276,7 +274,6 @@ describe('primary names', function () {
       requestPrimaryNameResult.Messages[0].Data,
     );
     const expectedNewPrimaryName = {
-      baseName: 'test-name',
       name: 'test-name',
       owner: processId,
       startTimestamp: approvalTimestamp,
@@ -295,7 +292,6 @@ describe('primary names', function () {
       },
       newPrimaryName: expectedNewPrimaryName,
       request: {
-        baseName: 'test-name',
         endTimestamp: 1839367899,
         name: 'test-name',
         startTimestamp: approvalTimestamp,
