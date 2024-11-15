@@ -209,6 +209,7 @@ local function addAuctionResultFields(ioEvent, result)
 		"baseFee",
 		"demandFactor",
 	})
+	-- TODO: add removedPrimaryNamesAndOwners to ioEvent
 	addResultFundingPlanFields(ioEvent, result)
 end
 
@@ -2822,14 +2823,10 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 		return
 	end
 
-	-- Removes the record and primary names, then create the auction
-	---@param releasedName string
-	---@param releaseTimestamp number
-	---@param releasedInitiator string
-	local removeRecordsAndCreateAuction = function(releasedName, releaseTimestamp, releasedInitiator)
-		local removedRecord = arns.removeRecord(releasedName)
-		local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNamesForBaseName(releasedName) -- NOTE: this should be empty if there are no primary names allowed before release
-		local auction = arns.createAuction(releasedName, releaseTimestamp, releasedInitiator)
+	local removeRecordsAndCreateAuction = function()
+		local removedRecord = arns.removeRecord(name)
+		local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNamesForBaseName(name) -- NOTE: this should be empty if there are no primary names allowed before release
+		local auction = arns.createAuction(name, timestamp, initiator)
 		return {
 			removedRecord = removedRecord,
 			removedPrimaryNamesAndOwners = removedPrimaryNamesAndOwners,
@@ -2838,21 +2835,21 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	end
 
 	-- we should be able to create the auction here
-	local status, createAuctionDataOrError = eventingPcall(msg.ioEvent, function(error)
+	local status, createAuctionData = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
 			Error = "Auction-Creation-Error",
 			Data = tostring(error),
 		})
-	end, removeRecordsAndCreateAuction, name, timestamp, initiator)
+	end, removeRecordsAndCreateAuction)
 
-	if not status or not createAuctionDataOrError then
+	if not status or not createAuctionData then
 		ao.send({
 			Target = msg.From,
 			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
 			Error = "Auction-Creation-Error",
-			Data = tostring(createAuctionDataOrError),
+			Data = tostring(createAuctionData),
 		})
 		return
 	end
@@ -2860,9 +2857,9 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	-- add the auction result fields
 	addAuctionResultFields(msg.ioEvent, {
 		name = name,
-		auction = createAuctionDataOrError.auction,
-		removedRecord = createAuctionDataOrError.removedRecord,
-		removedPrimaryNamesAndOwners = createAuctionDataOrError.removedPrimaryNamesAndOwners,
+		auction = createAuctionData.auction,
+		removedRecord = createAuctionData.removedRecord,
+		removedPrimaryNamesAndOwners = createAuctionData.removedPrimaryNamesAndOwners,
 	})
 
 	-- note: no change to token supply here - only on auction bids
@@ -2871,12 +2868,12 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 
 	local auction = {
 		name = name,
-		startTimestamp = createAuctionDataOrError.auction.startTimestamp,
-		endTimestamp = createAuctionDataOrError.auction.endTimestamp,
-		initiator = createAuctionDataOrError.auction.initiator,
-		baseFee = createAuctionDataOrError.auction.baseFee,
-		demandFactor = createAuctionDataOrError.auction.demandFactor,
-		settings = createAuctionDataOrError.auction.settings,
+		startTimestamp = createAuctionData.auction.startTimestamp,
+		endTimestamp = createAuctionData.auction.endTimestamp,
+		initiator = createAuctionData.auction.initiator,
+		baseFee = createAuctionData.auction.baseFee,
+		demandFactor = createAuctionData.auction.demandFactor,
+		settings = createAuctionData.auction.settings,
 	}
 
 	-- send to the initiator and the process that released the name
