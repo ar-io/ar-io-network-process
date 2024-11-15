@@ -159,10 +159,18 @@ describe("Primary Names", function()
 				local approvePrimaryNameRequestResult =
 					primaryNames.approvePrimaryNameRequest("primary-name-recipient", "test", "owner", 1234567890)
 				assert.are.same({
-					name = "test",
-					owner = "primary-name-recipient",
-					startTimestamp = 1234567890,
-					baseName = "test",
+					newPrimaryName = {
+						baseName = "test",
+						name = "test",
+						owner = "primary-name-recipient",
+						startTimestamp = 1234567890,
+					},
+					request = {
+						baseName = "test",
+						endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
+						name = "test",
+						startTimestamp = 1234567890,
+					},
 				}, approvePrimaryNameRequestResult)
 				assert.are.same({
 					["primary-name-recipient"] = { name = "test", startTimestamp = 1234567890, baseName = "test" },

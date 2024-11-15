@@ -34,9 +34,15 @@ PrimaryNames = PrimaryNames or {
 --- @class PrimaryNameRequest
 --- @field name ArNSName -- the name being requested
 --- @field baseName ArNSName -- the base name, identified when creating the name request
---- @field initiator WalletAddress -- the process id that made the request
 --- @field startTimestamp number -- the timestamp of the request
 --- @field endTimestamp number -- the timestamp of the request expiration
+
+--- @class CreatePrimaryNameResult
+--- @field request PrimaryNameRequest|nil
+--- @field newPrimaryName PrimaryNameWithOwner|nil
+--- @field baseNameOwner WalletAddress
+--- @field fundingPlan table
+--- @field fundingResult table
 
 --- Creates a transient request for a primary name. This is done by a user and must be approved by the name owner of the base name.
 --- @param name string -- the name being requested, this could be an undername provided by the ant
@@ -44,7 +50,7 @@ PrimaryNames = PrimaryNames or {
 --- @param timestamp number -- the timestamp of the request
 --- @param msgId string -- the message id of the request
 --- @param fundFrom "balance"|"stakes"|"any"|nil -- the address to fund the request from. Default is "balance"
---- @return PrimaryNameRequest|PrimaryNameWithOwner primaryNameRequestOrWithOwner - the request created, or the primary name with owner data if the request is approved
+--- @return CreatePrimaryNameResult # the request created, or the primary name with owner data if the request is approved
 function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
 	local baseName = name:match("[^_]+$") or name
@@ -75,14 +81,17 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 	}
 
 	--- if the initiator is base name owner, then just set the primary name and return
+	local newPrimaryName
 	if record.processId == initiator then
-		local newPrimaryName = primaryNames.setPrimaryNameFromRequest(initiator, request, timestamp)
-		return newPrimaryName
+		newPrimaryName = primaryNames.setPrimaryNameFromRequest(initiator, request, timestamp)
+	else
+		-- otherwise store the request for asynchronous approval
+		PrimaryNames.requests[initiator] = request
 	end
 
-	PrimaryNames.requests[initiator] = request
 	return {
 		request = request,
+		newPrimaryName = newPrimaryName,
 		baseNameOwner = record.processId,
 		fundingPlan = fundingPlan,
 		fundingResult = fundingResult,
@@ -112,11 +121,15 @@ function primaryNames.getUnsafePrimaryNameOwners()
 	return PrimaryNames.owners or {}
 end
 
+--- @class PrimaryNameRequestApproval
+--- @field newPrimaryName PrimaryNameWithOwner
+--- @field request PrimaryNameRequest
+
 --- Action taken by the owner of a primary name. This is who pays for the primary name.
 --- @param recipient string -- the address that is requesting the primary name
 --- @param from string -- the process id that is requesting the primary name for the owner
 --- @param timestamp number -- the timestamp of the request
---- @return PrimaryNameWithOwner primaryNameWithOwner - the primary name with owner data
+--- @return PrimaryNameRequestApproval # the primary name with owner data and original request
 function primaryNames.approvePrimaryNameRequest(recipient, name, from, timestamp)
 	local request = primaryNames.getPrimaryNameRequest(recipient)
 	assert(request, "Primary name request not found")
@@ -132,14 +145,17 @@ function primaryNames.approvePrimaryNameRequest(recipient, name, from, timestamp
 
 	-- set the primary name
 	local newPrimaryName = primaryNames.setPrimaryNameFromRequest(recipient, request, timestamp)
-	return newPrimaryName
+	return {
+		newPrimaryName = newPrimaryName,
+		request = request,
+	}
 end
 
 --- Update the primary name maps and return the primary name. Removes the request from the requests map.
 --- @param recipient string -- the address that is requesting the primary name
 --- @param request PrimaryNameRequest
 --- @param startTimestamp number
---- @return PrimaryNameWithOwner primaryNameWithOwner - the primary name with owner data
+--- @return PrimaryNameWithOwner # the primary name with owner data
 function primaryNames.setPrimaryNameFromRequest(recipient, request, startTimestamp)
 	PrimaryNames.names[request.name] = recipient
 	PrimaryNames.owners[recipient] = {
@@ -155,6 +171,10 @@ function primaryNames.setPrimaryNameFromRequest(recipient, request, startTimesta
 		baseName = request.baseName,
 	}
 end
+
+--- @class RemovedPrimaryNameResult
+--- @field name string
+--- @field owner WalletAddress
 
 --- Remove primary names, returning the results of the name removals
 --- @param names string[]
@@ -294,10 +314,10 @@ end
 --- @return table<string, PrimaryNameRequest> prunedNameClaims - the names of the requests that were pruned
 function primaryNames.prunePrimaryNameRequests(timestamp)
 	local prunedNameRequests = {}
-	for name, request in pairs(primaryNames.getUnsafePrimaryNameRequests()) do
+	for initiator, request in pairs(primaryNames.getUnsafePrimaryNameRequests()) do
 		if request.endTimestamp <= timestamp then
-			PrimaryNames.requests[name] = nil
-			prunedNameRequests[name] = request
+			PrimaryNames.requests[initiator] = nil
+			prunedNameRequests[initiator] = request
 		end
 	end
 	return prunedNameRequests

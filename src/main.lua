@@ -111,12 +111,14 @@ LastKnownLockedSupply = LastKnownLockedSupply or 0 -- total vault balance across
 LastKnownStakedSupply = LastKnownStakedSupply or 0 -- total operator stake across all gateways
 LastKnownDelegatedSupply = LastKnownDelegatedSupply or 0 -- total delegated stake across all gateways
 LastKnownWithdrawSupply = LastKnownWithdrawSupply or 0 -- total withdraw supply across all gateways (gateways and delegates)
+LastKnownPnpRequestSupply = LastKnownPnpRequestSupply or 0 -- total supply stashed in outstanding Primary Name Protocol requests
 local function lastKnownTotalTokenSupply()
 	return LastKnownCirculatingSupply
 		+ LastKnownLockedSupply
 		+ LastKnownStakedSupply
 		+ LastKnownDelegatedSupply
 		+ LastKnownWithdrawSupply
+		+ LastKnownPnpRequestSupply
 		+ Balances[Protocol]
 end
 LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
@@ -129,6 +131,26 @@ local function eventingPcall(ioEvent, onError, fnToCall, ...)
 		return status
 	end
 	return status, result
+end
+
+--- @param fundingPlan FundingPlan|nil
+local function adjustSuppliesForFundingPlan(fundingPlan)
+	if not fundingPlan then
+		return
+	end
+	local totalActiveStakesUsed = utils.reduce(fundingPlan.stakes, function(acc, _, stakeSpendingPlan)
+		return acc + stakeSpendingPlan.delegatedStake
+	end, 0)
+	local totalWithdrawStakesUsed = utils.reduce(fundingPlan.stakes, function(acc, _, stakeSpendingPlan)
+		return acc
+			+ utils.reduce(stakeSpendingPlan.vaults, function(acc2, _, vaultBalance)
+				return acc2 + vaultBalance
+			end, 0)
+	end, 0)
+	LastKnownStakedSupply = LastKnownStakedSupply - totalActiveStakesUsed
+	LastKnownWithdrawSupply = LastKnownWithdrawSupply - totalWithdrawStakesUsed
+	-- TODO: THIS CAN VARY IN THE RELEASE-NAME FLOW WHERE AN INITIATOR IS PAID OUT
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply - fundingPlan.balance
 end
 
 local function addResultFundingPlanFields(ioEvent, result)
@@ -168,6 +190,7 @@ local function addResultFundingPlanFields(ioEvent, result)
 		ioEvent:addField("New-Withdraw-Vaults-Count", newWithdrawVaultsTallies.count)
 		ioEvent:addField("New-Withdraw-Vaults-Total-Balance", newWithdrawVaultsTallies.totalBalance)
 	end
+	adjustSuppliesForFundingPlan(result.fundingPlan)
 end
 
 local function addRecordResultFields(ioEvent, result)
@@ -220,6 +243,7 @@ local function addSupplyData(ioEvent, supplyData)
 	ioEvent:addField("Staked-Supply", supplyData.stakedSupply or LastKnownStakedSupply)
 	ioEvent:addField("Delegated-Supply", supplyData.delegatedSupply or LastKnownDelegatedSupply)
 	ioEvent:addField("Withdraw-Supply", supplyData.withdrawSupply or LastKnownWithdrawSupply)
+	ioEvent:addField("Request-Supply", supplyData.requestSupply or LastKnownPnpRequestSupply)
 	ioEvent:addField("Total-Token-Supply", supplyData.totalTokenSupply or lastKnownTotalTokenSupply())
 	ioEvent:addField("Protocol-Balance", Balances[Protocol])
 end
@@ -333,6 +357,7 @@ end, function(msg)
 		lastKnownStakedSupply = LastKnownStakedSupply,
 		lastKnownDelegatedSupply = LastKnownDelegatedSupply,
 		lastKnownWithdrawSupply = LastKnownWithdrawSupply,
+		lastKnownRequestSupply = LastKnownPnpRequestSupply,
 		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
 	}
 	local status, resultOrError = pcall(prune.pruneState, msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
@@ -405,6 +430,25 @@ end, function(msg)
 
 		local pruneGatewaysResult = resultOrError.pruneGatewaysResult or {}
 		addPruneGatewaysResult(msg.ioEvent, pruneGatewaysResult)
+
+		local prunedPrimaryNameRequests = resultOrError.prunedPrimaryNameRequests or {}
+		local prunedRequestsCount = utils.lengthOfTable(prunedPrimaryNameRequests)
+		if prunedRequestsCount then
+			msg.ioEvent:addField("Pruned-Requests-Count", prunedRequestsCount)
+			for initiator, request in pairs(prunedPrimaryNameRequests) do
+				-- Send credit notices back to the initiators
+				ao.send({
+					Target = initiator,
+					Action = "Credit-Notice",
+					Sender = ao.id,
+					Quantity = request.balance,
+					Data = "You received " .. msg.Tags.Quantity .. " from " .. ao.id,
+					Reason = "Primary Name request expired",
+				})
+				LastKnownPnpRequestSupply = LastKnownPnpRequestSupply - request.balance
+				LastKnownCirculatingSupply = LastKnownCirculatingSupply + request.balance
+			end
+		end
 	end
 
 	if
@@ -413,6 +457,7 @@ end, function(msg)
 		or LastKnownStakedSupply ~= previousState.lastKnownStakedSupply
 		or LastKnownDelegatedSupply ~= previousState.lastKnownDelegatedSupply
 		or LastKnownWithdrawSupply ~= previousState.lastKnownWithdrawSupply
+		or LastKnownPnpRequestSupply ~= previousState.lastKnownRequestSupply
 		or Balances[Protocol] ~= previousState.Balances[Protocol]
 		or lastKnownTotalTokenSupply() ~= previousState.lastKnownTotalSupply
 	then
@@ -830,7 +875,6 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	if result ~= nil then
 		record = result.record
 		addRecordResultFields(msg.ioEvent, result)
-		LastKnownCirculatingSupply = LastKnownCirculatingSupply - record.purchasePrice
 		addSupplyData(msg.ioEvent)
 	end
 
@@ -892,7 +936,6 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 	if result ~= nil then
 		record = result.record
 		addRecordResultFields(msg.ioEvent, result)
-		LastKnownCirculatingSupply = LastKnownCirculatingSupply - record.purchasePrice
 		addSupplyData(msg.ioEvent)
 	end
 
@@ -964,8 +1007,6 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 	if result ~= nil then
 		msg.ioEvent:addField("Total-Extension-Fee", result.totalExtensionFee)
 		addRecordResultFields(msg.ioEvent, result)
-
-		LastKnownCirculatingSupply = LastKnownCirculatingSupply - result.totalExtensionFee
 		addSupplyData(msg.ioEvent)
 
 		recordResult = result.record
@@ -1039,7 +1080,6 @@ addEventingHandler(
 			addRecordResultFields(msg.ioEvent, result)
 			msg.ioEvent:addField("previousUndernameLimit", recordResult.undernameLimit - tonumber(msg.Tags.Quantity))
 			msg.ioEvent:addField("additionalUndernameCost", result.additionalUndernameCost)
-			LastKnownCirculatingSupply = LastKnownCirculatingSupply - result.additionalUndernameCost
 			addSupplyData(msg.ioEvent)
 		end
 
@@ -2089,6 +2129,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.
 	local stakedSupply = 0
 	local delegatedSupply = 0
 	local withdrawSupply = 0
+	local pnpRequestSupply = 0
 	local protocolBalance = balances.getBalance(Protocol)
 	local userBalances = balances.getBalances()
 
@@ -2128,11 +2169,17 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.
 		end
 	end
 
+	-- pnp requests
+	for _, pnpRequest in pairs(primaryNames.getUnsafePrimaryNameRequests()) do
+		pnpRequestSupply = pnpRequestSupply + pnpRequest.balance
+	end
+
 	LastKnownCirculatingSupply = circulatingSupply
 	LastKnownLockedSupply = lockedSupply
 	LastKnownStakedSupply = stakedSupply
 	LastKnownDelegatedSupply = delegatedSupply
 	LastKnownWithdrawSupply = withdrawSupply
+	LastKnownPnpRequestSupply = pnpRequestSupply
 
 	addSupplyData(msg.ioEvent, {
 		totalTokenSupply = totalSupply,
@@ -3079,7 +3126,6 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 	if result ~= nil then
 		local record = result.record
 		addAuctionResultFields(msg.ioEvent, result)
-		LastKnownCirculatingSupply = LastKnownCirculatingSupply - record.purchasePrice
 		addSupplyData(msg.ioEvent)
 
 		msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
@@ -3184,7 +3230,7 @@ addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap
 		return
 	end
 
-	local disallowedDelegates = utils.splitAndTrimString(msg.Tags["Disallowed-Delegates"])
+	local disallowedDelegates = utils.splitAndTrimString(msg.Tags["Disallowed-Delegates"], ",")
 	msg.ioEvent:addField("Input-Disallowed-Delegates-Count", utils.lengthOfTable(disallowedDelegates))
 
 	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
@@ -3304,7 +3350,7 @@ addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMa
 		return primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msg.Id, fundFrom)
 	end
 
-	local shouldContinue, primaryNameRequest = eventingPcall(msg.ioEvent, function(error)
+	local shouldContinue, primaryNameResult = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = {
@@ -3313,31 +3359,33 @@ addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMa
 			},
 		})
 	end, checkAssertionsAndReturnResult)
-	if not shouldContinue or not primaryNameRequest then
+	if not shouldContinue or not primaryNameResult then
 		return
 	end
 
+	adjustSuppliesForFundingPlan(primaryNameResult.fundingPlan)
+
 	--- if the from is the new owner, then send an approved notice to the from
-	if primaryNameRequest.owner and primaryNameRequest.owner == msg.From then
+	if primaryNameResult.newPrimaryName then
 		ao.send({
 			Target = msg.From,
 			Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
-			Data = json.encode(primaryNameRequest),
+			Data = json.encode(primaryNameResult),
 		})
 		return
 	end
 
-	if primaryNameRequest.baseNameOwner and primaryNameRequest.baseNameOwner ~= msg.From then
+	if primaryNameResult.request then
 		--- send a notice to the from, and the base name owner
 		ao.send({
 			Target = msg.From,
 			Action = ActionMap.PrimaryNameRequest .. "-Notice",
-			Data = json.encode(primaryNameRequest),
+			Data = json.encode(primaryNameResult),
 		})
 		ao.send({
-			Target = primaryNameRequest.baseNameOwner,
+			Target = primaryNameResult.baseNameOwner,
 			Action = ActionMap.PrimaryNameRequest .. "-Notice",
-			Data = json.encode(primaryNameRequest),
+			Data = json.encode(primaryNameResult),
 		})
 	end
 end)
@@ -3378,13 +3426,11 @@ addEventingHandler(
 			Data = json.encode(approvedPrimaryNameResult),
 		})
 		--- send a notice to the owner
-		if approvedPrimaryNameResult.owner ~= msg.From then
-			ao.send({
-				Target = approvedPrimaryNameResult.owner,
-				Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
-				Data = json.encode(approvedPrimaryNameResult),
-			})
-		end
+		ao.send({
+			Target = approvedPrimaryNameResult.newPrimaryName.owner,
+			Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
+			Data = json.encode(approvedPrimaryNameResult),
+		})
 	end
 )
 

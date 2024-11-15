@@ -181,12 +181,13 @@ describe('primary names', function () {
     });
     assertNoResultError(requestPrimaryNameResult);
 
+    const approvedTimestamp = 1234567899;
     const { result: approvePrimaryNameRequestResult } =
       await approvePrimaryNameRequest({
         name: 'test-name',
         caller: processId,
         recipient: recipient,
-        timestamp: 1234567890,
+        timestamp: approvedTimestamp,
         memory: requestPrimaryNameResult.Memory,
       });
 
@@ -207,14 +208,21 @@ describe('primary names', function () {
     const approvedPrimaryNameResult = JSON.parse(
       approvePrimaryNameRequestResult.Messages[0].Data,
     );
-    assert.deepStrictEqual(approvedPrimaryNameResult, {
+    const expectedNewPrimaryName = {
+      baseName: 'test-name',
       name: 'test-name',
       owner: recipient,
-      startTimestamp: 1234567890,
-      baseName: 'test-name',
+      startTimestamp: approvedTimestamp,
+    };
+    assert.deepStrictEqual(approvedPrimaryNameResult, {
+      newPrimaryName: expectedNewPrimaryName,
+      request: {
+        baseName: 'test-name',
+        endTimestamp: 1839367890,
+        name: 'test-name',
+        startTimestamp: 1234567890,
+      },
     });
-
-    // now fetch the primary name using the owner address
     const { result: primaryNameForAddressResult } =
       await getPrimaryNameForAddress({
         address: recipient,
@@ -224,12 +232,7 @@ describe('primary names', function () {
     const primaryNameLookupResult = JSON.parse(
       primaryNameForAddressResult.Messages[0].Data,
     );
-    assert.deepStrictEqual(primaryNameLookupResult, {
-      name: 'test-name',
-      owner: recipient,
-      startTimestamp: 1234567890,
-      baseName: 'test-name',
-    });
+    assert.deepStrictEqual(primaryNameLookupResult, expectedNewPrimaryName);
 
     // reverse lookup the owner of the primary name
     const { result: ownerOfPrimaryNameResult } = await getOwnerOfPrimaryName({
@@ -238,12 +241,7 @@ describe('primary names', function () {
     });
 
     const ownerResult = JSON.parse(ownerOfPrimaryNameResult.Messages[0].Data);
-    assert.deepStrictEqual(ownerResult, {
-      name: 'test-name',
-      owner: recipient,
-      startTimestamp: 1234567890,
-      baseName: 'test-name',
-    });
+    assert.deepStrictEqual(ownerResult, expectedNewPrimaryName);
   });
 
   it('should immediately approve a primary name for an existing base name when the caller of the request is the base name owner', async function () {
@@ -253,10 +251,11 @@ describe('primary names', function () {
       processId,
     });
 
+    const approvalTimestamp = 1234567899;
     const { result: requestPrimaryNameResult } = await requestPrimaryName({
       name: 'test-name',
       caller: processId,
-      timestamp: 1234567890,
+      timestamp: approvalTimestamp,
       memory: buyRecordMemory,
     });
 
@@ -276,11 +275,31 @@ describe('primary names', function () {
     const approvedPrimaryNameResult = JSON.parse(
       requestPrimaryNameResult.Messages[0].Data,
     );
-    assert.deepStrictEqual(approvedPrimaryNameResult, {
+    const expectedNewPrimaryName = {
+      baseName: 'test-name',
       name: 'test-name',
       owner: processId,
-      startTimestamp: 1234567890,
-      baseName: 'test-name',
+      startTimestamp: approvalTimestamp,
+    };
+    assert.deepStrictEqual(approvedPrimaryNameResult, {
+      baseNameOwner: processId,
+      fundingPlan: {
+        address: processId,
+        balance: 100000000,
+        shortfall: 0,
+        stakes: [],
+      },
+      fundingResult: {
+        newWithdrawVaults: [],
+        totalFunded: 100000000,
+      },
+      newPrimaryName: expectedNewPrimaryName,
+      request: {
+        baseName: 'test-name',
+        endTimestamp: 1839367899,
+        name: 'test-name',
+        startTimestamp: approvalTimestamp,
+      },
     });
 
     // now fetch the primary name using the owner address
@@ -293,12 +312,7 @@ describe('primary names', function () {
     const primaryNameLookupResult = JSON.parse(
       primaryNameForAddressResult.Messages[0].Data,
     );
-    assert.deepStrictEqual(primaryNameLookupResult, {
-      name: 'test-name',
-      owner: processId,
-      startTimestamp: 1234567890,
-      baseName: 'test-name',
-    });
+    assert.deepStrictEqual(primaryNameLookupResult, expectedNewPrimaryName);
 
     // reverse lookup the owner of the primary name
     const { result: ownerOfPrimaryNameResult } = await getOwnerOfPrimaryName({
@@ -307,12 +321,7 @@ describe('primary names', function () {
     });
 
     const ownerResult = JSON.parse(ownerOfPrimaryNameResult.Messages[0].Data);
-    assert.deepStrictEqual(ownerResult, {
-      name: 'test-name',
-      owner: processId,
-      startTimestamp: 1234567890,
-      baseName: 'test-name',
-    });
+    assert.deepStrictEqual(ownerResult, expectedNewPrimaryName);
   });
 
   it('should allow removing a primary named by the owner or the owner of the base record', async function () {
