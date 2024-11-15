@@ -2874,8 +2874,10 @@ describe("gar", function()
 	end)
 
 	local sevenDays = 7 * 24 * 60 * 60 * 1000
+	local testReDelegatorAddress = "test-re-delegator"
+	local testSourceAddress = "unique-source-address"
+	local testTargetAddress = "unique-target-address"
 	describe("reDelegateStake", function()
-		local testReDelegatorAddress = "test-re-delegator"
 		local timestamp = 12345
 		local minDelegatedStake = gar.getSettings().delegates.minStake
 		local minOperatorStake = gar.getSettings().operators.minStake
@@ -2897,13 +2899,13 @@ describe("gar", function()
 			}
 			sourceGateway.totalDelegatedStake = minDelegatedStake
 			_G.GatewayRegistry = {
-				[stubGatewayAddress] = sourceGateway,
-				[stubRandomAddress] = targetGateway,
+				[testSourceAddress] = sourceGateway,
+				[testTargetAddress] = targetGateway,
 			}
 			local result = gar.reDelegateStake({
 				delegateAddress = testReDelegatorAddress,
-				sourceAddress = stubGatewayAddress,
-				targetAddress = stubRandomAddress,
+				sourceAddress = testSourceAddress,
+				targetAddress = testTargetAddress,
 				qty = qty,
 				currentTimestamp = timestamp,
 			})
@@ -2943,12 +2945,12 @@ describe("gar", function()
 			_G.GatewayRegistry = {
 				-- Set delegator as the source gateway
 				[testReDelegatorAddress] = sourceGateway,
-				[stubRandomAddress] = targetGateway,
+				[testTargetAddress] = targetGateway,
 			}
 			local result = gar.reDelegateStake({
 				delegateAddress = testReDelegatorAddress,
 				sourceAddress = testReDelegatorAddress,
-				targetAddress = stubRandomAddress,
+				targetAddress = testTargetAddress,
 				qty = qty,
 				currentTimestamp = timestamp,
 			})
@@ -2991,8 +2993,8 @@ describe("gar", function()
 				}
 				sourceGateway.totalDelegatedStake = initialStakeNeeded
 				_G.GatewayRegistry = {
-					[stubGatewayAddress] = sourceGateway,
-					[stubRandomAddress] = targetGateway,
+					[testSourceAddress] = sourceGateway,
+					[testTargetAddress] = targetGateway,
 				}
 				_G.ReDelegations[testReDelegatorAddress] = {
 					timestamp = 1, -- earlier timestamp
@@ -3001,8 +3003,8 @@ describe("gar", function()
 
 				local result = gar.reDelegateStake({
 					delegateAddress = testReDelegatorAddress,
-					sourceAddress = stubGatewayAddress,
-					targetAddress = stubRandomAddress,
+					sourceAddress = testSourceAddress,
+					targetAddress = testTargetAddress,
 					qty = initialStakeNeeded,
 					currentTimestamp = timestamp,
 				})
@@ -3051,8 +3053,8 @@ describe("gar", function()
 				}
 				sourceGateway.totalDelegatedStake = initialStakeNeeded
 				_G.GatewayRegistry = {
-					[stubGatewayAddress] = sourceGateway,
-					[stubRandomAddress] = targetGateway,
+					[testSourceAddress] = sourceGateway,
+					[testTargetAddress] = targetGateway,
 				}
 				_G.ReDelegations[testReDelegatorAddress] = {
 					timestamp = timestamp,
@@ -3061,8 +3063,8 @@ describe("gar", function()
 
 				local result = gar.reDelegateStake({
 					delegateAddress = testReDelegatorAddress,
-					sourceAddress = stubGatewayAddress,
-					targetAddress = stubRandomAddress,
+					sourceAddress = testSourceAddress,
+					targetAddress = testTargetAddress,
 					qty = initialStakeNeeded,
 					currentTimestamp = timestamp,
 				})
@@ -3100,13 +3102,13 @@ describe("gar", function()
 			}
 			sourceGateway.totalDelegatedStake = minDelegatedStake
 			_G.GatewayRegistry = {
-				[stubGatewayAddress] = sourceGateway,
+				[testSourceAddress] = sourceGateway,
 				[testReDelegatorAddress] = targetGateway,
 			}
 
 			local result = gar.reDelegateStake({
 				delegateAddress = testReDelegatorAddress,
-				sourceAddress = stubGatewayAddress,
+				sourceAddress = testSourceAddress,
 				targetAddress = testReDelegatorAddress,
 				qty = minDelegatedStake,
 				currentTimestamp = timestamp,
@@ -3141,14 +3143,14 @@ describe("gar", function()
 				}
 				sourceGateway.totalDelegatedStake = minDelegatedStake + minDelegatedStake
 				_G.GatewayRegistry = {
-					[stubGatewayAddress] = sourceGateway,
-					[stubRandomAddress] = targetGateway,
+					[testSourceAddress] = sourceGateway,
+					[testTargetAddress] = targetGateway,
 				}
 
 				local result = gar.reDelegateStake({
 					delegateAddress = testReDelegatorAddress,
-					sourceAddress = stubGatewayAddress,
-					targetAddress = stubRandomAddress,
+					sourceAddress = testSourceAddress,
+					targetAddress = testTargetAddress,
 					qty = minDelegatedStake,
 					currentTimestamp = timestamp,
 				})
@@ -3189,15 +3191,15 @@ describe("gar", function()
 					},
 				}
 				_G.GatewayRegistry = {
-					[stubGatewayAddress] = sourceGateway,
-					[stubRandomAddress] = targetGateway,
+					[testSourceAddress] = sourceGateway,
+					[testTargetAddress] = targetGateway,
 				}
 
 				local isSuccess, error = pcall(function()
 					gar.reDelegateStake({
 						delegateAddress = testReDelegatorAddress,
-						sourceAddress = stubGatewayAddress,
-						targetAddress = stubRandomAddress,
+						sourceAddress = testSourceAddress,
+						targetAddress = testTargetAddress,
 						qty = 1,
 						currentTimestamp = timestamp,
 					})
@@ -3220,15 +3222,15 @@ describe("gar", function()
 				[testReDelegatorAddress] = false,
 			}
 			_G.GatewayRegistry = {
-				[stubGatewayAddress] = sourceGateway,
-				[stubRandomAddress] = targetGateway,
+				[testSourceAddress] = sourceGateway,
+				[testTargetAddress] = targetGateway,
 			}
 
 			local isSuccess, error = pcall(function()
 				gar.reDelegateStake({
 					delegateAddress = testReDelegatorAddress,
-					sourceAddress = stubGatewayAddress,
-					targetAddress = stubRandomAddress,
+					sourceAddress = testSourceAddress,
+					targetAddress = testTargetAddress,
 					qty = minDelegatedStake,
 					currentTimestamp = timestamp,
 				})
@@ -3242,14 +3244,14 @@ describe("gar", function()
 			local sourceGateway = utils.deepCopy(testRedelgationGateway)
 
 			_G.GatewayRegistry = {
-				[stubGatewayAddress] = sourceGateway,
+				[testSourceAddress] = sourceGateway,
 			}
 
 			local isSuccess, error = pcall(function()
 				gar.reDelegateStake({
 					delegateAddress = testReDelegatorAddress,
-					sourceAddress = stubGatewayAddress,
-					targetAddress = stubRandomAddress,
+					sourceAddress = testSourceAddress,
+					targetAddress = testTargetAddress,
 					qty = minDelegatedStake,
 					currentTimestamp = timestamp,
 				})
@@ -3264,8 +3266,8 @@ describe("gar", function()
 			local isSuccess, error = pcall(function()
 				gar.reDelegateStake({
 					delegateAddress = testReDelegatorAddress,
-					sourceAddress = stubGatewayAddress,
-					targetAddress = stubRandomAddress,
+					sourceAddress = testSourceAddress,
+					targetAddress = testTargetAddress,
 					qty = minDelegatedStake,
 					currentTimestamp = timestamp,
 				})
@@ -3283,15 +3285,15 @@ describe("gar", function()
 			targetGateway.status = "leaving"
 
 			_G.GatewayRegistry = {
-				[stubGatewayAddress] = sourceGateway,
-				[stubRandomAddress] = targetGateway,
+				[testSourceAddress] = sourceGateway,
+				[testTargetAddress] = targetGateway,
 			}
 
 			local isSuccess, error = pcall(function()
 				gar.reDelegateStake({
 					delegateAddress = testReDelegatorAddress,
-					sourceAddress = stubGatewayAddress,
-					targetAddress = stubRandomAddress,
+					sourceAddress = testSourceAddress,
+					targetAddress = testTargetAddress,
 					qty = minDelegatedStake,
 					currentTimestamp = timestamp,
 				})
@@ -3314,14 +3316,14 @@ describe("gar", function()
 			sourceGateway.totalDelegatedStake = minDelegatedStake
 			sourceGateway.status = "leaving"
 			_G.GatewayRegistry = {
-				[stubGatewayAddress] = sourceGateway,
-				[stubRandomAddress] = targetGateway,
+				[testSourceAddress] = sourceGateway,
+				[testTargetAddress] = targetGateway,
 			}
 
 			local result = gar.reDelegateStake({
 				delegateAddress = testReDelegatorAddress,
-				sourceAddress = stubGatewayAddress,
-				targetAddress = stubRandomAddress,
+				sourceAddress = testSourceAddress,
+				targetAddress = testTargetAddress,
 				qty = minDelegatedStake,
 				currentTimestamp = timestamp,
 			})
@@ -3351,15 +3353,15 @@ describe("gar", function()
 
 			targetGateway.settings.allowDelegatedStaking = false
 			_G.GatewayRegistry = {
-				[stubGatewayAddress] = sourceGateway,
-				[stubRandomAddress] = targetGateway,
+				[testSourceAddress] = sourceGateway,
+				[testTargetAddress] = targetGateway,
 			}
 
 			local isSuccess, error = pcall(function()
 				gar.reDelegateStake({
 					delegateAddress = testReDelegatorAddress,
-					sourceAddress = stubGatewayAddress,
-					targetAddress = stubRandomAddress,
+					sourceAddress = testSourceAddress,
+					targetAddress = testTargetAddress,
 					qty = minDelegatedStake,
 					currentTimestamp = timestamp,
 				})
@@ -3380,14 +3382,14 @@ describe("gar", function()
 				sourceGateway.operatorStake = minOperatorStake + minDelegatedStake - 1
 				_G.GatewayRegistry = {
 					[testReDelegatorAddress] = sourceGateway,
-					[stubRandomAddress] = targetGateway,
+					[testTargetAddress] = targetGateway,
 				}
 
 				local isSuccess, error = pcall(function()
 					gar.reDelegateStake({
 						delegateAddress = testReDelegatorAddress,
 						sourceAddress = testReDelegatorAddress,
-						targetAddress = stubRandomAddress,
+						targetAddress = testTargetAddress,
 						qty = minDelegatedStake,
 						currentTimestamp = timestamp,
 					})
@@ -3415,13 +3417,13 @@ describe("gar", function()
 
 			_G.GatewayRegistry = {
 				[testReDelegatorAddress] = sourceGateway,
-				[stubRandomAddress] = targetGateway,
+				[testTargetAddress] = targetGateway,
 			}
 
 			local result = gar.reDelegateStake({
 				delegateAddress = testReDelegatorAddress,
 				sourceAddress = testReDelegatorAddress,
-				targetAddress = stubRandomAddress,
+				targetAddress = testTargetAddress,
 				qty = 1,
 				currentTimestamp = timestamp,
 			})
@@ -3458,15 +3460,15 @@ describe("gar", function()
 					},
 				}
 				_G.GatewayRegistry = {
-					[stubGatewayAddress] = sourceGateway,
-					[stubRandomAddress] = targetGateway,
+					[testSourceAddress] = sourceGateway,
+					[testTargetAddress] = targetGateway,
 				}
 
 				local isSuccess, error = pcall(function()
 					gar.reDelegateStake({
 						delegateAddress = testReDelegatorAddress,
-						sourceAddress = stubGatewayAddress,
-						targetAddress = stubRandomAddress,
+						sourceAddress = testSourceAddress,
+						targetAddress = testTargetAddress,
 						qty = 1,
 						currentTimestamp = timestamp,
 					})
@@ -3492,15 +3494,15 @@ describe("gar", function()
 					},
 				}
 				_G.GatewayRegistry = {
-					[stubGatewayAddress] = sourceGateway,
-					[stubRandomAddress] = targetGateway,
+					[testSourceAddress] = sourceGateway,
+					[testTargetAddress] = targetGateway,
 				}
 
 				local isSuccess, error = pcall(function()
 					gar.reDelegateStake({
 						delegateAddress = testReDelegatorAddress,
-						sourceAddress = stubGatewayAddress,
-						targetAddress = stubRandomAddress,
+						sourceAddress = testSourceAddress,
+						targetAddress = testTargetAddress,
 						qty = minDelegatedStake - 1,
 						currentTimestamp = timestamp,
 					})
@@ -3520,15 +3522,15 @@ describe("gar", function()
 				[testReDelegatorAddress] = stubDelegation,
 			}
 			_G.GatewayRegistry = {
-				[stubGatewayAddress] = sourceGateway,
-				[stubRandomAddress] = targetGateway,
+				[testSourceAddress] = sourceGateway,
+				[testTargetAddress] = targetGateway,
 			}
 
 			local isSuccess, error = pcall(function()
 				gar.reDelegateStake({
 					delegateAddress = testReDelegatorAddress,
-					sourceAddress = stubGatewayAddress,
-					targetAddress = stubRandomAddress,
+					sourceAddress = testSourceAddress,
+					targetAddress = testTargetAddress,
 					qty = minDelegatedStake + 1,
 					currentTimestamp = timestamp,
 				})
@@ -3549,15 +3551,15 @@ describe("gar", function()
 				},
 			}
 			_G.GatewayRegistry = {
-				[stubGatewayAddress] = sourceGateway,
-				[stubRandomAddress] = testRedelgationGateway,
+				[testSourceAddress] = sourceGateway,
+				[testTargetAddress] = testRedelgationGateway,
 			}
 
 			local isSuccess, error = pcall(function()
 				gar.reDelegateStake({
 					delegateAddress = testReDelegatorAddress,
-					sourceAddress = stubGatewayAddress,
-					targetAddress = stubRandomAddress,
+					sourceAddress = testSourceAddress,
+					targetAddress = testTargetAddress,
 					qty = minDelegatedStake,
 					currentTimestamp = timestamp,
 					vaultId = "vault-1",
@@ -3572,14 +3574,14 @@ describe("gar", function()
 		it("should not redelegate stake when vault ID cannot be found on the operator", function()
 			_G.GatewayRegistry = {
 				[testReDelegatorAddress] = testRedelgationGateway,
-				[stubRandomAddress] = testRedelgationGateway,
+				[testTargetAddress] = testRedelgationGateway,
 			}
 
 			local isSuccess, error = pcall(function()
 				gar.reDelegateStake({
 					delegateAddress = testReDelegatorAddress,
 					sourceAddress = testReDelegatorAddress,
-					targetAddress = stubRandomAddress,
+					targetAddress = testTargetAddress,
 					qty = minDelegatedStake,
 					currentTimestamp = timestamp,
 					vaultId = "vault-1",
@@ -3611,14 +3613,14 @@ describe("gar", function()
 			sourceGateway.totalDelegatedStake = minDelegatedStake
 
 			_G.GatewayRegistry = {
-				[stubGatewayAddress] = sourceGateway,
-				[stubRandomAddress] = testRedelgationGateway,
+				[testSourceAddress] = sourceGateway,
+				[testTargetAddress] = testRedelgationGateway,
 			}
 
 			local result = gar.reDelegateStake({
 				delegateAddress = testReDelegatorAddress,
-				sourceAddress = stubGatewayAddress,
-				targetAddress = stubRandomAddress,
+				sourceAddress = testSourceAddress,
+				targetAddress = testTargetAddress,
 				qty = minDelegatedStake,
 				currentTimestamp = timestamp,
 				vaultId = "vault-1",
@@ -3661,14 +3663,14 @@ describe("gar", function()
 			}
 
 			_G.GatewayRegistry = {
-				[stubGatewayAddress] = sourceGateway,
-				[stubRandomAddress] = targetGateway,
+				[testSourceAddress] = sourceGateway,
+				[testTargetAddress] = targetGateway,
 			}
 
 			local result = gar.reDelegateStake({
 				delegateAddress = testReDelegatorAddress,
-				sourceAddress = stubGatewayAddress,
-				targetAddress = stubRandomAddress,
+				sourceAddress = testSourceAddress,
+				targetAddress = testTargetAddress,
 				qty = minDelegatedStake,
 				currentTimestamp = timestamp,
 				vaultId = "vault-1",
@@ -3706,13 +3708,13 @@ describe("gar", function()
 			}
 			_G.GatewayRegistry = {
 				[testReDelegatorAddress] = sourceGateway,
-				[stubRandomAddress] = targetGateway,
+				[testTargetAddress] = targetGateway,
 			}
 
 			local result = gar.reDelegateStake({
 				delegateAddress = testReDelegatorAddress,
 				sourceAddress = testReDelegatorAddress,
-				targetAddress = stubRandomAddress,
+				targetAddress = testTargetAddress,
 				qty = minDelegatedStake,
 				currentTimestamp = timestamp,
 				vaultId = "vault-1",
@@ -3755,15 +3757,15 @@ describe("gar", function()
 			}
 
 			_G.GatewayRegistry = {
-				[stubGatewayAddress] = sourceGateway,
-				[stubRandomAddress] = targetGateway,
+				[testSourceAddress] = sourceGateway,
+				[testTargetAddress] = targetGateway,
 			}
 
 			local isSuccess, error = pcall(function()
 				gar.reDelegateStake({
 					delegateAddress = testReDelegatorAddress,
-					sourceAddress = stubGatewayAddress,
-					targetAddress = stubRandomAddress,
+					sourceAddress = testSourceAddress,
+					targetAddress = testTargetAddress,
 					qty = minDelegatedStake + 1,
 					currentTimestamp = timestamp,
 					vaultId = "vault-1",
@@ -3794,14 +3796,14 @@ describe("gar", function()
 			}
 
 			_G.GatewayRegistry = {
-				[stubGatewayAddress] = sourceGateway,
-				[stubRandomAddress] = targetGateway,
+				[testSourceAddress] = sourceGateway,
+				[testTargetAddress] = targetGateway,
 			}
 
 			local result = gar.reDelegateStake({
 				delegateAddress = testReDelegatorAddress,
-				sourceAddress = stubGatewayAddress,
-				targetAddress = stubRandomAddress,
+				sourceAddress = testSourceAddress,
+				targetAddress = testTargetAddress,
 				qty = minDelegatedStake,
 				currentTimestamp = timestamp,
 				vaultId = "vault-1",
@@ -3828,29 +3830,29 @@ describe("gar", function()
 
 	describe("getReDelegationFee", function()
 		it("should return 0 if the delegator has not redelegated in the last 7 epochs", function()
-			local result = gar.getReDelegationFee(stubRandomAddress)
+			local result = gar.getReDelegationFee(testTargetAddress)
 			assert.are.same({ reDelegationFeePct = 0 }, result)
 		end)
 
 		it("should return 0.1 if the delegator has redelegated once in the last 7 epochs", function()
 			_G.ReDelegations = {
-				[stubRandomAddress] = {
+				[testTargetAddress] = {
 					timestamp = 1,
 					redelegations = 1,
 				},
 			}
-			local result = gar.getReDelegationFee(stubRandomAddress)
+			local result = gar.getReDelegationFee(testTargetAddress)
 			assert.are.same({ reDelegationFeePct = 0.1, feeResetTimestamp = 1 + sevenDays }, result)
 		end)
 
 		it("should return 0.6 if the delegator has redelegated 7 times in the last 7 epochs", function()
 			_G.ReDelegations = {
-				[stubRandomAddress] = {
+				[testTargetAddress] = {
 					timestamp = 1,
 					redelegations = 7,
 				},
 			}
-			local result = gar.getReDelegationFee(stubRandomAddress)
+			local result = gar.getReDelegationFee(testTargetAddress)
 			assert.are.same({ reDelegationFeePct = 0.6, feeResetTimestamp = 1 + sevenDays }, result)
 		end)
 	end)
