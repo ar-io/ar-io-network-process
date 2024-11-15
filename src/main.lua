@@ -45,6 +45,7 @@ local ActionMap = {
 	DemandFactor = "Demand-Factor",
 	DemandFactorInfo = "Demand-Factor-Info",
 	DemandFactorSettings = "Demand-Factor-Settings",
+	ReDelegationFee = "Re-Delegation-Fee",
 	-- EPOCH READ APIS
 	Epochs = "Epochs",
 	Epoch = "Epoch",
@@ -1560,86 +1561,6 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 	})
 end)
 
-addEventingHandler(ActionMap.ReDelegateStake, utils.hasMatchingTag("Action", ActionMap.ReDelegateStake), function(msg)
-	local sourceAddress = msg.Tags.Source
-	local targetAddress = msg.Tags.Target
-	local delegateAddress = msg.From
-
-	local checkAssertions = function()
-		assert(utils.isValidAOAddress(sourceAddress), "Invalid source gateway address")
-		assert(utils.isValidAOAddress(targetAddress), "Invalid target gateway address")
-		assert(utils.isValidAOAddress(delegateAddress), "Invalid delegator address")
-
-		assert(
-			msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
-			"Invalid quantity. Must be integer greater than 0"
-		)
-	end
-
-	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.ReDelegateStake .. "-Notice",
-				Error = "Bad-Input",
-			},
-			Data = tostring(error),
-		})
-	end, checkAssertions)
-	if not shouldContinue then
-		return
-	end
-
-	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
-	local from = utils.formatAddress(msg.From)
-	local quantity = tonumber(msg.Tags.Quantity)
-	msg.ioEvent:addField("Target-Formatted", target)
-
-	local shouldContinue2, gateway = eventingPcall(
-		msg.ioEvent,
-		function(error)
-			ao.send({
-				Target = from,
-				Tags = {
-					Action = "Invalid-" .. ActionMap.ReDelegateStake .. "-Notice",
-					Error = tostring(error),
-				},
-				Data = tostring(error),
-			})
-		end,
-		gar.reDelegateStake,
-		{
-			sourceAddress = sourceAddress,
-			targetAddress = targetAddress,
-			delegateAddress = delegateAddress,
-			qty = quantity,
-			currentTimestamp = tonumber(msg.Timestamp),
-		},
-		tonumber(msg.Timestamp)
-	)
-	if not shouldContinue2 then
-		return
-	end
-
-	local delegateResult = {}
-	if gateway ~= nil then
-		local newStake = gateway.delegates[from].delegatedStake
-		msg.ioEvent:addField("Previous-Stake", newStake - quantity)
-		msg.ioEvent:addField("New-Stake", newStake)
-		msg.ioEvent:addField("Gateway-Total-Delegated-Stake", gateway.totalDelegatedStake)
-		delegateResult = gateway.delegates[from]
-	end
-
-	LastKnownDelegatedSupply = LastKnownDelegatedSupply + quantity
-	addSupplyData(msg.ioEvent)
-
-	ao.send({
-		Target = msg.From,
-		Tags = { Action = ActionMap.ReDelegateStake .. "-Notice", Gateway = msg.Tags.Target },
-		Data = json.encode(delegateResult),
-	})
-end)
-
 addEventingHandler(ActionMap.CancelWithdrawal, utils.hasMatchingTag("Action", ActionMap.CancelWithdrawal), function(msg)
 	local checkAssertions = function()
 		assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address or msg.From), "Invalid gateway address")
@@ -2457,7 +2378,11 @@ addEventingHandler(ActionMap.Gateways, Handlers.utils.hasMatchingTag("Action", A
 end)
 
 addEventingHandler(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", ActionMap.Gateway), function(msg)
+	print("Gateway action")
+	print(msg.Tags.Address)
+	print(msg.From)
 	local gateway = gar.getGateway(msg.Tags.Address or msg.From)
+
 	ao.send({
 		Target = msg.From,
 		Action = "Gateway-Notice",
@@ -3298,4 +3223,116 @@ addEventingHandler("paginatedDelegations", utils.hasMatchingTag("Action", "Pagin
 	})
 end)
 
+addEventingHandler(ActionMap.ReDelegateStake, utils.hasMatchingTag("Action", ActionMap.ReDelegateStake), function(msg)
+	print("start of re-delegate")
+
+	local sourceAddress = msg.Tags.Source
+	local targetAddress = msg.Tags.Target
+	local delegateAddress = msg.From
+	local quantity = tonumber(msg.Tags.Quantity)
+	local vaultId = msg.Tags["Vault-Id"]
+
+	local checkAssertions = function()
+		assert(utils.isValidAOAddress(sourceAddress), "Invalid source gateway address")
+		assert(utils.isValidAOAddress(targetAddress), "Invalid target gateway address")
+		assert(utils.isValidAOAddress(delegateAddress), "Invalid delegator address")
+		if vaultId then
+			assert(utils.isInteger(tonumber(vaultId)), "Invalid vault id")
+		end
+
+		assert(
+			msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+			"Invalid quantity. Must be integer greater than 0"
+		)
+	end
+
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Invalid-" .. ActionMap.ReDelegateStake .. "-Notice",
+				Error = "Bad-Input",
+			},
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
+
+	local shouldContinue2, reDelegationResult = eventingPcall(
+		msg.ioEvent,
+		function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Invalid-" .. ActionMap.ReDelegateStake .. "-Notice",
+					Error = tostring(error),
+				},
+				Data = tostring(error),
+			})
+		end,
+		gar.reDelegateStake,
+		{
+			sourceAddress = sourceAddress,
+			targetAddress = targetAddress,
+			delegateAddress = delegateAddress,
+			qty = quantity,
+			currentTimestamp = tonumber(msg.Timestamp),
+			vaultId = vaultId,
+		},
+		tonumber(msg.Timestamp)
+	)
+	if not shouldContinue2 then
+		return
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = ActionMap.ReDelegateStake .. "-Notice", Gateway = msg.Tags.Target },
+		Data = json.encode(reDelegationResult),
+	})
+end)
+
+addEventingHandler(ActionMap.ReDelegationFee, utils.hasMatchingTag("Action", ActionMap.ReDelegationFee), function(msg)
+	local delegateAddress = msg.From
+
+	local checkAssertions = function()
+		assert(utils.isValidAOAddress(delegateAddress), "Invalid delegator address")
+	end
+
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Invalid-" .. ActionMap.ReDelegationFee .. "-Notice",
+				Error = "Bad-Input",
+			},
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
+
+	local shouldContinue2, feeResult = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Invalid-" .. ActionMap.ReDelegationFee .. "-Notice",
+				Error = tostring(error),
+			},
+			Data = tostring(error),
+		})
+	end, gar.getReDelegationFee, delegateAddress, tonumber(msg.Timestamp))
+	if not shouldContinue2 then
+		return
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = ActionMap.ReDelegationFee .. "-Notice" },
+		Data = json.encode(feeResult),
+	})
+end)
 return process
