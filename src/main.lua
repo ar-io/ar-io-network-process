@@ -32,7 +32,8 @@ local gar = require("gar")
 local demand = require("demand")
 local epochs = require("epochs")
 local vaults = require("vaults")
-local tick = require("tick")
+local prune = require("prune")
+local primaryNames = require("primary_names")
 
 local ActionMap = {
 	-- reads
@@ -98,6 +99,12 @@ local ActionMap = {
 	AllowDelegates = "Allow-Delegates",
 	DisallowDelegates = "Disallow-Delegates",
 	Delegations = "Delegations",
+	-- PRIMARY NAMES
+	RemovePrimaryNames = "Remove-Primary-Names",
+	PrimaryNameRequest = "Primary-Name-Request",
+	ApprovePrimaryNameRequest = "Approve-Primary-Name-Request",
+	PrimaryNames = "Primary-Names",
+	PrimaryName = "Primary-Name",
 }
 
 -- Low fidelity trackers
@@ -106,12 +113,14 @@ LastKnownLockedSupply = LastKnownLockedSupply or 0 -- total vault balance across
 LastKnownStakedSupply = LastKnownStakedSupply or 0 -- total operator stake across all gateways
 LastKnownDelegatedSupply = LastKnownDelegatedSupply or 0 -- total delegated stake across all gateways
 LastKnownWithdrawSupply = LastKnownWithdrawSupply or 0 -- total withdraw supply across all gateways (gateways and delegates)
+LastKnownPnpRequestSupply = LastKnownPnpRequestSupply or 0 -- total supply stashed in outstanding Primary Name Protocol requests
 local function lastKnownTotalTokenSupply()
 	return LastKnownCirculatingSupply
 		+ LastKnownLockedSupply
 		+ LastKnownStakedSupply
 		+ LastKnownDelegatedSupply
 		+ LastKnownWithdrawSupply
+		+ LastKnownPnpRequestSupply
 		+ Balances[Protocol]
 end
 LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
@@ -124,6 +133,27 @@ local function eventingPcall(ioEvent, onError, fnToCall, ...)
 		return status
 	end
 	return status, result
+end
+
+--- @param fundingPlan FundingPlan|nil
+--- @param rewardForInitiator number|nil only applies in auction bids for released names
+local function adjustSuppliesForFundingPlan(fundingPlan, rewardForInitiator)
+	if not fundingPlan then
+		return
+	end
+	rewardForInitiator = rewardForInitiator or 0
+	local totalActiveStakesUsed = utils.reduce(fundingPlan.stakes, function(acc, _, stakeSpendingPlan)
+		return acc + stakeSpendingPlan.delegatedStake
+	end, 0)
+	local totalWithdrawStakesUsed = utils.reduce(fundingPlan.stakes, function(acc, _, stakeSpendingPlan)
+		return acc
+			+ utils.reduce(stakeSpendingPlan.vaults, function(acc2, _, vaultBalance)
+				return acc2 + vaultBalance
+			end, 0)
+	end, 0)
+	LastKnownStakedSupply = LastKnownStakedSupply - totalActiveStakesUsed
+	LastKnownWithdrawSupply = LastKnownWithdrawSupply - totalWithdrawStakesUsed
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply - fundingPlan.balance + rewardForInitiator
 end
 
 local function addResultFundingPlanFields(ioEvent, result)
@@ -163,6 +193,7 @@ local function addResultFundingPlanFields(ioEvent, result)
 		ioEvent:addField("New-Withdraw-Vaults-Count", newWithdrawVaultsTallies.count)
 		ioEvent:addField("New-Withdraw-Vaults-Total-Balance", newWithdrawVaultsTallies.totalBalance)
 	end
+	adjustSuppliesForFundingPlan(result.fundingPlan, result.rewardForInitiator)
 end
 
 local function addRecordResultFields(ioEvent, result)
@@ -204,6 +235,7 @@ local function addAuctionResultFields(ioEvent, result)
 		"baseFee",
 		"demandFactor",
 	})
+	-- TODO: add removedPrimaryNamesAndOwners to ioEvent
 	addResultFundingPlanFields(ioEvent, result)
 end
 
@@ -214,6 +246,7 @@ local function addSupplyData(ioEvent, supplyData)
 	ioEvent:addField("Staked-Supply", supplyData.stakedSupply or LastKnownStakedSupply)
 	ioEvent:addField("Delegated-Supply", supplyData.delegatedSupply or LastKnownDelegatedSupply)
 	ioEvent:addField("Withdraw-Supply", supplyData.withdrawSupply or LastKnownWithdrawSupply)
+	ioEvent:addField("Request-Supply", supplyData.requestSupply or LastKnownPnpRequestSupply)
 	ioEvent:addField("Total-Token-Supply", supplyData.totalTokenSupply or lastKnownTotalTokenSupply())
 	ioEvent:addField("Protocol-Balance", Balances[Protocol])
 end
@@ -327,9 +360,10 @@ end, function(msg)
 		lastKnownStakedSupply = LastKnownStakedSupply,
 		lastKnownDelegatedSupply = LastKnownDelegatedSupply,
 		lastKnownWithdrawSupply = LastKnownWithdrawSupply,
+		lastKnownRequestSupply = LastKnownPnpRequestSupply,
 		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
 	}
-	local status, resultOrError = pcall(tick.pruneState, msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
+	local status, resultOrError = pcall(prune.pruneState, msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -399,6 +433,25 @@ end, function(msg)
 
 		local pruneGatewaysResult = resultOrError.pruneGatewaysResult or {}
 		addPruneGatewaysResult(msg.ioEvent, pruneGatewaysResult)
+
+		local prunedPrimaryNameRequests = resultOrError.prunedPrimaryNameRequests or {}
+		local prunedRequestsCount = utils.lengthOfTable(prunedPrimaryNameRequests)
+		if prunedRequestsCount then
+			msg.ioEvent:addField("Pruned-Requests-Count", prunedRequestsCount)
+			for initiator, request in pairs(prunedPrimaryNameRequests) do
+				-- Send credit notices back to the initiators
+				ao.send({
+					Target = initiator,
+					Action = "Credit-Notice",
+					Sender = ao.id,
+					Quantity = request.balance,
+					Data = "You received " .. msg.Tags.Quantity .. " from " .. ao.id,
+					Reason = "Primary Name request expired",
+				})
+				LastKnownPnpRequestSupply = LastKnownPnpRequestSupply - request.balance
+				LastKnownCirculatingSupply = LastKnownCirculatingSupply + request.balance
+			end
+		end
 	end
 
 	if
@@ -407,6 +460,7 @@ end, function(msg)
 		or LastKnownStakedSupply ~= previousState.lastKnownStakedSupply
 		or LastKnownDelegatedSupply ~= previousState.lastKnownDelegatedSupply
 		or LastKnownWithdrawSupply ~= previousState.lastKnownWithdrawSupply
+		or LastKnownPnpRequestSupply ~= previousState.lastKnownRequestSupply
 		or Balances[Protocol] ~= previousState.Balances[Protocol]
 		or lastKnownTotalTokenSupply() ~= previousState.lastKnownTotalSupply
 	then
@@ -824,7 +878,6 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	if result ~= nil then
 		record = result.record
 		addRecordResultFields(msg.ioEvent, result)
-		LastKnownCirculatingSupply = LastKnownCirculatingSupply - record.purchasePrice
 		addSupplyData(msg.ioEvent)
 	end
 
@@ -886,7 +939,6 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 	if result ~= nil then
 		record = result.record
 		addRecordResultFields(msg.ioEvent, result)
-		LastKnownCirculatingSupply = LastKnownCirculatingSupply - record.purchasePrice
 		addSupplyData(msg.ioEvent)
 	end
 
@@ -958,8 +1010,6 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 	if result ~= nil then
 		msg.ioEvent:addField("Total-Extension-Fee", result.totalExtensionFee)
 		addRecordResultFields(msg.ioEvent, result)
-
-		LastKnownCirculatingSupply = LastKnownCirculatingSupply - result.totalExtensionFee
 		addSupplyData(msg.ioEvent)
 
 		recordResult = result.record
@@ -1033,7 +1083,6 @@ addEventingHandler(
 			addRecordResultFields(msg.ioEvent, result)
 			msg.ioEvent:addField("previousUndernameLimit", recordResult.undernameLimit - tonumber(msg.Tags.Quantity))
 			msg.ioEvent:addField("additionalUndernameCost", result.additionalUndernameCost)
-			LastKnownCirculatingSupply = LastKnownCirculatingSupply - result.additionalUndernameCost
 			addSupplyData(msg.ioEvent)
 		end
 
@@ -2083,6 +2132,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.
 	local stakedSupply = 0
 	local delegatedSupply = 0
 	local withdrawSupply = 0
+	local pnpRequestSupply = 0
 	local protocolBalance = balances.getBalance(Protocol)
 	local userBalances = balances.getBalances()
 
@@ -2122,11 +2172,17 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.
 		end
 	end
 
+	-- pnp requests
+	for _, pnpRequest in pairs(primaryNames.getUnsafePrimaryNameRequests()) do
+		pnpRequestSupply = pnpRequestSupply + pnpRequest.balance
+	end
+
 	LastKnownCirculatingSupply = circulatingSupply
 	LastKnownLockedSupply = lockedSupply
 	LastKnownStakedSupply = stakedSupply
 	LastKnownDelegatedSupply = delegatedSupply
 	LastKnownWithdrawSupply = withdrawSupply
+	LastKnownPnpRequestSupply = pnpRequestSupply
 
 	addSupplyData(msg.ioEvent, {
 		totalTokenSupply = totalSupply,
@@ -2797,6 +2853,11 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 		assert(record, "Record not found")
 		assert(record.type == "permabuy", "Only permabuy names can be released")
 		assert(record.processId == processId, "Process-Id mismatch")
+		-- TODO: throw an error here instead of allowing release and force removal of primary names? I tend to favor the protection for primary name owners.
+		assert(
+			#primaryNames.getPrimaryNamesForBaseName(name) == 0,
+			"Primary names are associated with this name. They must be removed before releasing the name."
+		)
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -2812,23 +2873,34 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 		return
 	end
 
+	local removeRecordsAndCreateAuction = function()
+		assert(timestamp, "Timestamp is required")
+		local removedRecord = arns.removeRecord(name)
+		local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNamesForBaseName(name) -- NOTE: this should be empty if there are no primary names allowed before release
+		local auction = arns.createAuction(name, timestamp, initiator)
+		return {
+			removedRecord = removedRecord,
+			removedPrimaryNamesAndOwners = removedPrimaryNamesAndOwners,
+			auction = auction,
+		}
+	end
+
 	-- we should be able to create the auction here
-	local status, auctionData = eventingPcall(msg.ioEvent, function(error)
+	local status, createAuctionData = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
 			Error = "Auction-Creation-Error",
 			Data = tostring(error),
 		})
-		return
-	end, arns.createAuction, name, timestamp, initiator)
+	end, removeRecordsAndCreateAuction)
 
-	if not status or not auctionData then
+	if not status or not createAuctionData then
 		ao.send({
 			Target = msg.From,
 			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
 			Error = "Auction-Creation-Error",
-			Data = tostring(auctionData),
+			Data = tostring(createAuctionData),
 		})
 		return
 	end
@@ -2836,7 +2908,9 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	-- add the auction result fields
 	addAuctionResultFields(msg.ioEvent, {
 		name = name,
-		auction = auctionData,
+		auction = createAuctionData.auction,
+		removedRecord = createAuctionData.removedRecord,
+		removedPrimaryNamesAndOwners = createAuctionData.removedPrimaryNamesAndOwners,
 	})
 
 	-- note: no change to token supply here - only on auction bids
@@ -2845,12 +2919,12 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 
 	local auction = {
 		name = name,
-		startTimestamp = auctionData.startTimestamp,
-		endTimestamp = auctionData.endTimestamp,
-		initiator = auctionData.initiator,
-		baseFee = auctionData.baseFee,
-		demandFactor = auctionData.demandFactor,
-		settings = auctionData.settings,
+		startTimestamp = createAuctionData.auction.startTimestamp,
+		endTimestamp = createAuctionData.auction.endTimestamp,
+		initiator = createAuctionData.auction.initiator,
+		baseFee = createAuctionData.auction.baseFee,
+		demandFactor = createAuctionData.auction.demandFactor,
+		settings = createAuctionData.auction.settings,
 	}
 
 	-- send to the initiator and the process that released the name
@@ -3056,7 +3130,6 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 	if result ~= nil then
 		local record = result.record
 		addAuctionResultFields(msg.ioEvent, result)
-		LastKnownCirculatingSupply = LastKnownCirculatingSupply - record.purchasePrice
 		addSupplyData(msg.ioEvent)
 
 		msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
@@ -3161,7 +3234,7 @@ addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap
 		return
 	end
 
-	local disallowedDelegates = utils.splitAndTrimString(msg.Tags["Disallowed-Delegates"])
+	local disallowedDelegates = utils.splitAndTrimString(msg.Tags["Disallowed-Delegates"], ",")
 	msg.ioEvent:addField("Input-Disallowed-Delegates-Count", utils.lengthOfTable(disallowedDelegates))
 
 	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
@@ -3365,4 +3438,189 @@ addEventingHandler(ActionMap.ReDelegationFee, utils.hasMatchingTag("Action", Act
 		Data = json.encode(feeResult),
 	})
 end)
+
+--- PRIMARY NAMES
+addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap.RemovePrimaryNames), function(msg)
+	local checkAssertionsAndReturnResult = function()
+		local names = utils.splitAndTrimString(msg.Tags.Names, ",")
+		local from = utils.formatAddress(msg.From)
+		assert(names and #names > 0, "Names are required")
+		assert(from, "From is required")
+		return primaryNames.removePrimaryNames(names, from)
+	end
+
+	local shouldContinue, removedPrimaryNamesAndOwners = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Invalid-" .. ActionMap.RemovePrimaryNames .. "-Notice",
+				Error = tostring(error),
+			},
+		})
+	end, checkAssertionsAndReturnResult)
+	if not shouldContinue or not removedPrimaryNamesAndOwners then
+		return
+	end
+
+	ao.send({
+		Target = msg.From,
+		Action = ActionMap.RemovePrimaryNames .. "-Notice",
+		Data = json.encode(removedPrimaryNamesAndOwners),
+	})
+
+	-- TODO: send messages to the recipients of the claims? we could index on unique recipients and send one per recipient to avoid multiple messages
+	-- OR ANTS are responsible for sending messages to the recipients of the claims
+	for _, removedPrimaryNameAndOwner in pairs(removedPrimaryNamesAndOwners) do
+		ao.send({
+			Target = removedPrimaryNameAndOwner.owner,
+			Action = ActionMap.RemovePrimaryNames .. "-Notice",
+			Tags = { Name = removedPrimaryNameAndOwner.name },
+			Data = json.encode(removedPrimaryNameAndOwner),
+		})
+	end
+end)
+
+addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMap.PrimaryNameRequest), function(msg)
+	local fundFrom = msg.Tags["Fund-From"]
+	local checkAssertionsAndReturnResult = function()
+		local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
+		local initiator = utils.formatAddress(msg.From) -- the process that is creating the claim
+		local timestamp = tonumber(msg.Timestamp)
+		assert(name, "Name is required")
+		assert(initiator, "Initiator is required")
+		assert(timestamp, "Timestamp is required")
+		assertValidFundFrom(fundFrom)
+		return primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msg.Id, fundFrom)
+	end
+
+	local shouldContinue, primaryNameResult = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Invalid-" .. ActionMap.PrimaryNameRequest .. "-Notice",
+				Error = tostring(error),
+			},
+		})
+	end, checkAssertionsAndReturnResult)
+	if not shouldContinue or not primaryNameResult then
+		return
+	end
+
+	adjustSuppliesForFundingPlan(primaryNameResult.fundingPlan)
+
+	--- if the from is the new owner, then send an approved notice to the from
+	if primaryNameResult.newPrimaryName then
+		ao.send({
+			Target = msg.From,
+			Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
+			Data = json.encode(primaryNameResult),
+		})
+		return
+	end
+
+	if primaryNameResult.request then
+		--- send a notice to the from, and the base name owner
+		ao.send({
+			Target = msg.From,
+			Action = ActionMap.PrimaryNameRequest .. "-Notice",
+			Data = json.encode(primaryNameResult),
+		})
+		ao.send({
+			Target = primaryNameResult.baseNameOwner,
+			Action = ActionMap.PrimaryNameRequest .. "-Notice",
+			Data = json.encode(primaryNameResult),
+		})
+	end
+end)
+
+addEventingHandler(
+	"approvePrimaryNameRequest",
+	utils.hasMatchingTag("Action", ActionMap.ApprovePrimaryNameRequest),
+	function(msg)
+		local checkAssertionsAndReturnResult = function()
+			local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
+			local recipient = utils.formatAddress(msg.Tags.Recipient) or utils.formatAddress(msg.From)
+			local from = utils.formatAddress(msg.From) -- the recipient of the primary name
+			local timestamp = tonumber(msg.Timestamp)
+			assert(name, "Name is required")
+			assert(recipient, "Recipient is required")
+			assert(from, "From is required")
+			assert(timestamp, "Timestamp is required")
+			return primaryNames.approvePrimaryNameRequest(recipient, name, from, timestamp)
+		end
+
+		local shouldContinue, approvedPrimaryNameResult = eventingPcall(msg.ioEvent, function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Invalid-" .. ActionMap.ApprovePrimaryNameRequest .. "-Notice",
+					Error = tostring(error),
+				},
+			})
+		end, checkAssertionsAndReturnResult)
+		if not shouldContinue or not approvedPrimaryNameResult then
+			return
+		end
+
+		--- send a notice to the from
+		ao.send({
+			Target = msg.From,
+			Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
+			Data = json.encode(approvedPrimaryNameResult),
+		})
+		--- send a notice to the owner
+		ao.send({
+			Target = approvedPrimaryNameResult.newPrimaryName.owner,
+			Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
+			Data = json.encode(approvedPrimaryNameResult),
+		})
+	end
+)
+
+--- Handles forward and reverse resolutions (e.g. name -> address and address -> name)
+addEventingHandler("getPrimaryNameData", utils.hasMatchingTag("Action", ActionMap.PrimaryName), function(msg)
+	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
+	local address = msg.Tags.Address and utils.formatAddress(msg.Tags.Address) or utils.formatAddress(msg.From)
+	local primaryNameData = name and primaryNames.getPrimaryNameDataWithOwnerFromName(name)
+		or address and primaryNames.getPrimaryNameDataWithOwnerFromAddress(address)
+	if not primaryNameData then
+		return ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.PrimaryName .. "-Notice", Error = "Primary-Name-Not-Found" },
+		})
+	end
+	return ao.send({
+		Target = msg.From,
+		Action = ActionMap.PrimaryName .. "-Notice",
+		Tags = { Owner = primaryNameData.owner, Name = primaryNameData.name },
+		Data = json.encode(primaryNameData),
+	})
+end)
+
+addEventingHandler("getPaginatedPrimaryNames", utils.hasMatchingTag("Action", ActionMap.PrimaryNames), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local status, result = pcall(
+		primaryNames.getPaginatedPrimaryNames,
+		page.cursor,
+		page.limit,
+		page.sortBy or "name",
+		page.sortOrder or "asc"
+	)
+
+	if not status or not result then
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.PrimaryNames .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+		return
+	end
+
+	return ao.send({
+		Target = msg.From,
+		Action = ActionMap.PrimaryNames .. "-Notice",
+		Data = json.encode(result),
+	})
+end)
+
 return process

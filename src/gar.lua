@@ -1211,6 +1211,23 @@ function gar.delegateAllowedToStake(delegateAddress, gateway)
 		or (gateway.delegates[delegateAddress] and gateway.delegates[delegateAddress].delegatedStake or 0) > 0
 end
 
+--- @alias VaultId string
+--- @alias GatewayAddress WalletAddress
+
+--- @class StakeSpendingPlan
+--- @field delegatedStake number
+--- @field vaults table<VaultId, number>
+
+--- @class FundingPlan
+--- @field address WalletAddress
+--- @field balance number
+--- @field stakes table<GatewayAddress, StakeSpendingPlan>
+--- @field shortfall number
+
+--- @param address WalletAddress the funder of the funding plan
+--- @param quantity number the amount the funding plan aims to satisfy
+--- @param sourcesPreference "any"|"balance"|"stakes" the allowed funding sources
+--- @return FundingPlan
 function gar.getFundingPlan(address, quantity, sourcesPreference)
 	sourcesPreference = sourcesPreference or "balance"
 	local fundingPlan = {
@@ -1396,13 +1413,22 @@ function planMinimumStakesDrawdown(fundingPlan, stakingProfile)
 		if fundingPlan.shortfall == 0 then
 			break
 		end
+
 		local stakeToDraw = math.min(gatewayInfo.delegate.delegatedStake, fundingPlan.shortfall)
-		fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress].delegatedStake = fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress].delegatedStake
-			+ stakeToDraw
-		fundingPlan.shortfall = fundingPlan.shortfall - stakeToDraw
-		-- not needed after this, but keep track
-		gatewayInfo.delegate.delegatedStake = gatewayInfo.delegate.delegatedStake - stakeToDraw
-		gatewayInfo.totalDelegatedStake = gatewayInfo.totalDelegatedStake - stakeToDraw
+		if stakeToDraw > 0 then
+			if not fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress] then
+				fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress] = {
+					delegatedStake = 0,
+					vaults = {},
+				}
+			end
+			fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress].delegatedStake = fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress].delegatedStake
+				+ stakeToDraw
+			fundingPlan.shortfall = fundingPlan.shortfall - stakeToDraw
+			-- not needed after this, but keep track
+			gatewayInfo.delegate.delegatedStake = gatewayInfo.delegate.delegatedStake - stakeToDraw
+			gatewayInfo.totalDelegatedStake = gatewayInfo.totalDelegatedStake - stakeToDraw
+		end
 	end
 end
 
