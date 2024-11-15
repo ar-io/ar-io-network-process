@@ -1,5 +1,5 @@
 import { createAosLoader } from './utils.mjs';
-import { describe, it } from 'node:test';
+import { after, describe, it } from 'node:test';
 import assert from 'node:assert';
 import {
   AO_LOADER_HANDLER_ENV,
@@ -10,6 +10,11 @@ import {
   PROCESS_ID,
   STUB_TIMESTAMP,
 } from '../tools/constants.mjs';
+import { getBaseRegistrationFeeForName, getDemandFactor } from './helpers.mjs';
+
+const genesisEpochStart = 1722837600000 + 1;
+const epochDurationMs = 60 * 1000 * 60 * 24; // 24 hours
+const distributionDelayMs = 60 * 1000 * 40; // 40 minutes (~ 20 arweave blocks)
 
 describe('Tick', async () => {
   const { handle: originalHandle, memory: startMemory } =
@@ -320,10 +325,8 @@ describe('Tick', async () => {
     const futureTimestamp = vaultData.endTimestamp + 1;
     const futureTick = await handle(
       {
-        Tags: [
-          { name: 'Action', value: 'Tick' },
-          { name: 'Timestamp', value: futureTimestamp.toString() },
-        ],
+        Tags: [{ name: 'Action', value: 'Tick' }],
+        Timestamp: futureTimestamp,
       },
       createVaultResult.Memory,
     );
@@ -658,5 +661,157 @@ describe('Tick', async () => {
         tenureWeight: 4,
       },
     });
+  });
+
+  it('should not increase demandFactor and baseRegistrationFee when records are bought until the end of the epoch', async () => {
+    const genesisEpochTick = await handle(
+      {
+        Tags: [{ name: 'Action', value: 'Tick' }],
+        Timestamp: genesisEpochStart,
+      },
+      startMemory,
+    );
+    const genesisFee = await getBaseRegistrationFeeForName({
+      memory: genesisEpochTick.Memory,
+      timestamp: genesisEpochStart,
+    });
+    assert.equal(genesisFee, 600_000_000);
+
+    const zeroTickDemandFactorResult = await getDemandFactor({
+      memory: genesisEpochTick.Memory,
+      timestamp: genesisEpochStart,
+    });
+    assert.equal(zeroTickDemandFactorResult, 1);
+
+    const fundedUser = 'funded-user-'.padEnd(43, '1');
+    const transferMemory = await transfer({
+      recipient: fundedUser,
+      quantity: 100_000_000_000_000,
+      memory: genesisEpochTick.Memory,
+    });
+
+    // Buy records in this epoch
+    let buyRecordMemory = transferMemory;
+    for (let i = 0; i < 10; i++) {
+      const { Memory } = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Name', value: 'test-name-' + i },
+            { name: 'Purchase-Type', value: 'permabuy' },
+          ],
+        },
+        buyRecordMemory,
+      );
+      buyRecordMemory = Memory;
+    }
+
+    // Tick to the half way through the first epoch
+    const firstEpochMidTimestamp = genesisEpochStart + epochDurationMs / 2;
+    const firstEpochMidTick = await handle(
+      {
+        Tags: [{ name: 'Action', value: 'Tick' }],
+        Timestamp: firstEpochMidTimestamp,
+      },
+      buyRecordMemory,
+    );
+    const feeDuringFirstEpoch = await getBaseRegistrationFeeForName({
+      memory: firstEpochMidTick.Memory,
+      timestamp: firstEpochMidTimestamp + 1,
+    });
+
+    assert.equal(feeDuringFirstEpoch, 600_000_000);
+    const firstEpochDemandFactorResult = await getDemandFactor({
+      memory: firstEpochMidTick.Memory,
+      timestamp: firstEpochMidTimestamp + 1,
+    });
+    assert.equal(firstEpochDemandFactorResult, 1);
+
+    // Tick to the end of the first epoch
+    const firstEpochEndTimestamp =
+      genesisEpochStart + epochDurationMs + distributionDelayMs + 1;
+    const firstEpochEndTick = await handle(
+      {
+        Tags: [{ name: 'Action', value: 'Tick' }],
+        Timestamp: firstEpochEndTimestamp,
+      },
+      buyRecordMemory,
+    );
+    const feeAfterFirstEpochEnd = await getBaseRegistrationFeeForName({
+      memory: firstEpochEndTick.Memory,
+      timestamp: firstEpochEndTimestamp + 1,
+    });
+
+    assert.equal(feeAfterFirstEpochEnd, 630_000_000);
+
+    const firstEpochEndDemandFactorResult = await getDemandFactor({
+      memory: firstEpochEndTick.Memory,
+      timestamp: firstEpochEndTimestamp + 1,
+    });
+    assert.equal(firstEpochEndDemandFactorResult, 1.0500000000000000444);
+  });
+
+  it('should reset to baseRegistrationFee when demandFactor is 0.5 for consecutive epochs', async () => {
+    const zeroEpochTick = await handle(
+      {
+        Tags: [{ name: 'Action', value: 'Tick' }],
+        Timestamp: genesisEpochStart,
+      },
+      startMemory,
+    );
+
+    const baseFeeAtZeroEpoch = await getBaseRegistrationFeeForName({
+      memory: zeroEpochTick.Memory,
+      timestamp: genesisEpochStart,
+    });
+    assert.equal(baseFeeAtZeroEpoch, 600_000_000);
+
+    let tickMemory = zeroEpochTick.Memory;
+
+    // Tick to the epoch where demandFactor is 0.5
+    for (let i = 0; i <= 49; i++) {
+      const epochTimestamp = genesisEpochStart + (epochDurationMs + 1) * i;
+      const { Memory } = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Tick' },
+            { name: 'Timestamp', value: epochTimestamp.toString() },
+          ],
+          Timestamp: epochTimestamp,
+        },
+        tickMemory,
+      );
+      tickMemory = Memory;
+
+      if (i === 45) {
+        const demandFactor = await getDemandFactor({
+          memory: tickMemory,
+          timestamp: epochTimestamp,
+        });
+        assert.equal(demandFactor, 0.50655939255251769548);
+      }
+
+      if ([46, 47, 48].includes(i)) {
+        const demandFactor = await getDemandFactor({
+          memory: tickMemory,
+          timestamp: epochTimestamp,
+        });
+        assert.equal(demandFactor, 0.5);
+      }
+    }
+
+    const afterTimestamp = genesisEpochStart + (epochDurationMs + 1) * 50;
+    const demandFactorAfterFeeAdjustment = await getDemandFactor({
+      memory: tickMemory,
+      timestamp: afterTimestamp,
+    });
+    const baseFeeAfterConsecutiveTicksWithNoPurchases =
+      await getBaseRegistrationFeeForName({
+        memory: tickMemory,
+        timestamp: afterTimestamp,
+      });
+
+    assert.equal(demandFactorAfterFeeAdjustment, 1);
+    assert.equal(baseFeeAfterConsecutiveTicksWithNoPurchases, 300_000_000);
   });
 });

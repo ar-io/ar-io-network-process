@@ -258,9 +258,7 @@ function gar.updateGatewaySettings(from, updatedSettings, updatedServices, obser
 		error("The minimum delegated stake must be at least " .. gar.getSettings().operators.minStake .. " IO")
 	end
 
-	local gateways = gar.getGateways()
-
-	for gatewayAddress, existingGateway in pairs(gateways) do
+	for gatewayAddress, existingGateway in pairs(gar.getGatewaysUnsafe()) do
 		if existingGateway.observerAddress == observerAddress and gatewayAddress ~= from then
 			error("Invalid observer wallet. The provided observer wallet is correlated with another gateway.")
 		end
@@ -326,11 +324,20 @@ function gar.getGateway(address)
 	return utils.deepCopy(GatewayRegistry[address])
 end
 
+function gar.getGatewayUnsafe(address)
+	return GatewayRegistry[address]
+end
+
+-- TODO: Add a getGatewaysProps function that omits lots of heavy data like vaults and delegates
 --- Gets all gateways
 ---@return table All gateway objects
 function gar.getGateways()
 	local gateways = utils.deepCopy(GatewayRegistry)
 	return gateways or {}
+end
+
+function gar.getGatewaysUnsafe()
+	return GatewayRegistry or {}
 end
 
 function gar.delegateStake(from, target, qty, currentTimestamp)
@@ -529,11 +536,11 @@ function gar.isGatewayActiveBeforeTimestamp(startTimestamp, gateway)
 	local isNotLeaving = not gar.isGatewayLeaving(gateway)
 	return didStartBeforeEpoch and isNotLeaving
 end
+
 function gar.getActiveGatewaysBeforeTimestamp(startTimestamp)
-	local gateways = gar.getGateways()
 	local activeGatewayAddresses = {}
 	-- use pairs as gateways is a map
-	for address, gateway in pairs(gateways) do
+	for address, gateway in pairs(gar.getGatewaysUnsafe()) do
 		if gar.isGatewayActiveBeforeTimestamp(startTimestamp, gateway) then
 			table.insert(activeGatewayAddresses, address)
 		end
@@ -857,7 +864,7 @@ function gar.slashOperatorStake(address, slashAmount, currentTimestamp)
 
 	gateway.operatorStake = gateway.operatorStake - slashAmount
 	gateway.slashings = gateway.slashings or {}
-	gateway.slashings[currentTimestamp] = slashAmount
+	gateway.slashings[tostring(currentTimestamp)] = slashAmount
 	balances.increaseBalance(ao.id, slashAmount)
 	GatewayRegistry[address] = gateway
 	-- TODO: send slash notice to gateway address
@@ -1109,6 +1116,19 @@ function gar.allowDelegates(delegates, gatewayAddress)
 	}
 end
 
+function gar.isEligibleForArNSDiscount(from)
+	local gateway = gar.getGatewayUnsafe(from)
+	if gateway == nil or gateway.weights == nil or gar.isGatewayLeaving(gateway) then
+		return false
+	end
+
+	local tenureWeight = gateway.weights.tenureWeight or 0
+	local gatewayPerformanceRatio = gateway.weights.gatewayRewardRatioWeight or 0
+
+	return tenureWeight >= constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD
+		and gatewayPerformanceRatio >= constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD
+end
+
 --- Remove delegate addresses from the allowedDelegatesLookup table in the gateway's settings
 --- @param delegates table The list of delegate addresses to remove
 --- @param gatewayAddress string The address of the gateway
@@ -1189,6 +1209,346 @@ function gar.delegateAllowedToStake(delegateAddress, gateway)
 	-- Delegate must either be in the allow list or have a balance greater than 0
 	return gateway.settings.allowedDelegatesLookup[delegateAddress]
 		or (gateway.delegates[delegateAddress] and gateway.delegates[delegateAddress].delegatedStake or 0) > 0
+end
+
+function gar.getFundingPlan(address, quantity, sourcesPreference)
+	sourcesPreference = sourcesPreference or "balance"
+	local fundingPlan = {
+		address = address,
+		balance = 0,
+		stakes = {},
+		shortfall = quantity,
+	}
+
+	planBalanceDrawdown(fundingPlan, sourcesPreference)
+
+	-- early return if possible. Otherwise we'll move on to using withdraw vaults
+	if fundingPlan.shortfall == 0 or sourcesPreference == "balance" then
+		return fundingPlan
+	end
+
+	local stakingProfile = planVaultsDrawdown(fundingPlan)
+
+	-- early return if possible. Otherwise we'll move on to use excess stakes
+	if fundingPlan.shortfall == 0 then
+		return fundingPlan
+	end
+
+	planExcessStakesDrawdown(fundingPlan, stakingProfile)
+
+	-- early return if possible. Otherwise we'll move on to using minimum stakes
+	if fundingPlan.shortfall == 0 then
+		return fundingPlan
+	end
+
+	planMinimumStakesDrawdown(fundingPlan, stakingProfile)
+
+	return fundingPlan
+end
+
+function planBalanceDrawdown(fundingPlan, sourcesPreference)
+	local availableBalance = balances.getBalance(fundingPlan.address)
+	if sourcesPreference == "balance" or sourcesPreference == "any" then
+		fundingPlan.balance = math.min(availableBalance, fundingPlan.shortfall)
+		fundingPlan.shortfall = fundingPlan.shortfall - fundingPlan.balance
+	end
+end
+
+function getStakingProfile(address)
+	return utils.sortTableByFields(
+		utils.reduce(
+			-- only consider gateways that have the address as a delegate
+			utils.filterDictionary(gar.getGatewaysUnsafe(), function(_, gateway)
+				return gateway.delegates[address] ~= nil
+			end),
+			-- extract only the essential gateway fields, copying tables so we don't mutate references
+			function(acc, gatewayAddress, gateway)
+				local totalEpochsGatewayPassed = gateway.stats.passedEpochCount or 0
+				local totalEpochsParticipatedIn = gateway.stats.totalEpochCount or 0
+				local gatewayRewardRatioWeight = (1 + totalEpochsGatewayPassed) / (1 + totalEpochsParticipatedIn)
+				local delegate = utils.deepCopy(gateway.delegates[address])
+				delegate.excessStake = math.max(0, delegate.delegatedStake - gateway.settings.minDelegatedStake)
+				delegate.gatewayAddress = gatewayAddress
+				table.insert(acc, {
+					totalDelegatedStake = gateway.totalDelegatedStake, -- for comparing gw total stake
+					gatewayRewardRatioWeight = gatewayRewardRatioWeight, -- for comparing gw performance
+					delegate = delegate,
+					startTimestamp = gateway.startTimestamp, -- for comparing gw tenure
+				})
+				return acc
+			end,
+			{}
+		),
+		{
+			{
+				order = "desc",
+				field = "delegate.excessStake",
+			},
+			{
+				order = "asc",
+				field = "gatewayRewardRatioWeight",
+			},
+			{
+				order = "desc",
+				field = "totalDelegatedStake",
+			},
+			{
+				order = "desc",
+				field = "startTimestamp",
+			},
+		}
+	)
+end
+
+function planVaultsDrawdown(fundingPlan)
+	-- find all the address's delegations across the gateways
+	local stakingProfile = getStakingProfile(fundingPlan.address)
+
+	-- simulate drawing down vaults until the remaining balance is satisfied OR vaults are exhausted
+	local vaults = utils.sortTableByFields(
+		-- flatten the vaults across all gateways so we can sort them together
+		utils.reduce(stakingProfile, function(acc, _, gatewayInfo)
+			for vaultId, vault in pairs(gatewayInfo.delegate.vaults) do
+				table.insert(acc, {
+					vaultId = vaultId,
+					gatewayAddress = gatewayInfo.delegate.gatewayAddress,
+					endTimestamp = vault.endTimestamp,
+					balance = vault.balance,
+				})
+			end
+			return acc
+		end, {}),
+		{
+			{
+				order = "asc",
+				field = "endTimestamp",
+			},
+		}
+	)
+
+	for _, vault in pairs(vaults) do
+		if fundingPlan.shortfall == 0 then
+			break
+		end
+		local balance = vault.balance
+		local balanceToDraw = math.min(balance, fundingPlan.shortfall)
+		local gatewayAddress = vault.gatewayAddress
+		if balanceToDraw > 0 then
+			if not fundingPlan["stakes"][gatewayAddress] then
+				fundingPlan["stakes"][gatewayAddress] = {
+					delegatedStake = 0,
+					vaults = {},
+				}
+			end
+			fundingPlan["stakes"][gatewayAddress].vaults[vault.vaultId] = balanceToDraw
+			fundingPlan.shortfall = fundingPlan.shortfall - balanceToDraw
+			vault.balance = balance - balanceToDraw
+		end
+	end
+
+	return stakingProfile
+end
+
+function planExcessStakesDrawdown(fundingPlan, stakingProfile)
+	-- simulate drawing down excess stakes until the remaining balance is satisfied OR excess stakes are exhausted
+	for _, gatewayInfo in pairs(stakingProfile) do
+		if fundingPlan.shortfall == 0 then
+			break
+		end
+		local excessStake = gatewayInfo.delegate.excessStake
+		local stakeToDraw = math.min(excessStake, fundingPlan.shortfall)
+		if stakeToDraw > 0 then
+			if not fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress] then
+				fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress] = {
+					delegatedStake = 0,
+					vaults = {},
+				}
+			end
+			fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress].delegatedStake = stakeToDraw
+			fundingPlan.shortfall = fundingPlan.shortfall - stakeToDraw
+			gatewayInfo.delegate.delegatedStake = gatewayInfo.delegate.delegatedStake - stakeToDraw
+			-- maintain consistency for future re-sorting of the gatewayInfos based on theoretical updated state
+			gatewayInfo.delegate.excessStake = excessStake - stakeToDraw
+			gatewayInfo.totalDelegatedStake = gatewayInfo.totalDelegatedStake - stakeToDraw
+		end
+	end
+	return stakingProfile
+end
+
+function planMinimumStakesDrawdown(fundingPlan, stakingProfile)
+	-- re-sort the gateways since their totalDelegatedStakes may have changed
+	stakingProfile = utils.sortTableByFields(stakingProfile, {
+		{
+			order = "asc",
+			field = "gatewayRewardRatioWeight",
+		},
+		{
+			order = "desc",
+			field = "totalDelegatedStake",
+		},
+		{
+			order = "desc",
+			field = "startTimestamp",
+		},
+	})
+
+	for _, gatewayInfo in pairs(stakingProfile) do
+		if fundingPlan.shortfall == 0 then
+			break
+		end
+		local stakeToDraw = math.min(gatewayInfo.delegate.delegatedStake, fundingPlan.shortfall)
+		fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress].delegatedStake = fundingPlan["stakes"][gatewayInfo.delegate.gatewayAddress].delegatedStake
+			+ stakeToDraw
+		fundingPlan.shortfall = fundingPlan.shortfall - stakeToDraw
+		-- not needed after this, but keep track
+		gatewayInfo.delegate.delegatedStake = gatewayInfo.delegate.delegatedStake - stakeToDraw
+		gatewayInfo.totalDelegatedStake = gatewayInfo.totalDelegatedStake - stakeToDraw
+	end
+end
+
+-- TODO: return event-worthy data
+--- Reduces all balances and creates withdraw stakes as prescribed by the funding plan
+--- @param fundingPlan table The funding plan to apply
+--- @param msgId string The current message ID
+--- @param currentTimestamp number The current timestamp
+function gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
+	local appliedPlan = {
+		totalFunded = 0,
+		newWithdrawVaults = {},
+	}
+
+	-- draw down balance first
+	balances.reduceBalance(fundingPlan.address, fundingPlan.balance)
+	appliedPlan.totalFunded = appliedPlan.totalFunded + fundingPlan.balance
+
+	--draw down stakes and vaults, creating withdraw vaults if necessary
+	for gatewayAddress, delegationPlan in pairs(fundingPlan.stakes) do
+		local gateway = gar.getGateway(gatewayAddress)
+		if not gateway then
+			error("Gateway not found")
+		end
+		local delegate = gateway.delegates[fundingPlan.address]
+		if not delegate then
+			error("Delegate not found")
+		end
+
+		-- draw down the delegated stake balance
+		delegate.delegatedStake = delegate.delegatedStake - delegationPlan.delegatedStake
+		assert(delegate.delegatedStake >= 0, "Delegated stake cannot be negative")
+		gateway.totalDelegatedStake = gateway.totalDelegatedStake - delegationPlan.delegatedStake
+		assert(gateway.totalDelegatedStake >= 0, "Total delegated stake cannot be negative")
+		appliedPlan.totalFunded = appliedPlan.totalFunded + delegationPlan.delegatedStake
+
+		-- draw down the vaults
+		delegate.vaults = utils.reduce(delegate.vaults, function(acc, vaultId, vault)
+			if delegationPlan.vaults[vaultId] then
+				-- if the whole vault is used, "prune" it by moving on
+				if vault.balance ~= delegationPlan.vaults[vaultId] then
+					acc[vaultId] = {
+						balance = vault.balance - delegationPlan.vaults[vaultId],
+						startTimestamp = vault.startTimestamp,
+						endTimestamp = vault.endTimestamp,
+					}
+					assert(acc[vaultId].balance > 0, "Vault balance should be greater than 0")
+				end
+				appliedPlan.totalFunded = appliedPlan.totalFunded + delegationPlan.vaults[vaultId]
+			else
+				-- nothing to change
+				acc[vaultId] = vault
+			end
+			return acc
+		end, {})
+
+		-- create an exit vault for the remaining stake if less than the gateway's minimum
+		if delegate.delegatedStake > 0 and delegate.delegatedStake < gateway.settings.minDelegatedStake then
+			-- create a vault for the remaining stake
+			delegate.vaults[msgId] = {
+				balance = delegate.delegatedStake,
+				startTimestamp = currentTimestamp,
+				endTimestamp = currentTimestamp + gar.getSettings().delegates.withdrawLengthMs,
+			}
+			gateway.totalDelegatedStake = gateway.totalDelegatedStake - delegate.delegatedStake
+			delegate.delegatedStake = 0
+			appliedPlan.newWithdrawVaults[gatewayAddress] = {
+				[msgId] = utils.deepCopy(delegate.vaults[msgId]),
+			}
+		end
+
+		-- TODO: ensure delegates with 0 stake and no vaults are pruned
+
+		-- update the gateway
+		GatewayRegistry[gatewayAddress] = gateway
+	end
+
+	return appliedPlan
+end
+
+--- Fetch copies of all the delegations present across all gateways for the given address
+--- @param address string The address of the delegator
+--- @return table # a table, indexed by gateway address, of all the address's delegations, including nested vaults
+function gar.getDelegations(address)
+	return utils.reduce(gar.getGatewaysUnsafe(), function(acc, gatewayAddress, gateway)
+		if gateway.delegates[address] then
+			acc[gatewayAddress] = utils.deepCopy(gateway.delegates[address])
+		end
+		return acc
+	end, {})
+end
+
+---@class Delegation
+---@field type string # The type of the object. Either "stake" or "vault"
+---@field gatewayAddress string # The address of the gateway the delegation is associated with
+---@field delegateStake number|nil # The amount of stake delegated to the gateway if type is "stake"
+---@field startTimestamp number # The start timestamp of the delegation's initial stake or the vault's creation
+---@field messageId string|nil # The message ID associated with the vault's creation if type is "vault"
+---@field balance number|nil # The balance of the vault if type is "vault"
+---@field endTimestamp number|nil # The end timestamp of the vault if type is "vault"
+---@field delegationId string # The unique ID of the delegation
+
+--- Fetch a flattened array of all the delegations (stakes and vaults) present across all gateways for the given address
+--- @param address string The address of the delegator
+--- @return Delegation[] # A table of all the address's staked and vaulted delegations
+function gar.getFlattenedDelegations(address)
+	return utils.reduce(gar.getDelegations(address), function(acc, gatewayAddress, delegation)
+		table.insert(acc, {
+			type = "stake",
+			gatewayAddress = gatewayAddress,
+			balance = delegation.delegatedStake,
+			startTimestamp = delegation.startTimestamp,
+			delegationId = gatewayAddress .. "_" .. delegation.startTimestamp,
+		})
+		for vaultId, vault in pairs(delegation.vaults) do
+			table.insert(acc, {
+				type = "vault",
+				gatewayAddress = gatewayAddress,
+				startTimestamp = vault.startTimestamp,
+				vaultId = vaultId,
+				balance = vault.balance,
+				endTimestamp = vault.endTimestamp,
+				delegationId = gatewayAddress .. "_" .. vault.startTimestamp,
+			})
+		end
+		return acc
+	end, {})
+end
+
+--- Fetch a heterogenous array of all active and vaulted delegated stakes, cursored on startTimestamp
+--- @param address string The address of the delegator
+--- @param cursor number|nil The cursor startTimestamp after which to fetch more stakes (optional)
+--- @param limit number The max number of stakes to fetch
+--- @param sortBy string The field to sort by. Default is "startTimestamp"
+--- @param sortOrder string The order to sort by, either "asc" or "desc". Default is "asc"
+--- @return PaginatedTable # A table containing the paginated stakes and pagination metadata as Delegation objects
+function gar.getPaginatedDelegations(address, cursor, limit, sortBy, sortOrder)
+	local delegationsArray = gar.getFlattenedDelegations(address)
+	return utils.paginateTableWithCursor(
+		delegationsArray,
+		cursor,
+		"delegationId",
+		limit,
+		sortBy or "startTimestamp",
+		sortOrder or "asc"
+	)
 end
 
 return gar

@@ -64,8 +64,9 @@ local function AOEvent(initialData)
 	end
 
 	function event:addFieldsIfExist(table, fields)
+		table = table == nil and {} or table -- allow for nil OR a table, but not other falsey value types
 		if type(table) ~= "table" then
-			print("ERROR: Fields must be provided as a table.")
+			print("ERROR: Table and fields must be provided as tables.")
 			return self
 		end
 		for _, key in pairs(fields) do
@@ -77,6 +78,7 @@ local function AOEvent(initialData)
 	end
 
 	function event:addFieldsWithPrefixIfExist(srcTable, prefix, fields)
+		srcTable = srcTable == nil and {} or srcTable -- allow for nil OR a table, but not other falsey value types
 		if type(srcTable) ~= "table" or type(fields) ~= "table" then
 			print("ERROR: table and fields must be provided as a table.")
 			return self

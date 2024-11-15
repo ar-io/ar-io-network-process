@@ -68,41 +68,107 @@ function utils.parsePaginationTags(msg)
 	}
 end
 
---- Sorts a table by a given field
+--- Sorts a table by multiple fields with specified orders for each field.
+--- Supports tables of non-table values by using `nil` as a field name.
+--- Each field is provided as a table with 'field' (string|nil) and 'order' ("asc" or "desc").
+--- Supports nested fields using dot notation.
 --- @param prevTable table The table to sort
---- @param field string|nil The field to sort by. Nil if sorting by the primitive items themselves.
---- @param order string The order to sort by ("asc" or "desc")
+--- @param fields table A list of fields with order specified, e.g., { { field = "name", order = "asc" } }
 --- @return table The sorted table
-function utils.sortTableByField(prevTable, field, order)
-	local tableCopy = utils.deepCopy(prevTable) or {}
+function utils.sortTableByFields(prevTable, fields)
+	-- Handle sorting for non-table values with possible nils
+	if fields[1].field == nil then
+		-- Separate non-nil values and count nil values
+		local nonNilValues = {}
+		local nilValuesCount = 0
 
-	if order ~= "asc" and order ~= "desc" then
-		error("Invalid sort order")
+		for _, value in pairs(prevTable) do -- Use pairs instead of ipairs to include all elements
+			if value == nil then
+				nilValuesCount = nilValuesCount + 1
+			else
+				table.insert(nonNilValues, value)
+			end
+		end
+
+		-- Sort non-nil values
+		table.sort(nonNilValues, function(a, b)
+			if fields[1].order == "asc" then
+				return a < b
+			else
+				return a > b
+			end
+		end)
+
+		-- Append nil values to the end
+		for _ = 1, nilValuesCount do
+			table.insert(nonNilValues, nil)
+		end
+
+		return nonNilValues
 	end
 
-	if not tableCopy or #tableCopy == 0 then
+	-- Deep copy for sorting complex nested values
+	local tableCopy = utils.deepCopy(prevTable) or {}
+
+	-- If no elements or no fields, return the copied table as-is
+	if #tableCopy == 0 or #fields == 0 then
 		return tableCopy
 	end
 
-	table.sort(tableCopy, function(a, b)
-		local aField = not field and a or a[field]
-		local bField = not field and b or b[field]
-		-- If one field is nil, ensure it goes to the end
-		if aField == nil and bField ~= nil then
-			return false
-		elseif aField ~= nil and bField == nil then
-			return true
-		elseif aField == nil and bField == nil then
-			-- If both fields are nil, consider them equal
-			return false
+	-- Helper function to retrieve a nested field value by path
+	local function getNestedValue(tbl, fieldPath)
+		local current = tbl
+		for segment in fieldPath:gmatch("[^.]+") do
+			if type(current) == "table" then
+				current = current[segment]
+			else
+				return nil
+			end
 		end
+		return current
+	end
 
-		if order == "asc" then
-			return aField < bField
-		else
-			return aField > bField
+	-- Sort table using table.sort with multiple fields and specified orders
+	table.sort(tableCopy, function(a, b)
+		for _, fieldSpec in ipairs(fields) do
+			local fieldPath = fieldSpec.field
+			local order = fieldSpec.order
+			local aField, bField
+
+			-- Check if field is nil, treating a and b as simple values
+			if fieldPath == nil then
+				aField = a
+				bField = b
+			else
+				aField = getNestedValue(a, fieldPath)
+				bField = getNestedValue(b, fieldPath)
+			end
+
+			-- Validate order
+			if order ~= "asc" and order ~= "desc" then
+				error("Invalid sort order. Expected 'asc' or 'desc'")
+			end
+
+			-- Handle nil values to ensure they go to the end
+			if aField == nil and bField ~= nil then
+				return false
+			elseif aField ~= nil and bField == nil then
+				return true
+			elseif aField ~= nil and bField ~= nil then
+				-- Compare based on the specified order
+				if aField ~= bField then
+					if order == "asc" then
+						return aField < bField
+					else
+						return aField > bField
+					end
+				end
+			end
 		end
+		-- All fields are equal
+		return false
 	end)
+
 	return tableCopy
 end
 
@@ -112,19 +178,19 @@ end
 --- @field totalItems number The total number of items
 --- @field sortBy string|nil The field to sort by, nil if sorting by the primitive items themselves
 --- @field sortOrder string The order to sort by
---- @field nextCursor string|nil The cursor to the next page
+--- @field nextCursor string|number|nil The cursor to the next page
 --- @field hasMore boolean Whether there is a next page
 
 --- Paginate a table with a cursor
 --- @param tableArray table The table to paginate
---- @param cursor string|nil The cursor to paginate from (optional)
+--- @param cursor string|number|nil The cursor to paginate from (optional)
 --- @param cursorField string|nil The field to use as the cursor or nil for lists of primitives
 --- @param limit number The limit of items to return
 --- @param sortBy string|nil The field to sort by. Nil if sorting by the primitive items themselves.
 --- @param sortOrder string The order to sort by ("asc" or "desc")
 --- @return PaginatedTable The paginated table result
 function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, sortBy, sortOrder)
-	local sortedArray = utils.sortTableByField(tableArray, sortBy, sortOrder)
+	local sortedArray = utils.sortTableByFields(tableArray, { { order = sortOrder, field = sortBy } })
 
 	if not sortedArray or #sortedArray == 0 then
 		return {
@@ -258,8 +324,9 @@ function utils.findInArray(array, predicate)
 end
 
 --- Deep copies a table
---- @param original table The table to copy
---- @return table|nil The deep copy of the table or nil if the original is nil
+--- @generic T: table|nil
+--- @param original T The table to copy
+--- @return T The deep copy of the table or nil if the original is nil
 function utils.deepCopy(original)
 	if not original then
 		return nil
@@ -367,8 +434,10 @@ end
 
 function utils.reduce(tbl, fn, init)
 	local acc = init
+	local i = 1
 	for k, v in pairs(tbl) do
-		acc = fn(acc, k, v)
+		acc = fn(acc, k, v, i)
+		i = i + 1
 	end
 	return acc
 end
@@ -417,6 +486,26 @@ function utils.getTableKeys(tbl)
 		table.insert(keys, key)
 	end
 	return keys
+end
+
+function utils.filterArray(arr, predicate)
+	local filtered = {}
+	for i, value in ipairs(arr or {}) do -- ipairs ensures we only traverse numeric keys sequentially
+		if predicate and predicate(i, value) then
+			table.insert(filtered, value) -- Insert re-indexes automatically
+		end
+	end
+	return filtered
+end
+
+function utils.filterDictionary(tbl, predicate)
+	local filtered = {}
+	for key, value in pairs(tbl or {}) do
+		if predicate and predicate(key, value) then
+			filtered[key] = value
+		end
+	end
+	return filtered
 end
 
 return utils

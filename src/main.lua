@@ -59,6 +59,7 @@ local ActionMap = {
 	ReservedNames = "Reserved-Names",
 	ReservedName = "Reserved-Name",
 	TokenCost = "Token-Cost",
+	CostDetails = "Get-Cost-Details-For-Action",
 	GetRegistrationFees = "Get-Registration-Fees",
 	-- GATEWAY REGISTRY READ APIS
 	Gateway = "Gateway",
@@ -94,6 +95,7 @@ local ActionMap = {
 	AuctionPrices = "Auction-Prices",
 	AllowDelegates = "Allow-Delegates",
 	DisallowDelegates = "Disallow-Delegates",
+	Delegations = "Delegations",
 }
 
 -- Low fidelity trackers
@@ -122,6 +124,45 @@ local function eventingPcall(ioEvent, onError, fnToCall, ...)
 	return status, result
 end
 
+local function addResultFundingPlanFields(ioEvent, result)
+	ioEvent:addFieldsWithPrefixIfExist(result.fundingPlan, "FP-", { "balance" })
+	local fundingPlanVaultsCount = 0
+	local fundingPlanStakesAmount = utils.reduce(
+		result.fundingPlan and result.fundingPlan.stakes or {},
+		function(acc, _, delegation)
+			return acc
+				+ delegation.delegatedStake
+				+ utils.reduce(delegation.vaults, function(acc2, _, vaultAmount)
+					fundingPlanVaultsCount = fundingPlanVaultsCount + 1
+					return acc2 + vaultAmount
+				end, 0)
+		end,
+		0
+	)
+	if fundingPlanStakesAmount > 0 then
+		ioEvent:addField("FP-Stakes-Amount", fundingPlanStakesAmount)
+	end
+	if fundingPlanVaultsCount > 0 then
+		ioEvent:addField("FP-Vaults-Count", fundingPlanVaultsCount)
+	end
+	local newWithdrawVaultsTallies = utils.reduce(
+		result.fundingResult and result.fundingResult.newWithdrawVaults or {},
+		function(acc, _, newWithdrawVault)
+			acc.totalBalance = acc.totalBalance
+				+ utils.reduce(newWithdrawVault, function(acc2, _, vault)
+					acc.count = acc.count + 1
+					return acc2 + vault.balance
+				end, 0)
+			return acc
+		end,
+		{ count = 0, totalBalance = 0 }
+	)
+	if newWithdrawVaultsTallies.count > 0 then
+		ioEvent:addField("New-Withdraw-Vaults-Count", newWithdrawVaultsTallies.count)
+		ioEvent:addField("New-Withdraw-Vaults-Total-Balance", newWithdrawVaultsTallies.totalBalance)
+	end
+end
+
 local function addRecordResultFields(ioEvent, result)
 	ioEvent:addFieldsIfExist(
 		result,
@@ -139,6 +180,7 @@ local function addRecordResultFields(ioEvent, result)
 			"purchasesThisPeriod",
 		})
 	end
+	addResultFundingPlanFields(ioEvent, result)
 end
 
 local function addAuctionResultFields(ioEvent, result)
@@ -160,6 +202,7 @@ local function addAuctionResultFields(ioEvent, result)
 		"baseFee",
 		"demandFactor",
 	})
+	addResultFundingPlanFields(ioEvent, result)
 end
 
 local function addSupplyData(ioEvent, supplyData)
@@ -237,6 +280,14 @@ local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
 			ioEvent:addField("Invariant-Slashed-Gateways", invariantSlashedGateways)
 		end
 	end
+end
+
+local function assertValidFundFrom(fundFrom)
+	if fundFrom == nil then
+		return
+	end
+	local validFundFrom = utils.createLookupTable({ "any", "balance", "stakes" })
+	assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stake")
 end
 
 local function addEventingHandler(handlerName, pattern, handleFn)
@@ -717,6 +768,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	local from = utils.formatAddress(msg.From)
 	local processId = utils.formatAddress(msg.Tags["Process-Id"] or msg.From)
 	local timestamp = tonumber(msg.Timestamp)
+	local fundFrom = msg.Tags["Fund-From"]
 
 	local checkAssertions = function()
 		assert(
@@ -736,6 +788,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 				"Invalid years. Must be integer between 1 and 5"
 			)
 		end
+		assertValidFundFrom(fundFrom)
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -760,7 +813,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 			},
 			Data = tostring(error),
 		})
-	end, arns.buyRecord, name, purchaseType, years, from, timestamp, processId)
+	end, arns.buyRecord, name, purchaseType, years, from, timestamp, processId, msg.Id, fundFrom)
 	if not shouldContinue2 then
 		return
 	end
@@ -775,10 +828,11 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 
 	msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
 
+	-- TODO: Send back fundingPlan and fundingResult as well?
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = ActionMap.BuyRecord .. "-Notice", Name = name },
-		Data = json.encode({
+		Data = json.encode(fundFrom and result or {
 			name = name,
 			startTimestamp = record.startTimestamp,
 			endTimestamp = record.endTimestamp,
@@ -790,9 +844,11 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 end)
 
 addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.UpgradeName), function(msg)
+	local fundFrom = msg.Tags["Fund-From"]
 	local checkAssertions = function()
 		assert(type(msg.Tags.Name) == "string", "Invalid name")
 		assert(msg.Timestamp, "Timestamp is required")
+		assertValidFundFrom(fundFrom)
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -819,7 +875,7 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 			},
 			Data = tostring(error),
 		})
-	end, arns.upgradeRecord, from, name, timestamp)
+	end, arns.upgradeRecord, from, name, timestamp, msg.Id, fundFrom)
 	if not shouldContinue2 then
 		return
 	end
@@ -835,7 +891,7 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 	ao.send({
 		Target = from,
 		Tags = { Action = ActionMap.UpgradeName .. "-Notice", Name = name },
-		Data = json.encode({
+		Data = json.encode(fundFrom and result or {
 			name = name,
 			startTimestamp = record.startTimestamp,
 			endTimestamp = record.endTimestamp,
@@ -848,12 +904,14 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 end)
 
 addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.ExtendLease), function(msg)
+	local fundFrom = msg.Tags["Fund-From"]
 	local checkAssertions = function()
 		assert(type(msg.Tags.Name) == "string", "Invalid name")
 		assert(
 			tonumber(msg.Tags.Years) > 0 and tonumber(msg.Tags.Years) < 5 and utils.isInteger(tonumber(msg.Tags.Years)),
 			"Invalid years. Must be integer between 1 and 5"
 		)
+		assertValidFundFrom(fundFrom)
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -870,16 +928,26 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 		return
 	end
 
-	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.ExtendLease .. "-Notice",
-				Error = "Invalid-" .. ActionMap.ExtendLease,
-			},
-			Data = tostring(error),
-		})
-	end, arns.extendLease, msg.From, string.lower(msg.Tags.Name), tonumber(msg.Tags.Years), msg.Timestamp)
+	local shouldContinue2, result = eventingPcall(
+		msg.ioEvent,
+		function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Invalid-" .. ActionMap.ExtendLease .. "-Notice",
+					Error = "Invalid-" .. ActionMap.ExtendLease,
+				},
+				Data = tostring(error),
+			})
+		end,
+		arns.extendLease,
+		msg.From,
+		string.lower(msg.Tags.Name),
+		tonumber(msg.Tags.Years),
+		msg.Timestamp,
+		msg.Id,
+		fundFrom
+	)
 	if not shouldContinue2 then
 		return
 	end
@@ -898,7 +966,7 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = ActionMap.ExtendLease .. "-Notice", Name = string.lower(msg.Tags.Name) },
-		Data = json.encode(recordResult),
+		Data = json.encode(fundFrom and result or recordResult),
 	})
 end)
 
@@ -906,14 +974,17 @@ addEventingHandler(
 	ActionMap.IncreaseUndernameLimit,
 	utils.hasMatchingTag("Action", ActionMap.IncreaseUndernameLimit),
 	function(msg)
+		local fundFrom = msg.Tags["Fund-From"]
 		local checkAssertions = function()
 			assert(type(msg.Tags.Name) == "string", "Invalid name")
 			assert(
-				tonumber(msg.Tags.Quantity) > 0
+				msg.Tags.Quantity
+					and tonumber(msg.Tags.Quantity) > 0
 					and tonumber(msg.Tags.Quantity) < 9990
 					and utils.isInteger(msg.Tags.Quantity),
 				"Invalid quantity. Must be an integer value greater than 0 and less than 9990"
 			)
+			assertValidFundFrom(fundFrom)
 		end
 
 		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -946,7 +1017,9 @@ addEventingHandler(
 			msg.From,
 			string.lower(msg.Tags.Name),
 			tonumber(msg.Tags.Quantity),
-			msg.Timestamp
+			msg.Timestamp,
+			msg.Id,
+			fundFrom
 		)
 		if not shouldContinue2 then
 			return
@@ -968,65 +1041,136 @@ addEventingHandler(
 				Action = ActionMap.IncreaseUndernameLimit .. "-Notice",
 				Name = string.lower(msg.Tags.Name),
 			},
-			Data = json.encode(recordResult),
+			Data = json.encode(fundFrom and result or recordResult),
 		})
 	end
 )
 
-addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.TokenCost), function(msg)
-	local checkAssertions = function()
-		assert(
-			type(msg.Tags.Intent) == "string",
-			-- assert is one of those three interactions
-			msg.Tags.Intent == ActionMap.BuyRecord
-				or msg.Tags.Intent == ActionMap.ExtendLease
-				or msg.Tags.Intent == ActionMap.IncreaseUndernameLimit,
-			"Intent must be valid registry interaction (e.g. BuyRecord, ExtendLease, IncreaseUndernameLimit). Provided intent: "
-				.. (msg.Tags.Intent or "nil")
-		)
-		-- if years is provided, assert it is a number and integer between 1 and 5
-		if msg.Tags.Years then
-			assert(utils.isInteger(tonumber(msg.Tags.Years)), "Invalid years. Must be integer between 1 and 5")
-		end
-
-		-- if quantity provided must be a number and integer greater than 0
-		if msg.Tags.Quantity then
-			assert(utils.isInteger(tonumber(msg.Tags.Quantity)), "Invalid quantity. Must be integer greater than 0")
-		end
+function assertTokenCostTags(msg)
+	local intentType = msg.Tags.Intent
+	local validIntents = utils.createLookupTable({
+		ActionMap.BuyRecord,
+		ActionMap.ExtendLease,
+		ActionMap.IncreaseUndernameLimit,
+		ActionMap.UpgradeName,
+	})
+	assert(
+		intentType and type(intentType) == "string" and validIntents[intentType],
+		"Intent must be valid registry interaction (e.g. BuyRecord, ExtendLease, IncreaseUndernameLimit, UpgradeName). Provided intent: "
+			.. (intentType or "nil")
+	)
+	assert(msg.Tags.Name, "Name is required")
+	-- if years is provided, assert it is a number and integer between 1 and 5
+	if msg.Tags.Years then
+		assert(utils.isInteger(tonumber(msg.Tags.Years)), "Invalid years. Must be integer between 1 and 5")
 	end
 
-	local inputStatus, inputResult = pcall(checkAssertions)
+	-- if quantity provided must be a number and integer greater than 0
+	if msg.Tags.Quantity then
+		assert(utils.isInteger(tonumber(msg.Tags.Quantity)), "Invalid quantity. Must be integer greater than 0")
+	end
+end
 
-	if not inputStatus then
+addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.TokenCost), function(msg)
+	local checkAssertions = function()
+		assertTokenCostTags(msg)
+	end
+
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
+			Tags = { Action = "Invalid-" .. ActionMap.TokenCost .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
 		})
+	end, checkAssertions)
+	if not shouldContinue then
 		return
 	end
 
-	local status, result = pcall(arns.getTokenCost, {
-		intent = msg.Tags.Intent,
-		name = string.lower(msg.Tags.Name),
-		years = tonumber(msg.Tags.Years) or 1,
-		quantity = tonumber(msg.Tags.Quantity),
-		purchaseType = msg.Tags["Purchase-Type"] or "lease",
-		currentTimestamp = tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp),
-	})
-	if not status then
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-Token-Cost-Notice", Error = "Invalid-Token-Cost" },
-			Data = tostring(result),
-		})
-	else
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Token-Cost-Notice", ["Token-Cost"] = tostring(result) },
-			Data = json.encode(result),
-		})
+	local shouldContinue2, tokenCostResult = eventingPcall(
+		msg.ioEvent,
+		function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Invalid-" .. ActionMap.TokenCost .. "-Notice",
+					Error = "Invalid-" .. ActionMap.TokenCost,
+				},
+				Data = tostring(error),
+			})
+		end,
+		arns.getTokenCost,
+		{
+			intent = msg.Tags.Intent,
+			name = string.lower(msg.Tags.Name),
+			years = tonumber(msg.Tags.Years) or 1,
+			quantity = tonumber(msg.Tags.Quantity),
+			purchaseType = msg.Tags["Purchase-Type"] or "lease",
+			currentTimestamp = tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp),
+			from = msg.From,
+		}
+	)
+	if not shouldContinue2 or not tokenCostResult then
+		return
 	end
+	local tokenCost = tokenCostResult.tokenCost
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = ActionMap.TokenCost .. "-Notice", ["Token-Cost"] = tostring(tokenCost) },
+		Data = json.encode(tokenCost),
+	})
+end)
+
+addEventingHandler(ActionMap.CostDetails, utils.hasMatchingTag("Action", ActionMap.CostDetails), function(msg)
+	local fundFrom = msg.Tags["Fund-From"]
+	local checkAssertions = function()
+		assertTokenCostTags(msg)
+		assertValidFundFrom(fundFrom)
+	end
+
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.CostDetails .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
+
+	local shouldContinue2, tokenCostAndFundingPlan = eventingPcall(
+		msg.ioEvent,
+		function(error)
+			ao.send({
+				Target = msg.From,
+				Tags = {
+					Action = "Invalid-" .. ActionMap.CostDetails .. "-Notice",
+					Error = "Invalid-" .. ActionMap.CostDetails,
+				},
+				Data = tostring(error),
+			})
+		end,
+		arns.getTokenCostAndFundingPlanForIntent,
+		msg.Tags.Intent,
+		string.lower(msg.Tags.Name),
+		tonumber(msg.Tags.Years) or 1,
+		tonumber(msg.Tags.Quantity),
+		msg.Tags["Purchase-Type"] or "lease",
+		tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp),
+		msg.From,
+		fundFrom
+	)
+	if not shouldContinue2 or tokenCostAndFundingPlan == nil then
+		return
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = ActionMap.CostDetails .. "-Notice" },
+		Data = json.encode(tokenCostAndFundingPlan),
+	})
 end)
 
 addEventingHandler(
@@ -1266,8 +1410,8 @@ addEventingHandler(
 				msg.Tags.Quantity
 					and tonumber(msg.Tags.Quantity)
 					and utils.isInteger(tonumber(msg.Tags.Quantity))
-					and tonumber(msg.Tags.Quantity) > 0,
-				"Invalid quantity. Must be integer greater than 0"
+					and tonumber(msg.Tags.Quantity) > constants.minimumWithdrawalAmount,
+				"Invalid quantity. Must be integer greater than " .. constants.minimumWithdrawalAmount
 			)
 			if msg.Tags.Instant ~= nil then
 				assert(
@@ -1568,8 +1712,10 @@ addEventingHandler(
 		local checkAssertions = function()
 			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
 			assert(
-				msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(msg.Tags.Quantity),
-				"Invalid quantity. Must be integer greater than 0"
+				msg.Tags.Quantity
+					and tonumber(msg.Tags.Quantity) > constants.minimumWithdrawalAmount
+					and utils.isInteger(msg.Tags.Quantity),
+				"Invalid quantity. Must be integer greater than " .. constants.minimumWithdrawalAmount
 			)
 			if msg.Tags.Instant ~= nil then
 				assert(
@@ -1946,8 +2092,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.
 	totalSupply = totalSupply + protocolBalance + circulatingSupply
 
 	-- tally supply stashed in gateways and delegates
-	local gateways = gar.getGateways()
-	for _, gateway in pairs(gateways) do
+	for _, gateway in pairs(gar.getGatewaysUnsafe()) do
 		totalSupply = totalSupply + gateway.operatorStake + gateway.totalDelegatedStake
 		stakedSupply = stakedSupply + gateway.operatorStake
 		delegatedSupply = delegatedSupply + gateway.totalDelegatedStake
@@ -2536,8 +2681,13 @@ end)
 
 addEventingHandler("paginatedGateways", utils.hasMatchingTag("Action", "Paginated-Gateways"), function(msg)
 	local page = utils.parsePaginationTags(msg)
-	local status, result =
-		pcall(gar.getPaginatedGateways, page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
+	local status, result = pcall(
+		gar.getPaginatedGateways,
+		page.cursor,
+		page.limit,
+		page.sortBy or "startTimestamp",
+		page.sortOrder or "desc"
+	)
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -2807,6 +2957,17 @@ addEventingHandler("auctionPrices", utils.hasMatchingTag("Action", ActionMap.Auc
 
 	local currentPrice = auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
 	local prices = auction:computePricesForAuction(type, years, intervalMs)
+
+	local isEligibleForArNSDiscount = gar.isEligibleForArNSDiscount(msg.From)
+	local discounts = {}
+
+	if isEligibleForArNSDiscount then
+		table.insert(discounts, {
+			name = constants.ARNS_DISCOUNT_NAME,
+			multiplier = constants.ARNS_DISCOUNT_PERCENTAGE,
+		})
+	end
+
 	local jsonPrices = {}
 	for k, v in pairs(prices) do
 		jsonPrices[tostring(k)] = v
@@ -2821,11 +2982,13 @@ addEventingHandler("auctionPrices", utils.hasMatchingTag("Action", ActionMap.Auc
 			years = years,
 			prices = jsonPrices,
 			currentPrice = currentPrice,
+			discounts = discounts,
 		}),
 	})
 end)
 
 addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.AuctionBid), function(msg)
+	local fundFrom = msg.Tags["Fund-From"]
 	local name = string.lower(msg.Tags.Name)
 	local bidAmount = msg.Tags.Quantity and tonumber(msg.Tags.Quantity) or nil -- if nil, we use the current bid price
 	local bidder = utils.formatAddress(msg.From)
@@ -2863,6 +3026,7 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 
 		local auction = arns.getAuction(name)
 		assert(auction, "Auction not found")
+		assertValidFundFrom(fundFrom)
 	end
 
 	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
@@ -2882,7 +3046,7 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 			Tags = { Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice", Error = "Auction-Bid-Error" },
 			Data = tostring(error),
 		})
-	end, arns.submitAuctionBid, name, bidAmount, bidder, timestamp, processId, type, years)
+	end, arns.submitAuctionBid, name, bidAmount, bidder, timestamp, processId, type, years, msg.Id, fundFrom)
 	if not shouldContinue2 then
 		return
 	end
@@ -2907,6 +3071,8 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 				purchasePrice = record.purchasePrice,
 				processId = record.processId,
 				type = record.type,
+				fundingPlan = result.fundingPlan,
+				fundingResult = result.fundingResult,
 			}),
 		})
 
@@ -3021,6 +3187,41 @@ addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap
 		Target = msg.From,
 		Tags = { Action = ActionMap.DisallowDelegates .. "-Notice" },
 		Data = json.encode(result and result.removedDelegates or {}),
+	})
+end)
+
+addEventingHandler("paginatedDelegations", utils.hasMatchingTag("Action", "Paginated-Delegations"), function(msg)
+	local address = utils.formatAddress(msg.Tags.Address or msg.From)
+	local page = utils.parsePaginationTags(msg)
+	local function checkAssertions()
+		assert(utils.isValidAOAddress(address), "Invalid address.")
+	end
+	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.Delegations .. "-Notice", Error = "Bad-Input" },
+			Data = tostring(error),
+		})
+	end, checkAssertions)
+	if not shouldContinue then
+		return
+	end
+
+	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = "Invalid-" .. ActionMap.Delegations .. "-Notice", Error = "Pagination-Error" },
+			Data = tostring(error),
+		})
+	end, gar.getPaginatedDelegations, address, page.cursor, page.limit, page.sortBy, page.sortOrder)
+	if not shouldContinue2 then
+		return
+	end
+
+	ao.send({
+		Target = msg.From,
+		Tags = { Action = ActionMap.Delegations .. "-Notice" },
+		Data = json.encode(result),
 	})
 end)
 
