@@ -486,13 +486,13 @@ function gar.reDelegateStake(params)
 
 	local previousReDelegations = ReDelegations[delegateAddress]
 
-	local redelegationFeePct = math.min(
+	local reDelegationFeePct = math.min(
 		previousReDelegations and previousReDelegations.redelegations >= 1 and 0.1 * previousReDelegations.redelegations
 			or 0,
 		0.6
 	)
 
-	local redelegationFee = math.ceil(stakeToTakeFromSource * redelegationFeePct)
+	local redelegationFee = math.ceil(stakeToTakeFromSource * reDelegationFeePct)
 	local stakeToDelegate = stakeToTakeFromSource - redelegationFee
 
 	if stakeToDelegate == 0 then
@@ -635,15 +635,15 @@ function gar.reDelegateStake(params)
 	balances.increaseBalance(ao.id, redelegationFee)
 
 	-- Update redelegations
-	local redelegationTimestamp = previousReDelegations and previousReDelegations.timestamp or currentTimestamp
+
 	if not previousReDelegations then
 		ReDelegations[delegateAddress] = {
-			timestamp = redelegationTimestamp,
+			timestamp = currentTimestamp,
 			redelegations = 1,
 		}
 	else
 		ReDelegations[delegateAddress] = {
-			timestamp = redelegationTimestamp,
+			timestamp = currentTimestamp,
 			redelegations = previousReDelegations.redelegations + 1,
 		}
 	end
@@ -663,8 +663,23 @@ function gar.reDelegateStake(params)
 		sourceGateway = sourceGateway,
 		targetGateway = targetGateway,
 		reDelegationFee = redelegationFee,
-		feeResetTimestamp = redelegationTimestamp + 7 * 24 * 60 * 60 * 1000, -- 7 days
+		feeResetTimestamp = currentTimestamp + 7 * 24 * 60 * 60 * 1000, -- 7 days
 		reDelegationsSinceFeeReset = ReDelegations[delegateAddress].redelegations,
+	}
+end
+
+function gar.getReDelegationFee(delegateAddress)
+	local previousReDelegations = ReDelegations[delegateAddress]
+
+	local reDelegationFeePct = math.min(
+		previousReDelegations and previousReDelegations.redelegations >= 1 and 0.1 * previousReDelegations.redelegations
+			or 0,
+		0.6
+	)
+
+	return {
+		reDelegationFeePct = reDelegationFeePct,
+		feeResetTimestamp = previousReDelegations and previousReDelegations.timestamp + 7 * 24 * 60 * 60 * 1000 or nil,
 	}
 end
 
