@@ -5,13 +5,13 @@ local primaryNames = {}
 
 local PRIMARY_NAME_COST = 100000000 -- 100 IO
 
----@alias WalletAddress string
----@alias ArNSName string
+--- @alias WalletAddress string
+--- @alias ArNSName string
 
----@class PrimaryNames
----@field owners table<WalletAddress, PrimaryName> - map indexed by owner address containing the primary name and all metadata, used for reverse lookups
----@field names table<ArNSName, WalletAddress> - map indexed by primary name containing the owner address, used for reverse lookups
----@field requests table<WalletAddress, PrimaryNameRequest> - map indexed by owner address containing the request, used for pruning expired requests
+--- @class PrimaryNames
+--- @field owners table<WalletAddress, PrimaryName> - map indexed by owner address containing the primary name and all metadata, used for reverse lookups
+--- @field names table<ArNSName, WalletAddress> - map indexed by primary name containing the owner address, used for reverse lookups
+--- @field requests table<WalletAddress, PrimaryNameRequest> - map indexed by owner address containing the request, used for pruning expired requests
 
 PrimaryNames = PrimaryNames or {
 	requests = {},
@@ -19,23 +19,23 @@ PrimaryNames = PrimaryNames or {
 	owners = {},
 }
 
----@class PrimaryName
----@field name ArNSName
----@field baseName ArNSName
----@field startTimestamp number
+--- @class PrimaryName
+--- @field name ArNSName
+--- @field baseName ArNSName
+--- @field startTimestamp number
 
----@class PrimaryNameWithOwner
----@field name ArNSName
----@field baseName ArNSName
----@field owner WalletAddress
----@field startTimestamp number
+--- @class PrimaryNameWithOwner
+--- @field name ArNSName
+--- @field baseName ArNSName
+--- @field owner WalletAddress
+--- @field startTimestamp number
 
----@class PrimaryNameRequest
----@field name ArNSName -- the name being requested
----@field baseName ArNSName -- the base name, identified when creating the name request
----@field initiator WalletAddress -- the process id that made the request
----@field startTimestamp number -- the timestamp of the request
----@field endTimestamp number -- the timestamp of the request expiration
+--- @class PrimaryNameRequest
+--- @field name ArNSName -- the name being requested
+--- @field baseName ArNSName -- the base name, identified when creating the name request
+--- @field initiator WalletAddress -- the process id that made the request
+--- @field startTimestamp number -- the timestamp of the request
+--- @field endTimestamp number -- the timestamp of the request expiration
 
 --- Creates a transient request for a primary name. This is done by a user and must be approved by the name owner of the base name.
 --- @param name string -- the name being requested, this could be an undername provided by the ant
@@ -59,7 +59,7 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp)
 	--- TODO: replace with funding plan
 	assert(balances.walletHasSufficientBalance(initiator, PRIMARY_NAME_COST), "Insufficient balance")
 
-	--- transfer the primary name cost from the initiator to the treasury
+	--- transfer the primary name cost from the initiator to the protocol balance
 	balances.transfer(ao.id, initiator, PRIMARY_NAME_COST)
 
 	local request = {
@@ -146,7 +146,6 @@ function primaryNames.setPrimaryNameFromRequest(recipient, request, startTimesta
 		owner = recipient,
 		startTimestamp = startTimestamp,
 		baseName = request.baseName,
-		-- TODO: add base name owner if useful
 	}
 end
 
@@ -163,10 +162,6 @@ function primaryNames.removePrimaryNames(names, from)
 	return removedPrimaryNamesAndOwners
 end
 
---- @class RemovedPrimaryNameResult
---- @field owner WalletAddress
---- @field name ArNSName
-
 --- Release a primary name
 --- @param name ArNSName -- the name being released
 --- @param from WalletAddress -- the address that is releasing the primary name, or the owner of the base name
@@ -181,9 +176,9 @@ function primaryNames.removePrimaryName(name, from)
 		"Caller is not the owner of the primary name, or the owner of the " .. primaryName.baseName .. " record"
 	)
 
-	PrimaryNames.requests[name] = nil -- should never happen, but cleanup anyway
 	PrimaryNames.names[name] = nil
 	PrimaryNames.owners[primaryName.owner] = nil
+	PrimaryNames.requests[primaryName.owner] = nil -- should never happen, but cleanup anyway
 	return {
 		name = name,
 		owner = primaryName.owner,
@@ -218,8 +213,11 @@ end
 --- @return PrimaryNameWithOwner|nil primaryNameWithOwner - the primary name with owner data, or nil if it does not exist
 function primaryNames.getPrimaryNameDataWithOwnerFromName(name)
 	local owner = primaryNames.getAddressForPrimaryName(name)
+	if not owner then
+		return nil
+	end
 	local nameData = primaryNames.getPrimaryNameDataWithOwnerFromAddress(owner)
-	if not owner or not nameData then
+	if not nameData then
 		return nil
 	end
 	return {
@@ -248,11 +246,11 @@ function primaryNames.getPrimaryNamesForBaseName(baseName)
 	return primaryNamesForArNSName
 end
 
----@class RemovedPrimaryName
----@field owner WalletAddress
----@field name ArNSName
+--- @class RemovedPrimaryName
+--- @field owner WalletAddress
+--- @field name ArNSName
 
---- Remove all primary names with a given base  name
+--- Remove all primary names with a given base name
 --- @param baseName string
 --- @return RemovedPrimaryName[] removedPrimaryNames - the results of the name removals
 function primaryNames.removePrimaryNamesForBaseName(baseName)

@@ -3255,10 +3255,9 @@ end)
 
 --- PRIMARY NAMES
 addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap.RemovePrimaryNames), function(msg)
-	--- @param input table the message to check assertions and return the result
-	local checkAssertionsAndReturnResult = function(input)
-		local names = input.Tags.Names and utils.splitAndTrimString(input.Tags.Names, ",") or nil
-		local from = utils.formatAddress(input.From)
+	local checkAssertionsAndReturnResult = function()
+		local names = utils.splitAndTrimString(msg.Tags.Names, ",")
+		local from = utils.formatAddress(msg.From)
 		assert(names and #names > 0, "Names are required")
 		assert(from, "From is required")
 		return primaryNames.removePrimaryNames(names, from)
@@ -3267,10 +3266,12 @@ addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap
 	local shouldContinue, removedPrimaryNamesAndOwners = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.RemovePrimaryNames .. "-Notice", Error = "Bad-Input" },
-			Data = tostring(error),
+			Tags = {
+				Action = "Invalid-" .. ActionMap.RemovePrimaryNames .. "-Notice",
+				Error = tostring(error),
+			},
 		})
-	end, checkAssertionsAndReturnResult, msg)
+	end, checkAssertionsAndReturnResult)
 	if not shouldContinue or not removedPrimaryNamesAndOwners then
 		return
 	end
@@ -3294,11 +3295,10 @@ addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap
 end)
 
 addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMap.PrimaryNameRequest), function(msg)
-	--- @param input table the message to check assertions and return the result
-	local checkAssertionsAndReturnResult = function(input)
-		local name = input.Tags.Name and string.lower(input.Tags.Name) or nil
-		local initiator = utils.formatAddress(input.From) -- the process that is creating the claim
-		local timestamp = tonumber(input.Timestamp)
+	local checkAssertionsAndReturnResult = function()
+		local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
+		local initiator = utils.formatAddress(msg.From) -- the process that is creating the claim
+		local timestamp = tonumber(msg.Timestamp)
 		assert(name, "Name is required")
 		assert(initiator, "Initiator is required")
 		assert(timestamp, "Timestamp is required")
@@ -3308,10 +3308,12 @@ addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMa
 	local shouldContinue, primaryNameRequest = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.PrimaryNameRequest .. "-Notice", Error = "Bad-Input" },
-			Data = tostring(error),
+			Tags = {
+				Action = "Invalid-" .. ActionMap.PrimaryNameRequest .. "-Notice",
+				Error = tostring(error),
+			},
 		})
-	end, checkAssertionsAndReturnResult, msg)
+	end, checkAssertionsAndReturnResult)
 	if not shouldContinue or not primaryNameRequest then
 		return
 	end
@@ -3345,12 +3347,11 @@ addEventingHandler(
 	"approvePrimaryNameRequest",
 	utils.hasMatchingTag("Action", ActionMap.ApprovePrimaryNameRequest),
 	function(msg)
-		--- @param input table the message to check assertions and return the result
-		local checkAssertionsAndReturnResult = function(input)
-			local name = input.Tags.Name and string.lower(input.Tags.Name) or nil
-			local recipient = utils.formatAddress(input.Tags.Recipient) or utils.formatAddress(input.From)
-			local from = utils.formatAddress(input.From) -- the recipient of the primary name
-			local timestamp = tonumber(input.Timestamp)
+		local checkAssertionsAndReturnResult = function()
+			local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
+			local recipient = utils.formatAddress(msg.Tags.Recipient) or utils.formatAddress(msg.From)
+			local from = utils.formatAddress(msg.From) -- the recipient of the primary name
+			local timestamp = tonumber(msg.Timestamp)
 			assert(name, "Name is required")
 			assert(recipient, "Recipient is required")
 			assert(from, "From is required")
@@ -3363,11 +3364,10 @@ addEventingHandler(
 				Target = msg.From,
 				Tags = {
 					Action = "Invalid-" .. ActionMap.ApprovePrimaryNameRequest .. "-Notice",
-					Error = "Bad-Input",
+					Error = tostring(error),
 				},
-				Data = tostring(error),
 			})
-		end, checkAssertionsAndReturnResult, msg)
+		end, checkAssertionsAndReturnResult)
 		if not shouldContinue or not approvedPrimaryNameResult then
 			return
 		end
