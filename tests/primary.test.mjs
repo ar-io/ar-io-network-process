@@ -412,4 +412,29 @@ describe('primary names', function () {
       });
     });
   });
+
+  describe('getPaginatedPrimaryNameRequests', function () {
+    it('should return all primary name requests', async function () {
+      const getPaginatedPrimaryNameRequestsResult = await handle({
+        Tags: [
+          { name: 'Action', value: 'Primary-Name-Requests' },
+          { name: 'Limit', value: 10 },
+          { name: 'Sort-By', value: 'startTimestamp' },
+          { name: 'Sort-Order', value: 'asc' },
+        ],
+      });
+      assertNoResultError(getPaginatedPrimaryNameRequestsResult);
+      const primaryNameRequests = JSON.parse(
+        getPaginatedPrimaryNameRequestsResult.Messages[0].Data,
+      );
+      assert.deepStrictEqual(primaryNameRequests, {
+        items: [],
+        totalItems: 0,
+        limit: 10,
+        hasMore: false,
+        sortBy: 'startTimestamp',
+        sortOrder: 'asc',
+      });
+    });
+  });
 });
