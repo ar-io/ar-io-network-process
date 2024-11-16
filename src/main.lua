@@ -3301,66 +3301,46 @@ addEventingHandler("paginatedDelegations", utils.hasMatchingTag("Action", "Pagin
 end)
 
 addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", ActionMap.RedelegateStake), function(msg)
-	print("start of re-delegate")
-
 	local sourceAddress = msg.Tags.Source
 	local targetAddress = msg.Tags.Target
 	local delegateAddress = msg.From
-	local quantity = tonumber(msg.Tags.Quantity)
+	local quantity = msg.Tags.Quantity and tonumber(msg.Tags.Quantity) or nil
 	local vaultId = msg.Tags["Vault-Id"]
+	local timestamp = tonumber(msg.Timestamp)
 
-	local checkAssertions = function()
+	local checkAssertionsAndReturnResult = function()
 		assert(utils.isValidAOAddress(sourceAddress), "Invalid source gateway address")
 		assert(utils.isValidAOAddress(targetAddress), "Invalid target gateway address")
 		assert(utils.isValidAOAddress(delegateAddress), "Invalid delegator address")
+		assert(timestamp, "Timestamp is required")
 		if vaultId then
 			assert(utils.isInteger(tonumber(vaultId)), "Invalid vault id")
 		end
 
 		assert(
-			msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+			quantity and quantity > 0 and utils.isInteger(quantity),
 			"Invalid quantity. Must be integer greater than 0"
 		)
-	end
-
-	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.RedelegateStake .. "-Notice",
-				Error = "Bad-Input",
-			},
-			Data = tostring(error),
-		})
-	end, checkAssertions)
-	if not shouldContinue then
-		return
-	end
-
-	local shouldContinue2, redelegationResult = eventingPcall(
-		msg.ioEvent,
-		function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Invalid-" .. ActionMap.RedelegateStake .. "-Notice",
-					Error = tostring(error),
-				},
-				Data = tostring(error),
-			})
-		end,
-		gar.redelegateStake,
-		{
+		return gar.redelegateStake({
 			sourceAddress = sourceAddress,
 			targetAddress = targetAddress,
 			delegateAddress = delegateAddress,
 			qty = quantity,
-			currentTimestamp = tonumber(msg.Timestamp),
+			currentTimestamp = timestamp,
 			vaultId = vaultId,
-		},
-		tonumber(msg.Timestamp)
-	)
-	if not shouldContinue2 or not redelegationResult then
+		})
+	end
+
+	local shouldContinue, redelegationResult = eventingPcall(msg.ioEvent, function(error)
+		ao.send({
+			Target = msg.From,
+			Tags = {
+				Action = "Invalid-" .. ActionMap.RedelegateStake .. "-Notice",
+				Error = tostring(error),
+			},
+		})
+	end, checkAssertionsAndReturnResult)
+	if not shouldContinue or not redelegationResult then
 		return
 	end
 
@@ -3398,37 +3378,22 @@ addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", Act
 end)
 
 addEventingHandler(ActionMap.RedelegationFee, utils.hasMatchingTag("Action", ActionMap.RedelegationFee), function(msg)
-	local delegateAddress = msg.From
-
-	local checkAssertions = function()
+	local checkAssertionsAndReturnResult = function()
+		local delegateAddress = msg.From
 		assert(utils.isValidAOAddress(delegateAddress), "Invalid delegator address")
+		return gar.getRedelegationFee(delegateAddress, tonumber(msg.Timestamp))
 	end
 
-	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.RedelegationFee .. "-Notice",
-				Error = "Bad-Input",
-			},
-			Data = tostring(error),
-		})
-	end, checkAssertions)
-	if not shouldContinue then
-		return
-	end
-
-	local shouldContinue2, feeResult = eventingPcall(msg.ioEvent, function(error)
+	local shouldContinue, feeResult = eventingPcall(msg.ioEvent, function(error)
 		ao.send({
 			Target = msg.From,
 			Tags = {
 				Action = "Invalid-" .. ActionMap.RedelegationFee .. "-Notice",
 				Error = tostring(error),
 			},
-			Data = tostring(error),
 		})
-	end, gar.getRedelegationFee, delegateAddress, tonumber(msg.Timestamp))
-	if not shouldContinue2 then
+	end, checkAssertionsAndReturnResult)
+	if not shouldContinue or not feeResult then
 		return
 	end
 
