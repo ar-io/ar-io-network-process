@@ -1677,7 +1677,7 @@ describe('GatewayRegistry', async () => {
       assert.deepStrictEqual(
         JSON.parse(feeResultAfterRedelegation.Messages[0].Data),
         {
-          redelegationFeePct: 10,
+          redelegationFeeRate: 10,
           feeResetTimestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7, // 7 days
         },
       );
@@ -1695,7 +1695,7 @@ describe('GatewayRegistry', async () => {
       assert.deepStrictEqual(
         JSON.parse(feeResultSevenEpochsLater.Messages[0].Data),
         {
-          redelegationFeePct: 0,
+          redelegationFeeRate: 0,
         },
       );
     });

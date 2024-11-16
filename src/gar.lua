@@ -1669,13 +1669,13 @@ function gar.redelegateStake(params)
 
 	local previousRedelegations = gar.getRedelegation(delegateAddress)
 
-	local redelegationFeePct = math.min(
+	local redelegationFeeRate = math.min(
 		previousRedelegations and previousRedelegations.redelegations >= 1 and 10 * previousRedelegations.redelegations
 			or 0,
 		60
 	)
 
-	local redelegationFee = math.ceil(stakeToTakeFromSource * (redelegationFeePct / 100))
+	local redelegationFee = math.ceil(stakeToTakeFromSource * (redelegationFeeRate / 100))
 	local stakeToDelegate = stakeToTakeFromSource - redelegationFee
 
 	assert(stakeToDelegate > 0, "The redelegation stake amount minus the redelegation fee is too low to redelegate.")
@@ -1835,14 +1835,14 @@ end
 function gar.getRedelegationFee(delegateAddress)
 	local previousRedelegations = gar.getRedelegationUnsafe(delegateAddress)
 
-	local redelegationFeePct = math.min(
+	local redelegationFeeRate = math.min(
 		previousRedelegations and previousRedelegations.redelegations >= 1 and 10 * previousRedelegations.redelegations
 			or 0,
 		60
 	)
 
 	return {
-		redelegationFeePct = redelegationFeePct,
+		redelegationFeeRate = redelegationFeeRate,
 		feeResetTimestamp = previousRedelegations
 				and previousRedelegations.timestamp + constants.redelegationFeeResetIntervalMs
 			or nil,
