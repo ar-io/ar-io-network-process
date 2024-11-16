@@ -1792,18 +1792,15 @@ function gar.redelegateStake(params)
 		-- move the stake to the operator's stake
 		targetGateway.operatorStake = targetGateway.operatorStake + stakeToDelegate
 	else
-		if targetGateway.delegates[delegateAddress] == nil then
-			-- create the new delegate stake
-			targetGateway.delegates[delegateAddress] = {
-				delegatedStake = stakeToDelegate,
-				startTimestamp = currentTimestamp,
-				vaults = {},
-			}
-		else
-			-- increment the existing delegate's stake
-			targetGateway.delegates[delegateAddress].delegatedStake = targetGateway.delegates[delegateAddress].delegatedStake
-				+ stakeToDelegate
-		end
+		local previousDelegate = targetGateway.delegates[delegateAddress]
+		local previousDelegateStake = previousDelegate and previousDelegate.delegatedStake or 0
+		local previousDelegateVaults = previousDelegate and previousDelegate.vaults or {}
+		local previousDelegateStartTimestamp = previousDelegate and previousDelegate.startTimestamp or currentTimestamp
+		targetGateway.delegates[delegateAddress] = {
+			delegatedStake = previousDelegateStake + stakeToDelegate,
+			startTimestamp = previousDelegateStartTimestamp,
+			vaults = previousDelegateVaults,
+		}
 		targetGateway.totalDelegatedStake = targetGateway.totalDelegatedStake + stakeToDelegate
 	end
 
