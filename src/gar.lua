@@ -1578,37 +1578,37 @@ function gar.getPaginatedDelegations(address, cursor, limit, sortBy, sortOrder)
 end
 
 --- @type { [string]: { timestamp: number, redelegations: number } }
-ReDelegations = ReDelegations or {}
+Redelegations = Redelegations or {}
 
-function gar.pruneReDelegationFeeData(currentTimestamp)
-	local reDelegations = gar.getReDelgations()
+function gar.pruneRedelegationFeeData(currentTimestamp)
+	local redelegations = gar.getRedelgations()
 
 	local delegatorsWithFeesReset = {}
 
-	ReDelegations = utils.reduce(reDelegations, function(acc, delegateAddress, reDelegationData)
-		if reDelegationData.timestamp + constants.redelegationFeeResetIntervalMs < currentTimestamp then
+	Redelegations = utils.reduce(redelegations, function(acc, delegateAddress, redelegationData)
+		if redelegationData.timestamp + constants.redelegationFeeResetIntervalMs < currentTimestamp then
 			table.insert(delegatorsWithFeesReset, delegateAddress)
 			return acc
 		end
-		acc[delegateAddress] = reDelegationData
+		acc[delegateAddress] = redelegationData
 		return acc
 	end, {})
 end
 
-function gar.getReDelgations()
-	return utils.deepCopy(ReDelegations)
+function gar.getRedelgations()
+	return utils.deepCopy(Redelegations)
 end
 
-function gar.getReDelgationsUnsafe()
-	return ReDelegations
+function gar.getRedelgationsUnsafe()
+	return Redelegations
 end
 
-function gar.getReDelegation(delegateAddress)
-	return gar.getReDelgations()[delegateAddress]
+function gar.getRedelegation(delegateAddress)
+	return gar.getRedelgations()[delegateAddress]
 end
 
-function gar.getReDelegationUnsafe(delegateAddress)
-	return gar.getReDelgationsUnsafe()[delegateAddress]
+function gar.getRedelegationUnsafe(delegateAddress)
+	return gar.getRedelgationsUnsafe()[delegateAddress]
 end
 
 --- Take stake from a delegate and stake it to a new delegate.
@@ -1619,7 +1619,7 @@ end
 --- It can move stake from the vaulted stake
 --- It can move stake from its own stake as long as it meets the minimum staking requirements after the stake is moved.
 ---
---- @class ReDelegateStakeParams
+--- @class RedelegateStakeParams
 --- @field delegateAddress string # The address of the delegate to redelegate stake from (required)
 --- @field sourceAddress string # The address of the gateway to redelegate stake from (required)
 --- @field targetAddress string # The address of the gateway to redelegate stake to (required)
@@ -1627,16 +1627,16 @@ end
 --- @field currentTimestamp number # The current timestamp (required)
 --- @field vaultId string | nil # The vault id to redelegate from (optional)
 
---- @class ReDelegateStakeResult
+--- @class RedelegateStakeResult
 --- @field sourceGateway table # The updated gateway object that the stake was moved from
 --- @field targetGateway table # The updated gateway object that the stake was moved to
---- @field reDelegationFee number # The fee charged for the redelegation
+--- @field redelegationFee number # The fee charged for the redelegation
 --- @field feeResetTimestamp number # The timestamp when the reldelegation fee will be reset
---- @field reDelegationsSinceFeeReset number # The number of redelegations the user has made since the last fee reset
+--- @field redelegationsSinceFeeReset number # The number of redelegations the user has made since the last fee reset
 
---- @param params ReDelegateStakeParams
---- @return ReDelegateStakeResult
-function gar.reDelegateStake(params)
+--- @param params RedelegateStakeParams
+--- @return RedelegateStakeResult
+function gar.redelegateStake(params)
 	local delegateAddress = params.delegateAddress
 	local targetAddress = params.targetAddress
 	local sourceAddress = params.sourceAddress
@@ -1650,46 +1650,35 @@ function gar.reDelegateStake(params)
 	assert(type(sourceAddress) == "string", "Source address is required and must be a string")
 	assert(type(delegateAddress) == "string", "Delegate address is required and must be a string")
 	assert(type(currentTimestamp) == "number", "Current timestamp is required and must be a number")
-
-	if sourceAddress == targetAddress then
-		error("Source and target gateway addresses must be different.")
-	end
+	assert(sourceAddress ~= targetAddress, "Source and target gateway addresses must be different.")
 
 	local sourceGateway = gar.getGateway(sourceAddress)
 	local targetGateway = gar.getGateway(targetAddress)
 
-	if not sourceGateway then
-		error("Source Gateway not found")
-	end
-	if not targetGateway then
-		error("Target Gateway not found")
-	end
-	if targetGateway.status == "leaving" then
-		error("Target Gateway is leaving the network and cannot have more stake delegated to it.")
-	end
+	assert(sourceGateway, "Source Gateway not found")
+	assert(targetGateway, "Target Gateway not found")
+	assert(
+		targetGateway.status ~= "leaving",
+		"Target Gateway is leaving the network and cannot have more stake delegated to it."
+	)
+	assert(targetGateway.settings.allowDelegatedStaking, "Target Gateway does not allow delegated staking.")
+	assert(
+		gar.delegateAllowedToStake(delegateAddress, targetGateway),
+		"This Gateway does not allow this delegate to stake."
+	)
 
-	if not targetGateway.settings.allowDelegatedStaking then
-		error("Target Gateway does not allow delegated staking.")
-	end
+	local previousRedelegations = gar.getRedelegation(delegateAddress)
 
-	if not gar.delegateAllowedToStake(delegateAddress, targetGateway) then
-		error("This Gateway does not allow this delegate to stake.")
-	end
-
-	local previousReDelegations = gar.getReDelegation(delegateAddress)
-
-	local reDelegationFeePct = math.min(
-		previousReDelegations and previousReDelegations.redelegations >= 1 and 10 * previousReDelegations.redelegations
+	local redelegationFeePct = math.min(
+		previousRedelegations and previousRedelegations.redelegations >= 1 and 10 * previousRedelegations.redelegations
 			or 0,
 		60
 	)
 
-	local redelegationFee = math.ceil(stakeToTakeFromSource * (reDelegationFeePct / 100))
+	local redelegationFee = math.ceil(stakeToTakeFromSource * (redelegationFeePct / 100))
 	local stakeToDelegate = stakeToTakeFromSource - redelegationFee
 
-	if stakeToDelegate == 0 then
-		error("The redelegation stake amount minus the redelegation fee is too low to redelegate.")
-	end
+	assert(stakeToDelegate > 0, "The redelegation stake amount minus the redelegation fee is too low to redelegate.")
 
 	-- Assert source has enough stake to redelegate and remove the stake from the source
 	if delegateAddress == sourceAddress then
@@ -1699,13 +1688,11 @@ function gar.reDelegateStake(params)
 			-- Get the redelegation amount from the operator vault
 
 			local existingVault = sourceGateway.vaults[vaultId]
-			if not existingVault then
-				error("Vault not found on the operator.")
-			end
-
-			if existingVault.balance < stakeToTakeFromSource then
-				error("Quantity must be less than or equal to the vaulted stake amount.")
-			end
+			assert(existingVault, "Vault not found on the operator.")
+			assert(
+				existingVault.balance >= stakeToTakeFromSource,
+				"Quantity must be less than or equal to the vaulted stake amount."
+			)
 
 			if existingVault.balance == stakeToTakeFromSource then
 				-- The operator vault has been emptied
@@ -1718,14 +1705,12 @@ function gar.reDelegateStake(params)
 		else
 			-- Get the redelegation amount from the operator stakes
 			local maxWithdraw = sourceGateway.operatorStake - gar.getSettings().operators.minStake
-
-			if stakeToTakeFromSource > maxWithdraw then
-				error(
-					"Resulting stake is not enough to maintain the minimum operator stake of "
-						.. gar.getSettings().operators.minStake
-						.. " IO"
-				)
-			end
+			assert(
+				stakeToTakeFromSource <= maxWithdraw,
+				"Resulting stake is not enough to maintain the minimum operator stake of "
+					.. gar.getSettings().operators.minStake
+					.. " IO"
+			)
 
 			sourceGateway.operatorStake = sourceGateway.operatorStake - stakeToTakeFromSource
 		end
@@ -1737,13 +1722,11 @@ function gar.reDelegateStake(params)
 
 		if vaultId then
 			local existingVault = existingDelegate.vaults[vaultId]
-			if not existingVault then
-				error("Vault not found on the delegate.")
-			end
-
-			if existingVault.balance < stakeToTakeFromSource then
-				error("Quantity must be less than or equal to the vaulted stake amount.")
-			end
+			assert(existingVault, "Vault not found on the delegate.")
+			assert(
+				existingVault.balance >= stakeToTakeFromSource,
+				"Quantity must be less than or equal to the vaulted stake amount."
+			)
 
 			if existingVault.balance == stakeToTakeFromSource then
 				-- The vault has been emptied
@@ -1763,19 +1746,19 @@ function gar.reDelegateStake(params)
 			end
 		else
 			-- Check if the delegate has enough stake to redelegate
-			if existingDelegate.delegatedStake < stakeToTakeFromSource then
-				error("Quantity must be less than or equal to the delegated stake amount.")
-			end
+			assert(
+				existingDelegate.delegatedStake >= stakeToTakeFromSource,
+				"Quantity must be less than or equal to the delegated stake amount."
+			)
 
 			-- Check if the delegate will have enough stake left after re-delegating
 			local existingStake = existingDelegate.delegatedStake
 			local requiredMinimumStake = sourceGateway.settings.minDelegatedStake
 			local maxAllowedToWithdraw = existingStake - requiredMinimumStake
-			if maxAllowedToWithdraw < stakeToTakeFromSource and stakeToTakeFromSource ~= existingStake then
-				error(
-					"Remaining delegated stake must be greater than the minimum delegated stake. Adjust the amount or re-delegate all stake."
-				)
-			end
+			assert(
+				stakeToTakeFromSource <= maxAllowedToWithdraw or stakeToTakeFromSource == existingStake,
+				"Remaining delegated stake must be greater than the minimum delegated stake. Adjust the amount or re-delegate all stake."
+			)
 
 			-- If the delegate has enough stake to redelegate, move the stake. If its all the stake, remove the delegate
 			if existingDelegate.delegatedStake == stakeToTakeFromSource then
@@ -1799,9 +1782,10 @@ function gar.reDelegateStake(params)
 	end
 
 	-- Check if the delegate has enough stake to redelegate
-	if stakeToDelegate < minimumStakeForGatewayAndDelegate then
-		error("Quantity must be greater than the minimum delegated stake amount.")
-	end
+	assert(
+		stakeToDelegate >= minimumStakeForGatewayAndDelegate,
+		"Quantity must be greater than the minimum delegated stake amount."
+	)
 
 	-- The stake can now be applied to the targetGateway
 	if targetAddress == delegateAddress then
@@ -1826,19 +1810,10 @@ function gar.reDelegateStake(params)
 	-- Move redelegation fee to protocol balance
 	balances.increaseBalance(ao.id, redelegationFee)
 
-	-- Update redelegations
-
-	if not previousReDelegations then
-		ReDelegations[delegateAddress] = {
-			timestamp = currentTimestamp,
-			redelegations = 1,
-		}
-	else
-		ReDelegations[delegateAddress] = {
-			timestamp = currentTimestamp,
-			redelegations = previousReDelegations.redelegations + 1,
-		}
-	end
+	Redelegations[delegateAddress] = {
+		timestamp = currentTimestamp,
+		redelegations = (previousRedelegations and previousRedelegations.redelegations or 0) + 1,
+	}
 
 	-- prune user from allow list, if necessary, to save memory
 	if sourceGateway.settings.allowedDelegatesLookup then
@@ -1854,24 +1829,24 @@ function gar.reDelegateStake(params)
 	return {
 		sourceGateway = sourceGateway,
 		targetGateway = targetGateway,
-		reDelegationFee = redelegationFee,
+		redelegationFee = redelegationFee,
 		feeResetTimestamp = currentTimestamp + 7 * 24 * 60 * 60 * 1000, -- 7 days
-		reDelegationsSinceFeeReset = ReDelegations[delegateAddress].redelegations,
+		redelegationsSinceFeeReset = Redelegations[delegateAddress].redelegations,
 	}
 end
 
-function gar.getReDelegationFee(delegateAddress)
-	local previousReDelegations = gar.getReDelegationUnsafe(delegateAddress)
+function gar.getRedelegationFee(delegateAddress)
+	local previousRedelegations = gar.getRedelegationUnsafe(delegateAddress)
 
-	local reDelegationFeePct = math.min(
-		previousReDelegations and previousReDelegations.redelegations >= 1 and 10 * previousReDelegations.redelegations
+	local redelegationFeePct = math.min(
+		previousRedelegations and previousRedelegations.redelegations >= 1 and 10 * previousRedelegations.redelegations
 			or 0,
 		60
 	)
 
 	return {
-		reDelegationFeePct = reDelegationFeePct,
-		feeResetTimestamp = previousReDelegations and previousReDelegations.timestamp + 7 * 24 * 60 * 60 * 1000 or nil,
+		redelegationFeePct = redelegationFeePct,
+		feeResetTimestamp = previousRedelegations and previousRedelegations.timestamp + 7 * 24 * 60 * 60 * 1000 or nil,
 	}
 end
 

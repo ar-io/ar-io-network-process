@@ -73,7 +73,7 @@ describe("gar", function()
 			},
 		}
 		_G.GatewayRegistry = {}
-		_G.ReDelegations = {}
+		_G.Redelegations = {}
 	end)
 
 	describe("joinNetwork", function()
@@ -2873,10 +2873,10 @@ describe("gar", function()
 	end)
 
 	local sevenDays = 7 * 24 * 60 * 60 * 1000
-	local testReDelegatorAddress = "test-re-delegator"
+	local testRedelegatorAddress = "test-re-delegator"
 	local testSourceAddress = "unique-source-address"
 	local testTargetAddress = "unique-target-address"
-	describe("reDelegateStake", function()
+	describe("redelegateStake", function()
 		local timestamp = 12345
 		local minDelegatedStake = gar.getSettings().delegates.minStake
 		local minOperatorStake = gar.getSettings().operators.minStake
@@ -2912,15 +2912,15 @@ describe("gar", function()
 			local qty = minDelegatedStake
 
 			sourceGateway.delegates = {
-				[testReDelegatorAddress] = stubDelegation,
+				[testRedelegatorAddress] = stubDelegation,
 			}
 			sourceGateway.totalDelegatedStake = minDelegatedStake
 			_G.GatewayRegistry = {
 				[testSourceAddress] = sourceGateway,
 				[testTargetAddress] = targetGateway,
 			}
-			local result = gar.reDelegateStake({
-				delegateAddress = testReDelegatorAddress,
+			local result = gar.redelegateStake({
+				delegateAddress = testRedelegatorAddress,
 				sourceAddress = testSourceAddress,
 				targetAddress = testTargetAddress,
 				qty = qty,
@@ -2928,9 +2928,9 @@ describe("gar", function()
 			})
 
 			-- setup expectations on gateway tables
-			sourceGateway.delegates[testReDelegatorAddress] = nil
+			sourceGateway.delegates[testRedelegatorAddress] = nil
 			sourceGateway.totalDelegatedStake = 0
-			targetGateway.delegates[testReDelegatorAddress] = {
+			targetGateway.delegates[testRedelegatorAddress] = {
 				delegatedStake = qty,
 				startTimestamp = timestamp,
 				vaults = {},
@@ -2940,15 +2940,15 @@ describe("gar", function()
 			assert.are.same({
 				sourceGateway = sourceGateway,
 				targetGateway = targetGateway,
-				reDelegationFee = 0,
+				redelegationFee = 0,
 				feeResetTimestamp = timestamp + sevenDays,
-				reDelegationsSinceFeeReset = 1,
+				redelegationsSinceFeeReset = 1,
 			}, result)
 
 			assert.are.same({
 				timestamp = timestamp,
 				redelegations = 1,
-			}, _G.ReDelegations[testReDelegatorAddress])
+			}, _G.Redelegations[testRedelegatorAddress])
 		end)
 
 		it("should redelegate stake from its own gateway into another gateway", function()
@@ -2961,21 +2961,21 @@ describe("gar", function()
 
 			_G.GatewayRegistry = {
 				-- Set delegator as the source gateway
-				[testReDelegatorAddress] = sourceGateway,
+				[testRedelegatorAddress] = sourceGateway,
 				[testTargetAddress] = targetGateway,
 			}
-			local result = gar.reDelegateStake({
-				delegateAddress = testReDelegatorAddress,
-				sourceAddress = testReDelegatorAddress,
+			local result = gar.redelegateStake({
+				delegateAddress = testRedelegatorAddress,
+				sourceAddress = testRedelegatorAddress,
 				targetAddress = testTargetAddress,
 				qty = qty,
 				currentTimestamp = timestamp,
 			})
 
 			-- setup expectations on gateway tables
-			sourceGateway.delegates[testReDelegatorAddress] = nil
+			sourceGateway.delegates[testRedelegatorAddress] = nil
 			sourceGateway.operatorStake = minOperatorStake
-			targetGateway.delegates[testReDelegatorAddress] = {
+			targetGateway.delegates[testRedelegatorAddress] = {
 				delegatedStake = qty,
 				startTimestamp = timestamp,
 				vaults = {},
@@ -2985,9 +2985,9 @@ describe("gar", function()
 			assert.are.same({
 				sourceGateway = sourceGateway,
 				targetGateway = targetGateway,
-				reDelegationFee = 0,
+				redelegationFee = 0,
 				feeResetTimestamp = timestamp + sevenDays,
-				reDelegationsSinceFeeReset = 1,
+				redelegationsSinceFeeReset = 1,
 			}, result)
 		end)
 
@@ -2999,10 +2999,10 @@ describe("gar", function()
 
 				-- Use enough stake to account for the 10% fee
 				local initialStakeNeeded = math.ceil(minDelegatedStake / (1 - 0.1))
-				local reDelegationFee = math.ceil(initialStakeNeeded * 0.1)
+				local redelegationFee = math.ceil(initialStakeNeeded * 0.1)
 
 				sourceGateway.delegates = {
-					[testReDelegatorAddress] = {
+					[testRedelegatorAddress] = {
 						delegatedStake = initialStakeNeeded,
 						startTimestamp = 0,
 						vaults = {},
@@ -3013,13 +3013,13 @@ describe("gar", function()
 					[testSourceAddress] = sourceGateway,
 					[testTargetAddress] = targetGateway,
 				}
-				_G.ReDelegations[testReDelegatorAddress] = {
+				_G.Redelegations[testRedelegatorAddress] = {
 					timestamp = 1, -- earlier timestamp
 					redelegations = 1,
 				}
 
-				local result = gar.reDelegateStake({
-					delegateAddress = testReDelegatorAddress,
+				local result = gar.redelegateStake({
+					delegateAddress = testRedelegatorAddress,
 					sourceAddress = testSourceAddress,
 					targetAddress = testTargetAddress,
 					qty = initialStakeNeeded,
@@ -3027,26 +3027,26 @@ describe("gar", function()
 				})
 
 				-- setup expectations on gateway tables
-				sourceGateway.delegates[testReDelegatorAddress] = nil
+				sourceGateway.delegates[testRedelegatorAddress] = nil
 				sourceGateway.totalDelegatedStake = 0
-				targetGateway.delegates[testReDelegatorAddress] = {
-					delegatedStake = initialStakeNeeded - reDelegationFee,
+				targetGateway.delegates[testRedelegatorAddress] = {
+					delegatedStake = initialStakeNeeded - redelegationFee,
 					startTimestamp = timestamp,
 					vaults = {},
 				}
-				targetGateway.totalDelegatedStake = initialStakeNeeded - reDelegationFee
+				targetGateway.totalDelegatedStake = initialStakeNeeded - redelegationFee
 
 				assert.are.same({
 					sourceGateway = sourceGateway,
 					targetGateway = targetGateway,
-					reDelegationFee = reDelegationFee,
+					redelegationFee = redelegationFee,
 					feeResetTimestamp = timestamp + sevenDays,
-					reDelegationsSinceFeeReset = 2,
+					redelegationsSinceFeeReset = 2,
 				}, result)
 				assert.are.same({
 					timestamp = timestamp, -- new timestamp
 					redelegations = 2,
-				}, _G.ReDelegations[testReDelegatorAddress])
+				}, _G.Redelegations[testRedelegatorAddress])
 			end
 		)
 
@@ -3058,11 +3058,11 @@ describe("gar", function()
 
 				-- Use enough stake to account for the 60% fee
 				local initialStakeNeeded = math.ceil(minDelegatedStake / (1 - 0.6))
-				local reDelegationFee = math.ceil(initialStakeNeeded * 0.6)
-				local stakeToBeDelegated = initialStakeNeeded - reDelegationFee
+				local redelegationFee = math.ceil(initialStakeNeeded * 0.6)
+				local stakeToBeDelegated = initialStakeNeeded - redelegationFee
 
 				sourceGateway.delegates = {
-					[testReDelegatorAddress] = {
+					[testRedelegatorAddress] = {
 						delegatedStake = initialStakeNeeded,
 						startTimestamp = 0,
 						vaults = {},
@@ -3073,13 +3073,13 @@ describe("gar", function()
 					[testSourceAddress] = sourceGateway,
 					[testTargetAddress] = targetGateway,
 				}
-				_G.ReDelegations[testReDelegatorAddress] = {
+				_G.Redelegations[testRedelegatorAddress] = {
 					timestamp = timestamp,
 					redelegations = 7, -- delegator already has 7 redelegations
 				}
 
-				local result = gar.reDelegateStake({
-					delegateAddress = testReDelegatorAddress,
+				local result = gar.redelegateStake({
+					delegateAddress = testRedelegatorAddress,
 					sourceAddress = testSourceAddress,
 					targetAddress = testTargetAddress,
 					qty = initialStakeNeeded,
@@ -3087,10 +3087,10 @@ describe("gar", function()
 				})
 
 				-- setup expectations on gateway tables
-				sourceGateway.delegates[testReDelegatorAddress] = nil
+				sourceGateway.delegates[testRedelegatorAddress] = nil
 				sourceGateway.totalDelegatedStake = 0
 
-				targetGateway.delegates[testReDelegatorAddress] = {
+				targetGateway.delegates[testRedelegatorAddress] = {
 					delegatedStake = stakeToBeDelegated,
 					startTimestamp = timestamp,
 					vaults = {},
@@ -3099,14 +3099,14 @@ describe("gar", function()
 				assert.are.same({
 					sourceGateway = sourceGateway,
 					targetGateway = targetGateway,
-					reDelegationFee = reDelegationFee,
+					redelegationFee = redelegationFee,
 					feeResetTimestamp = timestamp + sevenDays,
-					reDelegationsSinceFeeReset = 8,
+					redelegationsSinceFeeReset = 8,
 				}, result)
 				assert.are.same({
 					timestamp = timestamp,
 					redelegations = 8,
-				}, _G.ReDelegations[testReDelegatorAddress])
+				}, _G.Redelegations[testRedelegatorAddress])
 			end
 		)
 
@@ -3115,33 +3115,33 @@ describe("gar", function()
 			local targetGateway = utils.deepCopy(testRedelgationGateway)
 
 			sourceGateway.delegates = {
-				[testReDelegatorAddress] = stubDelegation,
+				[testRedelegatorAddress] = stubDelegation,
 			}
 			sourceGateway.totalDelegatedStake = minDelegatedStake
 			_G.GatewayRegistry = {
 				[testSourceAddress] = sourceGateway,
-				[testReDelegatorAddress] = targetGateway,
+				[testRedelegatorAddress] = targetGateway,
 			}
 
-			local result = gar.reDelegateStake({
-				delegateAddress = testReDelegatorAddress,
+			local result = gar.redelegateStake({
+				delegateAddress = testRedelegatorAddress,
 				sourceAddress = testSourceAddress,
-				targetAddress = testReDelegatorAddress,
+				targetAddress = testRedelegatorAddress,
 				qty = minDelegatedStake,
 				currentTimestamp = timestamp,
 			})
 
 			-- setup expectations on gateway tables
-			sourceGateway.delegates[testReDelegatorAddress] = nil
+			sourceGateway.delegates[testRedelegatorAddress] = nil
 			sourceGateway.totalDelegatedStake = 0
 			targetGateway.operatorStake = minOperatorStake + minDelegatedStake
 
 			assert.are.same({
 				sourceGateway = sourceGateway,
 				targetGateway = targetGateway,
-				reDelegationFee = 0,
+				redelegationFee = 0,
 				feeResetTimestamp = timestamp + sevenDays,
-				reDelegationsSinceFeeReset = 1,
+				redelegationsSinceFeeReset = 1,
 			}, result)
 		end)
 
@@ -3152,7 +3152,7 @@ describe("gar", function()
 				local targetGateway = utils.deepCopy(testRedelgationGateway)
 
 				sourceGateway.delegates = {
-					[testReDelegatorAddress] = {
+					[testRedelegatorAddress] = {
 						delegatedStake = minDelegatedStake + minDelegatedStake,
 						startTimestamp = 0,
 						vaults = {},
@@ -3164,8 +3164,8 @@ describe("gar", function()
 					[testTargetAddress] = targetGateway,
 				}
 
-				local result = gar.reDelegateStake({
-					delegateAddress = testReDelegatorAddress,
+				local result = gar.redelegateStake({
+					delegateAddress = testRedelegatorAddress,
 					sourceAddress = testSourceAddress,
 					targetAddress = testTargetAddress,
 					qty = minDelegatedStake,
@@ -3173,13 +3173,13 @@ describe("gar", function()
 				})
 
 				-- setup expectations on gateway tables
-				sourceGateway.delegates[testReDelegatorAddress] = {
+				sourceGateway.delegates[testRedelegatorAddress] = {
 					delegatedStake = minDelegatedStake,
 					startTimestamp = 0,
 					vaults = {},
 				}
 				sourceGateway.totalDelegatedStake = minDelegatedStake
-				targetGateway.delegates[testReDelegatorAddress] = {
+				targetGateway.delegates[testRedelegatorAddress] = {
 					delegatedStake = minDelegatedStake,
 					startTimestamp = timestamp,
 					vaults = {},
@@ -3189,9 +3189,9 @@ describe("gar", function()
 				assert.are.same({
 					sourceGateway = sourceGateway,
 					targetGateway = targetGateway,
-					reDelegationFee = 0,
+					redelegationFee = 0,
 					feeResetTimestamp = timestamp + sevenDays,
-					reDelegationsSinceFeeReset = 1,
+					redelegationsSinceFeeReset = 1,
 				}, result)
 			end
 		)
@@ -3201,8 +3201,8 @@ describe("gar", function()
 			function()
 				local sourceGateway = utils.deepCopy(testRedelgationGateway)
 				local targetGateway = utils.deepCopy(testRedelgationGateway)
-				_G.ReDelegations = {
-					[testReDelegatorAddress] = {
+				_G.Redelegations = {
+					[testRedelegatorAddress] = {
 						timestamp = timestamp,
 						redelegations = 1,
 					},
@@ -3213,8 +3213,8 @@ describe("gar", function()
 				}
 
 				local isSuccess, error = pcall(function()
-					gar.reDelegateStake({
-						delegateAddress = testReDelegatorAddress,
+					gar.redelegateStake({
+						delegateAddress = testRedelegatorAddress,
 						sourceAddress = testSourceAddress,
 						targetAddress = testTargetAddress,
 						qty = 1,
@@ -3236,7 +3236,7 @@ describe("gar", function()
 			local targetGateway = utils.deepCopy(testRedelgationGateway)
 
 			targetGateway.settings.allowedDelegatesLookup = {
-				[testReDelegatorAddress] = false,
+				[testRedelegatorAddress] = false,
 			}
 			_G.GatewayRegistry = {
 				[testSourceAddress] = sourceGateway,
@@ -3244,8 +3244,8 @@ describe("gar", function()
 			}
 
 			local isSuccess, error = pcall(function()
-				gar.reDelegateStake({
-					delegateAddress = testReDelegatorAddress,
+				gar.redelegateStake({
+					delegateAddress = testRedelegatorAddress,
 					sourceAddress = testSourceAddress,
 					targetAddress = testTargetAddress,
 					qty = minDelegatedStake,
@@ -3265,8 +3265,8 @@ describe("gar", function()
 			}
 
 			local isSuccess, error = pcall(function()
-				gar.reDelegateStake({
-					delegateAddress = testReDelegatorAddress,
+				gar.redelegateStake({
+					delegateAddress = testRedelegatorAddress,
 					sourceAddress = testSourceAddress,
 					targetAddress = testTargetAddress,
 					qty = minDelegatedStake,
@@ -3281,8 +3281,8 @@ describe("gar", function()
 
 		it("should not redelegate stake if source gateway is not in the GatewayRegistry", function()
 			local isSuccess, error = pcall(function()
-				gar.reDelegateStake({
-					delegateAddress = testReDelegatorAddress,
+				gar.redelegateStake({
+					delegateAddress = testRedelegatorAddress,
 					sourceAddress = testSourceAddress,
 					targetAddress = testTargetAddress,
 					qty = minDelegatedStake,
@@ -3307,8 +3307,8 @@ describe("gar", function()
 			}
 
 			local isSuccess, error = pcall(function()
-				gar.reDelegateStake({
-					delegateAddress = testReDelegatorAddress,
+				gar.redelegateStake({
+					delegateAddress = testRedelegatorAddress,
 					sourceAddress = testSourceAddress,
 					targetAddress = testTargetAddress,
 					qty = minDelegatedStake,
@@ -3328,7 +3328,7 @@ describe("gar", function()
 			local targetGateway = utils.deepCopy(testRedelgationGateway)
 
 			sourceGateway.delegates = {
-				[testReDelegatorAddress] = stubDelegation,
+				[testRedelegatorAddress] = stubDelegation,
 			}
 			sourceGateway.totalDelegatedStake = minDelegatedStake
 			sourceGateway.status = "leaving"
@@ -3337,8 +3337,8 @@ describe("gar", function()
 				[testTargetAddress] = targetGateway,
 			}
 
-			local result = gar.reDelegateStake({
-				delegateAddress = testReDelegatorAddress,
+			local result = gar.redelegateStake({
+				delegateAddress = testRedelegatorAddress,
 				sourceAddress = testSourceAddress,
 				targetAddress = testTargetAddress,
 				qty = minDelegatedStake,
@@ -3346,9 +3346,9 @@ describe("gar", function()
 			})
 
 			-- setup expectations on gateway tables
-			sourceGateway.delegates[testReDelegatorAddress] = nil
+			sourceGateway.delegates[testRedelegatorAddress] = nil
 			sourceGateway.totalDelegatedStake = 0
-			targetGateway.delegates[testReDelegatorAddress] = {
+			targetGateway.delegates[testRedelegatorAddress] = {
 				delegatedStake = minDelegatedStake,
 				startTimestamp = timestamp,
 				vaults = {},
@@ -3358,9 +3358,9 @@ describe("gar", function()
 			assert.are.same({
 				sourceGateway = sourceGateway,
 				targetGateway = targetGateway,
-				reDelegationFee = 0,
+				redelegationFee = 0,
 				feeResetTimestamp = timestamp + sevenDays,
-				reDelegationsSinceFeeReset = 1,
+				redelegationsSinceFeeReset = 1,
 			}, result)
 		end)
 
@@ -3375,8 +3375,8 @@ describe("gar", function()
 			}
 
 			local isSuccess, error = pcall(function()
-				gar.reDelegateStake({
-					delegateAddress = testReDelegatorAddress,
+				gar.redelegateStake({
+					delegateAddress = testRedelegatorAddress,
 					sourceAddress = testSourceAddress,
 					targetAddress = testTargetAddress,
 					qty = minDelegatedStake,
@@ -3398,14 +3398,14 @@ describe("gar", function()
 				-- Less than the required amount to keep min operator stake and start a new delegate
 				sourceGateway.operatorStake = minOperatorStake + minDelegatedStake - 1
 				_G.GatewayRegistry = {
-					[testReDelegatorAddress] = sourceGateway,
+					[testRedelegatorAddress] = sourceGateway,
 					[testTargetAddress] = targetGateway,
 				}
 
 				local isSuccess, error = pcall(function()
-					gar.reDelegateStake({
-						delegateAddress = testReDelegatorAddress,
-						sourceAddress = testReDelegatorAddress,
+					gar.redelegateStake({
+						delegateAddress = testRedelegatorAddress,
+						sourceAddress = testRedelegatorAddress,
 						targetAddress = testTargetAddress,
 						qty = minDelegatedStake,
 						currentTimestamp = timestamp,
@@ -3424,7 +3424,7 @@ describe("gar", function()
 
 			sourceGateway.operatorStake = minOperatorStake + 1
 			targetGateway.delegates = {
-				[testReDelegatorAddress] = {
+				[testRedelegatorAddress] = {
 					delegatedStake = minDelegatedStake,
 					startTimestamp = 1337, -- custom start timestamp
 					vaults = {},
@@ -3433,13 +3433,13 @@ describe("gar", function()
 			targetGateway.totalDelegatedStake = minDelegatedStake
 
 			_G.GatewayRegistry = {
-				[testReDelegatorAddress] = sourceGateway,
+				[testRedelegatorAddress] = sourceGateway,
 				[testTargetAddress] = targetGateway,
 			}
 
-			local result = gar.reDelegateStake({
-				delegateAddress = testReDelegatorAddress,
-				sourceAddress = testReDelegatorAddress,
+			local result = gar.redelegateStake({
+				delegateAddress = testRedelegatorAddress,
+				sourceAddress = testRedelegatorAddress,
 				targetAddress = testTargetAddress,
 				qty = 1,
 				currentTimestamp = timestamp,
@@ -3447,7 +3447,7 @@ describe("gar", function()
 
 			-- setup expectations on gateway tables
 			sourceGateway.operatorStake = minOperatorStake
-			targetGateway.delegates[testReDelegatorAddress] = {
+			targetGateway.delegates[testRedelegatorAddress] = {
 				delegatedStake = minDelegatedStake + 1,
 				startTimestamp = 1337,
 				vaults = {},
@@ -3457,9 +3457,9 @@ describe("gar", function()
 			assert.are.same({
 				sourceGateway = sourceGateway,
 				targetGateway = targetGateway,
-				reDelegationFee = 0,
+				redelegationFee = 0,
 				feeResetTimestamp = timestamp + sevenDays,
-				reDelegationsSinceFeeReset = 1,
+				redelegationsSinceFeeReset = 1,
 			}, result)
 		end)
 
@@ -3470,7 +3470,7 @@ describe("gar", function()
 				local targetGateway = utils.deepCopy(testRedelgationGateway)
 
 				sourceGateway.delegates = {
-					[testReDelegatorAddress] = {
+					[testRedelegatorAddress] = {
 						delegatedStake = minDelegatedStake,
 						startTimestamp = 0,
 						vaults = {},
@@ -3482,8 +3482,8 @@ describe("gar", function()
 				}
 
 				local isSuccess, error = pcall(function()
-					gar.reDelegateStake({
-						delegateAddress = testReDelegatorAddress,
+					gar.redelegateStake({
+						delegateAddress = testRedelegatorAddress,
 						sourceAddress = testSourceAddress,
 						targetAddress = testTargetAddress,
 						qty = 1,
@@ -3504,7 +3504,7 @@ describe("gar", function()
 				local targetGateway = utils.deepCopy(testRedelgationGateway)
 
 				sourceGateway.delegates = {
-					[testReDelegatorAddress] = {
+					[testRedelegatorAddress] = {
 						delegatedStake = minDelegatedStake + minDelegatedStake - 1,
 						startTimestamp = 0,
 						vaults = {},
@@ -3516,8 +3516,8 @@ describe("gar", function()
 				}
 
 				local isSuccess, error = pcall(function()
-					gar.reDelegateStake({
-						delegateAddress = testReDelegatorAddress,
+					gar.redelegateStake({
+						delegateAddress = testRedelegatorAddress,
 						sourceAddress = testSourceAddress,
 						targetAddress = testTargetAddress,
 						qty = minDelegatedStake - 1,
@@ -3536,7 +3536,7 @@ describe("gar", function()
 			local targetGateway = utils.deepCopy(testRedelgationGateway)
 
 			sourceGateway.delegates = {
-				[testReDelegatorAddress] = stubDelegation,
+				[testRedelegatorAddress] = stubDelegation,
 			}
 			_G.GatewayRegistry = {
 				[testSourceAddress] = sourceGateway,
@@ -3544,8 +3544,8 @@ describe("gar", function()
 			}
 
 			local isSuccess, error = pcall(function()
-				gar.reDelegateStake({
-					delegateAddress = testReDelegatorAddress,
+				gar.redelegateStake({
+					delegateAddress = testRedelegatorAddress,
 					sourceAddress = testSourceAddress,
 					targetAddress = testTargetAddress,
 					qty = minDelegatedStake + 1,
@@ -3561,7 +3561,7 @@ describe("gar", function()
 		it("should not redelegate stake when vault ID cannot be found on the delegate", function()
 			local sourceGateway = utils.deepCopy(testRedelgationGateway)
 			sourceGateway.delegates = {
-				[testReDelegatorAddress] = {
+				[testRedelegatorAddress] = {
 					delegatedStake = minDelegatedStake,
 					startTimestamp = 0,
 					vaults = {},
@@ -3573,8 +3573,8 @@ describe("gar", function()
 			}
 
 			local isSuccess, error = pcall(function()
-				gar.reDelegateStake({
-					delegateAddress = testReDelegatorAddress,
+				gar.redelegateStake({
+					delegateAddress = testRedelegatorAddress,
 					sourceAddress = testSourceAddress,
 					targetAddress = testTargetAddress,
 					qty = minDelegatedStake,
@@ -3590,14 +3590,14 @@ describe("gar", function()
 
 		it("should not redelegate stake when vault ID cannot be found on the operator", function()
 			_G.GatewayRegistry = {
-				[testReDelegatorAddress] = testRedelgationGateway,
+				[testRedelegatorAddress] = testRedelgationGateway,
 				[testTargetAddress] = testRedelgationGateway,
 			}
 
 			local isSuccess, error = pcall(function()
-				gar.reDelegateStake({
-					delegateAddress = testReDelegatorAddress,
-					sourceAddress = testReDelegatorAddress,
+				gar.redelegateStake({
+					delegateAddress = testRedelegatorAddress,
+					sourceAddress = testRedelegatorAddress,
 					targetAddress = testTargetAddress,
 					qty = minDelegatedStake,
 					currentTimestamp = timestamp,
@@ -3615,7 +3615,7 @@ describe("gar", function()
 			local targetGateway = utils.deepCopy(testRedelgationGateway)
 
 			sourceGateway.delegates = {
-				[testReDelegatorAddress] = {
+				[testRedelegatorAddress] = {
 					delegatedStake = minDelegatedStake,
 					startTimestamp = 0,
 					vaults = {
@@ -3634,8 +3634,8 @@ describe("gar", function()
 				[testTargetAddress] = testRedelgationGateway,
 			}
 
-			local result = gar.reDelegateStake({
-				delegateAddress = testReDelegatorAddress,
+			local result = gar.redelegateStake({
+				delegateAddress = testRedelegatorAddress,
 				sourceAddress = testSourceAddress,
 				targetAddress = testTargetAddress,
 				qty = minDelegatedStake,
@@ -3644,8 +3644,8 @@ describe("gar", function()
 			})
 
 			-- setup expectations on gateway tables
-			sourceGateway.delegates[testReDelegatorAddress] = stubDelegation
-			targetGateway.delegates[testReDelegatorAddress] = {
+			sourceGateway.delegates[testRedelegatorAddress] = stubDelegation
+			targetGateway.delegates[testRedelegatorAddress] = {
 				delegatedStake = minDelegatedStake,
 				startTimestamp = timestamp,
 				vaults = {},
@@ -3655,9 +3655,9 @@ describe("gar", function()
 			assert.are.same({
 				sourceGateway = sourceGateway,
 				targetGateway = targetGateway,
-				reDelegationFee = 0,
+				redelegationFee = 0,
 				feeResetTimestamp = timestamp + sevenDays,
-				reDelegationsSinceFeeReset = 1,
+				redelegationsSinceFeeReset = 1,
 			}, result)
 		end)
 
@@ -3666,7 +3666,7 @@ describe("gar", function()
 			local targetGateway = utils.deepCopy(testRedelgationGateway)
 
 			sourceGateway.delegates = {
-				[testReDelegatorAddress] = {
+				[testRedelegatorAddress] = {
 					delegatedStake = 0,
 					startTimestamp = 0,
 					vaults = {
@@ -3684,8 +3684,8 @@ describe("gar", function()
 				[testTargetAddress] = targetGateway,
 			}
 
-			local result = gar.reDelegateStake({
-				delegateAddress = testReDelegatorAddress,
+			local result = gar.redelegateStake({
+				delegateAddress = testRedelegatorAddress,
 				sourceAddress = testSourceAddress,
 				targetAddress = testTargetAddress,
 				qty = minDelegatedStake,
@@ -3694,8 +3694,8 @@ describe("gar", function()
 			})
 
 			-- setup expectations on gateway tables
-			sourceGateway.delegates[testReDelegatorAddress] = nil
-			targetGateway.delegates[testReDelegatorAddress] = {
+			sourceGateway.delegates[testRedelegatorAddress] = nil
+			targetGateway.delegates[testRedelegatorAddress] = {
 				delegatedStake = minDelegatedStake,
 				startTimestamp = timestamp,
 				vaults = {},
@@ -3705,9 +3705,9 @@ describe("gar", function()
 			assert.are.same({
 				sourceGateway = sourceGateway,
 				targetGateway = targetGateway,
-				reDelegationFee = 0,
+				redelegationFee = 0,
 				feeResetTimestamp = timestamp + sevenDays,
-				reDelegationsSinceFeeReset = 1,
+				redelegationsSinceFeeReset = 1,
 			}, result)
 		end)
 
@@ -3724,13 +3724,13 @@ describe("gar", function()
 				},
 			}
 			_G.GatewayRegistry = {
-				[testReDelegatorAddress] = sourceGateway,
+				[testRedelegatorAddress] = sourceGateway,
 				[testTargetAddress] = targetGateway,
 			}
 
-			local result = gar.reDelegateStake({
-				delegateAddress = testReDelegatorAddress,
-				sourceAddress = testReDelegatorAddress,
+			local result = gar.redelegateStake({
+				delegateAddress = testRedelegatorAddress,
+				sourceAddress = testRedelegatorAddress,
 				targetAddress = testTargetAddress,
 				qty = minDelegatedStake,
 				currentTimestamp = timestamp,
@@ -3738,7 +3738,7 @@ describe("gar", function()
 			})
 
 			-- setup expectations on gateway tables
-			targetGateway.delegates[testReDelegatorAddress] = {
+			targetGateway.delegates[testRedelegatorAddress] = {
 				delegatedStake = minDelegatedStake,
 				startTimestamp = timestamp,
 				vaults = {},
@@ -3749,9 +3749,9 @@ describe("gar", function()
 			assert.are.same({
 				sourceGateway = sourceGateway,
 				targetGateway = targetGateway,
-				reDelegationFee = 0,
+				redelegationFee = 0,
 				feeResetTimestamp = timestamp + sevenDays,
-				reDelegationsSinceFeeReset = 1,
+				redelegationsSinceFeeReset = 1,
 			}, result)
 		end)
 
@@ -3760,7 +3760,7 @@ describe("gar", function()
 			local targetGateway = utils.deepCopy(testRedelgationGateway)
 
 			sourceGateway.delegates = {
-				[testReDelegatorAddress] = {
+				[testRedelegatorAddress] = {
 					delegatedStake = minDelegatedStake,
 					startTimestamp = 0,
 					vaults = {
@@ -3779,8 +3779,8 @@ describe("gar", function()
 			}
 
 			local isSuccess, error = pcall(function()
-				gar.reDelegateStake({
-					delegateAddress = testReDelegatorAddress,
+				gar.redelegateStake({
+					delegateAddress = testRedelegatorAddress,
 					sourceAddress = testSourceAddress,
 					targetAddress = testTargetAddress,
 					qty = minDelegatedStake + 1,
@@ -3799,7 +3799,7 @@ describe("gar", function()
 			local targetGateway = utils.deepCopy(testRedelgationGateway)
 
 			sourceGateway.delegates = {
-				[testReDelegatorAddress] = {
+				[testRedelegatorAddress] = {
 					delegatedStake = minDelegatedStake,
 					startTimestamp = 0,
 					vaults = {
@@ -3817,8 +3817,8 @@ describe("gar", function()
 				[testTargetAddress] = targetGateway,
 			}
 
-			local result = gar.reDelegateStake({
-				delegateAddress = testReDelegatorAddress,
+			local result = gar.redelegateStake({
+				delegateAddress = testRedelegatorAddress,
 				sourceAddress = testSourceAddress,
 				targetAddress = testTargetAddress,
 				qty = minDelegatedStake,
@@ -3827,8 +3827,8 @@ describe("gar", function()
 			})
 
 			-- setup expectations on gateway tables
-			sourceGateway.delegates[testReDelegatorAddress].vaults["vault-1"].balance = minDelegatedStake
-			targetGateway.delegates[testReDelegatorAddress] = {
+			sourceGateway.delegates[testRedelegatorAddress].vaults["vault-1"].balance = minDelegatedStake
+			targetGateway.delegates[testRedelegatorAddress] = {
 				delegatedStake = minDelegatedStake,
 				startTimestamp = timestamp,
 				vaults = {},
@@ -3838,39 +3838,39 @@ describe("gar", function()
 			assert.are.same({
 				sourceGateway = sourceGateway,
 				targetGateway = targetGateway,
-				reDelegationFee = 0,
+				redelegationFee = 0,
 				feeResetTimestamp = timestamp + sevenDays,
-				reDelegationsSinceFeeReset = 1,
+				redelegationsSinceFeeReset = 1,
 			}, result)
 		end)
 	end)
 
-	describe("getReDelegationFee", function()
+	describe("getRedelegationFee", function()
 		it("should return 0 if the delegator has not redelegated in the last 7 epochs", function()
-			local result = gar.getReDelegationFee(testTargetAddress)
-			assert.are.same({ reDelegationFeePct = 0 }, result)
+			local result = gar.getRedelegationFee(testTargetAddress)
+			assert.are.same({ redelegationFeePct = 0 }, result)
 		end)
 
 		it("should return 0.1 if the delegator has redelegated once in the last 7 epochs", function()
-			_G.ReDelegations = {
+			_G.Redelegations = {
 				[testTargetAddress] = {
 					timestamp = 1,
 					redelegations = 1,
 				},
 			}
-			local result = gar.getReDelegationFee(testTargetAddress)
-			assert.are.same({ reDelegationFeePct = 10, feeResetTimestamp = 1 + sevenDays }, result)
+			local result = gar.getRedelegationFee(testTargetAddress)
+			assert.are.same({ redelegationFeePct = 10, feeResetTimestamp = 1 + sevenDays }, result)
 		end)
 
 		it("should return 0.6 if the delegator has redelegated 7 times in the last 7 epochs", function()
-			_G.ReDelegations = {
+			_G.Redelegations = {
 				[testTargetAddress] = {
 					timestamp = 1,
 					redelegations = 7,
 				},
 			}
-			local result = gar.getReDelegationFee(testTargetAddress)
-			assert.are.same({ reDelegationFeePct = 60, feeResetTimestamp = 1 + sevenDays }, result)
+			local result = gar.getRedelegationFee(testTargetAddress)
+			assert.are.same({ redelegationFeePct = 60, feeResetTimestamp = 1 + sevenDays }, result)
 		end)
 	end)
 end)

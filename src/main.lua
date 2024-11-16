@@ -46,7 +46,7 @@ local ActionMap = {
 	DemandFactor = "Demand-Factor",
 	DemandFactorInfo = "Demand-Factor-Info",
 	DemandFactorSettings = "Demand-Factor-Settings",
-	ReDelegationFee = "Re-Delegation-Fee",
+	RedelegationFee = "Redelegation-Fee",
 	-- EPOCH READ APIS
 	Epochs = "Epochs",
 	Epoch = "Epoch",
@@ -85,7 +85,7 @@ local ActionMap = {
 	UpdateGatewaySettings = "Update-Gateway-Settings",
 	SaveObservations = "Save-Observations",
 	DelegateStake = "Delegate-Stake",
-	ReDelegateStake = "Re-Delegate-Stake",
+	RedelegateStake = "Redelegate-Stake",
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
 	CancelWithdrawal = "Cancel-Withdrawal",
 	InstantWithdrawal = "Instant-Withdrawal",
@@ -3300,7 +3300,7 @@ addEventingHandler("paginatedDelegations", utils.hasMatchingTag("Action", "Pagin
 	})
 end)
 
-addEventingHandler(ActionMap.ReDelegateStake, utils.hasMatchingTag("Action", ActionMap.ReDelegateStake), function(msg)
+addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", ActionMap.RedelegateStake), function(msg)
 	print("start of re-delegate")
 
 	local sourceAddress = msg.Tags.Source
@@ -3327,7 +3327,7 @@ addEventingHandler(ActionMap.ReDelegateStake, utils.hasMatchingTag("Action", Act
 		ao.send({
 			Target = msg.From,
 			Tags = {
-				Action = "Invalid-" .. ActionMap.ReDelegateStake .. "-Notice",
+				Action = "Invalid-" .. ActionMap.RedelegateStake .. "-Notice",
 				Error = "Bad-Input",
 			},
 			Data = tostring(error),
@@ -3337,19 +3337,19 @@ addEventingHandler(ActionMap.ReDelegateStake, utils.hasMatchingTag("Action", Act
 		return
 	end
 
-	local shouldContinue2, reDelegationResult = eventingPcall(
+	local shouldContinue2, redelegationResult = eventingPcall(
 		msg.ioEvent,
 		function(error)
 			ao.send({
 				Target = msg.From,
 				Tags = {
-					Action = "Invalid-" .. ActionMap.ReDelegateStake .. "-Notice",
+					Action = "Invalid-" .. ActionMap.RedelegateStake .. "-Notice",
 					Error = tostring(error),
 				},
 				Data = tostring(error),
 			})
 		end,
-		gar.reDelegateStake,
+		gar.redelegateStake,
 		{
 			sourceAddress = sourceAddress,
 			targetAddress = targetAddress,
@@ -3360,12 +3360,12 @@ addEventingHandler(ActionMap.ReDelegateStake, utils.hasMatchingTag("Action", Act
 		},
 		tonumber(msg.Timestamp)
 	)
-	if not shouldContinue2 or not reDelegationResult then
+	if not shouldContinue2 or not redelegationResult then
 		return
 	end
 
-	local reDelegationFee = reDelegationResult.reDelegationFee
-	local stakeMoved = quantity - reDelegationFee
+	local redelegationFee = redelegationResult.redelegationFee
+	local stakeMoved = quantity - redelegationFee
 
 	local isStakeMovingFromDelegateToOperator = delegateAddress == targetAddress
 	local isStakeMovingFromOperatorToDelegate = delegateAddress == sourceAddress
@@ -3387,17 +3387,17 @@ addEventingHandler(ActionMap.ReDelegateStake, utils.hasMatchingTag("Action", Act
 		LastKnownDelegatedSupply = LastKnownDelegatedSupply + stakeMoved
 	end
 
-	LastKnownCirculatingSupply = LastKnownCirculatingSupply - reDelegationResult.reDelegationFee
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply - redelegationResult.redelegationFee
 	addSupplyData(msg.ioEvent)
 
 	ao.send({
 		Target = msg.From,
-		Tags = { Action = ActionMap.ReDelegateStake .. "-Notice", Gateway = msg.Tags.Target },
-		Data = json.encode(reDelegationResult),
+		Tags = { Action = ActionMap.RedelegateStake .. "-Notice", Gateway = msg.Tags.Target },
+		Data = json.encode(redelegationResult),
 	})
 end)
 
-addEventingHandler(ActionMap.ReDelegationFee, utils.hasMatchingTag("Action", ActionMap.ReDelegationFee), function(msg)
+addEventingHandler(ActionMap.RedelegationFee, utils.hasMatchingTag("Action", ActionMap.RedelegationFee), function(msg)
 	local delegateAddress = msg.From
 
 	local checkAssertions = function()
@@ -3408,7 +3408,7 @@ addEventingHandler(ActionMap.ReDelegationFee, utils.hasMatchingTag("Action", Act
 		ao.send({
 			Target = msg.From,
 			Tags = {
-				Action = "Invalid-" .. ActionMap.ReDelegationFee .. "-Notice",
+				Action = "Invalid-" .. ActionMap.RedelegationFee .. "-Notice",
 				Error = "Bad-Input",
 			},
 			Data = tostring(error),
@@ -3422,19 +3422,19 @@ addEventingHandler(ActionMap.ReDelegationFee, utils.hasMatchingTag("Action", Act
 		ao.send({
 			Target = msg.From,
 			Tags = {
-				Action = "Invalid-" .. ActionMap.ReDelegationFee .. "-Notice",
+				Action = "Invalid-" .. ActionMap.RedelegationFee .. "-Notice",
 				Error = tostring(error),
 			},
 			Data = tostring(error),
 		})
-	end, gar.getReDelegationFee, delegateAddress, tonumber(msg.Timestamp))
+	end, gar.getRedelegationFee, delegateAddress, tonumber(msg.Timestamp))
 	if not shouldContinue2 then
 		return
 	end
 
 	ao.send({
 		Target = msg.From,
-		Tags = { Action = ActionMap.ReDelegationFee .. "-Notice" },
+		Tags = { Action = ActionMap.RedelegationFee .. "-Notice" },
 		Data = json.encode(feeResult),
 	})
 end)

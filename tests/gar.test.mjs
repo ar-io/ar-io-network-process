@@ -1560,8 +1560,8 @@ describe('GatewayRegistry', async () => {
     });
   });
 
-  describe('Re-Delegate-Stake', () => {
-    const reDelegateStake = async ({
+  describe('Redelegate-Stake', () => {
+    const redelegateStake = async ({
       memory,
       delegatorAddress,
       quantity,
@@ -1575,7 +1575,7 @@ describe('GatewayRegistry', async () => {
           From: delegatorAddress,
           Owner: delegatorAddress,
           Tags: [
-            { name: 'Action', value: 'Re-Delegate-Stake' },
+            { name: 'Action', value: 'Redelegate-Stake' },
             { name: 'Source', value: sourceAddress },
             { name: 'Target', value: targetAddress },
             { name: 'Quantity', value: `${quantity}` },
@@ -1634,7 +1634,7 @@ describe('GatewayRegistry', async () => {
         },
       });
 
-      const { memory: reDelegateStakeMemory, result } = await reDelegateStake({
+      const { memory: redelegateStakeMemory, result } = await redelegateStake({
         memory: delegatedStakeMemory,
         delegatorAddress,
         quantity: stakeQty,
@@ -1645,7 +1645,7 @@ describe('GatewayRegistry', async () => {
 
       const targetGatewayAfter = await getGateway({
         address: targetAddress,
-        memory: reDelegateStakeMemory,
+        memory: redelegateStakeMemory,
         timestamp: STUB_TIMESTAMP,
       });
       assert(targetGatewayAfter.totalDelegatedStake === stakeQty);
@@ -1659,25 +1659,25 @@ describe('GatewayRegistry', async () => {
 
       const sourceGatewayAfter = await getGateway({
         address: sourceAddress,
-        memory: reDelegateStakeMemory,
+        memory: redelegateStakeMemory,
         timestamp: STUB_TIMESTAMP,
       });
       assert(sourceGatewayAfter.totalDelegatedStake === 0);
       assert.deepStrictEqual(sourceGatewayAfter.delegates, []);
 
-      const feeResultAfterReDelegation = await handle(
+      const feeResultAfterRedelegation = await handle(
         {
           From: delegatorAddress,
           Owner: delegatorAddress,
-          Tags: [{ name: 'Action', value: 'Re-Delegation-Fee' }],
+          Tags: [{ name: 'Action', value: 'Redelegation-Fee' }],
           Timestamp: STUB_TIMESTAMP,
         },
-        reDelegateStakeMemory,
+        redelegateStakeMemory,
       );
       assert.deepStrictEqual(
-        JSON.parse(feeResultAfterReDelegation.Messages[0].Data),
+        JSON.parse(feeResultAfterRedelegation.Messages[0].Data),
         {
-          reDelegationFeePct: 10,
+          redelegationFeePct: 10,
           feeResetTimestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7, // 7 days
         },
       );
@@ -1687,15 +1687,15 @@ describe('GatewayRegistry', async () => {
         {
           From: delegatorAddress,
           Owner: delegatorAddress,
-          Tags: [{ name: 'Action', value: 'Re-Delegation-Fee' }],
+          Tags: [{ name: 'Action', value: 'Redelegation-Fee' }],
           Timestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7 * 7 + 1, // 7 days
         },
-        reDelegateStakeMemory,
+        redelegateStakeMemory,
       );
       assert.deepStrictEqual(
         JSON.parse(feeResultSevenEpochsLater.Messages[0].Data),
         {
-          reDelegationFeePct: 0,
+          redelegationFeePct: 0,
         },
       );
     });
