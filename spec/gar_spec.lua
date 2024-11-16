@@ -3873,4 +3873,45 @@ describe("gar", function()
 			assert.are.same({ redelegationFeeRate = 60, feeResetTimestamp = 1 + sevenDays }, result)
 		end)
 	end)
+
+	describe("pruneRedelegationFeeData", function()
+		before_each(function()
+			_G.Redelegations = {}
+		end)
+
+		it("should return an empty array when there are no tracked redelegations", function()
+			local prunedRedelegations = gar.pruneRedelegationFeeData(604800001)
+			assert.are.same({}, prunedRedelegations)
+			assert.are.same({}, _G.Redelegations)
+		end)
+
+		it("should prune redelegations that are equal to or older than the pruning threshold", function()
+			_G.Redelegations = {
+				["recently-delegated"] = {
+					timestamp = 100000000,
+					redelegations = 1,
+				},
+				["delegated-two-weeks-ago"] = {
+					timestamp = 1,
+					redelegations = 2,
+				},
+				["delegated-over-two-weeks-ago"] = {
+					timestamp = 0,
+					redelegations = 2,
+				},
+			}
+			local prunedRedelegations = gar.pruneRedelegationFeeData(604800001)
+			table.sort(prunedRedelegations)
+			assert.are.same({
+				"delegated-over-two-weeks-ago",
+				"delegated-two-weeks-ago",
+			}, prunedRedelegations)
+			assert.are.same({
+				["recently-delegated"] = {
+					timestamp = 100000000,
+					redelegations = 1,
+				},
+			}, _G.Redelegations)
+		end)
+	end)
 end)

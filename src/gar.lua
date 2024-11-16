@@ -1581,18 +1581,18 @@ end
 Redelegations = Redelegations or {}
 
 function gar.pruneRedelegationFeeData(currentTimestamp)
-	local redelegations = gar.getRedelgations()
-
 	local delegatorsWithFeesReset = {}
+	local pruningThreshold = currentTimestamp - constants.redelegationFeeResetIntervalMs
 
-	Redelegations = utils.reduce(redelegations, function(acc, delegateAddress, redelegationData)
-		if redelegationData.timestamp + constants.redelegationFeeResetIntervalMs < currentTimestamp then
+	Redelegations = utils.reduce(gar.getRedelgationsUnsafe(), function(acc, delegateAddress, redelegationData)
+		if redelegationData.timestamp > pruningThreshold then
+			acc[delegateAddress] = redelegationData
+		else
 			table.insert(delegatorsWithFeesReset, delegateAddress)
-			return acc
 		end
-		acc[delegateAddress] = redelegationData
 		return acc
 	end, {})
+	return delegatorsWithFeesReset
 end
 
 function gar.getRedelgations()
