@@ -1829,17 +1829,18 @@ end
 function gar.getRedelegationFee(delegateAddress)
 	local previousRedelegations = gar.getRedelegationUnsafe(delegateAddress)
 
-	local redelegationFeeRate = math.min(
-		previousRedelegations and previousRedelegations.redelegations >= 1 and 10 * previousRedelegations.redelegations
-			or 0,
-		60
-	)
+	local previousRedelegationCount = previousRedelegations and previousRedelegations.redelegations or 0
+	--- first one is free, max of 60%
+	local redelegationFeeRate = math.min(10 * previousRedelegationCount, 60)
+
+	local lastRedelegationTimestamp = previousRedelegations and previousRedelegations.timestamp or nil
+	local feeResetTimestamp = lastRedelegationTimestamp
+			and lastRedelegationTimestamp + constants.redelegationFeeResetIntervalMs
+		or nil
 
 	return {
 		redelegationFeeRate = redelegationFeeRate,
-		feeResetTimestamp = previousRedelegations
-				and previousRedelegations.timestamp + constants.redelegationFeeResetIntervalMs
-			or nil,
+		feeResetTimestamp = feeResetTimestamp,
 	}
 end
 
