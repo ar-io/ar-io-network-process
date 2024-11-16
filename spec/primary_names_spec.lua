@@ -404,4 +404,33 @@ describe("Primary Names", function()
 			}, _G.PrimaryNames)
 		end)
 	end)
+
+	describe("getPaginatedPrimaryNameRequests", function()
+		it("should return all primary name requests", function()
+			_G.PrimaryNames.requests = {
+				["initiator1"] = {
+					name = "test",
+					startTimestamp = 1234567890,
+					endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
+				},
+			}
+			local paginatedPrimaryNameRequests =
+				primaryNames.getPaginatedPrimaryNameRequests(nil, 10, "startTimestamp", "asc")
+			assert.are.same({
+				items = {
+					{
+						name = "test",
+						startTimestamp = 1234567890,
+						endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
+						initiator = "initiator1",
+					},
+				},
+				totalItems = 1,
+				limit = 10,
+				hasMore = false,
+				sortBy = "startTimestamp",
+				sortOrder = "asc",
+			}, paginatedPrimaryNameRequests)
+		end)
+	end)
 end)

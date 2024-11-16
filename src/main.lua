@@ -100,6 +100,7 @@ local ActionMap = {
 	-- PRIMARY NAMES
 	RemovePrimaryNames = "Remove-Primary-Names",
 	PrimaryNameRequest = "Primary-Name-Request",
+	PrimaryNameRequests = "Primary-Name-Requests",
 	ApprovePrimaryNameRequest = "Approve-Primary-Name-Request",
 	PrimaryNames = "Primary-Names",
 	PrimaryName = "Primary-Name",
@@ -3455,6 +3456,39 @@ addEventingHandler("getPrimaryNameData", utils.hasMatchingTag("Action", ActionMa
 		Data = json.encode(primaryNameData),
 	})
 end)
+
+addEventingHandler(
+	"getPaginatedPrimaryNameRequests",
+	utils.hasMatchingTag("Action", ActionMap.PrimaryNameRequests),
+	function(msg)
+		local page = utils.parsePaginationTags(msg)
+		local status, result = eventingPcall(
+			msg.ioEvent,
+			function(error)
+				ao.send({
+					Target = msg.From,
+					Tags = {
+						Action = "Invalid-" .. ActionMap.PrimaryNameRequests .. "-Notice",
+						Error = tostring(error),
+					},
+				})
+			end,
+			primaryNames.getPaginatedPrimaryNameRequests,
+			page.cursor,
+			page.limit,
+			page.sortBy or "startTimestamp",
+			page.sortOrder or "asc"
+		)
+		if not status or not result then
+			return
+		end
+		return ao.send({
+			Target = msg.From,
+			Action = ActionMap.PrimaryNameRequests .. "-Notice",
+			Data = json.encode(result),
+		})
+	end
+)
 
 addEventingHandler("getPaginatedPrimaryNames", utils.hasMatchingTag("Action", ActionMap.PrimaryNames), function(msg)
 	local page = utils.parsePaginationTags(msg)

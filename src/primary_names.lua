@@ -300,14 +300,34 @@ end
 function primaryNames.getPaginatedPrimaryNames(cursor, limit, sortBy, sortOrder)
 	local primaryNamesArray = {}
 	local cursorField = "name"
-	for owner, primaryName in ipairs(primaryNames.getUnsafePrimaryNameOwners()) do
+	for address, primaryName in ipairs(primaryNames.getUnsafePrimaryNameOwners()) do
 		table.insert(primaryNamesArray, {
 			name = primaryName.name,
-			owner = owner,
+			address = address,
 			startTimestamp = primaryName.startTimestamp,
 		})
 	end
 	return utils.paginateTableWithCursor(primaryNamesArray, cursor, cursorField, limit, sortBy, sortOrder)
+end
+
+--- Get paginated primary name requests
+--- @param cursor string|nil
+--- @param limit number
+--- @param sortBy string
+--- @param sortOrder string
+--- @return PaginatedTable<PrimaryNameRequest> paginatedPrimaryNameRequests - the paginated primary name requests
+function primaryNames.getPaginatedPrimaryNameRequests(cursor, limit, sortBy, sortOrder)
+	local primaryNameRequestsArray = {}
+	local cursorField = "initiator"
+	for initiator, request in pairs(primaryNames.getUnsafePrimaryNameRequests()) do
+		table.insert(primaryNameRequestsArray, {
+			name = request.name,
+			startTimestamp = request.startTimestamp,
+			endTimestamp = request.endTimestamp,
+			initiator = initiator,
+		})
+	end
+	return utils.paginateTableWithCursor(primaryNameRequestsArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
 --- Prune expired primary name requests
