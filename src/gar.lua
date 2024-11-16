@@ -396,30 +396,36 @@ function gar.getGatewaysUnsafe()
 	return GatewayRegistry or {}
 end
 
---- @param delegatedStake number
 --- @param startTimestamp number
-function gar.createDelegate(delegatedStake, startTimestamp)
+function gar.createDelegate(startTimestamp)
 	return {
-		delegatedStake = delegatedStake,
+		delegatedStake = 0,
 		startTimestamp = startTimestamp,
 		vaults = {},
 	}
 end
 
+--- @param delegate Delegate
+--- @param gateway Gateway
+--- @param quantity mIO
+function gar.increaseDelegateStakeAtGateway(delegate, gateway, quantity)
+	delegate.delegatedStake = delegate.delegatedStake + quantity
+	gateway.totalDelegatedStake = gateway.totalDelegatedStake + quantity
+end
+
 --- Creates a delegate at a gateway, managing allowlisting accounting if necessary
---- @param delegatedStake number
 --- @param startTimestamp number
 --- @param gateway Gateway
 --- @param delegateAddress WalletAddress
 --- @return Delegate # the created delegate
-function gar.createDelegateAtGateway(delegatedStake, startTimestamp, gateway, delegateAddress)
+function gar.createDelegateAtGateway(startTimestamp, gateway, delegateAddress)
 	-- prune user from allow list, if necessary, to save memory
 	if gateway.settings.allowedDelegatesLookup then
 		gateway.settings.allowedDelegatesLookup[delegateAddress] = nil
 	end
-	gateway.delegates[delegateAddress] = gar.createDelegate(delegatedStake, startTimestamp)
-	gateway.totalDelegatedStake = gateway.totalDelegatedStake + delegatedStake
-	return gateway.delegates[delegateAddress]
+	local newDelegate = gar.createDelegate(startTimestamp)
+	gateway.delegates[delegateAddress] = newDelegate
+	return newDelegate
 end
 
 function gar.createDelegateVault(balance, startTimestamp)
@@ -480,12 +486,11 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 	end
 
 	-- If this delegate has staked before, update its amount, if not, create a new delegated staker
-	existingDelegate = existingDelegate or gar.createDelegateAtGateway(0, currentTimestamp, gateway, from)
-	existingDelegate.delegatedStake = existingDelegate.delegatedStake + qty
+	existingDelegate = existingDelegate or gar.createDelegateAtGateway(currentTimestamp, gateway, from)
+	gar.increaseDelegateStakeAtGateway(existingDelegate, gateway, qty)
 
 	-- Decrement the user's balance
 	balances.reduceBalance(from, qty)
-	gateway.totalDelegatedStake = gateway.totalDelegatedStake + qty
 
 	-- update the gateway
 	GatewayRegistry[target] = gateway
@@ -1851,10 +1856,8 @@ function gar.redelegateStake(params)
 		targetGateway.operatorStake = targetGateway.operatorStake + stakeToDelegate
 	else
 		targetGateway.delegates[delegateAddress] = targetGateway.delegates[delegateAddress]
-			or gar.createDelegateAtGateway(0, currentTimestamp, targetGateway, delegateAddress)
-		targetGateway.delegates[delegateAddress].delegatedStake = targetGateway.delegates[delegateAddress].delegatedStake
-			+ stakeToDelegate
-		targetGateway.totalDelegatedStake = targetGateway.totalDelegatedStake + stakeToDelegate
+			or gar.createDelegateAtGateway(currentTimestamp, targetGateway, delegateAddress)
+		gar.increaseDelegateStakeAtGateway(targetGateway.delegates[delegateAddress], targetGateway, stakeToDelegate)
 	end
 
 	-- Move redelegation fee to protocol balance
