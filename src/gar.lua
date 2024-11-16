@@ -1669,11 +1669,7 @@ function gar.redelegateStake(params)
 
 	local previousRedelegations = gar.getRedelegation(delegateAddress)
 
-	local redelegationFeeRate = math.min(
-		previousRedelegations and previousRedelegations.redelegations >= 1 and 10 * previousRedelegations.redelegations
-			or 0,
-		60
-	)
+	local redelegationFeeRate = gar.getRedelegationFee(delegateAddress).redelegationFeeRate
 
 	local redelegationFee = math.ceil(stakeToTakeFromSource * (redelegationFeeRate / 100))
 	local stakeToDelegate = stakeToTakeFromSource - redelegationFee
@@ -1716,9 +1712,7 @@ function gar.redelegateStake(params)
 		end
 	else
 		local existingDelegate = sourceGateway.delegates[delegateAddress]
-		if not existingDelegate then
-			error("This delegate has no stake to redelegate.")
-		end
+		assert(existingDelegate, "This delegate has no stake to redelegate.")
 
 		if vaultId then
 			local existingVault = existingDelegate.vaults[vaultId]
