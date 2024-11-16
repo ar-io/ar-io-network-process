@@ -49,7 +49,7 @@ end
 
 --- Creates a transient request for a primary name. This is done by a user and must be approved by the name owner of the base name.
 --- @param name string -- the name being requested, this could be an undername provided by the ant
---- @param initiator string -- the address that is creating the primary name request, e.g. the ANT process id
+--- @param initiator WalletAddress -- the address that is creating the primary name request, e.g. the ANT process id
 --- @param timestamp number -- the timestamp of the request
 --- @param msgId string -- the message id of the request
 --- @param fundFrom "balance"|"stakes"|"any"|nil -- the address to fund the request from. Default is "balance"
@@ -101,14 +101,14 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 end
 
 --- Get a primary name request, safely deep copying the request
---- @param address string
+--- @param address WalletAddress
 --- @return PrimaryNameRequest|nil primaryNameClaim - the request found, or nil if it does not exist
 function primaryNames.getPrimaryNameRequest(address)
 	return utils.deepCopy(primaryNames.getUnsafePrimaryNameRequests()[address])
 end
 
 --- Unsafe access to the primary name requests
---- @return table<string, PrimaryNameRequest> primaryNameClaims - the primary name requests
+--- @return table<WalletAddress, PrimaryNameRequest> primaryNameClaims - the primary name requests
 function primaryNames.getUnsafePrimaryNameRequests()
 	return PrimaryNames.requests or {}
 end
@@ -118,7 +118,7 @@ function primaryNames.getUnsafePrimaryNames()
 end
 
 --- Unsafe access to the primary name owners
---- @return table<string, PrimaryName> primaryNames - the primary names
+--- @return table<WalletAddress, PrimaryName> primaryNames - the primary names
 function primaryNames.getUnsafePrimaryNameOwners()
 	return PrimaryNames.owners or {}
 end
@@ -300,10 +300,10 @@ end
 function primaryNames.getPaginatedPrimaryNames(cursor, limit, sortBy, sortOrder)
 	local primaryNamesArray = {}
 	local cursorField = "name"
-	for address, primaryName in ipairs(primaryNames.getUnsafePrimaryNameOwners()) do
+	for owner, primaryName in pairs(primaryNames.getUnsafePrimaryNameOwners()) do
 		table.insert(primaryNamesArray, {
 			name = primaryName.name,
-			address = address,
+			owner = owner,
 			startTimestamp = primaryName.startTimestamp,
 		})
 	end
