@@ -1827,7 +1827,7 @@ function gar.redelegateStake(params)
 		sourceGateway = sourceGateway,
 		targetGateway = targetGateway,
 		redelegationFee = redelegationFee,
-		feeResetTimestamp = currentTimestamp + 7 * 24 * 60 * 60 * 1000, -- 7 days
+		feeResetTimestamp = currentTimestamp + constants.redelegationFeeResetIntervalMs,
 		redelegationsSinceFeeReset = Redelegations[delegateAddress].redelegations,
 	}
 end
@@ -1843,7 +1843,9 @@ function gar.getRedelegationFee(delegateAddress)
 
 	return {
 		redelegationFeePct = redelegationFeePct,
-		feeResetTimestamp = previousRedelegations and previousRedelegations.timestamp + 7 * 24 * 60 * 60 * 1000 or nil,
+		feeResetTimestamp = previousRedelegations
+				and previousRedelegations.timestamp + constants.redelegationFeeResetIntervalMs
+			or nil,
 	}
 end
 
