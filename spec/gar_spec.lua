@@ -537,7 +537,6 @@ describe("gar", function()
 			expectedSettings.allowedDelegatesLookup = {
 				["test-allowlisted-delegator-address-number-1"] = true,
 				["test-allowlisted-delegator-address-number-2"] = true,
-				[stubRandomAddress] = true,
 			}
 
 			local status, result = pcall(gar.leaveNetwork, stubGatewayAddress, startTimestamp, stubMessageId)
