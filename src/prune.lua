@@ -39,6 +39,7 @@ function prune.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 	local prunedReserved = arns.pruneReservedNames(timestamp)
 	local prunedVaults = vaults.pruneVaults(timestamp)
 	local pruneGatewaysResult = gar.pruneGateways(timestamp, msgId)
+	local delegatorsWithFeeReset = gar.pruneRedelegationFeeData(timestamp)
 	local prunedEpochs = epochs.pruneEpochs(timestamp)
 	return {
 		prunedRecords = prunedRecords,
@@ -50,6 +51,7 @@ function prune.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 		prunedEpochs = prunedEpochs,
 		prunedPrimaryNamesAndOwners = prunedPrimaryNamesAndOwners,
 		prunedPrimaryNameRequests = prunedPrimaryNameRequests,
+		delegatorsWithFeeReset = delegatorsWithFeeReset,
 	}
 end
 

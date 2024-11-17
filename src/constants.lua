@@ -11,6 +11,7 @@ constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.10 -- the minimum penalty ra
 constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.50 -- the maximum penalty rate for an expedited withdrawal (50% of the amount being withdrawn)
 constants.mIOPerIO = 1000000
 constants.minimumWithdrawalAmount = constants.mIOPerIO -- the minimum amount that can be withdrawn from the GAR
+constants.redelegationFeeResetIntervalMs = 1000 * 60 * 60 * 24 * 7 -- 7 epochs
 
 -- ARNS
 constants.DEFAULT_UNDERNAME_COUNT = 10

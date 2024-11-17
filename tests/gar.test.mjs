@@ -78,7 +78,6 @@ describe('GatewayRegistry', async () => {
       },
       memory,
     );
-
     const gateway = JSON.parse(gatewayResult.Messages?.[0]?.Data);
     return gateway;
   };
@@ -1558,6 +1557,147 @@ describe('GatewayRegistry', async () => {
           },
         ],
       });
+    });
+  });
+
+  describe('Redelegate-Stake', () => {
+    const redelegateStake = async ({
+      memory,
+      delegatorAddress,
+      quantity,
+      sourceAddress,
+      targetAddress,
+      vaultId,
+      timestamp,
+    }) => {
+      const result = await handle(
+        {
+          From: delegatorAddress,
+          Owner: delegatorAddress,
+          Tags: [
+            { name: 'Action', value: 'Redelegate-Stake' },
+            { name: 'Source', value: sourceAddress },
+            { name: 'Target', value: targetAddress },
+            { name: 'Quantity', value: `${quantity}` },
+            ...(vaultId ? [{ name: 'Vault-Id', value: vaultId }] : []),
+          ],
+          Timestamp: timestamp,
+        },
+        memory,
+      );
+      return {
+        result,
+        memory: result.Memory,
+      };
+    };
+
+    it('should allow re-delegating stake', async () => {
+      const sourceAddress = 'source-address-'.padEnd(43, 'a');
+      const targetAddress = 'target-address-'.padEnd(43, 'b');
+      const delegatorAddress = 'delegator-address-'.padEnd(43, 'c');
+
+      const { memory: joinSourceMemory } = await joinNetwork({
+        address: sourceAddress,
+        memory: sharedMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const { memory: joinTargetMemory } = await joinNetwork({
+        address: targetAddress,
+        memory: joinSourceMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const stakeQty = 500_000_000;
+      const transferMemory = await transfer({
+        recipient: delegatorAddress,
+        quantity: stakeQty,
+        memory: joinTargetMemory,
+      });
+
+      const { memory: delegatedStakeMemory } = await delegateStake({
+        delegatorAddress,
+        quantity: stakeQty,
+        gatewayAddress: sourceAddress,
+        timestamp: STUB_TIMESTAMP,
+        memory: transferMemory,
+      });
+
+      const sourceGatewayBefore = await getGateway({
+        address: sourceAddress,
+        memory: delegatedStakeMemory,
+      });
+      assert(sourceGatewayBefore.totalDelegatedStake === stakeQty);
+      assert.deepStrictEqual(sourceGatewayBefore.delegates, {
+        [delegatorAddress]: {
+          delegatedStake: stakeQty,
+          startTimestamp: STUB_TIMESTAMP,
+          vaults: [],
+        },
+      });
+
+      const { memory: redelegateStakeMemory, result } = await redelegateStake({
+        memory: delegatedStakeMemory,
+        delegatorAddress,
+        quantity: stakeQty,
+        sourceAddress,
+        targetAddress,
+        timestamp: STUB_TIMESTAMP,
+      });
+
+      const targetGatewayAfter = await getGateway({
+        address: targetAddress,
+        memory: redelegateStakeMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      assert(targetGatewayAfter.totalDelegatedStake === stakeQty);
+      assert.deepStrictEqual(targetGatewayAfter.delegates, {
+        [delegatorAddress]: {
+          delegatedStake: stakeQty,
+          startTimestamp: STUB_TIMESTAMP,
+          vaults: [],
+        },
+      });
+
+      const sourceGatewayAfter = await getGateway({
+        address: sourceAddress,
+        memory: redelegateStakeMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      assert(sourceGatewayAfter.totalDelegatedStake === 0);
+      assert.deepStrictEqual(sourceGatewayAfter.delegates, []);
+
+      const feeResultAfterRedelegation = await handle(
+        {
+          From: delegatorAddress,
+          Owner: delegatorAddress,
+          Tags: [{ name: 'Action', value: 'Redelegation-Fee' }],
+          Timestamp: STUB_TIMESTAMP,
+        },
+        redelegateStakeMemory,
+      );
+      assert.deepStrictEqual(
+        JSON.parse(feeResultAfterRedelegation.Messages[0].Data),
+        {
+          redelegationFeeRate: 10,
+          feeResetTimestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7, // 7 days
+        },
+      );
+
+      // Fee is pruned after 7 days
+      const feeResultSevenEpochsLater = await handle(
+        {
+          From: delegatorAddress,
+          Owner: delegatorAddress,
+          Tags: [{ name: 'Action', value: 'Redelegation-Fee' }],
+          Timestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7 * 7 + 1, // 7 days
+        },
+        redelegateStakeMemory,
+      );
+      assert.deepStrictEqual(
+        JSON.parse(feeResultSevenEpochsLater.Messages[0].Data),
+        {
+          redelegationFeeRate: 0,
+        },
+      );
     });
   });
 });

@@ -5,6 +5,8 @@ Balances = Balances or {}
 local balances = {}
 local utils = require("utils")
 
+--- @alias mIO number
+
 --- Transfers tokens from one address to another
 ---@param recipient string The address to receive tokens
 ---@param from string The address sending tokens
