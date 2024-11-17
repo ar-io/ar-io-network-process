@@ -1253,6 +1253,7 @@ addEventingHandler(
 addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.JoinNetwork), function(msg)
 	-- TODO: add assertions on all the provided input, although the joinNetwork function will throw an error if the input is invalid
 
+	--- @type UpdateGatewaySettings
 	local updatedSettings = {
 		label = msg.Tags.Label,
 		note = msg.Tags.Note,

@@ -9,13 +9,15 @@ local gar = {}
 --- @field totalDelegatedStake number
 --- @field vaults table<WalletAddress, Vault>
 --- @field delegates table<WalletAddress, Delegate>
---- @field startTimestamp number
---- @field endTimestamp number|nil
+--- @field startTimestamp Timestamp
+--- @field endTimestamp Timestamp|nil
 --- @field stats GatewayStats
 --- @field settings GatewaySettings
 --- @field services GatewayServices | nil
 --- @field status "joined"|"leaving"
 --- @field observerAddress WalletAddress
+--- @field weights GatewayWeights | nil
+--- @field slashings table<Timestamp, mIO> | nil
 
 --- @class GatewayStats
 --- @field prescribedEpochCount number
@@ -36,15 +38,24 @@ local gar = {}
 --- @field fqdn string
 --- @field protocol string
 --- @field port number
---- @field properties string TODO IS THIS CORRECT?
+--- @field properties string
 --- @field note string | nil
+
+--- @class GatewayWeights
+--- @field stakeWeight number
+--- @field tenureWeight number
+--- @field gatewayRewardRatioWeight number
+--- @field observerRewardRatioWeight number
+--- @field compositeWeight number
+--- @field normalizedCompositeWeight number
 
 --- @alias GatewayServices table<string, any> TODO IS THIS CORRECT
 --- @alias MessageId string
+--- @alias Timestamp number
 
 --- @class Delegate
 --- @field delegatedStake number
---- @field startTimestamp number
+--- @field startTimestamp Timestamp
 --- @field vaults table<MessageId, Vault>
 
 --- @alias Gateways table<WalletAddress, Gateway>
@@ -72,13 +83,26 @@ GatewayRegistrySettings = GatewayRegistrySettings
 		},
 	}
 
+--- @class JoinGatewaySettings
+--- @field allowDelegatedStaking boolean | nil
+--- @field allowedDelegates WalletAddress[] | nil
+--- @field delegateRewardShareRatio number | nil
+--- @field autoStake boolean | nil
+--- @field minDelegatedStake number
+--- @field label string
+--- @field fqdn string
+--- @field protocol string
+--- @field port number
+--- @field properties string
+--- @field note string | nil
+
 --- Joins the network with the given parameters
 --- @param from WalletAddress The address from which the request is made
 --- @param stake mIO: The amount of stake to be used
---- @param settings table The settings for joining the network
+--- @param settings JoinGatewaySettings The settings for joining the network
 --- @param services GatewayServices The services to be used in the network
 --- @param observerAddress WalletAddress The address of the observer
---- @param timeStamp number The timestamp of the request
+--- @param timeStamp Timestamp The timestamp of the request
 --- @return Gateway # Returns the newly joined gateway
 function gar.joinNetwork(from, stake, settings, services, observerAddress, timeStamp)
 	gar.assertValidGatewayParameters(from, stake, settings, services, observerAddress)
@@ -130,6 +154,10 @@ function gar.joinNetwork(from, stake, settings, services, observerAddress, timeS
 	return gateway
 end
 
+--- @param from WalletAddress the address of the gateway to exit
+--- @param currentTimestamp Timestamp
+--- @param msgId MessageId
+--- @return Gateway # a copy of the updated gateway
 function gar.leaveNetwork(from, currentTimestamp, msgId)
 	local gateway = gar.getGateway(from)
 
@@ -177,7 +205,7 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 
 	-- update global state
 	GatewayRegistry[from] = gateway
-	return gateway
+	return utils.deepCopy(gateway)
 end
 
 --- Increases the operator stake for a gateway
@@ -292,6 +320,25 @@ function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWi
 	}
 end
 
+--- @class UpdateGatewaySettings
+--- @field allowDelegatedStaking boolean | nil
+--- @field allowedDelegates WalletAddress[] | nil
+--- @field delegateRewardShareRatio number | nil
+--- @field autoStake boolean | nil
+--- @field minDelegatedStake number | nil
+--- @field label string
+--- @field fqdn string
+--- @field protocol string
+--- @field port number
+--- @field properties string
+--- @field note string | nil
+
+--- @param from WalletAddress
+--- @param updatedSettings UpdateGatewaySettings
+--- @param updatedServices GatewayServices -- TODO: IS THIS RIGHT?
+--- @param observerAddress WalletAddress
+--- @param currentTimestamp Timestamp
+--- @param msgId MessageId
 function gar.updateGatewaySettings(from, updatedSettings, updatedServices, observerAddress, currentTimestamp, msgId)
 	local gateway = gar.getGateway(from)
 
@@ -321,6 +368,7 @@ function gar.updateGatewaySettings(from, updatedSettings, updatedServices, obser
 	-- update the allow list first if necessary since we may need it for accounting in any subsequent delegate kicks
 	if updatedSettings.allowDelegatedStaking and updatedSettings.allowedDelegates then
 		-- Replace the existing lookup table
+		--- @diagnostic disable-next-line: inject-field
 		updatedSettings.allowedDelegatesLookup = utils.createLookupTable(updatedSettings.allowedDelegates)
 		updatedSettings.allowedDelegates = nil -- no longer need the list now that lookup is built
 
@@ -347,6 +395,7 @@ function gar.updateGatewaySettings(from, updatedSettings, updatedServices, obser
 		end
 
 		-- clear the allowedDelegatesLookup since we no longer need it
+		--- @diagnostic disable-next-line: inject-field
 		updatedSettings.allowedDelegatesLookup = nil
 	end
 
@@ -444,6 +493,9 @@ function gar.createDelegateAtGateway(startTimestamp, gateway, delegateAddress)
 	return newDelegate
 end
 
+--- @param balance mIO # the starting balance of the vault
+--- @param startTimestamp number # the timestamp when the vault was created
+--- @return Vault # a vault with the specified balance, start timestamp, and computed end timestamp
 function gar.createDelegateVault(balance, startTimestamp)
 	return {
 		balance = balance,
@@ -964,6 +1016,7 @@ function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
 	local gatewaysArray = {}
 	local cursorField = "gatewayAddress" -- the cursor will be the gateway address
 	for address, record in pairs(gateways) do
+		--- @diagnostic disable-next-line: inject-field
 		record.gatewayAddress = address
 		-- TODO: remove delegates here to avoid sending an unbounded array; to fetch delegates, use getPaginatedDelegates
 		table.insert(gatewaysArray, record)
@@ -986,6 +1039,7 @@ function gar.getPaginatedDelegates(address, cursor, limit, sortBy, sortOrder)
 	local delegatesArray = {}
 	local cursorField = "address"
 	for delegateAddress, delegate in pairs(gateway.delegates) do
+		--- @diagnostic disable-next-line: inject-field
 		delegate.address = delegateAddress
 		table.insert(delegatesArray, delegate)
 	end
@@ -1720,12 +1774,11 @@ function gar.redelegateStake(params)
 	local currentTimestamp = params.currentTimestamp
 	local vaultId = params.vaultId
 
-	-- TODO: Could use isValidAOAddress
 	assert(type(stakeToTakeFromSource) == "number", "Quantity is required and must be a number")
 	assert(stakeToTakeFromSource > 0, "Quantity must be greater than 0")
-	assert(type(targetAddress) == "string", "Target address is required and must be a string")
-	assert(type(sourceAddress) == "string", "Source address is required and must be a string")
-	assert(type(delegateAddress) == "string", "Delegate address is required and must be a string")
+	assert(utils.isValidAOAddress(targetAddress), "Target address is required and must be a string")
+	assert(utils.isValidAOAddress(sourceAddress), "Source address is required and must be a string")
+	assert(utils.isValidAOAddress(delegateAddress), "Delegate address is required and must be a string")
 	assert(type(currentTimestamp) == "number", "Current timestamp is required and must be a number")
 	assert(sourceAddress ~= targetAddress, "Source and target gateway addresses must be different.")
 
