@@ -1881,7 +1881,7 @@ function gar.redelegateStake(params)
 	local minimumStakeForGatewayAndDelegate
 	if existingTargetDelegate and existingTargetDelegate.delegatedStake ~= 0 then
 		-- It already has a stake that is not zero
-		minimumStakeForGatewayAndDelegate = 1 -- Delegate must provide at least one additional IO
+		minimumStakeForGatewayAndDelegate = 1 -- Delegate must provide at least one additional mIO
 	else
 		-- Consider if the operator increases the minimum amount after you've already staked
 		minimumStakeForGatewayAndDelegate = targetGateway.settings.minDelegatedStake

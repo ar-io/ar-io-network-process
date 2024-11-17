@@ -2872,9 +2872,9 @@ describe("gar", function()
 	end)
 
 	local sevenDays = 7 * 24 * 60 * 60 * 1000
-	local testRedelegatorAddress = "test-re-delegator"
-	local testSourceAddress = "unique-source-address"
-	local testTargetAddress = "unique-target-address"
+	local testRedelegatorAddress = "test-re-delegator-1234567890123456789012345"
+	local testSourceAddress = "unique-source-address-123456789012345678901"
+	local testTargetAddress = "unique-target-address-123456789012345678901"
 	describe("redelegateStake", function()
 		local timestamp = 12345
 		local minDelegatedStake = gar.getSettings().delegates.minStake
