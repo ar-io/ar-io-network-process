@@ -355,39 +355,9 @@ end, function(msg)
 
 	local msgId = msg.Id
 	print("Pruning state at timestamp: " .. msgTimestamp)
-	-- we need to be concious about deep copying here, as it could consume a large amount of memory. so long as we are pruning effectively, this should be fine
-	local previousState = {
-		Vaults = utils.deepCopy(Vaults),
-		GatewayRegistry = utils.deepCopy(GatewayRegistry),
-		NameRegistry = utils.deepCopy(NameRegistry),
-		Epochs = utils.deepCopy(Epochs),
-		Balances = utils.deepCopy(Balances),
-		lastKnownCirculatingSupply = LastKnownCirculatingSupply,
-		lastKnownLockedSupply = LastKnownLockedSupply,
-		lastKnownStakedSupply = LastKnownStakedSupply,
-		lastKnownDelegatedSupply = LastKnownDelegatedSupply,
-		lastKnownWithdrawSupply = LastKnownWithdrawSupply,
-		lastKnownRequestSupply = LastKnownPnpRequestSupply,
-		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
-	}
-	local status, resultOrError = pcall(prune.pruneState, msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
-	if not status then
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-Tick-Notice",
-			Error = "Invalid-Tick",
-			Data = json.encode(resultOrError),
-		})
-		Vaults = previousState.Vaults
-		GatewayRegistry = previousState.GatewayRegistry
-		NameRegistry = previousState.NameRegistry
-		Epochs = previousState.Epochs
-		Balances = previousState.Balances
-		msg.ioEvent:addField("Tick-Error", tostring(resultOrError))
-		return true -- stop processing here and return
-	end
+	local resultOrError = prune.pruneState(msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
 
-	if resultOrError ~= nil then
+	if resultOrError then
 		local prunedRecordsCount = utils.lengthOfTable(resultOrError.prunedRecords or {})
 		if prunedRecordsCount > 0 then
 			local prunedRecordNames = {}
@@ -448,20 +418,9 @@ end, function(msg)
 		end
 	end
 
-	if
-		LastKnownCirculatingSupply ~= previousState.lastKnownCirculatingSupply
-		or LastKnownLockedSupply ~= previousState.lastKnownLockedSupply
-		or LastKnownStakedSupply ~= previousState.lastKnownStakedSupply
-		or LastKnownDelegatedSupply ~= previousState.lastKnownDelegatedSupply
-		or LastKnownWithdrawSupply ~= previousState.lastKnownWithdrawSupply
-		or LastKnownPnpRequestSupply ~= previousState.lastKnownRequestSupply
-		or Balances[Protocol] ~= previousState.Balances[Protocol]
-		or lastKnownTotalTokenSupply() ~= previousState.lastKnownTotalSupply
-	then
-		addSupplyData(msg.ioEvent)
-	end
+	addSupplyData(msg.ioEvent)
 
-	return status
+	return resultOrError
 end)
 
 -- Write handlers
