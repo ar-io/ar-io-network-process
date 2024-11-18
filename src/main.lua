@@ -981,7 +981,7 @@ addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", Action
 		gwPrevStake = unsafeGatewayBeforeLeaving.operatorStake
 	end
 
-	assert(gatewayBeforeLeaving, "Gateway not found")
+	assert(unsafeGatewayBeforeLeaving, "Gateway not found")
 	assert(timestamp, "Timestamp is required")
 
 	local gateway = gar.leaveNetwork(from, timestamp, msg.Id)
