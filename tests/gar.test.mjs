@@ -366,6 +366,14 @@ describe('GatewayRegistry', async () => {
           prescribedEpochCount: 0,
           observedEpochCount: 0,
         },
+        weights: {
+          stakeWeight: 0,
+          tenureWeight: 0,
+          gatewayRewardRatioWeight: 0,
+          observerRewardRatioWeight: 0,
+          compositeWeight: 0,
+          normalizedCompositeWeight: 0,
+        },
       });
     });
 
