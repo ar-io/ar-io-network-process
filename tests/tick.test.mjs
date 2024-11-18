@@ -1,5 +1,5 @@
 import { assertNoResultError, createAosLoader } from './utils.mjs';
-import { after, describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import {
   AO_LOADER_HANDLER_ENV,
@@ -10,7 +10,11 @@ import {
   PROCESS_ID,
   STUB_TIMESTAMP,
 } from '../tools/constants.mjs';
-import { getBaseRegistrationFeeForName, getDemandFactor } from './helpers.mjs';
+import {
+  getBaseRegistrationFeeForName,
+  getDemandFactor,
+  getDelegatesItems,
+} from './helpers.mjs';
 
 const genesisEpochStart = 1722837600000 + 1;
 const epochDurationMs = 60 * 1000 * 60 * 24; // 24 hours
@@ -616,18 +620,12 @@ describe('Tick', async () => {
     const gatewayData = JSON.parse(gateway.Messages[0].Data);
     assert.deepStrictEqual(gatewayData, {
       status: 'joined',
-      vaults: [],
+      // TODO: Verify via vaults handler
+      //vaults: [],
       startTimestamp: STUB_TIMESTAMP,
       observerAddress: STUB_ADDRESS,
       operatorStake: 100_000_000_000 + expectedGatewayOperatorReward,
       totalDelegatedStake: 50_000_000_000 + expectedGatewayDelegateReward,
-      delegates: {
-        [delegateAddress]: {
-          delegatedStake: 50_000_000_000 + expectedGatewayDelegateReward,
-          startTimestamp: delegateTimestamp,
-          vaults: [],
-        },
-      },
       settings: {
         allowDelegatedStaking: true,
         autoStake: true,
@@ -658,6 +656,19 @@ describe('Tick', async () => {
         tenureWeight: 4,
       },
     });
+
+    const delegateItems = await getDelegatesItems({
+      memory: distributionTick.Memory,
+      gatewayAddress: STUB_ADDRESS,
+    });
+    assert.deepEqual(delegateItems, [
+      {
+        delegatedStake: 50_000_000_000 + expectedGatewayDelegateReward,
+        startTimestamp: delegateTimestamp,
+        vaults: [],
+        address: delegateAddress,
+      },
+    ]);
   });
 
   it('should not increase demandFactor and baseRegistrationFee when records are bought until the end of the epoch', async () => {

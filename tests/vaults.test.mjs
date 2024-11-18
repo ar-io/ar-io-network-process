@@ -6,6 +6,7 @@ import {
   AO_LOADER_HANDLER_ENV,
   PROCESS_OWNER,
 } from '../tools/constants.mjs';
+import { getVaults } from './helpers.mjs';
 
 describe('Vaults', async () => {
   const { handle: originalHandle, memory: startMemory } =
@@ -419,20 +420,15 @@ describe('Vaults', async () => {
       let cursor = '';
       let fetchedVaults = [];
       while (true) {
-        const paginatedVaults = await handle(
-          {
-            Tags: [
-              { name: 'Action', value: 'Paginated-Vaults' },
-              { name: 'Cursor', value: cursor },
-              { name: 'Limit', value: '1' },
-            ],
-          },
-          paginatedVaultMemory,
-        );
+        const { result: paginatedVaultsResult } = await getVaults({
+          memory: paginatedVaultMemory,
+          cursor,
+          limit: 1,
+        });
 
         // parse items, nextCursor
         const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
-          JSON.parse(paginatedVaults.Messages?.[0]?.Data);
+          JSON.parse(paginatedVaultsResult.Messages?.[0]?.Data);
 
         assert.equal(totalItems, 2);
         assert.equal(items.length, 1);
@@ -466,22 +462,17 @@ describe('Vaults', async () => {
       let cursor = '';
       let fetchedVaults = [];
       while (true) {
-        const paginatedVaults = await handle(
-          {
-            Tags: [
-              { name: 'Action', value: 'Paginated-Vaults' },
-              { name: 'Cursor', value: cursor },
-              { name: 'Limit', value: '1' },
-              { name: 'Sort-By', value: 'balance' },
-              { name: 'Sort-Order', value: 'asc' },
-            ],
-          },
-          paginatedVaultMemory,
-        );
+        const { result: paginatedVaultsResult } = await getVaults({
+          memory: paginatedVaultMemory,
+          cursor,
+          limit: 1,
+          sortBy: 'balance',
+          sortOrder: 'asc',
+        });
 
         // parse items, nextCursor
         const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
-          JSON.parse(paginatedVaults.Messages?.[0]?.Data);
+          JSON.parse(paginatedVaultsResult.Messages?.[0]?.Data);
 
         assert.equal(totalItems, 2);
         assert.equal(items.length, 1);

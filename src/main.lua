@@ -307,9 +307,9 @@ local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
 		ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
 		local invariantSlashedGateways = {}
 		for gwAddress, _ in pairs(slashedGateways) do
-			local gw = gar.getGateway(gwAddress) or {}
-			if gw and (gw.totalDelegatedStake > 0) then
-				invariantSlashedGateways[gwAddress] = gw.totalDelegatedStake
+			local unsafeGateway = gar.getGatewayUnsafe(gwAddress) or {}
+			if unsafeGateway and (unsafeGateway.totalDelegatedStake > 0) then
+				invariantSlashedGateways[gwAddress] = unsafeGateway.totalDelegatedStake
 			end
 		end
 		if utils.lengthOfTable(invariantSlashedGateways) > 0 then
@@ -973,15 +973,15 @@ end)
 addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", ActionMap.LeaveNetwork), function(msg)
 	local from = utils.formatAddress(msg.From)
 	local timestamp = tonumber(msg.Timestamp)
-	local gatewayBeforeLeaving = gar.getGateway(from)
+	local unsafeGatewayBeforeLeaving = gar.getGatewayUnsafe(from)
 	local gwPrevTotalDelegatedStake = 0
 	local gwPrevStake = 0
-	if gatewayBeforeLeaving ~= nil then
-		gwPrevTotalDelegatedStake = gatewayBeforeLeaving.totalDelegatedStake
-		gwPrevStake = gatewayBeforeLeaving.operatorStake
+	if unsafeGatewayBeforeLeaving ~= nil then
+		gwPrevTotalDelegatedStake = unsafeGatewayBeforeLeaving.totalDelegatedStake
+		gwPrevStake = unsafeGatewayBeforeLeaving.operatorStake
 	end
 
-	assert(gatewayBeforeLeaving, "Gateway not found")
+	assert(unsafeGatewayBeforeLeaving, "Gateway not found")
 	assert(timestamp, "Timestamp is required")
 
 	local gateway = gar.leaveNetwork(from, timestamp, msg.Id)
@@ -1337,10 +1337,10 @@ addEventingHandler(
 	ActionMap.UpdateGatewaySettings,
 	utils.hasMatchingTag("Action", ActionMap.UpdateGatewaySettings),
 	function(msg)
-		local gateway = gar.getGateway(msg.From)
+		local unsafeGateway = gar.getGatewayUnsafe(msg.From)
 		local updatedServices = utils.safeDecodeJson(msg.Tags.Services)
 
-		assert(gateway, "Gateway not found")
+		assert(unsafeGateway, "Gateway not found")
 		assert(not msg.Tags.Services or updatedServices, "Services must be provided if Services-Json is provided")
 		-- keep defaults, but update any new ones
 
@@ -1353,32 +1353,33 @@ addEventingHandler(
 		local needNewAllowlist = not shouldClearAllowlist
 			and (
 				enableLimitedDelegatedStaking
-				or (gateway.settings.allowedDelegatedLooksup and msg.Tags["Allowed-Delegates"] ~= nil)
+				or (unsafeGateway.settings.allowedDelegatesLookup and msg.Tags["Allowed-Delegates"] ~= nil)
 			)
 
 		local updatedSettings = {
-			label = msg.Tags.Label or gateway.settings.label,
-			note = msg.Tags.Note or gateway.settings.note,
-			fqdn = msg.Tags.FQDN or gateway.settings.fqdn,
-			port = tonumber(msg.Tags.Port) or gateway.settings.port,
-			protocol = msg.Tags.Protocol or gateway.settings.protocol,
+			label = msg.Tags.Label or unsafeGateway.settings.label,
+			note = msg.Tags.Note or unsafeGateway.settings.note,
+			fqdn = msg.Tags.FQDN or unsafeGateway.settings.fqdn,
+			port = tonumber(msg.Tags.Port) or unsafeGateway.settings.port,
+			protocol = msg.Tags.Protocol or unsafeGateway.settings.protocol,
 			allowDelegatedStaking = enableOpenDelegatedStaking -- clear directive to enable
 				or enableLimitedDelegatedStaking -- clear directive to enable
 				or not disableDelegatedStaking -- NOT clear directive to DISABLE
-					and gateway.settings.allowDelegatedStaking, -- otherwise unspecified, so use previous setting
+					and unsafeGateway.settings.allowDelegatedStaking, -- otherwise unspecified, so use previous setting
 
 			allowedDelegates = needNewAllowlist and utils.splitAndTrimString(msg.Tags["Allowed-Delegates"], ",") -- replace the lookup list
 				or nil, -- change nothing
 
-			minDelegatedStake = tonumber(msg.Tags["Min-Delegated-Stake"]) or gateway.settings.minDelegatedStake,
+			minDelegatedStake = tonumber(msg.Tags["Min-Delegated-Stake"]) or unsafeGateway.settings.minDelegatedStake,
 			delegateRewardShareRatio = tonumber(msg.Tags["Delegate-Reward-Share-Ratio"])
-				or gateway.settings.delegateRewardShareRatio,
-			properties = msg.Tags.Properties or gateway.settings.properties,
-			autoStake = not msg.Tags["Auto-Stake"] and gateway.settings.autoStake or msg.Tags["Auto-Stake"] == "true",
+				or unsafeGateway.settings.delegateRewardShareRatio,
+			properties = msg.Tags.Properties or unsafeGateway.settings.properties,
+			autoStake = not msg.Tags["Auto-Stake"] and unsafeGateway.settings.autoStake
+				or msg.Tags["Auto-Stake"] == "true",
 		}
 
 		-- TODO: we could standardize this on our prepended handler to inject and ensure formatted addresses and converted values
-		local observerAddress = msg.Tags["Observer-Address"] or gateway.observerAddress
+		local observerAddress = msg.Tags["Observer-Address"] or unsafeGateway.observerAddress
 		local formattedAddress = utils.formatAddress(msg.From)
 		local formattedObserverAddress = utils.formatAddress(observerAddress)
 		local timestamp = tonumber(msg.Timestamp)
@@ -1800,7 +1801,7 @@ addEventingHandler(ActionMap.State, Handlers.utils.hasMatchingTag("Action", Acti
 end)
 
 addEventingHandler(ActionMap.Gateways, Handlers.utils.hasMatchingTag("Action", ActionMap.Gateways), function(msg)
-	local gateways = gar.getGateways()
+	local gateways = gar.getCompactGateways()
 	ao.send({
 		Target = msg.From,
 		Action = "Gateways-Notice",
@@ -1809,7 +1810,7 @@ addEventingHandler(ActionMap.Gateways, Handlers.utils.hasMatchingTag("Action", A
 end)
 
 addEventingHandler(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", ActionMap.Gateway), function(msg)
-	local gateway = gar.getGateway(msg.Tags.Address or msg.From)
+	local gateway = gar.getCompactGateway(msg.Tags.Address or msg.From)
 	ao.send({
 		Target = msg.From,
 		Action = "Gateway-Notice",
@@ -2670,5 +2671,22 @@ addEventingHandler("getPaginatedPrimaryNames", utils.hasMatchingTag("Action", Ac
 		Data = json.encode(result),
 	})
 end)
+
+addEventingHandler(
+	"getPaginatedGatewayVaults",
+	utils.hasMatchingTag("Action", "Paginated-Gateway-Vaults"),
+	function(msg)
+		local page = utils.parsePaginationTags(msg)
+		local gatewayAddress = utils.formatAddress(msg.Tags.Address or msg.From)
+		assert(utils.isValidAOAddress(gatewayAddress), "Invalid gateway address")
+		local result =
+			gar.getPaginatedVaultsForGateway(gatewayAddress, page.cursor, page.limit, page.sortBy, page.sortOrder)
+		return ao.send({
+			Target = msg.From,
+			Action = "Gateway-Vaults-Notice",
+			Data = json.encode(result),
+		})
+	end
+)
 
 return process

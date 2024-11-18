@@ -329,11 +329,13 @@ function utils.findInArray(array, predicate)
 	return nil -- Return nil if the element is not found
 end
 
---- Deep copies a table
+--- Deep copies a table with optional exclusion of specified fields, including nested fields
+--- Preserves proper sequential ordering of array tables when some of the excluded nested keys are array indexes
 --- @generic T: table|nil
 --- @param original T The table to copy
+--- @param excludedFields table|nil An array of keys or dot-separated key paths to exclude from the deep copy
 --- @return T The deep copy of the table or nil if the original is nil
-function utils.deepCopy(original)
+function utils.deepCopy(original, excludedFields)
 	if not original then
 		return nil
 	end
@@ -342,15 +344,49 @@ function utils.deepCopy(original)
 		return original
 	end
 
-	local copy = {}
-	for key, value in pairs(original) do
-		if type(value) == "table" then
-			copy[key] = utils.deepCopy(value) -- Recursively copy the nested table
-		else
-			copy[key] = value
+	local excluded = utils.createLookupTable(excludedFields)
+
+	-- Helper function to check if a key path is excluded
+	local function isExcluded(keyPath)
+		for excludedKey in pairs(excluded) do
+			if keyPath == excludedKey or keyPath:match("^" .. excludedKey .. "%.") then
+				return true
+			end
 		end
+		return false
 	end
-	return copy
+
+	-- Recursive function to deep copy with nested field exclusion
+	local function deepCopyHelper(orig, path)
+		if type(orig) ~= "table" then
+			return orig
+		end
+
+		local result = {}
+		local isArray = #orig > 0
+
+		for key, value in pairs(orig) do
+			local keyPath = path and (path .. "." .. key) or key
+			if not isExcluded(keyPath) then
+				result[key] = deepCopyHelper(value, keyPath)
+			end
+		end
+
+		-- Preserve array order if the original table is an array
+		if isArray then
+			local orderedResult = {}
+			for i = 1, #orig do
+				if result[i] ~= nil then
+					table.insert(orderedResult, result[i])
+				end
+			end
+			return orderedResult
+		end
+
+		return result
+	end
+
+	return deepCopyHelper(original, nil)
 end
 
 --- Gets the length of a table
