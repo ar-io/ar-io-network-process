@@ -1908,7 +1908,7 @@ addEventingHandler(ActionMap.Distributions, utils.hasMatchingTag("Action", Actio
 	})
 end)
 
-addEventingHandler(ActionMap.ReservedNames, utils.hasMatchingTag("Action", ActionMap.ReservedNames), function(msg)
+addEventingHandler("paginatedReservedNames", utils.hasMatchingTag("Action", "Paginated-Reserved-Names"), function(msg)
 	local page = utils.parsePaginationTags(msg)
 	local reservedNames = arns.getPaginatedReservedNames(page.cursor, page.limit, page.sortBy or "name", page.sortOrder)
 	ao.send({ Target = msg.From, Action = "Reserved-Names-Notice", Data = json.encode(reservedNames) })
