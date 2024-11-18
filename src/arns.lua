@@ -18,8 +18,7 @@ NameRegistry = NameRegistry or {
 	auctions = {},
 }
 
---- @class Record
---- @field name string The name of the record
+--- @class StoredRecord
 --- @field processId string The process id of the record
 --- @field startTimestamp number The start timestamp of the record
 --- @field type 'lease' | 'permabuy' The type of the record (lease/permabuy)
@@ -27,10 +26,13 @@ NameRegistry = NameRegistry or {
 --- @field purchasePrice number The purchase price of the record
 --- @field endTimestamp number|nil The end timestamp of the record
 
+--- @class Record : StoredRecord
+--- @field name string The name of the record
+
 --- @class ReservedName
 --- @field name string The name of the reserved record
 --- @field target string|nil The address of the target of the reserved record
---- @field timestamp number|nil The timestamp of the reserved record
+--- @field endTimestamp number|nil The time at which the record is no longer reserved
 
 --- @class BuyRecordResponse
 --- @field record Record The updated record
@@ -89,6 +91,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 	assert(not arns.getReservedName(name) or arns.getReservedName(name).target == from, "Name is reserved")
 	assert(not arns.getAuction(name), "Name is in auction")
 
+	--- @type StoredRecord
 	local newRecord = {
 		processId = processId,
 		startTimestamp = timestamp,
@@ -121,12 +124,12 @@ end
 
 --- Adds a record to the registry
 --- @param name string The name of the record
---- @param record Record The record to the name registry
+--- @param record StoredRecord The record to the name registry
 function arns.addRecord(name, record)
 	NameRegistry.records[name] = record
 
 	-- remove reserved name if it exists in reserved
-	if arns.getReservedName(record.name) then
+	if arns.getReservedName(name) then
 		NameRegistry.reserved[name] = nil
 	end
 end
@@ -138,12 +141,14 @@ end
 --- @param sortOrder string The order to sort by
 --- @return PaginatedTable<Record> The paginated records
 function arns.getPaginatedRecords(cursor, limit, sortBy, sortOrder)
-	local records = arns.getRecords()
+	--- @type Record[]
 	local recordsArray = {}
 	local cursorField = "name" -- the cursor will be the name
-	for name, record in pairs(records) do
-		record.name = name
-		table.insert(recordsArray, record)
+	for name, record in pairs(arns.getRecordsUnsafe()) do
+		local recordCopy = utils.deepCopy(record)
+		--- @diagnostic disable-next-line: inject-field
+		recordCopy.name = name
+		table.insert(recordsArray, recordCopy)
 	end
 
 	return utils.paginateTableWithCursor(recordsArray, cursor, cursorField, limit, sortBy, sortOrder)
@@ -156,12 +161,13 @@ end
 --- @param sortOrder string The order to sort by
 --- @return PaginatedTable<ReservedName> The paginated reserved names
 function arns.getPaginatedReservedNames(cursor, limit, sortBy, sortOrder)
-	local reserved = arns.getReservedNames()
+	--- @type ReservedName[]
 	local reservedArray = {}
 	local cursorField = "name" -- the cursor will be the name
-	for name, reservedName in pairs(reserved) do
-		reservedName.name = name
-		table.insert(reservedArray, reservedName)
+	for name, reservedName in pairs(arns.getReservedNamesUnsafe()) do
+		local reservedNameCopy = utils.deepCopy(reservedName)
+		reservedNameCopy.name = name
+		table.insert(reservedArray, reservedNameCopy)
 	end
 	return utils.paginateTableWithCursor(reservedArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
@@ -307,7 +313,7 @@ end
 
 --- Gets a record
 --- @param name string The name of the record
---- @return Record|nil The a deep copy of the record or nil if it does not exist
+--- @return StoredRecord|nil # A deep copy of the record or nil if it does not exist
 function arns.getRecord(name)
 	return utils.deepCopy(NameRegistry.records[name])
 end
@@ -336,23 +342,35 @@ function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
 	return activeNames
 end
 
---- Gets all records
---- @return table<string, Record> The a deep copy of the records table
+--- Gets deep copies of all records
+--- @return table<string, StoredRecord> # A deep copy of the records table
 function arns.getRecords()
 	local records = utils.deepCopy(NameRegistry.records)
 	return records or {}
 end
 
---- Gets all reserved names
---- @return table<string, Record> The a deep copy of the reserved names table
+--- Gets all records
+--- @return table<string, StoredRecord> # The actual records table
+function arns.getRecordsUnsafe()
+	return NameRegistry and NameRegistry.records or {}
+end
+
+--- Gets copies of all reserved names
+--- @return table<string, ReservedName> # A deep copy of the reserved names table
 function arns.getReservedNames()
 	local reserved = utils.deepCopy(NameRegistry.reserved)
 	return reserved or {}
 end
 
+--- Gets all reserved names
+--- @return table<string, ReservedName> # The actual reserved names table
+function arns.getReservedNamesUnsafe()
+	return NameRegistry and NameRegistry.reserved or {}
+end
+
 --- Gets a reserved name
 --- @param name string The name of the reserved record
---- @return table|nil The a deep copy of the reserved name or nil if it does not exist
+--- @return table|nil # A deep copy of the reserved name or nil if it does not exist
 function arns.getReservedName(name)
 	return utils.deepCopy(NameRegistry.reserved[name])
 end
@@ -360,7 +378,7 @@ end
 --- Modifies the undername limit for a record
 --- @param name string The name of the record
 --- @param qty number The quantity to increase the undername limit by
---- @return Record|nil The updated record
+--- @return StoredRecord|nil # The updated record
 function arns.modifyRecordundernameLimit(name, qty)
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
@@ -371,7 +389,7 @@ end
 --- Modifies the process id for a record
 --- @param name string The name of the record
 --- @param processId string The new process id
---- @return Record|nil The updated record
+--- @return StoredRecord|nil # The updated record
 function arns.modifyProcessId(name, processId)
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
@@ -382,7 +400,7 @@ end
 --- Modifies the end timestamp for a record
 --- @param name string The name of the record
 --- @param newEndTimestamp number The new end timestamp
---- @return Record|nil The updated record
+--- @return StoredRecord|nil # The updated record
 function arns.modifyRecordEndTimestamp(name, newEndTimestamp)
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
@@ -986,7 +1004,7 @@ function arns.pruneReservedNames(currentTimestamp)
 end
 
 --- Asserts that a name can be reassigned
---- @param record Record The record to check
+--- @param record StoredRecord The record to check
 --- @param currentTimestamp number The current timestamp
 --- @param from string The address of the sender
 --- @param newProcessId string The new process id
@@ -1012,7 +1030,7 @@ end
 --- @param from string The address of the sender
 --- @param currentTimestamp number The current timestamp
 --- @param newProcessId string The new process id
---- @return Record|nil updatedRecord - the updated record
+--- @return StoredRecord|nil updatedRecord - the updated record
 function arns.reassignName(name, from, currentTimestamp, newProcessId)
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
