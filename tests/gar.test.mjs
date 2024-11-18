@@ -1621,11 +1621,12 @@ describe('GatewayRegistry', async () => {
       };
     };
 
-    it('should allow re-delegating stake', async () => {
-      const sourceAddress = 'source-address-'.padEnd(43, 'a');
-      const targetAddress = 'target-address-'.padEnd(43, 'b');
-      const delegatorAddress = 'delegator-address-'.padEnd(43, 'c');
+    const sourceAddress = 'source-address-'.padEnd(43, 'a');
+    const targetAddress = 'target-address-'.padEnd(43, 'b');
+    const delegatorAddress = 'delegator-address-'.padEnd(43, 'c');
+    const stakeQty = 500_000_000;
 
+    it('should allow re-delegating stake', async () => {
       const { memory: joinSourceMemory } = await joinNetwork({
         address: sourceAddress,
         memory: sharedMemory,
@@ -1636,7 +1637,6 @@ describe('GatewayRegistry', async () => {
         memory: joinSourceMemory,
         timestamp: STUB_TIMESTAMP,
       });
-      const stakeQty = 500_000_000;
       const transferMemory = await transfer({
         recipient: delegatorAddress,
         quantity: stakeQty,
@@ -1748,6 +1748,108 @@ describe('GatewayRegistry', async () => {
         {
           redelegationFeeRate: 0,
         },
+      );
+    });
+
+    it("should allow re-delegating stake with a vault and the vault's balance", async () => {
+      const { memory: joinSourceMemory } = await joinNetwork({
+        address: sourceAddress,
+        memory: sharedMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const { memory: joinTargetMemory } = await joinNetwork({
+        address: targetAddress,
+        memory: joinSourceMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const transferMemory = await transfer({
+        recipient: delegatorAddress,
+        quantity: stakeQty,
+        memory: joinTargetMemory,
+      });
+
+      const { memory: delegatedStakeMemory } = await delegateStake({
+        delegatorAddress,
+        quantity: stakeQty,
+        gatewayAddress: sourceAddress,
+        timestamp: STUB_TIMESTAMP,
+        memory: transferMemory,
+      });
+
+      const sourceGatewayBefore = await getGateway({
+        address: sourceAddress,
+        memory: delegatedStakeMemory,
+      });
+      assert(sourceGatewayBefore.totalDelegatedStake === stakeQty);
+      const delegateItems = await getDelegatesItems({
+        memory: delegatedStakeMemory,
+        gatewayAddress: sourceAddress,
+      });
+      assert.deepStrictEqual(
+        [
+          {
+            startTimestamp: STUB_TIMESTAMP,
+            delegatedStake: stakeQty,
+            vaults: [],
+            address: delegatorAddress,
+          },
+        ],
+        delegateItems,
+      );
+
+      const decreaseStakeMsgId = 'decrease-stake-message-id-'.padEnd(43, 'x');
+      const { memory: decreaseStakeMemory } = await decreaseDelegateStake({
+        memory: delegatedStakeMemory,
+        timestamp: STUB_TIMESTAMP + 1,
+        delegatorAddress,
+        decreaseQty: stakeQty,
+        gatewayAddress: sourceAddress,
+        messageId: decreaseStakeMsgId,
+      });
+
+      const { memory: redelegateStakeMemory } = await redelegateStake({
+        memory: decreaseStakeMemory,
+        delegatorAddress,
+        quantity: stakeQty,
+        sourceAddress,
+        targetAddress,
+        vaultId: decreaseStakeMsgId,
+        timestamp: STUB_TIMESTAMP + 2,
+      });
+
+      const targetGatewayAfter = await getGateway({
+        address: targetAddress,
+        memory: redelegateStakeMemory,
+        timestamp: STUB_TIMESTAMP + 2,
+      });
+      assert(targetGatewayAfter.totalDelegatedStake === stakeQty);
+      assert.deepStrictEqual(
+        await getDelegatesItems({
+          memory: redelegateStakeMemory,
+          gatewayAddress: targetAddress,
+        }),
+        [
+          {
+            delegatedStake: stakeQty,
+            startTimestamp: STUB_TIMESTAMP + 2,
+            address: delegatorAddress,
+            vaults: [],
+          },
+        ],
+      );
+
+      const sourceGatewayAfter = await getGateway({
+        address: sourceAddress,
+        memory: redelegateStakeMemory,
+        timestamp: STUB_TIMESTAMP + 2,
+      });
+      assert(sourceGatewayAfter.totalDelegatedStake === 0);
+      assert.deepStrictEqual(
+        await getDelegatesItems({
+          memory: redelegateStakeMemory,
+          gatewayAddress: sourceAddress,
+        }),
+        [],
       );
     });
   });
