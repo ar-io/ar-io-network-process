@@ -355,23 +355,23 @@ end, function(msg)
 
 	local msgId = msg.Id
 	print("Pruning state at timestamp: " .. msgTimestamp)
-	local resultOrError = prune.pruneState(msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
+	local prunedStateResult = prune.pruneState(msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
 
-	if resultOrError then
-		local prunedRecordsCount = utils.lengthOfTable(resultOrError.prunedRecords or {})
+	if prunedStateResult then
+		local prunedRecordsCount = utils.lengthOfTable(prunedStateResult.prunedRecords or {})
 		if prunedRecordsCount > 0 then
 			local prunedRecordNames = {}
-			for name, _ in pairs(resultOrError.prunedRecords) do
+			for name, _ in pairs(prunedStateResult.prunedRecords) do
 				table.insert(prunedRecordNames, name)
 			end
 			msg.ioEvent:addField("Pruned-Records", prunedRecordNames)
 			msg.ioEvent:addField("Pruned-Records-Count", prunedRecordsCount)
 			msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
 		end
-		local newGracePeriodRecordsCount = utils.lengthOfTable(resultOrError.newGracePeriodRecords or {})
+		local newGracePeriodRecordsCount = utils.lengthOfTable(prunedStateResult.newGracePeriodRecords or {})
 		if newGracePeriodRecordsCount > 0 then
 			local newGracePeriodRecordNames = {}
-			for name, record in pairs(resultOrError.newGracePeriodRecords) do
+			for name, record in pairs(prunedStateResult.newGracePeriodRecords) do
 				table.insert(newGracePeriodRecordNames, name)
 				if record.endTimestamp > LastGracePeriodEntryEndTimestamp then
 					LastGracePeriodEntryEndTimestamp = record.endTimestamp
@@ -381,37 +381,37 @@ end, function(msg)
 			msg.ioEvent:addField("New-Grace-Period-Records-Count", newGracePeriodRecordsCount)
 			msg.ioEvent:addField("Last-Grace-Period-Entry-End-Timestamp", LastGracePeriodEntryEndTimestamp)
 		end
-		local prunedAuctions = resultOrError.prunedAuctions or {}
+		local prunedAuctions = prunedStateResult.prunedAuctions or {}
 		local prunedAuctionsCount = utils.lengthOfTable(prunedAuctions)
 		if prunedAuctionsCount > 0 then
 			msg.ioEvent:addField("Pruned-Auctions", prunedAuctions)
 			msg.ioEvent:addField("Pruned-Auctions-Count", prunedAuctionsCount)
 		end
-		local prunedReserved = resultOrError.prunedReserved or {}
+		local prunedReserved = prunedStateResult.prunedReserved or {}
 		local prunedReservedCount = utils.lengthOfTable(prunedReserved)
 		if prunedReservedCount > 0 then
 			msg.ioEvent:addField("Pruned-Reserved", prunedReserved)
 			msg.ioEvent:addField("Pruned-Reserved-Count", prunedReservedCount)
 		end
-		local prunedVaultsCount = utils.lengthOfTable(resultOrError.prunedVaults or {})
+		local prunedVaultsCount = utils.lengthOfTable(prunedStateResult.prunedVaults or {})
 		if prunedVaultsCount > 0 then
-			msg.ioEvent:addField("Pruned-Vaults", resultOrError.prunedVaults)
+			msg.ioEvent:addField("Pruned-Vaults", prunedStateResult.prunedVaults)
 			msg.ioEvent:addField("Pruned-Vaults-Count", prunedVaultsCount)
-			for _, vault in pairs(resultOrError.prunedVaults) do
+			for _, vault in pairs(prunedStateResult.prunedVaults) do
 				LastKnownLockedSupply = LastKnownLockedSupply - vault.balance
 				LastKnownCirculatingSupply = LastKnownCirculatingSupply + vault.balance
 			end
 		end
-		local prunedEpochsCount = utils.lengthOfTable(resultOrError.prunedEpochs or {})
+		local prunedEpochsCount = utils.lengthOfTable(prunedStateResult.prunedEpochs or {})
 		if prunedEpochsCount > 0 then
-			msg.ioEvent:addField("Pruned-Epochs", resultOrError.prunedEpochs)
+			msg.ioEvent:addField("Pruned-Epochs", prunedStateResult.prunedEpochs)
 			msg.ioEvent:addField("Pruned-Epochs-Count", prunedEpochsCount)
 		end
 
-		local pruneGatewaysResult = resultOrError.pruneGatewaysResult or {}
+		local pruneGatewaysResult = prunedStateResult.pruneGatewaysResult or {}
 		addPruneGatewaysResult(msg.ioEvent, pruneGatewaysResult)
 
-		local prunedPrimaryNameRequests = resultOrError.prunedPrimaryNameRequests or {}
+		local prunedPrimaryNameRequests = prunedStateResult.prunedPrimaryNameRequests or {}
 		local prunedRequestsCount = utils.lengthOfTable(prunedPrimaryNameRequests)
 		if prunedRequestsCount then
 			msg.ioEvent:addField("Pruned-Requests-Count", prunedRequestsCount)
@@ -420,7 +420,7 @@ end, function(msg)
 
 	addSupplyData(msg.ioEvent)
 
-	return resultOrError
+	return prunedStateResult
 end)
 
 -- Write handlers
