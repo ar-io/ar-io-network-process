@@ -337,7 +337,7 @@ describe('GatewayRegistry', async () => {
         address: STUB_ADDRESS,
         memory: sharedMemory,
       });
-      assert.deepEqual(gateway, {
+      assert.deepStrictEqual(gateway, {
         observerAddress: STUB_ADDRESS,
         operatorStake: 100_000_000_000, // matches the initial operator stake from the test setup
         totalDelegatedStake: 0,
@@ -443,6 +443,14 @@ describe('GatewayRegistry', async () => {
           passedEpochCount: 0,
           prescribedEpochCount: 0,
           observedEpochCount: 0,
+        },
+        weights: {
+          stakeWeight: 0,
+          tenureWeight: 0,
+          gatewayRewardRatioWeight: 0,
+          observerRewardRatioWeight: 0,
+          compositeWeight: 0,
+          normalizedCompositeWeight: 0,
         },
       });
 
