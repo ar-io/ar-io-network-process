@@ -381,8 +381,11 @@ function gar.updateGatewaySettings(from, updatedSettings, updatedServices, obser
 
 	-- if allowDelegateStaking is currently false, and you want to set it to true - you have to wait until all the vaults have been returned
 	assert(
-		updatedSettings.allowDelegatedStaking == false
-			or (updatedSettings.allowDelegatedStaking == true and next(gateway.delegates) == nil),
+		not (
+				updatedSettings.allowDelegatedStaking
+				and not gateway.settings.allowDelegatedStaking
+				and next(gateway.delegates)
+			),
 		"You cannot enable delegated staking until all delegated stakes have been withdrawn."
 	)
 
