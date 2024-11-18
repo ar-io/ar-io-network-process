@@ -1,7 +1,6 @@
 key.json
 node_modules
 .luarocks
-**/coverage/*
 !.gitkeep
 /luarocks
 /lua
@@ -13,3 +12,4 @@ luacov-html
 *.gz
 dist
 luacov.stats.out
+coverage
