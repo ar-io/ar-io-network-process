@@ -1192,7 +1192,7 @@ addEventingHandler(ActionMap.CancelWithdrawal, utils.hasMatchingTag("Action", Ac
 	end
 
 	ao.send({
-		Target = msg.FromAddress,
+		Target = msg.From,
 		Tags = {
 			Action = ActionMap.CancelWithdrawal .. "-Notice",
 			Address = gatewayAddress,
