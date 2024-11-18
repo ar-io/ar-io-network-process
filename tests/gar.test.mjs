@@ -601,7 +601,7 @@ describe('GatewayRegistry', async () => {
         endTimestamp: leavingTimestamp + 1000 * 60 * 60 * 24 * 90, // 90 days
       });
 
-      assert.deepEqual(
+      assert.deepStrictEqual(
         await getGatewayVaultsItems({
           memory: leaveNetworkMemory,
           gatewayAddress: STUB_ADDRESS,
