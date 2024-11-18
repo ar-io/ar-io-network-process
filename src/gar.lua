@@ -153,6 +153,14 @@ function gar.joinNetwork(from, stake, settings, services, observerAddress, timeS
 		services = services or nil,
 		status = "joined",
 		observerAddress = observerAddress or from,
+		weights = {
+			stakeWeight = 0,
+			tenureWeight = 0,
+			gatewayRewardRatioWeight = 0,
+			observerRewardRatioWeight = 0,
+			compositeWeight = 0,
+			normalizedCompositeWeight = 0,
+		},
 	}
 
 	local gateway = gar.addGateway(from, newGateway)
@@ -1707,7 +1715,7 @@ end
 
 --- Fetch a heterogenous array of all active and vaulted delegated stakes, cursored on startTimestamp
 --- @param address string The address of the delegator
---- @param cursor number|nil The cursor startTimestamp after which to fetch more stakes (optional)
+--- @param cursor string|nil The cursor after which to fetch more stakes (optional)
 --- @param limit number The max number of stakes to fetch
 --- @param sortBy string The field to sort by. Default is "startTimestamp"
 --- @param sortOrder string The order to sort by, either "asc" or "desc". Default is "asc"

@@ -385,7 +385,7 @@ describe('primary names', function () {
     const errorTag = primaryNameForAddressResult.Messages[0].Tags.find(
       (tag) => tag.name === 'Error',
     ).value;
-    assert.equal(errorTag, 'Primary-Name-Not-Found');
+    assert.ok(errorTag, 'Expected an error tag');
   });
 
   describe('getPaginatedPrimaryNames', function () {

@@ -45,6 +45,14 @@ local testGateway = {
 	vaults = {},
 	delegates = {},
 	startTimestamp = 0,
+	weights = {
+		stakeWeight = 0,
+		tenureWeight = 0,
+		gatewayRewardRatioWeight = 0,
+		observerRewardRatioWeight = 0,
+		compositeWeight = 0,
+		normalizedCompositeWeight = 0,
+	},
 	stats = {
 		prescribedEpochCount = 0,
 		observedEpochCount = 0,
@@ -327,6 +335,7 @@ describe("gar", function()
 				services = testServices,
 				status = "joined",
 				observerAddress = stubObserverAddress,
+				weights = testGateway.weights,
 			}
 
 			local status, result = pcall(
@@ -1026,6 +1035,7 @@ describe("gar", function()
 				settings = expectedSettings,
 				status = testGateway.status,
 				observerAddress = testGateway.observerAddress,
+				weights = testGateway.weights,
 			}, result)
 		end)
 
@@ -1063,6 +1073,7 @@ describe("gar", function()
 				settings = testGateway.settings,
 				status = testGateway.status,
 				observerAddress = testGateway.observerAddress,
+				weights = testGateway.weights,
 			}
 			local status, result = pcall(
 				gar.decreaseDelegateStake,
