@@ -1,4 +1,5 @@
 local tick = require("prune")
+local Auction = require("auctions")
 
 describe("prune", function()
 	before_each(function()
@@ -15,9 +16,16 @@ describe("prune", function()
 				},
 			},
 			auctions = {
-				["test-auction"] = {
-					endTimestamp = 1000000,
-				},
+				["test-auction"] = Auction:new(
+					"test-auction",
+					1000000 - 14 * 24 * 60 * 60 * 1000,
+					1,
+					1,
+					"foo",
+					function()
+						return 1
+					end
+				),
 			},
 		}
 		_G.PrimaryNames = {
@@ -54,7 +62,6 @@ describe("prune", function()
 			assert.are.same({
 				["test-record"] = {
 					startTimestamp = pruneTimestamp,
-					endTimestamp = pruneTimestamp + 14 * 24 * 60 * 60 * 1000,
 					baseFee = 500000000,
 					demandFactor = 1,
 					initiator = "test",
@@ -85,11 +92,7 @@ describe("prune", function()
 	it("should prune auctions at the time they expire", function()
 		local pruneTimestamp = 1000000
 		local result = tick.pruneState(pruneTimestamp, "msgId", 0)
-		assert.are.same({
-			["test-auction"] = {
-				endTimestamp = pruneTimestamp,
-			},
-		}, result.prunedAuctions)
+		assert.are.same(pruneTimestamp, Auction.endTimestampForAuction(result.prunedAuctions["test-auction"]))
 		assert.are.same({}, _G.NameRegistry.auctions)
 	end)
 

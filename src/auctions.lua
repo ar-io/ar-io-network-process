@@ -1,6 +1,7 @@
 local Auction = {}
 
 -- Default Auction Settings
+--- @type AuctionSettings
 AuctionSettings = {
 	durationMs = 60 * 1000 * 60 * 24 * 14, -- 14 days in milliseconds
 	decayRate = 0.000000000016847809193121693, -- 0.02037911 / durationMs
@@ -8,15 +9,21 @@ AuctionSettings = {
 	startPriceMultiplier = 50, -- multiplier for the starting price
 }
 
+--- @class AuctionSettings
+--- @field durationMs number The duration of the auction in milliseconds
+--- @field decayRate number The decay rate for the auction
+--- @field scalingExponent number The scaling exponent for the auction
+--- @field startPriceMultiplier number The start price multiplier for the auction
+
 --- Represents an Auction.
 --- @class Auction
 --- @field name string The name of the auction
 --- @field demandFactor number The demand factor for pricing
 --- @field baseFee number The base fee for the auction
 --- @field initiator string The address of the initiator of the auction
---- @field settings table The settings for the auction
+--- @field settings AuctionSettings The settings for the auction
 --- @field startTimestamp number The starting timestamp for the auction
---- @field endTimestamp number The ending timestamp for the auction
+--- @field endTimestamp function Computes the ending timestamp for the auction
 --- @field registrationFeeCalculator function Function to calculate registration fee
 --- @field computePricesForAuction function Function to compute prices for the auction
 --- @field getPriceForAuctionAtTimestamp function Function to get the price for the auction at a given timestamp
@@ -36,7 +43,6 @@ function Auction:new(name, startTimestamp, demandFactor, baseFee, initiator, reg
 		name = name,
 		initiator = initiator,
 		startTimestamp = startTimestamp,
-		endTimestamp = startTimestamp + AuctionSettings.durationMs,
 		registrationFeeCalculator = registrationFeeCalculator,
 		baseFee = baseFee,
 		demandFactor = demandFactor,
@@ -59,7 +65,7 @@ end
 --- @return table A table of prices indexed by timestamp
 function Auction:computePricesForAuction(type, years, intervalMs)
 	local prices = {}
-	for i = self.startTimestamp, self.endTimestamp, intervalMs do
+	for i = self.startTimestamp, Auction.endTimestampForAuction(self), intervalMs do
 		local priceAtTimestamp = self:getPriceForAuctionAtTimestamp(i, type, years)
 		prices[i] = priceAtTimestamp
 	end
@@ -94,6 +100,11 @@ end
 --- @return number The floor price for the auction
 function Auction:floorPrice(type, years)
 	return self.registrationFeeCalculator(type, self.baseFee, years, self.demandFactor)
+end
+
+--- @param auction Auction
+function Auction.endTimestampForAuction(auction)
+	return auction.startTimestamp + auction.settings.durationMs
 end
 
 return Auction

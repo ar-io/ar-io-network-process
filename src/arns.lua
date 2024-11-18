@@ -18,14 +18,16 @@ NameRegistry = NameRegistry or {
 	auctions = {},
 }
 
---- @class Record
---- @field name string The name of the record
+--- @class StoredRecord
 --- @field processId string The process id of the record
 --- @field startTimestamp number The start timestamp of the record
 --- @field type 'lease' | 'permabuy' The type of the record (lease/permabuy)
 --- @field undernameLimit number The undername limit of the record
 --- @field purchasePrice number The purchase price of the record
 --- @field endTimestamp number|nil The end timestamp of the record
+
+--- @class Record : StoredRecord
+--- @field name string The name of the record
 
 --- @class ReservedName
 --- @field name string The name of the reserved record
@@ -89,6 +91,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 	assert(not arns.getReservedName(name) or arns.getReservedName(name).target == from, "Name is reserved")
 	assert(not arns.getAuction(name), "Name is in auction")
 
+	--- @type StoredRecord
 	local newRecord = {
 		processId = processId,
 		startTimestamp = timestamp,
@@ -121,12 +124,12 @@ end
 
 --- Adds a record to the registry
 --- @param name string The name of the record
---- @param record Record The record to the name registry
+--- @param record StoredRecord The record to the name registry
 function arns.addRecord(name, record)
 	NameRegistry.records[name] = record
 
 	-- remove reserved name if it exists in reserved
-	if arns.getReservedName(record.name) then
+	if arns.getReservedName(name) then
 		NameRegistry.reserved[name] = nil
 	end
 end
@@ -847,7 +850,7 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 	local auction = arns.getAuction(name)
 	assert(auction, "Auction not found")
 	assert(
-		timestamp >= auction.startTimestamp and timestamp <= auction.endTimestamp,
+		timestamp >= auction.startTimestamp and timestamp <= Auction.endTimestampForAuction(auction),
 		"Bid timestamp is outside of auction start and end timestamps"
 	)
 	local requiredBid = auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
@@ -872,6 +875,7 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 	-- apply the funding plan
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, timestamp)
 
+	--- @type StoredRecord
 	local record = {
 		processId = processId,
 		startTimestamp = timestamp,
@@ -965,7 +969,7 @@ end
 function arns.pruneAuctions(currentTimestamp)
 	local prunedAuctions = {}
 	for name, auction in pairs(arns.getAuctions()) do
-		if auction.endTimestamp <= currentTimestamp then
+		if Auction.endTimestampForAuction(auction) <= currentTimestamp then
 			prunedAuctions[name] = arns.removeAuction(name)
 		end
 	end

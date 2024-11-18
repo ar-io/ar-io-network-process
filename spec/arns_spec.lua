@@ -1090,14 +1090,12 @@ describe("arns", function()
 			)
 			local expiredAuction = Auction:new(
 				"expired-auction",
-				currentTimestamp,
+				currentTimestamp - 1000 * 60 * 60 * 24 * 14, -- 14 days ago
 				1,
 				500000000,
 				"test-initiator",
 				arns.calculateRegistrationFee
 			)
-			-- manually set the end timestamp to the current timestamp
-			expiredAuction.endTimestamp = currentTimestamp
 			_G.NameRegistry.auctions = {
 				["active-auction"] = existingAuction,
 				["expired-auction"] = expiredAuction,
@@ -1134,7 +1132,7 @@ describe("arns", function()
 				assert(auction, "Auction should be created")
 				assert.are.equal(auction.name, "test-name")
 				assert.are.equal(auction.startTimestamp, 1000000)
-				assert.are.equal(auction.endTimestamp, twoWeeksMs + 1000000) -- 14 days late
+				assert.are.equal(Auction.endTimestampForAuction(auction), twoWeeksMs + 1000000) -- 14 days late
 				assert.are.equal(auction.initiator, "test-initiator")
 				assert.are.equal(auction.baseFee, 500000000)
 				assert.are.equal(auction.demandFactor, 1)
@@ -1231,7 +1229,7 @@ describe("arns", function()
 				local decayRate = auction.settings.decayRate
 				local scalingExponent = auction.settings.scalingExponent
 				-- all the prices before the last one should match
-				for i = startTimestamp, auction.endTimestamp - intervalMs, intervalMs do
+				for i = startTimestamp, Auction.endTimestampForAuction(auction) - intervalMs, intervalMs do
 					local timeSinceStart = i - auction.startTimestamp
 					local totalDecaySinceStart = decayRate * timeSinceStart
 					local expectedPriceAtTimestamp =
@@ -1243,8 +1241,9 @@ describe("arns", function()
 					)
 				end
 				-- make sure the last price at the end of the auction is the floor price
-				local lastProvidedPrice = prices[auction.endTimestamp]
-				local lastComputedPrice = auction:getPriceForAuctionAtTimestamp(auction.endTimestamp, "lease", 1)
+				local auctionEndTimestamp = Auction.endTimestampForAuction(auction)
+				local lastProvidedPrice = prices[auctionEndTimestamp]
+				local lastComputedPrice = auction:getPriceForAuctionAtTimestamp(auctionEndTimestamp, "lease", 1)
 				local listPricePercentDifference = (lastComputedPrice - lastProvidedPrice) / lastProvidedPrice
 				assert.is_true(
 					listPricePercentDifference <= 0.0001,

@@ -2,6 +2,7 @@
 local process = { _version = "0.0.1" }
 local constants = require("constants")
 local IOEvent = require("io_event")
+local Auction = require("auctions")
 
 Name = Name or "Testnet IO"
 Ticker = Ticker or "tIO"
@@ -2076,7 +2077,7 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	local auction = {
 		name = name,
 		startTimestamp = createAuctionData.auction.startTimestamp,
-		endTimestamp = createAuctionData.auction.endTimestamp,
+		endTimestamp = Auction.endTimestampForAuction(createAuctionData.auction),
 		initiator = createAuctionData.auction.initiator,
 		baseFee = createAuctionData.auction.baseFee,
 		demandFactor = createAuctionData.auction.demandFactor,
@@ -2103,16 +2104,15 @@ addEventingHandler("auctions", utils.hasMatchingTag("Action", ActionMap.Auctions
 	local page = utils.parsePaginationTags(msg)
 	local auctions = arns.getAuctions()
 	local auctionsWithoutFunctions = {}
-
-	for _, v in ipairs(auctions) do
+	for _, auction in pairs(auctions) do
 		table.insert(auctionsWithoutFunctions, {
-			name = v.name,
-			startTimestamp = v.startTimestamp,
-			endTimestamp = v.endTimestamp,
-			initiator = v.initiator,
-			baseFee = v.baseFee,
-			demandFactor = v.demandFactor,
-			settings = v.settings,
+			name = auction.name,
+			startTimestamp = auction.startTimestamp,
+			endTimestamp = Auction.endTimestampForAuction(auction),
+			initiator = auction.initiator,
+			baseFee = auction.baseFee,
+			demandFactor = auction.demandFactor,
+			settings = auction.settings,
 		})
 	end
 	-- paginate the auctions by name, showing auctions nearest to the endTimestamp first
@@ -2143,7 +2143,7 @@ addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.Aucti
 		Data = json.encode({
 			name = auction.name,
 			startTimestamp = auction.startTimestamp,
-			endTimestamp = auction.endTimestamp,
+			endTimestamp = Auction.endTimestampForAuction(auction),
 			initiator = auction.initiator,
 			baseFee = auction.baseFee,
 			demandFactor = auction.demandFactor,
