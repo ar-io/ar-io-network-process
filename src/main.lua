@@ -2672,4 +2672,21 @@ addEventingHandler("getPaginatedPrimaryNames", utils.hasMatchingTag("Action", Ac
 	})
 end)
 
+addEventingHandler(
+	"getPaginatedGatewayVaults",
+	utils.hasMatchingTag("Action", "Paginated-Gateway-Vaults"),
+	function(msg)
+		local page = utils.parsePaginationTags(msg)
+		local gatewayAddress = utils.formatAddress(msg.Tags.Address or msg.From)
+		assert(utils.isValidAOAddress(gatewayAddress), "Invalid gateway address")
+		local result =
+			gar.getPaginatedVaultsForGateway(gatewayAddress, page.cursor, page.limit, page.sortBy, page.sortOrder)
+		return ao.send({
+			Target = msg.From,
+			Action = "Gateway-Vaults-Notice",
+			Data = json.encode(result),
+		})
+	end
+)
+
 return process

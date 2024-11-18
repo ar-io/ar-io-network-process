@@ -6,6 +6,7 @@ import {
   transfer,
   getBalances,
   getDelegatesItems,
+  getGatewayVaultsItems,
 } from './helpers.mjs';
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
@@ -598,20 +599,30 @@ describe('GatewayRegistry', async () => {
         totalDelegatedStake: 0,
         status: 'leaving',
         endTimestamp: leavingTimestamp + 1000 * 60 * 60 * 24 * 90, // 90 days
-        // TODO: ASSERT VIA VAULTS FETCHING
-        // vaults: {
-        //   '2222222222222222222222222222222222222222222': {
-        //     balance: 50000000000,
-        //     endTimestamp: 7797601500, // 90 days for the minimum operator stake
-        //     startTimestamp: leavingTimestamp,
-        //   },
-        //   mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm: {
-        //     balance: 50000000000,
-        //     endTimestamp: 2613601500, // 30 days for the remaining stake
-        //     startTimestamp: leavingTimestamp,
-        //   },
-        // },
       });
+
+      assert.deepEqual(
+        await getGatewayVaultsItems({
+          memory: leaveNetworkMemory,
+          gatewayAddress: STUB_ADDRESS,
+        }),
+        [
+          {
+            vaultId: '2222222222222222222222222222222222222222222',
+            cursorId: `2222222222222222222222222222222222222222222_${leavingTimestamp}`,
+            balance: 50000000000,
+            endTimestamp: 7797601500, // 90 days for the minimum operator stake
+            startTimestamp: leavingTimestamp,
+          },
+          {
+            vaultId: 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
+            cursorId: `mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm_${leavingTimestamp}`,
+            balance: 50000000000,
+            endTimestamp: 2613601500, // 30 days for the remaining stake
+            startTimestamp: leavingTimestamp,
+          },
+        ],
+      );
     });
   });
 
@@ -969,15 +980,22 @@ describe('GatewayRegistry', async () => {
       assert.deepStrictEqual(updatedGateway, {
         ...gatewayBefore,
         operatorStake: 100_000_000_000 - decreaseQty, // matches the initial operator stake from the test setup minus the decrease
-        // TODO: ASSERT VIA VAULTS FETCHING
-        // vaults: {
-        //   [decreaseMessageId]: {
-        //     balance: decreaseQty,
-        //     startTimestamp: decreaseTimestamp,
-        //     endTimestamp: decreaseTimestamp + 1000 * 60 * 60 * 24 * 30, // should be 30 days for anything above the minimum
-        //   },
-        // },
       });
+      assert.deepEqual(
+        await getGatewayVaultsItems({
+          memory: decreaseStakeMemory,
+          gatewayAddress: STUB_ADDRESS,
+        }),
+        [
+          {
+            vaultId: decreaseMessageId,
+            cursorId: `${decreaseMessageId}_${decreaseTimestamp}`,
+            balance: decreaseQty,
+            startTimestamp: decreaseTimestamp,
+            endTimestamp: decreaseTimestamp + 1000 * 60 * 60 * 24 * 30, // should be 30 days for anything above the minimum
+          },
+        ],
+      );
     });
 
     it('should not allow decreasing the operator stake if below the minimum withdrawal', async () => {
@@ -1035,9 +1053,14 @@ describe('GatewayRegistry', async () => {
       assert.deepStrictEqual(gatewayAfter, {
         ...gatewayBefore,
         operatorStake: 100_000_000_000 - decreaseQty, // initial stake minus full decrease qty
-        // TODO: ASSERT VIA VAULTS FETCHING
-        //vaults: [], // no vaults bc it was instant
       });
+      assert.deepEqual(
+        await getGatewayVaultsItems({
+          memory: decreaseInstantMemory,
+          gatewayAddress: STUB_ADDRESS,
+        }),
+        [],
+      );
 
       // validate the tags exist
       const tags = {};

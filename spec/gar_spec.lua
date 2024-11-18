@@ -3954,4 +3954,142 @@ describe("gar", function()
 			}, compactGateways)
 		end)
 	end)
+
+	describe("getPaginatedVaultsForGateway", function()
+		before_each(function()
+			_G.GatewayRegistry = {}
+		end)
+
+		local vault1 = {
+			balance = 300,
+			startTimestamp = 3,
+			endTimestamp = 1000,
+		}
+		local vault2 = {
+			balance = 200,
+			startTimestamp = 2,
+			endTimestamp = 1000,
+		}
+		local vault3 = {
+			balance = 100,
+			startTimestamp = 1,
+			endTimestamp = 1000,
+		}
+		local expectedVault1 = utils.deepCopy(vault1)
+		expectedVault1.vaultId = "vault-1"
+		expectedVault1.cursorId = "vault-1_3"
+		local expectedVault2 = utils.deepCopy(vault2)
+		expectedVault2.vaultId = "vault-2"
+		expectedVault2.cursorId = "vault-2_2"
+		local expectedVault3 = utils.deepCopy(vault3)
+		expectedVault3.vaultId = "vault-3"
+		expectedVault3.cursorId = "vault-3_1"
+
+		it("should throw an error for a non-existent gateway", function()
+			local isSuccess, error = pcall(function()
+				gar.getPaginatedVaultsForGateway("non-existent-gateway", nil, 1)
+			end)
+			assert(not isSuccess)
+			assert(error)
+			assert(error:find("Gateway not found") ~= nil)
+		end)
+
+		it("should handle an empty result set gracefully", function()
+			_G.GatewayRegistry = {
+				["test-gateway"] = {
+					vaults = {},
+				},
+			}
+			local result = gar.getPaginatedVaultsForGateway("test-gateway", nil, 1)
+			assert.are.same({
+				limit = 1,
+				sortBy = "startTimestamp",
+				sortOrder = "asc",
+				hasMore = false,
+				nextCursor = nil,
+				totalItems = 0,
+				items = {},
+			}, result)
+		end)
+
+		it("should return paginated gateway vaults sorted by startTimestamp in ascending order by default", function()
+			local gateway = {
+				vaults = {
+					["vault-1"] = vault1,
+					["vault-2"] = vault2,
+					["vault-3"] = vault3,
+				},
+			}
+
+			_G.GatewayRegistry = {
+				["test-gateway"] = gateway,
+			}
+			local vaultsPage1 = gar.getPaginatedVaultsForGateway("test-gateway", nil, 1)
+			assert.are.same({
+				limit = 1,
+				sortBy = "startTimestamp",
+				sortOrder = "asc",
+				hasMore = true,
+				nextCursor = "vault-3_1",
+				totalItems = 3,
+				items = {
+					expectedVault3, -- should be first because it has a lower startTimestamp
+				},
+			}, vaultsPage1)
+			-- get the next page
+			local nextPage = gar.getPaginatedVaultsForGateway("test-gateway", tostring(vaultsPage1.nextCursor), 2)
+			assert.are.same({
+				limit = 2,
+				sortBy = "startTimestamp",
+				sortOrder = "asc",
+				hasMore = false,
+				nextCursor = nil,
+				totalItems = 3,
+				items = {
+					expectedVault2,
+					expectedVault1,
+				},
+			}, nextPage)
+		end)
+
+		it("should allow for descending pagination by other fields, e.g. balance", function()
+			local gateway = {
+				vaults = {
+					["vault-1"] = vault1,
+					["vault-2"] = vault2,
+					["vault-3"] = vault3,
+				},
+			}
+			_G.GatewayRegistry = {
+				["test-gateway"] = gateway,
+			}
+			local vaultsPage1 = gar.getPaginatedVaultsForGateway("test-gateway", nil, 1, "balance", "desc")
+			assert.are.same({
+				limit = 1,
+				sortBy = "balance",
+				sortOrder = "desc",
+				hasMore = true,
+				nextCursor = "vault-1_3",
+				totalItems = 3,
+				items = {
+					expectedVault1, -- should be first because it has a higher balance
+				},
+			}, vaultsPage1)
+			-- get the next page
+			local nextPage =
+				gar.getPaginatedVaultsForGateway("test-gateway", tostring(vaultsPage1.nextCursor), 2, "balance", "desc")
+			assert.are.same({
+				limit = 2,
+				sortBy = "balance",
+				sortOrder = "desc",
+				hasMore = false,
+				nextCursor = nil,
+				totalItems = 3,
+				items = {
+					expectedVault2,
+					expectedVault3,
+				},
+			}, nextPage)
+		end)
+	end)
 end)
