@@ -388,6 +388,8 @@ end, function(msg)
 		msg.Tags[tagName] = msg.Tags[tagName] and utils.formatAddress(msg.Tags[tagName]) or nil
 	end
 
+	msg.Tags.Quantity = msg.Tags.Quantity and tonumber(msg.Tags.Quantity) or nil
+
 	local status, resultOrError = pcall(prune.pruneState, msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
 	if not status then
 		ao.send({
@@ -486,7 +488,7 @@ end)
 addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
 	-- assert recipient is a valid arweave address
 	local recipient = msg.Tags.Recipient
-	local quantity = tonumber(msg.Tags.Quantity)
+	local quantity = msg.Tags.Quantity
 	assert(utils.isValidAOAddress(recipient), "Invalid recipient")
 	assert(quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
 
@@ -543,7 +545,7 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 end)
 
 addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.CreateVault), function(msg)
-	local quantity = tonumber(msg.Tags.Quantity)
+	local quantity = msg.Tags.Quantity
 	local lockLengthMs = tonumber(msg.Tags["Lock-Length"])
 	local timestamp = tonumber(msg.Timestamp)
 	local msgId = msg.Id
@@ -578,7 +580,7 @@ end)
 
 addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap.VaultedTransfer), function(msg)
 	local recipient = msg.Tags.Recipient
-	local quantity = tonumber(msg.Tags.Quantity)
+	local quantity = msg.Tags.Quantity
 	local lockLengthMs = tonumber(msg.Tags["Lock-Length"])
 	local timestamp = tonumber(msg.Timestamp)
 	local msgId = msg.Id
@@ -655,7 +657,7 @@ end)
 
 addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.IncreaseVault), function(msg)
 	local vaultId = msg.Tags["Vault-Id"]
-	local quantity = tonumber(msg.Tags.Quantity)
+	local quantity = msg.Tags.Quantity
 	assert(utils.isValidAOAddress(vaultId), "Invalid vault id")
 	assert(quantity and quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
 
@@ -794,7 +796,7 @@ addEventingHandler(
 	function(msg)
 		local fundFrom = msg.Tags["Fund-From"]
 		local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
-		local quantity = tonumber(msg.Tags.Quantity)
+		local quantity = msg.Tags.Quantity
 		local timestamp = tonumber(msg.Timestamp)
 		assert(type(name) == "string", "Invalid name")
 		assert(
@@ -809,7 +811,7 @@ addEventingHandler(
 		if result ~= nil then
 			recordResult = result.record
 			addRecordResultFields(msg.ioEvent, result)
-			msg.ioEvent:addField("previousUndernameLimit", recordResult.undernameLimit - tonumber(msg.Tags.Quantity))
+			msg.ioEvent:addField("previousUndernameLimit", recordResult.undernameLimit - msg.Tags.Quantity)
 			msg.ioEvent:addField("additionalUndernameCost", result.additionalUndernameCost)
 			addSupplyData(msg.ioEvent)
 		end
@@ -846,7 +848,7 @@ function assertTokenCostTags(msg)
 
 	-- if quantity provided must be a number and integer greater than 0
 	if msg.Tags.Quantity then
-		assert(utils.isInteger(tonumber(msg.Tags.Quantity)), "Invalid quantity. Must be integer greater than 0")
+		assert(utils.isInteger(msg.Tags.Quantity), "Invalid quantity. Must be integer greater than 0")
 	end
 end
 
@@ -855,7 +857,7 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 	local intent = msg.Tags.Intent
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
 	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
-	local quantity = msg.Tags.Quantity and tonumber(msg.Tags.Quantity) or nil
+	local quantity = msg.Tags.Quantity or nil
 	local purchaseType = msg.Tags["Purchase-Type"] or "lease"
 	local timestamp = tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp)
 
@@ -883,7 +885,7 @@ addEventingHandler(ActionMap.CostDetails, utils.hasMatchingTag("Action", ActionM
 	local fundFrom = msg.Tags["Fund-From"]
 	local name = string.lower(msg.Tags.Name)
 	local years = tonumber(msg.Tags.Years) or 1
-	local quantity = tonumber(msg.Tags.Quantity)
+	local quantity = msg.Tags.Quantity
 	local purchaseType = msg.Tags["Purchase-Type"] or "lease"
 	local timestamp = tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp)
 	assertTokenCostTags(msg)
@@ -1038,7 +1040,7 @@ addEventingHandler(
 	ActionMap.IncreaseOperatorStake,
 	utils.hasMatchingTag("Action", ActionMap.IncreaseOperatorStake),
 	function(msg)
-		local quantity = tonumber(msg.Tags.Quantity)
+		local quantity = msg.Tags.Quantity
 		assert(
 			quantity and utils.isInteger(quantity) and quantity > 0,
 			"Invalid quantity. Must be integer greater than 0"
@@ -1069,7 +1071,7 @@ addEventingHandler(
 	ActionMap.DecreaseOperatorStake,
 	utils.hasMatchingTag("Action", ActionMap.DecreaseOperatorStake),
 	function(msg)
-		local quantity = tonumber(msg.Tags.Quantity)
+		local quantity = msg.Tags.Quantity
 		local instantWithdraw = msg.Tags.Instant and msg.Tags.Instant == "true" or false
 		local timestamp = tonumber(msg.Timestamp)
 		assert(timestamp, "Timestamp is required")
@@ -1135,11 +1137,11 @@ addEventingHandler(
 
 addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.DelegateStake), function(msg)
 	local gatewayTarget = msg.Tags.Target or msg.Tags.Address
-	local quantity = tonumber(msg.Tags.Quantity)
+	local quantity = msg.Tags.Quantity
 	local timestamp = tonumber(msg.Timestamp)
 	assert(utils.isValidAOAddress(gatewayTarget), "Invalid gateway address")
 	assert(
-		msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+		msg.Tags.Quantity and msg.Tags.Quantity > 0 and utils.isInteger(msg.Tags.Quantity),
 		"Invalid quantity. Must be integer greater than 0"
 	)
 
@@ -1254,7 +1256,7 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", ActionMap.DecreaseDelegateStake),
 	function(msg)
 		local target = msg.Tags.Target or msg.Tags.Address
-		local quantity = tonumber(msg.Tags.Quantity)
+		local quantity = msg.Tags.Quantity
 		local instantWithdraw = msg.Tags.Instant and msg.Tags.Instant == "true" or false
 		local timestamp = tonumber(msg.Timestamp)
 		msg.ioEvent:addField("Target-Formatted", target)
@@ -2328,7 +2330,7 @@ end)
 addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.AuctionBid), function(msg)
 	local fundFrom = msg.Tags["Fund-From"]
 	local name = string.lower(msg.Tags.Name)
-	local bidAmount = msg.Tags.Quantity and tonumber(msg.Tags.Quantity) or nil -- if nil, we use the current bid price
+	local bidAmount = msg.Tags.Quantity or nil -- if nil, we use the current bid price
 	local bidder = msg.From
 	local processId = msg.Tags["Process-Id"]
 	local timestamp = tonumber(msg.Timestamp)
@@ -2473,7 +2475,7 @@ addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", Act
 	local sourceAddress = msg.Tags.Source
 	local targetAddress = msg.Tags.Target
 	local delegateAddress = msg.From
-	local quantity = msg.Tags.Quantity and tonumber(msg.Tags.Quantity) or nil
+	local quantity = msg.Tags.Quantity or nil
 	local vaultId = msg.Tags["Vault-Id"]
 	local timestamp = tonumber(msg.Timestamp)
 
