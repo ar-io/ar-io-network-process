@@ -373,15 +373,20 @@ end, function(msg)
 
 	-- Format all incoming addresses
 	msg.From = utils.formatAddress(msg.From)
-	msg.Tags.Recipient = msg.Tags.Recipient and utils.formatAddress(msg.Tags.Recipient) or nil
-	msg.Tags.Initiator = msg.Tags.Initiator and utils.formatAddress(msg.Tags.Initiator) or nil
-	msg.Tags.Target = msg.Tags.Target and utils.formatAddress(msg.Tags.Target) or nil
-	msg.Tags.Source = msg.Tags.Source and utils.formatAddress(msg.Tags.Source) or nil
-	msg.Tags.Address = msg.Tags.Address and utils.formatAddress(msg.Tags.Address) or nil
-	msg.Tags["Vault-Id"] = msg.Tags["Vault-Id"] and utils.formatAddress(msg.Tags["Vault-Id"]) or nil
-	msg.Tags["Process-Id"] = msg.Tags["Process-Id"] and utils.formatAddress(msg.Tags["Process-Id"]) or nil
-	msg.Tags["Observer-Address"] = msg.Tags["Observer-Address"] and utils.formatAddress(msg.Tags["Observer-Address"])
-		or nil
+
+	local knownAddressTags = {
+		"Recipient",
+		"Initiator",
+		"Target",
+		"Source",
+		"Address",
+		"Vault-Id",
+		"Process-Id",
+		"Observer-Address",
+	}
+	for _, tagName in ipairs(knownAddressTags) do
+		msg.Tags[tagName] = msg.Tags[tagName] and utils.formatAddress(msg.Tags[tagName]) or nil
+	end
 
 	local status, resultOrError = pcall(prune.pruneState, msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
 	if not status then
