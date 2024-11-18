@@ -445,19 +445,6 @@ end, function(msg)
 		local prunedRequestsCount = utils.lengthOfTable(prunedPrimaryNameRequests)
 		if prunedRequestsCount then
 			msg.ioEvent:addField("Pruned-Requests-Count", prunedRequestsCount)
-			for initiator, request in pairs(prunedPrimaryNameRequests) do
-				-- Send credit notices back to the initiators
-				ao.send({
-					Target = initiator,
-					Action = "Credit-Notice",
-					Sender = ao.id,
-					Quantity = request.balance,
-					Data = "You received " .. msg.Tags.Quantity .. " from " .. ao.id,
-					Reason = "Primary Name request expired",
-				})
-				LastKnownPnpRequestSupply = LastKnownPnpRequestSupply - request.balance
-				LastKnownCirculatingSupply = LastKnownCirculatingSupply + request.balance
-			end
 		end
 	end
 
