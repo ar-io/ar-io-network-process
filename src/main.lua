@@ -46,7 +46,6 @@ local ActionMap = {
 	DemandFactor = "Demand-Factor",
 	DemandFactorInfo = "Demand-Factor-Info",
 	DemandFactorSettings = "Demand-Factor-Settings",
-	RedelegationFee = "Redelegation-Fee",
 	-- EPOCH READ APIS
 	Epochs = "Epochs",
 	Epoch = "Epoch",
@@ -55,29 +54,18 @@ local ActionMap = {
 	PrescribedNames = "Epoch-Prescribed-Names",
 	Observations = "Epoch-Observations",
 	Distributions = "Epoch-Distributions",
-	-- NAME REGISTRY READ APIS
-	Record = "Record",
-	Records = "Records",
-	ReservedNames = "Reserved-Names",
-	ReservedName = "Reserved-Name",
-	TokenCost = "Token-Cost",
-	CostDetails = "Get-Cost-Details-For-Action",
-	GetRegistrationFees = "Get-Registration-Fees",
-	-- GATEWAY REGISTRY READ APIS
-	Gateway = "Gateway",
-	Gateways = "Gateways",
-	GatewayRegistrySettings = "Gateway-Registry-Settings",
-	-- writes
+	--- Vaults
 	Vault = "Vault",
 	Vaults = "Vaults",
 	CreateVault = "Create-Vault",
 	VaultedTransfer = "Vaulted-Transfer",
 	ExtendVault = "Extend-Vault",
 	IncreaseVault = "Increase-Vault",
-	BuyRecord = "Buy-Record", -- TODO: standardize these as `Buy-Name` or `Upgrade-Record`
-	UpgradeName = "Upgrade-Name", -- TODO: may be more aligned to `Upgrade-Record`
-	ExtendLease = "Extend-Lease",
-	IncreaseUndernameLimit = "Increase-Undername-Limit",
+	-- GATEWAY REGISTRY READ APIS
+	Gateway = "Gateway",
+	Gateways = "Gateways",
+	GatewayRegistrySettings = "Gateway-Registry-Settings",
+	Delegates = "Delegates",
 	JoinNetwork = "Join-Network",
 	LeaveNetwork = "Leave-Network",
 	IncreaseOperatorStake = "Increase-Operator-Stake",
@@ -89,10 +77,23 @@ local ActionMap = {
 	DecreaseDelegateStake = "Decrease-Delegate-Stake",
 	CancelWithdrawal = "Cancel-Withdrawal",
 	InstantWithdrawal = "Instant-Withdrawal",
+	RedelegationFee = "Redelegation-Fee",
+	--- ArNS
+	Record = "Record",
+	Records = "Records",
+	BuyRecord = "Buy-Record", -- TODO: standardize these as `Buy-Name` or `Upgrade-Record`
+	UpgradeName = "Upgrade-Name", -- TODO: may be more aligned to `Upgrade-Record`
+	ExtendLease = "Extend-Lease",
+	IncreaseUndernameLimit = "Increase-Undername-Limit",
 	ReassignName = "Reassign-Name",
+	ReleaseName = "Release-Name",
+	ReservedNames = "Reserved-Names",
+	ReservedName = "Reserved-Name",
+	TokenCost = "Token-Cost",
+	CostDetails = "Get-Cost-Details-For-Action",
+	GetRegistrationFees = "Get-Registration-Fees",
 	-- auctions
 	Auctions = "Auctions",
-	ReleaseName = "Release-Name",
 	AuctionInfo = "Auction-Info",
 	AuctionBid = "Auction-Bid",
 	AuctionPrices = "Auction-Prices",
@@ -1764,33 +1765,6 @@ addEventingHandler(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", Actio
 	})
 end)
 
-addEventingHandler(ActionMap.State, Handlers.utils.hasMatchingTag("Action", ActionMap.State), function(msg)
-	ao.send({
-		Target = msg.From,
-		Action = "State-Notice",
-		Data = json.encode({
-			Name = Name,
-			Ticker = Ticker,
-			Denomination = Denomination,
-			Balances = json.encode(Balances),
-			GatewayRegistry = json.encode(GatewayRegistry),
-			NameRegistry = json.encode(NameRegistry),
-			Epochs = json.encode(Epochs),
-			Vaults = json.encode(Vaults),
-			DemandFactor = json.encode(DemandFactor),
-		}),
-	})
-end)
-
-addEventingHandler(ActionMap.Gateways, Handlers.utils.hasMatchingTag("Action", ActionMap.Gateways), function(msg)
-	local gateways = gar.getCompactGateways()
-	ao.send({
-		Target = msg.From,
-		Action = "Gateways-Notice",
-		Data = json.encode(gateways),
-	})
-end)
-
 addEventingHandler(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", ActionMap.Gateway), function(msg)
 	local gateway = gar.getCompactGateway(msg.Tags.Address or msg.From)
 	ao.send({
@@ -1801,6 +1775,7 @@ addEventingHandler(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", Ac
 	})
 end)
 
+--- TODO: we want to remove this but need to ensure we don't break downstream apps
 addEventingHandler(ActionMap.Balances, Handlers.utils.hasMatchingTag("Action", ActionMap.Balances), function(msg)
 	ao.send({
 		Target = msg.From,
@@ -1824,18 +1799,12 @@ addEventingHandler(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", Ac
 end)
 
 addEventingHandler(ActionMap.DemandFactor, utils.hasMatchingTag("Action", ActionMap.DemandFactor), function(msg)
-	-- wrap in a protected call, and return the result or error accoringly to sender
-	local status, result = pcall(demand.getDemandFactor)
-	if status then
-		ao.send({ Target = msg.From, Action = "Demand-Factor-Notice", Data = json.encode(result) })
-	else
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-Demand-Factor-Notice",
-			Error = "Invalid-Demand-Factor",
-			Data = json.encode(result),
-		})
-	end
+	local demandFactor = demand.getDemandFactor()
+	ao.send({
+		Target = msg.From,
+		Action = "Demand-Factor-Notice",
+		Data = json.encode(demandFactor),
+	})
 end)
 
 addEventingHandler(ActionMap.DemandFactorInfo, utils.hasMatchingTag("Action", ActionMap.DemandFactorInfo), function(msg)
@@ -1863,28 +1832,6 @@ addEventingHandler(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Re
 
 	-- Send Record-Notice
 	ao.send(recordNotice)
-end)
-
-addEventingHandler(ActionMap.Records, utils.hasMatchingTag("Action", ActionMap.Records), function(msg)
-	local records = arns.getRecords()
-
-	-- Credit-Notice message template, that is sent to the Recipient of the transfer
-	local recordsNotice = {
-		Target = msg.From,
-		Action = "Records-Notice",
-		Data = json.encode(records),
-	}
-
-	-- Add forwarded tags to the records notice messages
-	for tagName, tagValue in pairs(msg) do
-		-- Tags beginning with "X-" are forwarded
-		if string.sub(tagName, 1, 2) == "X-" then
-			recordsNotice[tagName] = tagValue
-		end
-	end
-
-	-- Send Records-Notice
-	ao.send(recordsNotice)
 end)
 
 addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
@@ -1960,6 +1907,7 @@ addEventingHandler(ActionMap.Distributions, utils.hasMatchingTag("Action", Actio
 	ao.send({ Target = msg.From, Action = "Distributions-Notice", Data = json.encode(distributions) })
 end)
 
+--- TODO: make this paginated
 addEventingHandler(ActionMap.ReservedNames, utils.hasMatchingTag("Action", ActionMap.ReservedNames), function(msg)
 	local reservedNames = arns.getReservedNames()
 	ao.send({ Target = msg.From, Action = "Reserved-Names-Notice", Data = json.encode(reservedNames) })
@@ -1975,10 +1923,6 @@ addEventingHandler(ActionMap.ReservedName, utils.hasMatchingTag("Action", Action
 		ReservedName = msg.Tags.Name,
 		Data = json.encode(reservedName),
 	})
-end)
-
-addEventingHandler(ActionMap.Vaults, utils.hasMatchingTag("Action", ActionMap.Vaults), function(msg)
-	ao.send({ Target = msg.From, Action = "Vaults-Notice", Data = json.encode(Vaults) })
 end)
 
 addEventingHandler(ActionMap.Vault, utils.hasMatchingTag("Action", ActionMap.Vault), function(msg)
@@ -1998,43 +1942,52 @@ end)
 
 -- Pagination handlers
 
-addEventingHandler("paginatedRecords", utils.hasMatchingTag("Action", "Paginated-Records"), function(msg)
-	local page = utils.parsePaginationTags(msg)
-	local status, result =
-		pcall(arns.getPaginatedRecords, page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
-	if not status then
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-Records-Notice",
-			Error = "Pagination-Error",
-			Data = json.encode(result),
-		})
-	else
-		ao.send({ Target = msg.From, Action = "Records-Notice", Data = json.encode(result) })
+addEventingHandler(
+	"paginatedRecords",
+	utils.hasMatchingTag("Action", "Paginated-Records") or utils.hasMatchingTag("Action", ActionMap.Records),
+	function(msg)
+		local page = utils.parsePaginationTags(msg)
+		local status, result =
+			pcall(arns.getPaginatedRecords, page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
+		if not status then
+			ao.send({
+				Target = msg.From,
+				Action = "Invalid-Records-Notice",
+				Error = "Pagination-Error",
+				Data = json.encode(result),
+			})
+		else
+			ao.send({ Target = msg.From, Action = "Records-Notice", Data = json.encode(result) })
+		end
 	end
-end)
+)
 
-addEventingHandler("paginatedGateways", utils.hasMatchingTag("Action", "Paginated-Gateways"), function(msg)
-	local page = utils.parsePaginationTags(msg)
-	local status, result = pcall(
-		gar.getPaginatedGateways,
-		page.cursor,
-		page.limit,
-		page.sortBy or "startTimestamp",
-		page.sortOrder or "desc"
-	)
-	if not status then
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-Gateways-Notice",
-			Error = "Pagination-Error",
-			Data = json.encode(result),
-		})
-	else
-		ao.send({ Target = msg.From, Action = "Gateways-Notice", Data = json.encode(result) })
+addEventingHandler(
+	"paginatedGateways",
+	utils.hasMatchingTag("Action", "Paginated-Gateways") or utils.hasMatchingTag("Action", ActionMap.Gateways),
+	function(msg)
+		local page = utils.parsePaginationTags(msg)
+		local status, result = pcall(
+			gar.getPaginatedGateways,
+			page.cursor,
+			page.limit,
+			page.sortBy or "startTimestamp",
+			page.sortOrder or "desc"
+		)
+		if not status then
+			ao.send({
+				Target = msg.From,
+				Action = "Invalid-Gateways-Notice",
+				Error = "Pagination-Error",
+				Data = json.encode(result),
+			})
+		else
+			ao.send({ Target = msg.From, Action = "Gateways-Notice", Data = json.encode(result) })
+		end
 	end
-end)
+)
 
+--- TODO: make this support `Balances` requests
 addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginated-Balances"), function(msg)
 	local page = utils.parsePaginationTags(msg)
 	local status, result =
@@ -2051,46 +2004,54 @@ addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginate
 	end
 end)
 
-addEventingHandler("paginatedVaults", utils.hasMatchingTag("Action", "Paginated-Vaults"), function(msg)
-	local page = utils.parsePaginationTags(msg)
-	local status, result = pcall(vaults.getPaginatedVaults, page.cursor, page.limit, page.sortOrder, page.sortBy)
+addEventingHandler(
+	"paginatedVaults",
+	utils.hasMatchingTag("Action", "Paginated-Vaults") or utils.hasMatchingTag("Action", ActionMap.Vaults),
+	function(msg)
+		local page = utils.parsePaginationTags(msg)
+		local status, result = pcall(vaults.getPaginatedVaults, page.cursor, page.limit, page.sortOrder, page.sortBy)
 
-	if not status then
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-Vaults-Notice",
-			Error = "Pagination-Error",
-			Data = json.encode(result),
-		})
-	else
-		ao.send({ Target = msg.From, Action = "Vaults-Notice", Data = json.encode(result) })
-	end
-end)
-
-addEventingHandler("paginatedDelegates", utils.hasMatchingTag("Action", "Paginated-Delegates"), function(msg)
-	local page = utils.parsePaginationTags(msg)
-	local shouldContinue, result = eventingPcall(
-		msg.ioEvent,
-		function(error)
+		if not status then
 			ao.send({
 				Target = msg.From,
-				Action = "Invalid-Delegates-Notice",
+				Action = "Invalid-Vaults-Notice",
 				Error = "Pagination-Error",
-				Data = json.encode(error),
+				Data = json.encode(result),
 			})
-		end,
-		gar.getPaginatedDelegates,
-		msg.Tags.Address or msg.From,
-		page.cursor,
-		page.limit,
-		page.sortBy or "startTimestamp",
-		page.sortOrder
-	)
-	if not shouldContinue then
-		return
+		else
+			ao.send({ Target = msg.From, Action = "Vaults-Notice", Data = json.encode(result) })
+		end
 	end
-	ao.send({ Target = msg.From, Action = "Delegates-Notice", Data = json.encode(result) })
-end)
+)
+
+addEventingHandler(
+	"paginatedDelegates",
+	utils.hasMatchingTag("Action", "Paginated-Delegates") or utils.hasMatchingTag("Action", ActionMap.Delegates),
+	function(msg)
+		local page = utils.parsePaginationTags(msg)
+		local shouldContinue, result = eventingPcall(
+			msg.ioEvent,
+			function(error)
+				ao.send({
+					Target = msg.From,
+					Action = "Invalid-Delegates-Notice",
+					Error = "Pagination-Error",
+					Data = json.encode(error),
+				})
+			end,
+			gar.getPaginatedDelegates,
+			msg.Tags.Address or msg.From,
+			page.cursor,
+			page.limit,
+			page.sortBy or "startTimestamp",
+			page.sortOrder
+		)
+		if not shouldContinue then
+			return
+		end
+		ao.send({ Target = msg.From, Action = "Delegates-Notice", Data = json.encode(result) })
+	end
+)
 
 addEventingHandler(
 	"paginatedAllowedDelegates",
@@ -2662,7 +2623,7 @@ addEventingHandler(
 		local gatewayAddress = utils.formatAddress(msg.Tags.Address or msg.From)
 		assert(utils.isValidAOAddress(gatewayAddress), "Invalid gateway address")
 		local result =
-			gar.getPaginatedVaultsForGateway(gatewayAddress, page.cursor, page.limit, page.sortBy, page.sortOrder)
+			gar.getPaginatedGatewayVaults(gatewayAddress, page.cursor, page.limit, page.sortBy, page.sortOrder)
 		return ao.send({
 			Target = msg.From,
 			Action = "Gateway-Vaults-Notice",
