@@ -829,8 +829,7 @@ describe("gar", function()
 				settings = updatedSettings,
 				status = testGateway.status,
 			}
-			local status, result = pcall(
-				gar.updateGatewaySettings,
+			local result = gar.updateGatewaySettings(
 				stubGatewayAddress,
 				updatedSettings,
 				nil, -- no additional services on this gateway
@@ -838,7 +837,6 @@ describe("gar", function()
 				startTimestamp,
 				stubMessageId
 			)
-			assert.is_true(status)
 			assert.are.same(expectation, result)
 			assert.are.same(expectation, _G.GatewayRegistry[stubGatewayAddress])
 		end)
@@ -889,8 +887,7 @@ describe("gar", function()
 				settings = expectedSettings,
 				status = testGateway.status,
 			}
-			local status, result = pcall(
-				gar.updateGatewaySettings,
+			local result = gar.updateGatewaySettings(
 				stubGatewayAddress,
 				inputUpdatedSettings,
 				nil, -- no additional services on this gateway
@@ -898,7 +895,6 @@ describe("gar", function()
 				startTimestamp,
 				stubMessageId
 			)
-			assert.is_true(status)
 			assert.are.same(expectation, result)
 			assert.are.same(expectation, _G.GatewayRegistry[stubGatewayAddress])
 		end)
@@ -922,8 +918,7 @@ describe("gar", function()
 				},
 			}
 
-			local status, result = pcall(
-				gar.updateGatewaySettings,
+			local result = gar.updateGatewaySettings(
 				stubGatewayAddress,
 				testGateway.settings,
 				updatedServices,
@@ -931,7 +926,6 @@ describe("gar", function()
 				testGateway.startTimestamp,
 				stubMessageId
 			)
-			assert.is_true(status)
 			assert.are.same({
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,

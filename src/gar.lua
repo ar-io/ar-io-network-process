@@ -113,13 +113,8 @@ GatewayRegistrySettings = GatewayRegistrySettings
 function gar.joinNetwork(from, stake, settings, services, observerAddress, timeStamp)
 	gar.assertValidGatewayParameters(from, stake, settings, services, observerAddress)
 
-	if gar.getGateway(from) then
-		error("Gateway already exists")
-	end
-
-	if balances.getBalance(from) < stake then
-		error("Insufficient balance")
-	end
+	assert(not gar.getGateway(from), "Gateway already exists")
+	assert(balances.walletHasSufficientBalance(from, stake), "Insufficient balance")
 
 	local newGateway = {
 		operatorStake = stake,
@@ -175,13 +170,8 @@ end
 function gar.leaveNetwork(from, currentTimestamp, msgId)
 	local gateway = gar.getGateway(from)
 
-	if not gateway then
-		error("Gateway not found")
-	end
-
-	if not gar.isGatewayEligibleToLeave(gateway, currentTimestamp) then
-		error("The gateway is not eligible to leave the network.")
-	end
+	assert(gateway, "Gateway not found")
+	assert(gar.isGatewayEligibleToLeave(gateway, currentTimestamp), "The gateway is not eligible to leave the network.")
 
 	local gatewayEndTimestamp = currentTimestamp + gar.getSettings().operators.leaveLengthMs
 	local gatewayStakeWithdrawTimestamp = currentTimestamp + gar.getSettings().operators.withdrawLengthMs
@@ -231,18 +221,9 @@ function gar.increaseOperatorStake(from, qty)
 	assert(qty > 0 and utils.isInteger(qty), "Quantity must be an integer greater than 0")
 
 	local gateway = gar.getGateway(from)
-
-	if not gateway then
-		error("Gateway not found")
-	end
-
-	if gateway.status == "leaving" then
-		error("Gateway is leaving the network and cannot accept additional stake.")
-	end
-
-	if balances.getBalance(from) < qty then
-		error("Insufficient balance")
-	end
+	assert(gateway, "Gateway not found")
+	assert(gateway.status ~= "leaving", "Gateway is leaving the network and cannot accept additional stake.")
+	assert(balances.walletHasSufficientBalance(from, qty), "Insufficient balance")
 
 	balances.reduceBalance(from, qty)
 	gateway.operatorStake = gateway.operatorStake + qty
@@ -290,23 +271,18 @@ function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWi
 
 	local gateway = gar.getGateway(from)
 
-	if not gateway then
-		error("Gateway not found")
-	end
-
-	if gateway.status == "leaving" then
-		error("Gateway is leaving the network and cannot withdraw more stake.")
-	end
+	assert(gateway, "Gateway not found")
+	assert(gateway.status ~= "leaving", "Gateway is leaving the network and cannot withdraw more stake.")
 
 	local maxWithdraw = gateway.operatorStake - gar.getSettings().operators.minStake
 
-	if qty > maxWithdraw then
-		return error(
-			"Resulting stake is not enough to maintain the minimum operator stake of "
-				.. gar.getSettings().operators.minStake
-				.. " IO"
-		)
-	end
+	assert(
+		qty <= maxWithdraw,
+		"Resulting stake is not enough to maintain the minimum operator stake of "
+			.. gar.getSettings().operators.minStake
+			.. " IO"
+	)
+
 	gateway.operatorStake = gateway.operatorStake - qty
 
 	local expeditedWithdrawalFee = 0
@@ -350,28 +326,23 @@ end
 --- @param msgId MessageId
 function gar.updateGatewaySettings(from, updatedSettings, updatedServices, observerAddress, currentTimestamp, msgId)
 	local gateway = gar.getGateway(from)
-
-	if not gateway then
-		error("Gateway not found")
-	end
-
-	if gateway.status == "leaving" then
-		error("Gateway is leaving the network and cannot be updated")
-	end
+	assert(gateway, "Gateway not found")
+	assert(gateway.status ~= "leaving", "Gateway is leaving the network and cannot be updated")
 
 	gar.assertValidGatewayParameters(from, gateway.operatorStake, updatedSettings, updatedServices, observerAddress)
 
-	if
-		updatedSettings.minDelegatedStake
-		and updatedSettings.minDelegatedStake < gar.getSettings().delegates.minStake
-	then
-		error("The minimum delegated stake must be at least " .. gar.getSettings().operators.minStake .. " IO")
-	end
+	assert(
+		not updatedSettings.minDelegatedStake
+			or updatedSettings.minDelegatedStake >= gar.getSettings().delegates.minStake,
+		"The minimum delegated stake must be at least " .. gar.getSettings().delegates.minStake .. " IO"
+	)
 
 	for gatewayAddress, existingGateway in pairs(gar.getGatewaysUnsafe()) do
-		if existingGateway.observerAddress == observerAddress and gatewayAddress ~= from then
-			error("Invalid observer wallet. The provided observer wallet is correlated with another gateway.")
-		end
+		local invalidObserverAddress = existingGateway.observerAddress == observerAddress and gatewayAddress ~= from
+		assert(
+			not invalidObserverAddress,
+			"Invalid observer wallet. The provided observer wallet is correlated with another gateway."
+		)
 	end
 
 	-- update the allow list first if necessary since we may need it for accounting in any subsequent delegate kicks
@@ -409,13 +380,11 @@ function gar.updateGatewaySettings(from, updatedSettings, updatedServices, obser
 	end
 
 	-- if allowDelegateStaking is currently false, and you want to set it to true - you have to wait until all the vaults have been returned
-	if
-		updatedSettings.allowDelegatedStaking == true
-		and gateway.settings.allowDelegatedStaking == false
-		and next(gateway.delegates) ~= nil
-	then -- checks if the delegates table is not empty
-		error("You cannot enable delegated staking until all delegated stakes have been withdrawn.")
-	end
+	assert(
+		updatedSettings.allowDelegatedStaking == false
+			or (updatedSettings.allowDelegatedStaking == true and next(gateway.delegates) == nil),
+		"You cannot enable delegated staking until all delegated stakes have been withdrawn."
+	)
 
 	gateway.settings = updatedSettings
 	if updatedServices then
@@ -535,32 +504,14 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 	assert(type(from) == "string", "From is required and must be a string")
 
 	local gateway = gar.getGateway(target)
-	if not gateway then
-		error("Gateway not found")
-	end
+	assert(gateway, "Gateway not found")
+	assert(gateway.status ~= "leaving", "Gateway is leaving the network and cannot have more stake delegated to it.")
 
 	-- don't allow delegating to yourself
-	if from == target then
-		error("Cannot delegate to your own gateway, use increaseOperatorStake instead.")
-	end
-
-	if not balances.walletHasSufficientBalance(from, qty) then
-		error("Insufficient balance")
-	end
-
-	if gateway.status == "leaving" then
-		error("This Gateway is in the process of leaving the network and cannot have more stake delegated to it.")
-	end
-
-	if not gateway.settings.allowDelegatedStaking then
-		error(
-			"This Gateway does not allow delegated staking. Only allowed delegates can delegate stake to this Gateway."
-		)
-	end
-
-	if not gar.delegateAllowedToStake(from, gateway) then
-		error("This Gateway does not allow this delegate to stake.")
-	end
+	assert(from ~= target, "Cannot delegate to your own gateway, use increaseOperatorStake instead.")
+	assert(balances.walletHasSufficientBalance(from, qty), "Insufficient balance")
+	assert(gateway.settings.allowDelegatedStaking, "This Gateway does not allow delegated staking.")
+	assert(gar.delegateAllowedToStake(from, gateway), "This Gateway does not allow this delegate to stake.")
 
 	-- Assuming `gateway` is a table and `fromAddress` is defined
 	local existingDelegate = gateway.delegates[from]
@@ -573,9 +524,10 @@ function gar.delegateStake(from, target, qty, currentTimestamp)
 		-- Consider if the operator increases the minimum amount after you've already staked
 		minimumStakeForGatewayAndDelegate = gateway.settings.minDelegatedStake
 	end
-	if qty < minimumStakeForGatewayAndDelegate then
-		error("Quantity must be greater than the minimum delegated stake amount.")
-	end
+	assert(
+		qty >= minimumStakeForGatewayAndDelegate,
+		"Quantity must be greater than the minimum delegated stake amount."
+	)
 
 	-- If this delegate has staked before, update its amount, if not, create a new delegated staker
 	existingDelegate = existingDelegate or gar.createDelegateAtGateway(currentTimestamp, gateway, from)
@@ -595,27 +547,18 @@ end
 ---@param delegateAddress string # The address of the delegate to increase stake for (required)
 ---@param qty number # The amount of stake to increase by - must be positive integer (required)
 function gar.increaseExistingDelegateStake(gatewayAddress, gateway, delegateAddress, qty)
-	if not gateway then
-		error("Gateway not found")
-	end
-
-	if not delegateAddress then
-		error("Delegate address is required")
-	end
-
-	if not qty or not utils.isInteger(qty) or qty <= 0 then
-		error("Quantity is required and must be an integer greater than 0: " .. qty)
-	end
+	assert(gateway, "Gateway not found")
+	assert(delegateAddress, "Delegate address is required")
+	assert(
+		qty and utils.isInteger(qty) and qty > 0,
+		"Quantity is required and must be an integer greater than 0: " .. qty
+	)
 
 	local delegate = gateway.delegates[delegateAddress]
-	if not delegate then
-		error("Delegate not found")
-	end
+	assert(delegate, "Delegate not found")
 
 	-- consider case where delegate has been kicked from the gateway and has vaulted stake
-	if not gar.delegateAllowedToStake(delegateAddress, gateway) then
-		error("This Gateway does not allow this delegate to stake.")
-	end
+	assert(gar.delegateAllowedToStake(delegateAddress, gateway), "This Gateway does not allow this delegate to stake.")
 
 	increaseDelegateStakeAtGateway(gateway.delegates[delegateAddress], gateway, qty)
 	GatewayRegistry[gatewayAddress] = gateway
@@ -632,25 +575,18 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 
 	local gateway = gar.getGateway(gatewayAddress)
 
-	if not gateway then
-		error("Gateway not found")
-	end
-	if gateway.status == "leaving" then
-		error("Gateway is leaving the network and cannot withdraw more stake.")
-	end
+	assert(gateway, "Gateway not found")
+	assert(gateway.status ~= "leaving", "Gateway is leaving the network and cannot withdraw more stake.")
 
-	if gateway.delegates[delegator] == nil then
-		error("This delegate is not staked at this gateway.")
-	end
+	assert(gateway.delegates[delegator], "This delegate is not staked at this gateway.")
 
 	local existingStake = gateway.delegates[delegator].delegatedStake
 	local requiredMinimumStake = gateway.settings.minDelegatedStake
 	local maxAllowedToWithdraw = existingStake - requiredMinimumStake
-	if maxAllowedToWithdraw < qty and qty ~= existingStake then
-		error(
-			"Remaining delegated stake must be greater than the minimum delegated stake. Adjust the amount or withdraw all stake."
-		)
-	end
+	assert(
+		maxAllowedToWithdraw >= qty or qty == existingStake,
+		"Remaining delegated stake must be greater than the minimum delegated stake. Adjust the amount or withdraw all stake."
+	)
 
 	-- Instant withdrawal logic with penalty
 	local expeditedWithdrawalFee = 0
@@ -684,9 +620,7 @@ function gar.isGatewayLeaving(gateway)
 end
 
 function gar.isGatewayEligibleToLeave(gateway, timestamp)
-	if not gateway then
-		error("Gateway not found")
-	end
+	assert(gateway, "Gateway not found")
 	local isJoined = gar.isGatewayJoined(gateway, timestamp)
 	return isJoined
 end
@@ -881,10 +815,7 @@ end
 ---@param gateway table # The gateway object to update stats for
 ---@param stats table # The stats to update the gateway with
 function gar.updateGatewayStats(address, gateway, stats)
-	if gateway == nil then
-		error("Gateway not found")
-	end
-
+	assert(gateway, "Gateway not found")
 	assert(stats.prescribedEpochCount, "prescribedEpochCount is required")
 	assert(stats.observedEpochCount, "observedEpochCount is required")
 	assert(stats.totalEpochCount, "totalEpochCount is required")
@@ -901,10 +832,7 @@ end
 function gar.updateGatewayWeights(weightedGateway)
 	local address = weightedGateway.gatewayAddress
 	local gateway = gar.getGateway(address)
-	if gateway == nil then
-		error("Gateway not found")
-	end
-
+	assert(gateway, "Gateway not found")
 	assert(weightedGateway.stakeWeight, "stakeWeight is required")
 	assert(weightedGateway.tenureWeight, "tenureWeight is required")
 	assert(weightedGateway.gatewayRewardRatioWeight, "gatewayRewardRatioWeight is required")
@@ -1008,13 +936,9 @@ function gar.slashOperatorStake(address, slashAmount, currentTimestamp)
 	assert(slashAmount > 0, "Slash amount must be greater than 0")
 
 	local gateway = gar.getGateway(address)
-	if gateway == nil then
-		error("Gateway not found")
-	end
+	assert(gateway, "Gateway not found")
 	local garSettings = gar.getSettings()
-	if garSettings == nil then
-		error("Gateway Registry settings do not exist")
-	end
+	assert(garSettings, "Gateway Registry settings do not exist")
 
 	gateway.operatorStake = gateway.operatorStake - slashAmount
 	gateway.slashings = gateway.slashings or {}
@@ -1051,9 +975,7 @@ end
 ---@return table # A table containing the paginated delegates and pagination metadata
 function gar.getPaginatedDelegates(address, cursor, limit, sortBy, sortOrder)
 	local gateway = gar.getGateway(address)
-	if not gateway then
-		error("Gateway not found")
-	end
+	assert(gateway, "Gateway not found")
 	local delegatesArray = {}
 	local cursorField = "address"
 	for delegateAddress, delegate in pairs(gateway.delegates) do
@@ -1073,9 +995,7 @@ end
 ---@return table # A table containing the paginated allowed delegates and pagination metadata
 function gar.getPaginatedAllowedDelegates(address, cursor, limit, sortOrder)
 	local gateway = gar.getGateway(address)
-	if not gateway then
-		error("Gateway not found")
-	end
+	assert(gateway, "Gateway not found")
 	local allowedDelegatesArray = {}
 
 	if gateway.settings.allowedDelegatesLookup then
@@ -1096,13 +1016,9 @@ end
 
 function gar.cancelGatewayWithdrawal(from, gatewayAddress, vaultId)
 	local gateway = gar.getGateway(gatewayAddress)
-	if gateway == nil then
-		error("Gateway not found")
-	end
+	assert(gateway, "Gateway not found")
 
-	if gateway.status == "leaving" then
-		error("Gateway is leaving the network and cannot cancel withdrawals.")
-	end
+	assert(gateway.status ~= "leaving", "Gateway is leaving the network and cannot cancel withdrawals.")
 
 	local existingVault, delegate
 	local isGatewayWithdrawal = from == gatewayAddress
@@ -1111,20 +1027,14 @@ function gar.cancelGatewayWithdrawal(from, gatewayAddress, vaultId)
 		existingVault = gateway.vaults[vaultId]
 	else
 		delegate = gateway.delegates[from]
-		if delegate == nil then
-			error("Delegate not found")
-		end
+		assert(delegate, "Delegate not found")
 		existingVault = delegate.vaults[vaultId]
 	end
 
-	if existingVault == nil then
-		error("Vault not found for " .. from .. " on " .. gatewayAddress)
-	end
+	assert(existingVault, "Vault not found for " .. from .. " on " .. gatewayAddress)
 
 	-- confirm the gateway still allow staking
-	if not isGatewayWithdrawal and not gateway.settings.allowDelegatedStaking then
-		error("Gateway does not allow staking")
-	end
+	assert(isGatewayWithdrawal or gateway.settings.allowDelegatedStaking, "Gateway does not allow staking")
 
 	local previousOperatorStake = gateway.operatorStake
 	local previousTotalDelegatedStake = gateway.totalDelegatedStake
@@ -1133,9 +1043,7 @@ function gar.cancelGatewayWithdrawal(from, gatewayAddress, vaultId)
 		gateway.vaults[vaultId] = nil
 		gateway.operatorStake = gateway.operatorStake + vaultBalance
 	else
-		if not gar.delegateAllowedToStake(from, gateway) then
-			error("This Gateway does not allow this delegate to stake.")
-		end
+		assert(gar.delegateAllowedToStake(from, gateway), "This Gateway does not allow this delegate to stake.")
 		delegate.vaults[vaultId] = nil
 		increaseDelegateStakeAtGateway(delegate, gateway, vaultBalance)
 	end
@@ -1157,15 +1065,10 @@ end
 ---@return table # A table containing the gateway, elapsed time, remaining time, penalty rate, expedited withdrawal fee, and amount withdrawn
 function gar.instantGatewayWithdrawal(from, gatewayAddress, vaultId, currentTimestamp)
 	local gateway = gar.getGateway(gatewayAddress)
-	if gateway == nil then
-		error("Gateway not found")
-	end
+	assert(gateway, "Gateway not found")
 
 	local isGatewayWithdrawal = from == gatewayAddress
-
-	if isGatewayWithdrawal and gateway.status == "leaving" then
-		error("This gateway is leaving and this vault cannot be instantly withdrawn.")
-	end
+	assert(gateway.status ~= "leaving", "This gateway is leaving and this vault cannot be instantly withdrawn.")
 
 	local vault
 	local delegate
@@ -1173,14 +1076,10 @@ function gar.instantGatewayWithdrawal(from, gatewayAddress, vaultId, currentTime
 		vault = gateway.vaults[vaultId]
 	else
 		delegate = gateway.delegates[from]
-		if delegate == nil then
-			error("Delegate not found")
-		end
+		assert(delegate, "Delegate not found")
 		vault = delegate.vaults[vaultId]
 	end
-	if vault == nil then
-		error("Vault not found")
-	end
+	assert(vault, "Vault not found")
 
 	---@type number
 	local elapsedTime = currentTimestamp - vault.startTimestamp
@@ -1188,9 +1087,7 @@ function gar.instantGatewayWithdrawal(from, gatewayAddress, vaultId, currentTime
 	local totalWithdrawalTime = vault.endTimestamp - vault.startTimestamp
 
 	-- Ensure the elapsed time is not negative
-	if elapsedTime < 0 then
-		error("Invalid elapsed time")
-	end
+	assert(elapsedTime >= 0, "Invalid elapsed time")
 
 	-- Process the instant withdrawal
 	local expeditedWithdrawalFee, amountToWithdraw, penaltyRate =
@@ -1200,9 +1097,7 @@ function gar.instantGatewayWithdrawal(from, gatewayAddress, vaultId, currentTime
 	if isGatewayWithdrawal then
 		gateway.vaults[vaultId] = nil
 	else
-		if delegate == nil then
-			error("Delegate not found")
-		end
+		assert(delegate, "Delegate not found")
 		delegate.vaults[vaultId] = nil
 		-- Remove the delegate if no stake is left
 		if delegate.delegatedStake == 0 and next(delegate.vaults) == nil then
@@ -1243,22 +1138,19 @@ end
 --- @return table result Result table containing updated gateway object and the delegates that were actually added
 function gar.allowDelegates(delegateAddresses, gatewayAddress)
 	local gateway = gar.getGateway(gatewayAddress)
-	if gateway == nil then
-		error("Gateway not found")
-	end
+	assert(gateway, "Gateway not found")
 
 	-- Only allow modification of the allow list when allowDelegatedStaking is set to false or a current allow list is in place
-	if gateway.settings.allowDelegatedStaking == true and not gateway.settings.allowedDelegatesLookup then
-		error("Allow listing only possible when allowDelegatedStaking is set to 'allowlist'")
-	end
+	assert(
+		gateway.settings.allowDelegatedStaking == true and not gateway.settings.allowedDelegatesLookup,
+		"Allow listing only possible when allowDelegatedStaking is set to 'allowlist'"
+	)
 
 	assert(gateway.settings.allowedDelegatesLookup, "allowedDelegatesLookup should not be nil")
 
 	local addedDelegates = {}
 	for _, delegateAddress in ipairs(delegateAddresses) do
-		if not utils.isValidAOAddress(delegateAddress) then
-			error("Invalid delegate address: " .. delegateAddress)
-		end
+		assert(utils.isValidAOAddress(delegateAddress), "Invalid delegate address: " .. delegateAddress)
 
 		-- Skip over delegates that are already in the allow list or that have a stake balance
 		if not gar.delegateAllowedToStake(delegateAddress, gateway) then
@@ -1295,22 +1187,19 @@ end
 --- @return table result Result table containing updated gateway object and the delegates that were actually removed
 function gar.disallowDelegates(delegates, gatewayAddress, msgId, currentTimestamp)
 	local gateway = gar.getGateway(gatewayAddress)
-	if gateway == nil then
-		error("Gateway not found")
-	end
+	assert(gateway, "Gateway not found")
 
 	-- Only allow modification of the allow list when allowDelegatedStaking is set to false or a current allow list is in place
-	if gateway.settings.allowDelegatedStaking == true or not gateway.settings.allowedDelegatesLookup then
-		error("Allow listing only possible when allowDelegatedStaking is set to 'allowlist'")
-	end
+	assert(
+		gateway.settings.allowDelegatedStaking == true or not gateway.settings.allowedDelegatesLookup,
+		"Allow listing only possible when allowDelegatedStaking is set to 'allowlist'"
+	)
 
 	assert(gateway.settings.allowedDelegatesLookup, "allowedDelegatesLookup should not be nil")
 
 	local removedDelegates = {}
 	for _, delegateToDisallow in ipairs(delegates) do
-		if not utils.isValidAOAddress(delegateToDisallow) then
-			error("Invalid delegate address: " .. delegateToDisallow)
-		end
+		assert(utils.isValidAOAddress(delegateToDisallow), "Invalid delegate address: " .. delegateToDisallow)
 
 		-- Skip over delegates that are not in the allow list
 		if gateway.settings.allowedDelegatesLookup[delegateToDisallow] then
@@ -1604,13 +1493,9 @@ function gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
 	--draw down stakes and vaults, creating withdraw vaults if necessary
 	for gatewayAddress, delegationPlan in pairs(fundingPlan.stakes) do
 		local gateway = gar.getGateway(gatewayAddress)
-		if not gateway then
-			error("Gateway not found")
-		end
+		assert(gateway, "Gateway not found")
 		local delegate = gateway.delegates[fundingPlan.address]
-		if not delegate then
-			error("Delegate not found")
-		end
+		assert(delegate, "Delegate not found")
 
 		-- draw down the vaults first so that allowlisting logic will work correctly when drawing down balances
 		delegate.vaults = utils.reduce(delegate.vaults, function(acc, vaultId, vault)

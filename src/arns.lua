@@ -261,9 +261,7 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp, msgId, f
 	-- validate record can increase undernames
 	local record = arns.getRecord(name)
 
-	if not record then
-		error("Name is not registered")
-	end
+	assert(record, "Name is not registered")
 
 	-- throws errors on invalid requests
 	arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
@@ -283,9 +281,7 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp, msgId, f
 		additionalUndernameCost = additionalUndernameCost - discount
 	end
 
-	if additionalUndernameCost < 0 then
-		error("Invalid undername cost")
-	end
+	assert(additionalUndernameCost >= 0, "Invalid undername cost")
 
 	local fundingPlan = gar.getFundingPlan(from, additionalUndernameCost, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
@@ -646,9 +642,7 @@ function arns.getTokenCost(intendedAction)
 	end
 
 	-- if token Cost is less than 0, throw an error
-	if tokenCost < 0 then
-		error("Invalid token cost for " .. intendedAction.intent)
-	end
+	assert(tokenCost >= 0, "Invalid token cost for " .. intendedAction.intent)
 
 	return {
 		tokenCost = tokenCost,

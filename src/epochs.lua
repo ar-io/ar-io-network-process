@@ -429,29 +429,23 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	local epochStartTimestamp, _, epochDistributionTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 
 	-- avoid observations before the previous epoch distribution has occurred, as distributions affect weights of the current epoch
-	if timestamp < epochStartTimestamp + epochs.getSettings().distributionDelayMs then
-		error("Observations for the current epoch cannot be submitted before: " .. epochDistributionTimestamp)
-	end
+	assert(
+		timestamp >= epochStartTimestamp + epochs.getSettings().distributionDelayMs,
+		"Observations for the current epoch cannot be submitted before: " .. epochDistributionTimestamp
+	)
 
 	local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
-	if #prescribedObservers == 0 then
-		error("No prescribed observers for the current epoch.")
-	end
+	assert(#prescribedObservers > 0, "No prescribed observers for the current epoch.")
 
 	local observerIndex = utils.findInArray(prescribedObservers, function(prescribedObserver)
 		return prescribedObserver.observerAddress == observerAddress
 	end)
 
 	local observer = prescribedObservers[observerIndex]
-
-	if observer == nil then
-		error("Caller is not a prescribed observer for the current epoch.")
-	end
+	assert(observer, "Caller is not a prescribed observer for the current epoch.")
 
 	local observingGateway = gar.getGateway(observer.gatewayAddress)
-	if observingGateway == nil then
-		error("The associated gateway not found in the registry.")
-	end
+	assert(observingGateway, "The associated gateway not found in the registry.")
 
 	local epoch = epochs.getEpoch(epochIndex)
 

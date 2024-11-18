@@ -45,11 +45,8 @@ end
 ---@param qty number The amount to reduce by (must be integer)
 ---@throws error If target has insufficient balance
 function balances.reduceBalance(target, qty)
+	assert(balances.walletHasSufficientBalance(target, qty), "Insufficient balance")
 	local prevBalance = balances.getBalance(target)
-	if prevBalance < qty then
-		error("Insufficient balance")
-	end
-
 	Balances[target] = prevBalance - qty
 end
 
