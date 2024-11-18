@@ -791,21 +791,6 @@ describe('GatewayRegistry', async () => {
         ],
         expectedUpdatedGatewayProps: {
           totalDelegatedStake: 0, // 8 exiting and 9 not yet joined
-          // TODO: ADDRESS WITH DELEGATES FETCHING
-          // delegates: {
-          //   [STUB_ADDRESS_8]: {
-          //     // Kicked out due to not being in allowlist
-          //     delegatedStake: 0,
-          //     startTimestamp: STUB_TIMESTAMP,
-          //     vaults: {
-          //       mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm: {
-          //         balance: 500_000_000,
-          //         endTimestamp: 2613600000,
-          //         startTimestamp: STUB_TIMESTAMP,
-          //       },
-          //     },
-          //   },
-          // },
         },
         expectedUpdatedSettings: {
           allowDelegatedStaking: true,
@@ -815,50 +800,48 @@ describe('GatewayRegistry', async () => {
         expectedAllowedDelegates: [STUB_ADDRESS_9, STUB_ADDRESS_7],
       });
 
+      const { Memory: _, ...delegationsResult } = await handle(
+        {
+          From: STUB_ADDRESS_8,
+          Owner: STUB_ADDRESS_8,
+          Tags: [
+            { name: 'Action', value: 'Paginated-Delegations' },
+            { name: 'Limit', value: '100' },
+            { name: 'Sort-Order', value: 'desc' },
+            { name: 'Sort-By', value: 'startTimestamp' },
+          ],
+        },
+        updatedMemory,
+      );
+      assertNoResultError(delegationsResult);
+      assert.deepEqual(
+        [
+          {
+            // Kicked out due to not being in allowlist
+            type: 'stake',
+            gatewayAddress: STUB_ADDRESS,
+            delegationId: `${STUB_ADDRESS}_${STUB_TIMESTAMP}`,
+            balance: 0,
+            startTimestamp: STUB_TIMESTAMP,
+          },
+          {
+            type: 'vault',
+            gatewayAddress: STUB_ADDRESS,
+            delegationId: `${STUB_ADDRESS}_${STUB_TIMESTAMP}`,
+            vaultId: 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
+            balance: 500_000_000,
+            endTimestamp: 2613600000,
+            startTimestamp: STUB_TIMESTAMP,
+          },
+        ],
+        JSON.parse(delegationsResult.Messages[0].Data).items,
+      );
+
       await updateGatewaySettingsTest({
         inputMemory: updatedMemory,
         settingsTags: [{ name: 'Allow-Delegated-Staking', value: 'false' }],
         expectedUpdatedGatewayProps: {
           totalDelegatedStake: 0,
-          // TODO: ASSERT VIA DELEGATES FETCH
-          // delegates: {
-          //   [STUB_ADDRESS_8]: {
-          //     // kicked out in first round of updates
-          //     delegatedStake: 0,
-          //     startTimestamp: 21600000,
-          //     vaults: {
-          //       mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm: {
-          //         balance: 500000000,
-          //         endTimestamp: 2613600000,
-          //         startTimestamp: 21600000,
-          //       },
-          //     },
-          //   },
-          //   [STUB_ADDRESS_9]: {
-          //     // kicked out in this round of updates
-          //     delegatedStake: 0,
-          //     startTimestamp: 21600000,
-          //     vaults: {
-          //       mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm: {
-          //         balance: 500000000,
-          //         endTimestamp: 2613600000,
-          //         startTimestamp: 21600000,
-          //       },
-          //     },
-          //   },
-          //   [STUB_ADDRESS_7]: {
-          //     // kicked out in this round of updates
-          //     delegatedStake: 0,
-          //     startTimestamp: 21600000,
-          //     vaults: {
-          //       mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm: {
-          //         balance: 500000000,
-          //         endTimestamp: 2613600000,
-          //         startTimestamp: 21600000,
-          //       },
-          //     },
-          //   },
-          // },
         },
         expectedUpdatedSettings: {
           allowDelegatedStaking: false,
