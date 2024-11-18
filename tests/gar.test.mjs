@@ -1785,7 +1785,7 @@ describe('GatewayRegistry', async () => {
         memory: delegatedStakeMemory,
         gatewayAddress: sourceAddress,
       });
-      assert.deepEqual(
+      assert.deepStrictEqual(
         [
           {
             startTimestamp: STUB_TIMESTAMP,
@@ -1823,7 +1823,7 @@ describe('GatewayRegistry', async () => {
         timestamp: STUB_TIMESTAMP + 2,
       });
       assert(targetGatewayAfter.totalDelegatedStake === stakeQty);
-      assert.deepEqual(
+      assert.deepStrictEqual(
         await getDelegatesItems({
           memory: redelegateStakeMemory,
           gatewayAddress: targetAddress,
@@ -1844,7 +1844,7 @@ describe('GatewayRegistry', async () => {
         timestamp: STUB_TIMESTAMP + 2,
       });
       assert(sourceGatewayAfter.totalDelegatedStake === 0);
-      assert.deepEqual(
+      assert.deepStrictEqual(
         await getDelegatesItems({
           memory: redelegateStakeMemory,
           gatewayAddress: sourceAddress,
