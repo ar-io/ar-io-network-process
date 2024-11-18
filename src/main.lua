@@ -933,7 +933,6 @@ addEventingHandler(
 addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.JoinNetwork), function(msg)
 	-- TODO: add assertions on all the provided input, although the joinNetwork function will throw an error if the input is invalid
 
-	--- @type UpdateGatewaySettings
 	local updatedSettings = {
 		label = msg.Tags.Label,
 		note = msg.Tags.Note,
@@ -1143,47 +1142,19 @@ addEventingHandler(
 )
 
 addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.DelegateStake), function(msg)
-	local checkAssertions = function()
-		assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
-		assert(
-			msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
-			"Invalid quantity. Must be integer greater than 0"
-		)
-	end
-
-	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.DelegateStake .. "-Notice",
-				Error = "Bad-Input",
-			},
-			Data = tostring(error),
-		})
-	end, checkAssertions)
-	if not shouldContinue then
-		return
-	end
-
-	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 	local from = utils.formatAddress(msg.From)
+	local gatewayTarget = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 	local quantity = tonumber(msg.Tags.Quantity)
-	msg.ioEvent:addField("Target-Formatted", target)
+	local timestamp = tonumber(msg.Timestamp)
+	assert(utils.isValidAOAddress(gatewayTarget), "Invalid gateway address")
+	assert(
+		msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+		"Invalid quantity. Must be integer greater than 0"
+	)
 
-	local shouldContinue2, gateway = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = from,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.DelegateStake .. "-Notice",
-				Error = tostring(error),
-			},
-			Data = tostring(error),
-		})
-	end, gar.delegateStake, from, target, quantity, tonumber(msg.Timestamp))
-	if not shouldContinue2 then
-		return
-	end
+	msg.ioEvent:addField("Target-Formatted", gatewayTarget)
 
+	local gateway = gar.delegateStake(from, gatewayTarget, quantity, timestamp)
 	local delegateResult = {}
 	if gateway ~= nil then
 		local newStake = gateway.delegates[from].delegatedStake
@@ -1205,44 +1176,15 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 end)
 
 addEventingHandler(ActionMap.CancelWithdrawal, utils.hasMatchingTag("Action", ActionMap.CancelWithdrawal), function(msg)
-	local checkAssertions = function()
-		assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address or msg.From), "Invalid gateway address")
-		assert(utils.isValidAOAddress(msg.Tags["Vault-Id"]), "Invalid vault id")
-	end
-
-	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.CancelWithdrawal .. "-Notice",
-				Error = "Bad-Input",
-			},
-			Data = tostring(error),
-		})
-	end, checkAssertions)
-	if not shouldContinue then
-		return
-	end
-
+	local from = utils.formatAddress(msg.From)
 	local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From)
-	local fromAddress = utils.formatAddress(msg.From)
 	local vaultId = msg.Tags["Vault-Id"]
+	assert(utils.isValidAOAddress(gatewayAddress), "Invalid gateway address")
+	assert(utils.isValidAOAddress(vaultId), "Invalid vault id")
+
 	msg.ioEvent:addField("Target-Formatted", gatewayAddress)
 
-	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.CancelWithdrawal .. "-Notice",
-				Error = "Invalid-" .. ActionMap.CancelWithdrawal,
-			},
-			Data = tostring(error),
-		})
-	end, gar.cancelGatewayWithdrawal, fromAddress, gatewayAddress, vaultId)
-	if not shouldContinue2 then
-		return
-	end
-
+	local result = gar.cancelGatewayWithdrawal(from, gatewayAddress, vaultId)
 	local updatedGateway = {}
 	if result ~= nil then
 		updatedGateway = result.gateway
@@ -1285,39 +1227,11 @@ addEventingHandler(
 		local timestamp = tonumber(msg.Timestamp)
 		msg.ioEvent:addField("Target-Formatted", target)
 
-		local checkAssertions = function()
-			assert(utils.isValidAOAddress(target), "Invalid gateway address")
-			assert(utils.isValidAOAddress(vaultId), "Invalid vault id")
-		end
+		assert(utils.isValidAOAddress(target), "Invalid gateway address")
+		assert(utils.isValidAOAddress(vaultId), "Invalid vault id")
+		assert(timestamp, "Timestamp is required")
 
-		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Invalid-" .. ActionMap.InstantWithdrawal .. "-Notice",
-					Error = "Bad-Input",
-				},
-				Data = tostring(error),
-			})
-		end, checkAssertions)
-		if not shouldContinue then
-			return
-		end
-
-		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Invalid-" .. ActionMap.InstantWithdrawal .. "-Notice",
-					Error = "Invalid-" .. ActionMap.InstantWithdrawal,
-				},
-				Data = tostring(error),
-			})
-		end, gar.instantGatewayWithdrawal, from, target, vaultId, timestamp)
-		if not shouldContinue2 then
-			return
-		end
-
+		local result = gar.instantGatewayWithdrawal(from, target, vaultId, timestamp)
 		if result ~= nil then
 			local vaultBalance = result.vaultBalance
 			msg.ioEvent:addField("Stake-Amount-Withdrawn", vaultBalance)
@@ -1350,33 +1264,6 @@ addEventingHandler(
 	ActionMap.DecreaseDelegateStake,
 	utils.hasMatchingTag("Action", ActionMap.DecreaseDelegateStake),
 	function(msg)
-		local checkAssertions = function()
-			assert(utils.isValidAOAddress(msg.Tags.Target or msg.Tags.Address), "Invalid gateway address")
-			assert(
-				msg.Tags.Quantity
-					and tonumber(msg.Tags.Quantity) > constants.minimumWithdrawalAmount
-					and utils.isInteger(msg.Tags.Quantity),
-				"Invalid quantity. Must be integer greater than " .. constants.minimumWithdrawalAmount
-			)
-			if msg.Tags.Instant ~= nil then
-				assert(
-					msg.Tags.Instant == "true" or msg.Tags.Instant == "false",
-					"Instant must be a string with value 'true' or 'false'"
-				)
-			end
-		end
-
-		local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Invalid-Decrease-Delegate-Stake-Notice", Error = "Bad-Input" },
-				Data = tostring(error),
-			})
-		end, checkAssertions)
-		if not shouldContinue then
-			return
-		end
-
 		local from = utils.formatAddress(msg.From)
 		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
 		local quantity = tonumber(msg.Tags.Quantity)
@@ -1385,20 +1272,15 @@ addEventingHandler(
 		local messageId = msg.Id
 		msg.ioEvent:addField("Target-Formatted", target)
 		msg.ioEvent:addField("Quantity", quantity)
+		assert(utils.isValidAOAddress(target), "Invalid gateway address")
+		assert(
+			quantity
+				and tonumber(msg.Tags.Quantity) > constants.minimumWithdrawalAmount
+				and utils.isInteger(msg.Tags.Quantity),
+			"Invalid quantity. Must be integer greater than " .. constants.minimumWithdrawalAmount
+		)
 
-		local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
-			ao.send({
-				Target = from,
-				Tags = {
-					Action = "Invalid-" .. ActionMap.DecreaseDelegateStake .. "-Notice",
-					Error = "Invalid-" .. ActionMap.DecreaseDelegateStake,
-				},
-				Data = tostring(error),
-			})
-		end, gar.decreaseDelegateStake, target, from, quantity, timestamp, messageId, instantWithdraw)
-		if not shouldContinue2 then
-			return
-		end
+		local result = gar.decreaseDelegateStake(target, from, quantity, timestamp, messageId, instantWithdraw)
 
 		local decreaseDelegateStakeResult = {
 			gateway = result and result.gateway or {},
@@ -1466,32 +1348,10 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", ActionMap.UpdateGatewaySettings),
 	function(msg)
 		local gateway = gar.getGateway(msg.From)
-		if not gateway then
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Invalid-" .. ActionMap.UpdateGatewaySettings .. "-Notice",
-					Error = "Failed-Update-Gateway-Settings",
-				},
-				Data = "Gateway not found",
-			})
-			return
-		end
-
 		local updatedServices = utils.safeDecodeJson(msg.Tags.Services)
 
-		if msg.Tags.Services and not updatedServices then
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Invalid-" .. ActionMap.UpdateGatewaySettings .. "-Notice",
-					Error = "Invalid-" .. ActionMap.UpdateGatewaySettings,
-				},
-				Data = tostring("Failed to decode Services JSON: " .. msg.Tags.Services),
-			})
-			return
-		end
-
+		assert(gateway, "Gateway not found")
+		assert(not msg.Tags.Services or updatedServices, "Services must be provided if Services-Json is provided")
 		-- keep defaults, but update any new ones
 
 		-- If delegated staking is being fully enabled or disabled, clear the allowlist
@@ -1532,8 +1392,7 @@ addEventingHandler(
 		local formattedAddress = utils.formatAddress(msg.From)
 		local formattedObserverAddress = utils.formatAddress(observerAddress)
 		local timestamp = tonumber(msg.Timestamp)
-		local status, result = pcall(
-			gar.updateGatewaySettings,
+		local result = gar.updateGatewaySettings(
 			formattedAddress,
 			updatedSettings,
 			updatedServices,
@@ -1541,77 +1400,34 @@ addEventingHandler(
 			timestamp,
 			msg.Id
 		)
-		if not status then
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Invalid-" .. ActionMap.UpdateGatewaySettings .. "-Notice",
-					Error = "Failed-Update-Gateway-Settings",
-				},
-				Data = tostring(result),
-			})
-		else
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = ActionMap.UpdateGatewaySettings .. "-Notice" },
-				Data = json.encode(result),
-			})
-		end
+		ao.send({
+			Target = msg.From,
+			Tags = { Action = ActionMap.UpdateGatewaySettings .. "-Notice" },
+			Data = json.encode(result),
+		})
 	end
 )
 
 addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", ActionMap.ReassignName), function(msg)
+	local from = utils.formatAddress(msg.From)
 	local newProcessId = utils.formatAddress(msg.Tags["Process-Id"])
 	local name = string.lower(msg.Tags.Name)
 	local initiator = utils.formatAddress(msg.Tags.Initiator)
-	local checkAssertions = function()
-		assert(name and #name > 0, "Name is required")
-		assert(utils.isValidAOAddress(newProcessId), "Process Id must be a valid AO signer address..")
-		if initiator ~= nil then
-			assert(utils.isValidAOAddress(initiator), "Invalid initiator address.")
-		end
+	local timestamp = tonumber(msg.Timestamp)
+	assert(name and #name > 0, "Name is required")
+	assert(utils.isValidAOAddress(newProcessId), "Process Id must be a valid AO signer address..")
+	assert(timestamp, "Timestamp is required")
+	if initiator ~= nil then
+		assert(utils.isValidAOAddress(initiator), "Invalid initiator address.")
 	end
 
-	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.ReassignName .. "-Notice",
-				Error = "Bad-Input",
-			},
-			Data = tostring(error),
-		})
-	end, checkAssertions)
-	if not shouldContinue then
-		return
-	end
-
-	local status, reassignmentOrError = pcall(arns.reassignName, name, msg.From, tonumber(msg.Timestamp), newProcessId)
-	if not status then
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-" .. ActionMap.ReassignName .. "-Notice",
-			Error = ActionMap.ReassignName .. "-Error",
-			Data = tostring(reassignmentOrError),
-		})
-
-		if initiator ~= nil then
-			ao.send({
-				Target = initiator,
-				Action = "Invalid-" .. ActionMap.ReassignName .. "-Notice",
-				Error = ActionMap.ReassignName .. "-Error",
-				Data = tostring(reassignmentOrError),
-			})
-		end
-
-		return
-	end
+	local reassignment = arns.reassignName(name, from, timestamp, newProcessId)
 
 	ao.send({
 		Target = msg.From,
 		Action = ActionMap.ReassignName .. "-Notice",
 		Name = name,
-		Data = json.encode(reassignmentOrError),
+		Data = json.encode(reassignment),
 	})
 
 	if initiator ~= nil then
@@ -1619,48 +1435,23 @@ addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", Action
 			Target = initiator,
 			Action = ActionMap.ReassignName .. "-Notice",
 			Name = name,
-			Data = json.encode(reassignmentOrError),
+			Data = json.encode(reassignment),
 		})
 	end
 	return
 end)
 
 addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
+	local from = utils.formatAddress(msg.From)
 	local reportTxId = msg.Tags["Report-Tx-Id"]
 	local failedGateways = utils.splitAndTrimString(msg.Tags["Failed-Gateways"], ",")
-	local checkAssertions = function()
-		assert(utils.isValidAOAddress(reportTxId), "Invalid report tx id")
-		for _, gateway in ipairs(failedGateways) do
-			assert(utils.isValidAOAddress(gateway), "Invalid failed gateway address: " .. gateway)
-		end
+	local timestamp = tonumber(msg.Timestamp)
+	assert(utils.isValidAOAddress(reportTxId), "Invalid report tx id")
+	for _, gateway in ipairs(failedGateways) do
+		assert(utils.isValidAOAddress(gateway), "Invalid failed gateway address: " .. gateway)
 	end
 
-	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.SaveObservations .. "-Notice",
-				Error = "Invalid-Save-Observations",
-			},
-			Data = tostring(error),
-		})
-	end, checkAssertions)
-	if not shouldContinue then
-		return
-	end
-
-	local shouldContinue2, observations = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-" .. ActionMap.SaveObservations .. "-Notice",
-			Error = "Invalid-" .. ActionMap.SaveObservations,
-			Data = json.encode(error),
-		})
-	end, epochs.saveObservations, msg.From, reportTxId, failedGateways, msg.Timestamp)
-	if not shouldContinue2 then
-		return
-	end
-
+	local observations = epochs.saveObservations(from, reportTxId, failedGateways, timestamp)
 	if observations ~= nil then
 		local failureSummariesCount = utils.lengthOfTable(observations.failureSummaries or {})
 		if failureSummariesCount > 0 then
@@ -2075,17 +1866,8 @@ addEventingHandler(ActionMap.DemandFactor, utils.hasMatchingTag("Action", Action
 end)
 
 addEventingHandler(ActionMap.DemandFactorInfo, utils.hasMatchingTag("Action", ActionMap.DemandFactorInfo), function(msg)
-	local status, result = pcall(demand.getDemandFactorInfo)
-	if status then
-		ao.send({ Target = msg.From, Action = "Demand-Factor-Info-Notice", Data = json.encode(result) })
-	else
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-Demand-Factor-Info-Notice",
-			Error = "Invalid-Demand-Info-Factor",
-			Data = json.encode(result),
-		})
-	end
+	local result = demand.getDemandFactorInfo()
+	ao.send({ Target = msg.From, Action = "Demand-Factor-Info-Notice", Data = json.encode(result) })
 end)
 
 addEventingHandler(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Record), function(msg)
@@ -2134,23 +1916,12 @@ end)
 
 addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
-	local checkAssertions = function()
-		assert(msg.Tags["Epoch-Index"] or msg.Tags.Timestamp or msg.Timestamp, "Epoch index or timestamp is required")
-	end
+	local providedEpochIndex = tonumber(msg.Tags["Epoch-Index"])
+	local timestamp = tonumber(msg.Timestamp)
 
-	local inputStatus, inputResult = pcall(checkAssertions)
+	assert(providedEpochIndex or timestamp, "Epoch index or timestamp is required")
 
-	if not inputStatus then
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-Epoch-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
-		})
-		return
-	end
-
-	local epochIndex = tonumber(msg.Tags["Epoch-Index"])
-		or epochs.getEpochIndexForTimestamp(tonumber(msg.Tags.Timestamp or msg.Timestamp))
+	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
 	local epoch = epochs.getEpoch(epochIndex)
 	ao.send({ Target = msg.From, Action = "Epoch-Notice", Data = json.encode(epoch) })
 end)
@@ -2165,50 +1936,24 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", ActionMap.PrescribedObservers),
 	function(msg)
 		-- check if the epoch number is provided, if not get the epoch number from the timestamp
-		local checkAssertions = function()
-			assert(
-				msg.Tags["Epoch-Index"] or msg.Timestamp or msg.Tags.Timestamp,
-				"Epoch index or timestamp is required"
-			)
-		end
+		local providedEpochIndex = tonumber(msg.Tags["Epoch-Index"])
+		local timestamp = tonumber(msg.Timestamp)
 
-		local inputStatus, inputResult = pcall(checkAssertions)
+		assert(providedEpochIndex or timestamp, "Epoch index or timestamp is required")
 
-		if not inputStatus then
-			ao.send({
-				Target = msg.From,
-				Tags = { Action = "Invalid-Prescribed-Observers-Notice", Error = "Bad-Input" },
-				Data = tostring(inputResult),
-			})
-			return
-		end
-
-		local epochIndex = tonumber(msg.Tags["Epoch-Index"])
-			or epochs.getEpochIndexForTimestamp(tonumber(msg.Timestamp))
+		local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
 		local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
 		ao.send({ Target = msg.From, Action = "Prescribed-Observers-Notice", Data = json.encode(prescribedObservers) })
 	end
 )
 
 addEventingHandler(ActionMap.Observations, utils.hasMatchingTag("Action", ActionMap.Observations), function(msg)
-	-- check if the epoch number is provided, if not get the epoch number from the timestamp
-	local checkAssertions = function()
-		assert(msg.Tags["Epoch-Index"] or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
-	end
+	local providedEpochIndex = tonumber(msg.Tags["Epoch-Index"])
+	local timestamp = tonumber(msg.Timestamp)
 
-	local inputStatus, inputResult = pcall(checkAssertions)
+	assert(providedEpochIndex or timestamp, "Epoch index or timestamp is required")
 
-	if not inputStatus then
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-Observations-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
-		})
-		return
-	end
-
-	local epochIndex = tonumber(msg.Tags["Epoch-Index"])
-		or epochs.getEpochIndexForTimestamp(tonumber(msg.Timestamp or msg.Tags.Timestamp))
+	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
 	local observations = epochs.getObservationsForEpoch(epochIndex)
 	ao.send({
 		Target = msg.From,
@@ -2220,46 +1965,24 @@ end)
 
 addEventingHandler(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", ActionMap.PrescribedNames), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
-	local checkAssertions = function()
-		assert(msg.Tags["Epoch-Index"] or msg.Tags.Timestamp or msg.Timestamp, "Epoch index or timestamp is required")
-	end
+	local providedEpochIndex = tonumber(msg.Tags["Epoch-Index"])
+	local timestamp = tonumber(msg.Timestamp)
 
-	local inputStatus, inputResult = pcall(checkAssertions)
+	assert(providedEpochIndex or timestamp, "Epoch index or timestamp is required")
 
-	if not inputStatus then
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-Prescribed-Names-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
-		})
-		return
-	end
-
-	local epochIndex = tonumber(msg.Tags["Epoch-Index"])
-		or epochs.getEpochIndexForTimestamp(tonumber(msg.Timestamp or msg.Tags.Timestamp))
+	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
 	local prescribedNames = epochs.getPrescribedNamesForEpoch(epochIndex)
 	ao.send({ Target = msg.From, Action = "Prescribed-Names-Notice", Data = json.encode(prescribedNames) })
 end)
 
 addEventingHandler(ActionMap.Distributions, utils.hasMatchingTag("Action", ActionMap.Distributions), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
-	local checkAssertions = function()
-		assert(msg.Tags["Epoch-Index"] or msg.Timestamp or msg.Tags.Timestamp, "Epoch index or timestamp is required")
-	end
+	local providedEpochIndex = tonumber(msg.Tags["Epoch-Index"])
+	local timestamp = tonumber(msg.Timestamp)
 
-	local inputStatus, inputResult = pcall(checkAssertions)
+	assert(providedEpochIndex or timestamp, "Epoch index or timestamp is required")
 
-	if not inputStatus then
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-Distributions-Notice", Error = "Bad-Input" },
-			Data = tostring(inputResult),
-		})
-		return
-	end
-
-	local epochIndex = tonumber(msg.Tags["Epoch-Index"])
-		or epochs.getEpochIndexForTimestamp(tonumber(msg.Timestamp or msg.Tags.Timestamp))
+	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
 	local distributions = epochs.getDistributionsForEpoch(epochIndex)
 	ao.send({ Target = msg.From, Action = "Distributions-Notice", Data = json.encode(distributions) })
 end)
@@ -2270,7 +1993,9 @@ addEventingHandler(ActionMap.ReservedNames, utils.hasMatchingTag("Action", Actio
 end)
 
 addEventingHandler(ActionMap.ReservedName, utils.hasMatchingTag("Action", ActionMap.ReservedName), function(msg)
-	local reservedName = arns.getReservedName(msg.Tags.Name)
+	local name = msg.Tags.Name and string.lower(msg.Tags.Name)
+	assert(name, "Name is required")
+	local reservedName = arns.getReservedName(name)
 	ao.send({
 		Target = msg.From,
 		Action = "Reserved-Name-Notice",
@@ -2287,26 +2012,15 @@ addEventingHandler(ActionMap.Vault, utils.hasMatchingTag("Action", ActionMap.Vau
 	local address = msg.Tags.Address or msg.From
 	local vaultId = msg.Tags["Vault-Id"]
 	local vault = vaults.getVault(address, vaultId)
-	if not vault then
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-Vault-Notice",
-			Error = "Vault-Not-Found",
-			Tags = {
-				Address = address,
-				["Vault-Id"] = vaultId,
-			},
-		})
-		return
-	else
-		ao.send({
-			Target = msg.From,
-			Action = "Vault-Notice",
-			Address = address,
-			["Vault-Id"] = vaultId,
-			Data = json.encode(vault),
-		})
-	end
+	assert(vault, "Vault not found")
+
+	ao.send({
+		Target = msg.From,
+		Action = "Vault-Notice",
+		Address = address,
+		["Vault-Id"] = vaultId,
+		Data = json.encode(vault),
+	})
 end)
 
 -- Pagination handlers
@@ -2436,69 +2150,31 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	local initiator = utils.formatAddress(msg.Tags.Initiator or msg.From)
 	local timestamp = tonumber(msg.Timestamp)
 
-	local checkAssertions = function()
-		assert(name and #name > 0, "Name is required")
-		assert(processId and utils.isValidAOAddress(processId), "Process-Id is required")
-		assert(initiator and utils.isValidAOAddress(initiator), "Initiator is required")
-		assert(record, "Record not found")
-		assert(record.type == "permabuy", "Only permabuy names can be released")
-		assert(record.processId == processId, "Process-Id mismatch")
-		-- TODO: throw an error here instead of allowing release and force removal of primary names? I tend to favor the protection for primary name owners.
-		assert(
-			#primaryNames.getPrimaryNamesForBaseName(name) == 0,
-			"Primary names are associated with this name. They must be removed before releasing the name."
-		)
-	end
-
-	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
-			Error = "Bad-Input",
-			Data = tostring(error),
-		})
-		return
-	end, checkAssertions)
-	if not shouldContinue then
-		return
-	end
-
-	local removeRecordsAndCreateAuction = function()
-		assert(timestamp, "Timestamp is required")
-		local removedRecord = arns.removeRecord(name)
-		local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNamesForBaseName(name) -- NOTE: this should be empty if there are no primary names allowed before release
-		local auction = arns.createAuction(name, timestamp, initiator)
-		return {
-			removedRecord = removedRecord,
-			removedPrimaryNamesAndOwners = removedPrimaryNamesAndOwners,
-			auction = auction,
-		}
-	end
-
+	assert(name and #name > 0, "Name is required")
+	assert(processId and utils.isValidAOAddress(processId), "Process-Id is required")
+	assert(initiator and utils.isValidAOAddress(initiator), "Initiator is required")
+	assert(record, "Record not found")
+	assert(record.type == "permabuy", "Only permabuy names can be released")
+	assert(record.processId == processId, "Process-Id mismatch")
+	-- TODO: throw an error here instead of allowing release and force removal of primary names? I tend to favor the protection for primary name owners.
+	assert(
+		#primaryNames.getPrimaryNamesForBaseName(name) == 0,
+		"Primary names are associated with this name. They must be removed before releasing the name."
+	)
+	assert(timestamp, "Timestamp is required")
 	-- we should be able to create the auction here
-	local status, createAuctionData = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
-			Error = "Auction-Creation-Error",
-			Data = tostring(error),
-		})
-	end, removeRecordsAndCreateAuction)
+	local removedRecord = arns.removeRecord(name)
+	local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNamesForBaseName(name) -- NOTE: this should be empty if there are no primary names allowed before release
+	local createdAuction = arns.createAuction(name, timestamp, initiator)
+	local createAuctionData = {
+		removedRecord = removedRecord,
+		removedPrimaryNamesAndOwners = removedPrimaryNamesAndOwners,
+		auction = createdAuction,
+	}
 
-	if not status or not createAuctionData then
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-" .. ActionMap.ReleaseName .. "-Notice",
-			Error = "Auction-Creation-Error",
-			Data = tostring(createAuctionData),
-		})
-		return
-	end
-
-	-- add the auction result fields
 	addAuctionResultFields(msg.ioEvent, {
 		name = name,
-		auction = createAuctionData.auction,
+		auction = createAuctionData.createdAuction,
 		removedRecord = createAuctionData.removedRecord,
 		removedPrimaryNamesAndOwners = createAuctionData.removedPrimaryNamesAndOwners,
 	})

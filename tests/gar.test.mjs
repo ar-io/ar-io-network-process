@@ -1206,9 +1206,9 @@ describe('GatewayRegistry', async () => {
           assert: false,
         });
 
-      assert.equal(
-        result.Messages[0].Tags.find((t) => t.name === 'Error').value,
-        'Bad-Input',
+      assert.ok(
+        result.Messages[0].Tags.find((t) => t.name === 'Error'),
+        'Error tag should be present',
       );
       assert(
         result.Messages[0].Data.includes(
