@@ -1156,7 +1156,7 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 
 	ao.send({
 		Target = msg.From,
-		Tags = { Action = ActionMap.DelegateStake .. "-Notice", Gateway = msg.Target },
+		Tags = { Action = ActionMap.DelegateStake .. "-Notice", Gateway = msg.Tags.Target },
 		Data = json.encode(delegateResult),
 	})
 end)
