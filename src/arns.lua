@@ -149,6 +149,23 @@ function arns.getPaginatedRecords(cursor, limit, sortBy, sortOrder)
 	return utils.paginateTableWithCursor(recordsArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
+--- Get paginated reserved names
+--- @param cursor string|nil The cursor to paginate from
+--- @param limit number The limit of reserved names to return
+--- @param sortBy string The field to sort by
+--- @param sortOrder string The order to sort by
+--- @return PaginatedTable<ReservedName> The paginated reserved names
+function arns.getPaginatedReservedNames(cursor, limit, sortBy, sortOrder)
+	local reserved = arns.getReservedNames()
+	local reservedArray = {}
+	local cursorField = "name" -- the cursor will be the name
+	for name, reservedName in pairs(reserved) do
+		reservedName.name = name
+		table.insert(reservedArray, reservedName)
+	end
+	return utils.paginateTableWithCursor(reservedArray, cursor, cursorField, limit, sortBy, sortOrder)
+end
+
 --- @class ExtendLeaseResponse
 --- @field record Record The updated record
 --- @field totalExtensionFee number The total extension fee

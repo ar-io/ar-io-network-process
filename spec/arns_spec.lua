@@ -1682,4 +1682,34 @@ describe("arns", function()
 			}, paginatedRecords4)
 		end)
 	end)
+
+	describe("getPaginatedReservedNames", function()
+		before_each(function()
+			_G.NameRegistry.reserved = {
+				["reserved-name-1"] = {
+					target = "reserved-name-1-target",
+				},
+				["reserved-name-2"] = {
+					target = "reserved-name-2-target",
+				},
+			}
+		end)
+		it("should return the correct paginated reserved names", function()
+			local paginatedReservedNames = arns.getPaginatedReservedNames(nil, 1, "name", "desc")
+			assert.are.same({
+				limit = 1,
+				sortBy = "name",
+				sortOrder = "desc",
+				hasMore = true,
+				totalItems = 2,
+				nextCursor = "reserved-name-2",
+				items = {
+					{
+						name = "reserved-name-2",
+						target = "reserved-name-2-target",
+					},
+				},
+			}, paginatedReservedNames)
+		end)
+	end)
 end)
