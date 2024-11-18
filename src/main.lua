@@ -376,6 +376,7 @@ end, function(msg)
 	msg.Tags.Recipient = msg.Tags.Recipient and utils.formatAddress(msg.Tags.Recipient) or nil
 	msg.Tags.Initiator = msg.Tags.Initiator and utils.formatAddress(msg.Tags.Initiator) or nil
 	msg.Tags.Target = msg.Tags.Target and utils.formatAddress(msg.Tags.Target) or nil
+	msg.Tags.Source = msg.Tags.Source and utils.formatAddress(msg.Tags.Source) or nil
 	msg.Tags.Address = msg.Tags.Address and utils.formatAddress(msg.Tags.Address) or nil
 	msg.Tags["Vault-Id"] = msg.Tags["Vault-Id"] and utils.formatAddress(msg.Tags["Vault-Id"]) or nil
 	msg.Tags["Process-Id"] = msg.Tags["Process-Id"] and utils.formatAddress(msg.Tags["Process-Id"]) or nil
@@ -1251,6 +1252,12 @@ addEventingHandler(
 		local quantity = tonumber(msg.Tags.Quantity)
 		local instantWithdraw = msg.Tags.Instant and msg.Tags.Instant == "true" or false
 		local timestamp = tonumber(msg.Timestamp)
+		msg.ioEvent:addField("Target-Formatted", target)
+		msg.ioEvent:addField("Quantity", quantity)
+		assert(
+			quantity and utils.isInteger(quantity) and quantity > constants.minimumWithdrawalAmount,
+			"Invalid quantity. Must be integer greater than " .. constants.minimumWithdrawalAmount
+		)
 
 		local result = gar.decreaseDelegateStake(target, msg.From, quantity, timestamp, msg.Id, instantWithdraw)
 		local decreaseDelegateStakeResult = {
@@ -1992,6 +1999,9 @@ end)
 
 addEventingHandler(ActionMap.Vaults, utils.hasMatchingTag("Action", ActionMap.Vaults), function(msg)
 	ao.send({ Target = msg.From, Action = "Vaults-Notice", Data = json.encode(Vaults) })
+end)
+
+addEventingHandler(ActionMap.Vault, utils.hasMatchingTag("Action", ActionMap.Vault), function(msg)
 	local address = msg.Tags.Address or msg.From
 	local vaultId = msg.Tags["Vault-Id"]
 	local vault = vaults.getVault(address, vaultId)
