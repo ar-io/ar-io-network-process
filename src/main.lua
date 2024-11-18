@@ -994,6 +994,9 @@ addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", Action
 		gwPrevStake = gatewayBeforeLeaving.operatorStake
 	end
 
+	assert(gatewayBeforeLeaving, "Gateway not found")
+	assert(timestamp, "Timestamp is required")
+
 	local gateway = gar.leaveNetwork(from, timestamp, msg.Id)
 
 	if gateway ~= nil then
@@ -2541,26 +2544,12 @@ end)
 
 --- PRIMARY NAMES
 addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap.RemovePrimaryNames), function(msg)
-	local checkAssertionsAndReturnResult = function()
-		local names = utils.splitAndTrimString(msg.Tags.Names, ",")
-		local from = utils.formatAddress(msg.From)
-		assert(names and #names > 0, "Names are required")
-		assert(from, "From is required")
-		return primaryNames.removePrimaryNames(names, from)
-	end
+	local names = utils.splitAndTrimString(msg.Tags.Names, ",")
+	local from = utils.formatAddress(msg.From)
+	assert(names and #names > 0, "Names are required")
+	assert(from, "From is required")
 
-	local shouldContinue, removedPrimaryNamesAndOwners = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.RemovePrimaryNames .. "-Notice",
-				Error = tostring(error),
-			},
-		})
-	end, checkAssertionsAndReturnResult)
-	if not shouldContinue or not removedPrimaryNamesAndOwners then
-		return
-	end
+	local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNames(names, from)
 
 	ao.send({
 		Target = msg.From,
@@ -2582,29 +2571,15 @@ end)
 
 addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMap.PrimaryNameRequest), function(msg)
 	local fundFrom = msg.Tags["Fund-From"]
-	local checkAssertionsAndReturnResult = function()
-		local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
-		local initiator = utils.formatAddress(msg.From) -- the process that is creating the claim
-		local timestamp = tonumber(msg.Timestamp)
-		assert(name, "Name is required")
-		assert(initiator, "Initiator is required")
-		assert(timestamp, "Timestamp is required")
-		assertValidFundFrom(fundFrom)
-		return primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msg.Id, fundFrom)
-	end
+	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
+	local initiator = utils.formatAddress(msg.From) -- the process that is creating the claim
+	local timestamp = tonumber(msg.Timestamp)
+	assert(name, "Name is required")
+	assert(initiator, "Initiator is required")
+	assert(timestamp, "Timestamp is required")
+	assertValidFundFrom(fundFrom)
 
-	local shouldContinue, primaryNameResult = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.PrimaryNameRequest .. "-Notice",
-				Error = tostring(error),
-			},
-		})
-	end, checkAssertionsAndReturnResult)
-	if not shouldContinue or not primaryNameResult then
-		return
-	end
+	local primaryNameResult = primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msg.Id, fundFrom)
 
 	adjustSuppliesForFundingPlan(primaryNameResult.fundingPlan)
 
@@ -2637,30 +2612,16 @@ addEventingHandler(
 	"approvePrimaryNameRequest",
 	utils.hasMatchingTag("Action", ActionMap.ApprovePrimaryNameRequest),
 	function(msg)
-		local checkAssertionsAndReturnResult = function()
-			local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
-			local recipient = utils.formatAddress(msg.Tags.Recipient) or utils.formatAddress(msg.From)
-			local from = utils.formatAddress(msg.From) -- the recipient of the primary name
-			local timestamp = tonumber(msg.Timestamp)
-			assert(name, "Name is required")
-			assert(recipient, "Recipient is required")
-			assert(from, "From is required")
-			assert(timestamp, "Timestamp is required")
-			return primaryNames.approvePrimaryNameRequest(recipient, name, from, timestamp)
-		end
+		local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
+		local recipient = utils.formatAddress(msg.Tags.Recipient) or utils.formatAddress(msg.From)
+		local from = utils.formatAddress(msg.From) -- the recipient of the primary name
+		local timestamp = tonumber(msg.Timestamp)
+		assert(name, "Name is required")
+		assert(recipient, "Recipient is required")
+		assert(from, "From is required")
+		assert(timestamp, "Timestamp is required")
 
-		local shouldContinue, approvedPrimaryNameResult = eventingPcall(msg.ioEvent, function(error)
-			ao.send({
-				Target = msg.From,
-				Tags = {
-					Action = "Invalid-" .. ActionMap.ApprovePrimaryNameRequest .. "-Notice",
-					Error = tostring(error),
-				},
-			})
-		end, checkAssertionsAndReturnResult)
-		if not shouldContinue or not approvedPrimaryNameResult then
-			return
-		end
+		local approvedPrimaryNameResult = primaryNames.approvePrimaryNameRequest(recipient, name, from, timestamp)
 
 		--- send a notice to the from
 		ao.send({
@@ -2683,12 +2644,7 @@ addEventingHandler("getPrimaryNameData", utils.hasMatchingTag("Action", ActionMa
 	local address = msg.Tags.Address and utils.formatAddress(msg.Tags.Address) or utils.formatAddress(msg.From)
 	local primaryNameData = name and primaryNames.getPrimaryNameDataWithOwnerFromName(name)
 		or address and primaryNames.getPrimaryNameDataWithOwnerFromAddress(address)
-	if not primaryNameData then
-		return ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.PrimaryName .. "-Notice", Error = "Primary-Name-Not-Found" },
-		})
-	end
+	assert(primaryNameData, "Primary name data not found")
 	return ao.send({
 		Target = msg.From,
 		Action = ActionMap.PrimaryName .. "-Notice",
@@ -2702,26 +2658,12 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", ActionMap.PrimaryNameRequests),
 	function(msg)
 		local page = utils.parsePaginationTags(msg)
-		local status, result = eventingPcall(
-			msg.ioEvent,
-			function(error)
-				ao.send({
-					Target = msg.From,
-					Tags = {
-						Action = "Invalid-" .. ActionMap.PrimaryNameRequests .. "-Notice",
-						Error = tostring(error),
-					},
-				})
-			end,
-			primaryNames.getPaginatedPrimaryNameRequests,
+		local result = primaryNames.getPaginatedPrimaryNameRequests(
 			page.cursor,
 			page.limit,
 			page.sortBy or "startTimestamp",
 			page.sortOrder or "asc"
 		)
-		if not status or not result then
-			return
-		end
 		return ao.send({
 			Target = msg.From,
 			Action = ActionMap.PrimaryNameRequests .. "-Notice",
@@ -2732,22 +2674,8 @@ addEventingHandler(
 
 addEventingHandler("getPaginatedPrimaryNames", utils.hasMatchingTag("Action", ActionMap.PrimaryNames), function(msg)
 	local page = utils.parsePaginationTags(msg)
-	local status, result = pcall(
-		primaryNames.getPaginatedPrimaryNames,
-		page.cursor,
-		page.limit,
-		page.sortBy or "name",
-		page.sortOrder or "asc"
-	)
-
-	if not status or not result then
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.PrimaryNames .. "-Notice", Error = "Bad-Input" },
-			Data = tostring(error),
-		})
-		return
-	end
+	local result =
+		primaryNames.getPaginatedPrimaryNames(page.cursor, page.limit, page.sortBy or "name", page.sortOrder or "asc")
 
 	return ao.send({
 		Target = msg.From,
