@@ -2030,4 +2030,20 @@ describe('ArNS', async () => {
       });
     });
   });
+
+  describe('Reserved-Names', () => {
+    it('should paginate reserved names', async () => {
+      const result = await handle({
+        Tags: [{ name: 'Action', value: 'Reserved-Names' }],
+      });
+      const { items, hasMore, cursor, sortBy, sortOrder, totalItems } =
+        JSON.parse(result.Messages[0].Data);
+      assert.ok(Array.isArray(items));
+      assert.ok(hasMore === false);
+      assert.ok(cursor === undefined);
+      assert.equal(sortBy, 'name');
+      assert.equal(sortOrder, 'desc');
+      assert.equal(totalItems, 0);
+    });
+  });
 });
