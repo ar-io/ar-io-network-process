@@ -4,31 +4,7 @@ local constants = require("constants")
 local utils = require("utils")
 local gar = {}
 
---- @class Gateway
---- @field operatorStake number
---- @field totalDelegatedStake number
---- @field vaults table<WalletAddress, Vault>
---- @field delegates table<WalletAddress, Delegate>
---- @field startTimestamp Timestamp
---- @field endTimestamp Timestamp|nil
---- @field stats GatewayStats
---- @field settings GatewaySettings
---- @field services GatewayServices | nil
---- @field status "joined"|"leaving"
---- @field observerAddress WalletAddress
---- @field weights GatewayWeights | nil
---- @field slashings table<Timestamp, mIO> | nil
-
---- @class GatewayStats
---- @field prescribedEpochCount number
---- @field observedEpochCount number
---- @field totalEpochCount number
---- @field passedEpochCount number
---- @field failedEpochCount number
---- @field failedConsecutiveEpochs number
---- @field passedConsecutiveEpochs number
-
---- @class GatewaySettings
+--- @class CompactGatewaySettings
 --- @field allowDelegatedStaking boolean
 --- @field allowedDelegatesLookup table<WalletAddress, boolean> | nil
 --- @field delegateRewardShareRatio number
@@ -40,6 +16,36 @@ local gar = {}
 --- @field port number
 --- @field properties string
 --- @field note string | nil
+
+--- @class CompactGateway
+--- @field operatorStake number
+--- @field totalDelegatedStake number
+--- @field startTimestamp Timestamp
+--- @field endTimestamp Timestamp|nil
+--- @field stats GatewayStats
+--- @field settings CompactGatewaySettings
+--- @field services GatewayServices | nil
+--- @field status "joined"|"leaving"
+--- @field observerAddress WalletAddress
+--- @field weights GatewayWeights | nil
+--- @field slashings table<Timestamp, mIO> | nil
+
+--- @class Gateway : CompactGateway
+--- @field vaults table<WalletAddress, Vault>
+--- @field delegates table<WalletAddress, Delegate>
+--- @field settings GatewaySettings
+
+--- @class GatewayStats
+--- @field prescribedEpochCount number
+--- @field observedEpochCount number
+--- @field totalEpochCount number
+--- @field passedEpochCount number
+--- @field failedEpochCount number
+--- @field failedConsecutiveEpochs number
+--- @field passedConsecutiveEpochs number
+
+--- @class GatewaySettings : CompactGatewaySettings
+--- @field allowedDelegatesLookup table<WalletAddress, boolean> | nil
 
 --- @class GatewayWeights
 --- @field stakeWeight number
@@ -320,17 +326,12 @@ function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWi
 	}
 end
 
---- @class UpdateGatewaySettings
+--- @class UpdateGatewaySettings : GatewaySettings
 --- @field allowDelegatedStaking boolean | nil
 --- @field allowedDelegates WalletAddress[] | nil
 --- @field delegateRewardShareRatio number | nil
 --- @field autoStake boolean | nil
 --- @field minDelegatedStake number | nil
---- @field label string
---- @field fqdn string
---- @field protocol string
---- @field port number
---- @field properties string
 --- @field note string | nil
 
 --- @param from WalletAddress
@@ -421,10 +422,17 @@ function gar.updateGatewaySettings(from, updatedSettings, updatedServices, obser
 end
 
 --- Gets a copy of a gateway by address
----@param address string The address of their gateway to fetch
+---@param address WalletAddress The address of the gateway to fetch
 ---@return Gateway|nil A gateway object copy or nil if not found
 function gar.getGateway(address)
 	return utils.deepCopy(GatewayRegistry[address])
+end
+
+--- Gets a copy of a gateway by address, minus its vaults, delegates, and allowlist
+---@param address WalletAddress The address of the gateway to fetch
+---@return CompactGateway|nil A gateway object copy or nil if not found
+function gar.getCompactGateway(address)
+	return utils.deepCopy(GatewayRegistry[address], { "delegates", "vaults", "settings.allowedDelegatesLookup" })
 end
 
 --- Gets a gateway reference by address, preferably for read-only activities
@@ -434,7 +442,6 @@ function gar.getGatewayUnsafe(address)
 	return GatewayRegistry[address]
 end
 
--- TODO: Add a getGatewaysProps function that omits lots of heavy data like vaults and delegates
 --- Gets all gateways
 ---@return Gateways # address-mapped, deep copies of all the gateways objects
 function gar.getGateways()
@@ -445,6 +452,15 @@ end
 --- @return Gateways # All the address-mapped gateway objects
 function gar.getGatewaysUnsafe()
 	return GatewayRegistry or {}
+end
+
+--- @alias CompactGateways table<WalletAddress, CompactGateway>
+--- @return CompactGateways # address-mapped, deep copies of all the gateways objects without delegates, vaults, or allowlist
+function gar.getCompactGateways()
+	return utils.reduce(gar.getGatewaysUnsafe(), function(acc, gatewayAddress, gateway)
+		acc[gatewayAddress] = utils.deepCopy(gateway, { "delegates", "vaults", "settings.allowedDelegatesLookup" })
+		return acc
+	end, {})
 end
 
 --- @param startTimestamp number
