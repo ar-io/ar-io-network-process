@@ -3924,4 +3924,34 @@ describe("gar", function()
 			}, _G.Redelegations)
 		end)
 	end)
+
+	describe("getCompactGateways", function()
+		it("returns a operator-wallet-addressed dictionary of gateways without vaults or delegates", function()
+			_G.GatewayRegistry = {
+				["0x123"] = {
+					operator = "0x123",
+					vaults = {},
+					delegates = {},
+					settings = {
+						autoStake = true,
+						allowedDelegatesLookup = {},
+					},
+				},
+				["0x456"] = {
+					operator = "0x456",
+					vaults = {},
+					delegates = {},
+					settings = {
+						autoStake = false,
+						allowedDelegatesLookup = {},
+					},
+				},
+			}
+			local compactGateways = gar.getCompactGateways()
+			assert.are.same({
+				["0x123"] = { operator = "0x123", settings = { autoStake = true } },
+				["0x456"] = { operator = "0x456", settings = { autoStake = false } },
+			}, compactGateways)
+		end)
+	end)
 end)
