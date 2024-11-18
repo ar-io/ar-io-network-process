@@ -2278,14 +2278,8 @@ addEventingHandler("auctionPrices", utils.hasMatchingTag("Action", ActionMap.Auc
 	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
 	local intervalMs = msg.Tags["Price-Interval-Ms"] and tonumber(msg.Tags["Price-Interval-Ms"]) or 15 * 60 * 1000 -- 15 minute intervals by default
 
-	if not auction then
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-" .. ActionMap.AuctionPrices .. "-Notice",
-			Error = "Auction-Not-Found",
-		})
-		return
-	end
+	assert(auction, "Auction not found")
+	assert(timestamp, "Timestamp is required")
 
 	if not type then
 		type = "permabuy"
@@ -2340,58 +2334,36 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
 
 	-- assert name, bidder, processId are provided
-	local checkAssertions = function()
-		assert(name and #name > 0, "Name is required")
-		assert(bidder and utils.isValidAOAddress(bidder), "Bidder is required")
-		assert(processId and utils.isValidAOAddress(processId), "Process-Id is required")
-		assert(timestamp and timestamp > 0, "Timestamp is required")
-		-- if bidAmount is not nil assert that it is a number
-		if bidAmount then
+	assert(name and #name > 0, "Name is required")
+	assert(bidder and utils.isValidAOAddress(bidder), "Bidder is required")
+	assert(processId and utils.isValidAOAddress(processId), "Process-Id is required")
+	assert(timestamp and timestamp > 0, "Timestamp is required")
+	-- if bidAmount is not nil assert that it is a number
+	if bidAmount then
+		assert(
+			type(bidAmount) == "number" and bidAmount > 0 and utils.isInteger(bidAmount),
+			"Bid amount must be a positive integer"
+		)
+	end
+	if type then
+		assert(type == "permabuy" or type == "lease", "Invalid auction type. Must be either 'permabuy' or 'lease'")
+	end
+	if type == "lease" then
+		if years then
 			assert(
-				type(bidAmount) == "number" and bidAmount > 0 and utils.isInteger(bidAmount),
-				"Bid amount must be a positive integer"
+				years and utils.isInteger(years) and years > 0 and years <= constants.maxLeaseLengthYears,
+				"Years must be an integer between 1 and 5"
 			)
+		else
+			years = years or 1
 		end
-		if type then
-			assert(type == "permabuy" or type == "lease", "Invalid auction type. Must be either 'permabuy' or 'lease'")
-		end
-		if type == "lease" then
-			if years then
-				assert(
-					years and utils.isInteger(years) and years > 0 and years <= constants.maxLeaseLengthYears,
-					"Years must be an integer between 1 and 5"
-				)
-			else
-				years = years or 1
-			end
-		end
-
-		local auction = arns.getAuction(name)
-		assert(auction, "Auction not found")
-		assertValidFundFrom(fundFrom)
 	end
 
-	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice", Error = "Bad-Input" },
-			Data = tostring(error),
-		})
-	end, checkAssertions)
-	if not shouldContinue then
-		return
-	end
+	local auction = arns.getAuction(name)
+	assert(auction, "Auction not found")
+	assertValidFundFrom(fundFrom)
 
-	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.AuctionBid .. "-Notice", Error = "Auction-Bid-Error" },
-			Data = tostring(error),
-		})
-	end, arns.submitAuctionBid, name, bidAmount, bidder, timestamp, processId, type, years, msg.Id, fundFrom)
-	if not shouldContinue2 then
-		return
-	end
+	local result = arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, type, years, msg.Id, fundFrom)
 
 	if result ~= nil then
 		local record = result.record
@@ -2434,36 +2406,12 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 end)
 
 addEventingHandler("allowDelegates", utils.hasMatchingTag("Action", ActionMap.AllowDelegates), function(msg)
-	local function checkAssertions()
-		assert(
-			#(msg.Tags["Allowed-Delegates"] or ""),
-			"Allowed-Delegates, a comma-separated list string of delegate addresses, is required"
-		)
-	end
-	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.AllowDelegates .. "-Notice", Error = "Bad-Input" },
-			Data = tostring(error),
-		})
-	end, checkAssertions)
-	if not shouldContinue then
-		return
-	end
-
-	local newAllowedDelegates = utils.splitAndTrimString(msg.Tags["Allowed-Delegates"])
-	msg.ioEvent:addField("Input-New-Delegates-Count", utils.lengthOfTable(newAllowedDelegates))
-
-	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.AllowDelegates .. "-Notice", Error = "Bad-Input" },
-			Data = tostring(error),
-		})
-	end, gar.allowDelegates, newAllowedDelegates, msg.From)
-	if not shouldContinue2 then
-		return
-	end
+	local from = utils.formatAddress(msg.From)
+	local allowedDelegates = msg.Tags["Allowed-Delegates"]
+		and utils.splitAndTrimString(msg.Tags["Allowed-Delegates"], ",")
+	assert(allowedDelegates and #allowedDelegates > 0, "Allowed-Delegates is required")
+	msg.ioEvent:addField("Input-New-Delegates-Count", utils.lengthOfTable(allowedDelegates))
+	local result = gar.allowDelegates(allowedDelegates, from)
 
 	if result ~= nil then
 		msg.ioEvent:addField("New-Allowed-Delegates", result.newAllowedDelegates or {})
@@ -2483,37 +2431,13 @@ addEventingHandler("allowDelegates", utils.hasMatchingTag("Action", ActionMap.Al
 end)
 
 addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap.DisallowDelegates), function(msg)
-	local function checkAssertions()
-		assert(
-			#(msg.Tags["Disallowed-Delegates"] or ""),
-			"Disallowed-Delegates, a comma-separated list string of delegate addresses, is required"
-		)
-	end
-	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.DisallowDelegates .. "-Notice", Error = "Bad-Input" },
-			Data = tostring(error),
-		})
-	end, checkAssertions)
-	if not shouldContinue then
-		return
-	end
-
-	local disallowedDelegates = utils.splitAndTrimString(msg.Tags["Disallowed-Delegates"], ",")
+	local from = utils.formatAddress(msg.From)
+	local timestamp = tonumber(msg.Timestamp)
+	local disallowedDelegates = msg.Tags["Disallowed-Delegates"]
+		and utils.splitAndTrimString(msg.Tags["Disallowed-Delegates"], ",")
+	assert(disallowedDelegates and #disallowedDelegates > 0, "Disallowed-Delegates is required")
 	msg.ioEvent:addField("Input-Disallowed-Delegates-Count", utils.lengthOfTable(disallowedDelegates))
-
-	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.DisallowDelegates .. "-Notice", Error = "Bad-Input" },
-			Data = tostring(error),
-		})
-	end, gar.disallowDelegates, disallowedDelegates, msg.From)
-	if not shouldContinue2 then
-		return
-	end
-
+	local result = gar.disallowDelegates(disallowedDelegates, from, msg.Id, timestamp)
 	if result ~= nil then
 		msg.ioEvent:addField("New-Disallowed-Delegates", result.removedDelegates or {})
 		msg.ioEvent:addField("New-Disallowed-Delegates-Count", utils.lengthOfTable(result.removedDelegates))
@@ -2534,31 +2458,10 @@ end)
 addEventingHandler("paginatedDelegations", utils.hasMatchingTag("Action", "Paginated-Delegations"), function(msg)
 	local address = utils.formatAddress(msg.Tags.Address or msg.From)
 	local page = utils.parsePaginationTags(msg)
-	local function checkAssertions()
-		assert(utils.isValidAOAddress(address), "Invalid address.")
-	end
-	local shouldContinue = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.Delegations .. "-Notice", Error = "Bad-Input" },
-			Data = tostring(error),
-		})
-	end, checkAssertions)
-	if not shouldContinue then
-		return
-	end
 
-	local shouldContinue2, result = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = { Action = "Invalid-" .. ActionMap.Delegations .. "-Notice", Error = "Pagination-Error" },
-			Data = tostring(error),
-		})
-	end, gar.getPaginatedDelegations, address, page.cursor, page.limit, page.sortBy, page.sortOrder)
-	if not shouldContinue2 then
-		return
-	end
+	assert(utils.isValidAOAddress(address), "Invalid address.")
 
+	local result = gar.getPaginatedDelegations(address, page.cursor, page.limit, page.sortBy, page.sortOrder)
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = ActionMap.Delegations .. "-Notice" },
@@ -2574,41 +2477,23 @@ addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", Act
 	local vaultId = msg.Tags["Vault-Id"]
 	local timestamp = tonumber(msg.Timestamp)
 
-	local checkAssertionsAndReturnResult = function()
-		assert(utils.isValidAOAddress(sourceAddress), "Invalid source gateway address")
-		assert(utils.isValidAOAddress(targetAddress), "Invalid target gateway address")
-		assert(utils.isValidAOAddress(delegateAddress), "Invalid delegator address")
-		assert(timestamp, "Timestamp is required")
-		if vaultId then
-			assert(utils.isInteger(tonumber(vaultId)), "Invalid vault id")
-		end
-
-		assert(
-			quantity and quantity > 0 and utils.isInteger(quantity),
-			"Invalid quantity. Must be integer greater than 0"
-		)
-		return gar.redelegateStake({
-			sourceAddress = sourceAddress,
-			targetAddress = targetAddress,
-			delegateAddress = delegateAddress,
-			qty = quantity,
-			currentTimestamp = timestamp,
-			vaultId = vaultId,
-		})
+	assert(utils.isValidAOAddress(sourceAddress), "Invalid source gateway address")
+	assert(utils.isValidAOAddress(targetAddress), "Invalid target gateway address")
+	assert(utils.isValidAOAddress(delegateAddress), "Invalid delegator address")
+	assert(timestamp, "Timestamp is required")
+	if vaultId then
+		assert(utils.isInteger(tonumber(vaultId)), "Invalid vault id")
 	end
 
-	local shouldContinue, redelegationResult = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.RedelegateStake .. "-Notice",
-				Error = tostring(error),
-			},
-		})
-	end, checkAssertionsAndReturnResult)
-	if not shouldContinue or not redelegationResult then
-		return
-	end
+	assert(quantity and quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
+	local redelegationResult = gar.redelegateStake({
+		sourceAddress = sourceAddress,
+		targetAddress = targetAddress,
+		delegateAddress = delegateAddress,
+		qty = quantity,
+		currentTimestamp = timestamp,
+		vaultId = vaultId,
+	})
 
 	local redelegationFee = redelegationResult.redelegationFee
 	local stakeMoved = quantity - redelegationFee
@@ -2644,25 +2529,9 @@ addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", Act
 end)
 
 addEventingHandler(ActionMap.RedelegationFee, utils.hasMatchingTag("Action", ActionMap.RedelegationFee), function(msg)
-	local checkAssertionsAndReturnResult = function()
-		local delegateAddress = msg.From
-		assert(utils.isValidAOAddress(delegateAddress), "Invalid delegator address")
-		return gar.getRedelegationFee(delegateAddress, tonumber(msg.Timestamp))
-	end
-
-	local shouldContinue, feeResult = eventingPcall(msg.ioEvent, function(error)
-		ao.send({
-			Target = msg.From,
-			Tags = {
-				Action = "Invalid-" .. ActionMap.RedelegationFee .. "-Notice",
-				Error = tostring(error),
-			},
-		})
-	end, checkAssertionsAndReturnResult)
-	if not shouldContinue or not feeResult then
-		return
-	end
-
+	local delegateAddress = msg.Tags.Address or utils.formatAddress(msg.From)
+	assert(utils.isValidAOAddress(delegateAddress), "Invalid delegator address")
+	local feeResult = gar.getRedelegationFee(delegateAddress, tonumber(msg.Timestamp))
 	ao.send({
 		Target = msg.From,
 		Tags = { Action = ActionMap.RedelegationFee .. "-Notice" },
