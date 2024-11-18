@@ -719,4 +719,39 @@ describe("utils", function()
 			assert.are.same({ 2, 4 }, result)
 		end)
 	end)
+
+	describe("deepCopy", function()
+		it("should deep copy a table with nested tables containing mixed types", function()
+			local input = {
+				foo = "bar",
+				baz = 2,
+				qux = { 1, 2, 3 },
+				quux = { a = "b", c = "d" },
+				oof = true,
+			}
+			local result = utils.deepCopy(input)
+			assert.are.same(input, result)
+			assert.are_not.equal(input, result)
+			assert.are_not.equal(input.qux, result.qux)
+			assert.are_not.equal(input.quux, result.quux)
+		end)
+
+		it("should exclude nested fields specified in the exclusion list while preserving array indexing", function()
+			local input = {
+				foo = "bar",
+				baz = 2,
+				qux = { 1, 2, 3 },
+				quux = { a = "b", c = "d" },
+				oof = true,
+			}
+			local result = utils.deepCopy(input, { "foo", "qux.2", "quux.c" })
+			assert.are.same({
+				baz = 2,
+				qux = { 1, 3 },
+				quux = { a = "b" },
+				oof = true,
+			}, result)
+			assert.are_not.equal(input, result)
+		end)
+	end)
 end)
