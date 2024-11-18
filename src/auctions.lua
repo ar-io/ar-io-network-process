@@ -23,7 +23,6 @@ AuctionSettings = {
 --- @field initiator string The address of the initiator of the auction
 --- @field settings AuctionSettings The settings for the auction
 --- @field startTimestamp number The starting timestamp for the auction
---- @field endTimestamp function Computes the ending timestamp for the auction
 --- @field registrationFeeCalculator function Function to calculate registration fee
 --- @field computePricesForAuction function Function to compute prices for the auction
 --- @field getPriceForAuctionAtTimestamp function Function to get the price for the auction at a given timestamp
