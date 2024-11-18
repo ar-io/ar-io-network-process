@@ -971,9 +971,8 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 end)
 
 addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", ActionMap.LeaveNetwork), function(msg)
-	local from = msg.From
-	local unsafeGatewayBeforeLeaving = gar.getGatewayUnsafe(from)
 	local timestamp = tonumber(msg.Timestamp)
+	local unsafeGatewayBeforeLeaving = gar.getGatewayUnsafe(msg.From)
 	local gwPrevTotalDelegatedStake = 0
 	local gwPrevStake = 0
 	if unsafeGatewayBeforeLeaving ~= nil then
@@ -2673,5 +2672,22 @@ addEventingHandler("getPaginatedPrimaryNames", utils.hasMatchingTag("Action", Ac
 		Data = json.encode(result),
 	})
 end)
+
+addEventingHandler(
+	"getPaginatedGatewayVaults",
+	utils.hasMatchingTag("Action", "Paginated-Gateway-Vaults"),
+	function(msg)
+		local page = utils.parsePaginationTags(msg)
+		local gatewayAddress = utils.formatAddress(msg.Tags.Address or msg.From)
+		assert(utils.isValidAOAddress(gatewayAddress), "Invalid gateway address")
+		local result =
+			gar.getPaginatedVaultsForGateway(gatewayAddress, page.cursor, page.limit, page.sortBy, page.sortOrder)
+		return ao.send({
+			Target = msg.From,
+			Action = "Gateway-Vaults-Notice",
+			Data = json.encode(result),
+		})
+	end
+)
 
 return process

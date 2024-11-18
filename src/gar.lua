@@ -1968,4 +1968,35 @@ function gar.getRedelegationFee(delegateAddress)
 	}
 end
 
+--- @param gatewayAddress WalletAddress
+--- @param cursor string|nil a cursorId to paginate the vaults
+--- @param limit number
+--- @param sortBy "vaultId"|"startTimestamp"|"endTimestamp"|"balance"|"cursorId"|nil
+--- @param sortOrder "asc"|"desc"|nil
+--- @return PaginatedTable # A table containing the paginated vaults and pagination metadata
+function gar.getPaginatedVaultsForGateway(gatewayAddress, cursor, limit, sortBy, sortOrder)
+	local unsafeGateway = gar.getGatewayUnsafe(gatewayAddress)
+	assert(unsafeGateway, "Gateway not found")
+
+	local vaults = utils.reduce(unsafeGateway.vaults, function(acc, vaultId, vault)
+		table.insert(acc, {
+			vaultId = vaultId,
+			cursorId = vaultId .. "_" .. vault.startTimestamp,
+			balance = vault.balance,
+			startTimestamp = vault.startTimestamp,
+			endTimestamp = vault.endTimestamp,
+		})
+		return acc
+	end, {})
+
+	return utils.paginateTableWithCursor(
+		vaults,
+		cursor,
+		"cursorId",
+		limit,
+		sortBy or "startTimestamp",
+		sortOrder or "asc"
+	)
+end
+
 return gar
