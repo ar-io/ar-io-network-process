@@ -1017,9 +1017,9 @@ describe('GatewayRegistry', async () => {
           'Invalid quantity. Must be integer greater than 1000000',
         ),
       );
-      assert.equal(
-        result.Messages[0].Tags.find((t) => t.name === 'Error').value,
-        'Bad-Input',
+      assert(
+        result.Messages[0].Tags.find((t) => t.name === 'Error'),
+        'Error tag should be present',
       );
     });
 
