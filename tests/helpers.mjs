@@ -253,3 +253,17 @@ export const getVaults = async ({
     memory: Memory,
   };
 };
+
+export const getGatewayVaultsItems = async ({ memory, gatewayAddress }) => {
+  const gatewayVaultsResult = await handle(
+    {
+      Tags: [
+        { name: 'Action', value: 'Paginated-Gateway-Vaults' },
+        { name: 'Address', value: gatewayAddress },
+      ],
+    },
+    memory,
+  );
+  assertNoResultError(gatewayVaultsResult);
+  return JSON.parse(gatewayVaultsResult.Messages?.[0]?.Data).items;
+};
