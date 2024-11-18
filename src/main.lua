@@ -964,7 +964,7 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 	addSupplyData(msg.ioEvent)
 
 	ao.send({
-		Target = msg.FromAddress,
+		Target = msg.From,
 		Tags = { Action = ActionMap.JoinNetwork .. "-Notice" },
 		Data = json.encode(gateway),
 	})
