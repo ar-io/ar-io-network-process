@@ -1262,6 +1262,7 @@ addEventingHandler(
 		local result = gar.decreaseDelegateStake(target, msg.From, quantity, timestamp, msg.Id, instantWithdraw)
 		local decreaseDelegateStakeResult = {
 			gateway = result and result.gateway or {},
+			penaltyRate = result and result.penaltyRate or 0,
 			expeditedWithdrawalFee = result and result.expeditedWithdrawalFee or 0,
 			amountWithdrawn = result and result.amountWithdrawn or 0,
 		}
