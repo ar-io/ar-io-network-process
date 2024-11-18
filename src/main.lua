@@ -390,6 +390,7 @@ end, function(msg)
 		"Operator-Stake",
 		"Delegated-Stake",
 		"Withdraw-Stake",
+		"Timestamp",
 		"Years",
 		"Min-Delegated-Stake",
 		"Port",
