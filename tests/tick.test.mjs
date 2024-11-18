@@ -1,4 +1,4 @@
-import { createAosLoader } from './utils.mjs';
+import { assertNoResultError, createAosLoader } from './utils.mjs';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import {
@@ -342,10 +342,10 @@ describe('Tick', async () => {
       },
       futureTick.Memory,
     );
-    assert.deepEqual(undefined, prunedVault.Messages[0].Data);
-    assert.equal(
-      prunedVault.Messages[0].Tags.find((tag) => tag.name === 'Error').value,
-      'Vault-Not-Found',
+    // it should have an error tag
+    assert.ok(
+      prunedVault.Messages[0].Tags.find((tag) => tag.name === 'Error'),
+      'Error tag should be present',
     );
 
     // Check that the balance is returned to the owner
@@ -541,10 +541,7 @@ describe('Tick', async () => {
     );
 
     // assert no error tag
-    const observationErrorTag = observation.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(observationErrorTag, undefined);
+    assertNoResultError(observation);
 
     // now jump ahead to the epoch distribution timestamp
     const distributionTimestamp = epochData.distributionTimestamp;

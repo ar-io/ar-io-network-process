@@ -816,12 +816,12 @@ end
 
 --- Submits a bid to an auction
 --- @param name string The name of the auction
---- @param bidAmount number The amount of the bid
+--- @param bidAmount number|nil The amount of the bid
 --- @param bidder string The address of the bidder
 --- @param timestamp number The timestamp of the bid
 --- @param processId string The processId of the bid
 --- @param type string The type of the bid
---- @param years number The number of years for the bid
+--- @param years number|nil The number of years for the bid
 --- @param msgId string The current messageId
 --- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stakes". Default "balance"
 --- @return AuctionBidResult auctionBidResult The result of the bid

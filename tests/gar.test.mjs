@@ -328,7 +328,7 @@ describe('GatewayRegistry', async () => {
         address: STUB_ADDRESS,
         memory: sharedMemory,
       });
-      assert.deepEqual(gateway, {
+      assert.deepStrictEqual(gateway, {
         observerAddress: STUB_ADDRESS,
         operatorStake: 100_000_000_000, // matches the initial operator stake from the test setup
         totalDelegatedStake: 0,
@@ -354,6 +354,14 @@ describe('GatewayRegistry', async () => {
           passedEpochCount: 0,
           prescribedEpochCount: 0,
           observedEpochCount: 0,
+        },
+        weights: {
+          stakeWeight: 0,
+          tenureWeight: 0,
+          gatewayRewardRatioWeight: 0,
+          observerRewardRatioWeight: 0,
+          compositeWeight: 0,
+          normalizedCompositeWeight: 0,
         },
       });
     });
@@ -419,6 +427,14 @@ describe('GatewayRegistry', async () => {
           passedEpochCount: 0,
           prescribedEpochCount: 0,
           observedEpochCount: 0,
+        },
+        weights: {
+          stakeWeight: 0,
+          tenureWeight: 0,
+          gatewayRewardRatioWeight: 0,
+          observerRewardRatioWeight: 0,
+          compositeWeight: 0,
+          normalizedCompositeWeight: 0,
         },
       });
       const allowedDelegatesResult = await getAllowedDelegates({
@@ -986,9 +1002,9 @@ describe('GatewayRegistry', async () => {
           'Invalid quantity. Must be integer greater than 1000000',
         ),
       );
-      assert.equal(
-        result.Messages[0].Tags.find((t) => t.name === 'Error').value,
-        'Bad-Input',
+      assert(
+        result.Messages[0].Tags.find((t) => t.name === 'Error'),
+        'Error tag should be present',
       );
     });
 
@@ -1192,9 +1208,9 @@ describe('GatewayRegistry', async () => {
           assert: false,
         });
 
-      assert.equal(
-        result.Messages[0].Tags.find((t) => t.name === 'Error').value,
-        'Bad-Input',
+      assert.ok(
+        result.Messages[0].Tags.find((t) => t.name === 'Error'),
+        'Error tag should be present',
       );
       assert(
         result.Messages[0].Data.includes(
