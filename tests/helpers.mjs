@@ -12,6 +12,9 @@ import {
 
 const initialOperatorStake = 100_000_000_000;
 
+export const basePermabuyPrice = 2_500_000_000;
+export const baseLeasePrice = 600_000_000;
+
 const { handle: originalHandle, memory } = await createAosLoader();
 export const startMemory = memory;
 
@@ -33,12 +36,39 @@ export function assertNoResultError(result) {
   assert.strictEqual(errorTag, undefined);
 }
 
+export const getBalances = async ({ memory, timestamp = STUB_TIMESTAMP }) => {
+  const result = await handle(
+    {
+      Tags: [{ name: 'Action', value: 'Balances' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  );
+
+  const balances = JSON.parse(result.Messages?.[0]?.Data);
+  return balances;
+};
+
+export const getBalance = async ({
+  address,
+  memory,
+  timestamp = STUB_TIMESTAMP,
+}) => {
+  const balances = await getBalances({ memory, timestamp });
+  return balances[address];
+};
+
 export const transfer = async ({
   recipient = STUB_ADDRESS,
   quantity = initialOperatorStake,
   memory = startMemory,
   cast = false,
 } = {}) => {
+  if (quantity === 0) {
+    // Nothing to do
+    return memory;
+  }
+
   const transferResult = await handle(
     {
       From: PROCESS_OWNER,
@@ -132,4 +162,34 @@ export const setUpStake = async ({
     memory: stakeResult.Memory,
     result: stakeResult,
   };
+};
+
+export const getBaseRegistrationFeeForName = async ({
+  memory,
+  timestamp,
+  name = 'great-nam',
+}) => {
+  const result = await handle(
+    {
+      Tags: [{ name: 'Action', value: 'Get-Registration-Fees' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  );
+  assertNoResultError(result);
+  return JSON.parse(result.Messages[0].Data)[name.length.toString()]['lease'][
+    '1'
+  ];
+};
+
+export const getDemandFactor = async ({ memory, timestamp }) => {
+  const result = await handle(
+    {
+      Tags: [{ name: 'Action', value: 'Demand-Factor' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  );
+  assertNoResultError(result);
+  return result.Messages[0].Data;
 };

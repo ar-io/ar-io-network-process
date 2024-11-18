@@ -9,6 +9,9 @@ constants.defaultundernameLimit = 10
 constants.totalTokenSupply = 1000000000 * 1000000 -- 1 billion tokens
 constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.10 -- the minimum penalty rate for an expedited withdrawal (10% of the amount being withdrawn)
 constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.50 -- the maximum penalty rate for an expedited withdrawal (50% of the amount being withdrawn)
+constants.mIOPerIO = 1000000
+constants.minimumWithdrawalAmount = constants.mIOPerIO -- the minimum amount that can be withdrawn from the GAR
+constants.redelegationFeeResetIntervalMs = 1000 * 60 * 60 * 24 * 7 -- 7 epochs
 
 -- ARNS
 constants.DEFAULT_UNDERNAME_COUNT = 10
@@ -21,9 +24,11 @@ constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE = 0.005
 constants.oneYearMs = 31536000 * 1000
 constants.gracePeriodMs = 14 * 24 * 60 * 60 * 1000 -- 2 weeks
 constants.maxLeaseLengthYears = 5
+
 constants.ARNS_DISCOUNT_PERCENTAGE = 0.2
-constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR = 1
-constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR = 0.85
+constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD = 1
+constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD = 0.85
+constants.ARNS_DISCOUNT_NAME = "ArNS Discount"
 
 -- DEMAND
 constants.demandSettings = {

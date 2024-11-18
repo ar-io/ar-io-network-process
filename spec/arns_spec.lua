@@ -109,22 +109,22 @@ describe("arns", function()
 				function()
 					_G.GatewayRegistry[testAddress] = testGateway
 					_G.GatewayRegistry[testAddress].weights = {
-						tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
-						gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+						tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+						gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 					}
 					local result = gar.isEligibleForArNSDiscount(testAddress)
 					assert.is_true(result)
 
 					local demandBefore = demand.getCurrentPeriodRevenue()
 					local purchasesBefore = demand.getCurrentPeriodPurchases()
-					local discountedCost = 600000000 - (math.floor(600000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+					local discountTotal = 600000000 - (math.floor(600000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
 
 					local status, buyRecordResult =
 						pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
 
 					assert.is_true(status)
 					assert.are.same({
-						purchasePrice = discountedCost,
+						purchasePrice = discountTotal,
 						type = "lease",
 						undernameLimit = 10,
 						processId = testProcessId,
@@ -133,7 +133,7 @@ describe("arns", function()
 					}, buyRecordResult.record)
 					assert.are.same({
 						["test-name"] = {
-							purchasePrice = discountedCost,
+							purchasePrice = discountTotal,
 							type = "lease",
 							undernameLimit = 10,
 							processId = testProcessId,
@@ -141,9 +141,9 @@ describe("arns", function()
 							endTimestamp = timestamp + constants.oneYearMs * 1,
 						},
 					}, _G.NameRegistry.records)
-					assert.are.equal(startBalance - discountedCost, _G.Balances[testAddress])
-					assert.are.equal(discountedCost, _G.Balances[_G.ao.id])
-					assert.are.equal(demandBefore + discountedCost, demand.getCurrentPeriodRevenue())
+					assert.are.equal(startBalance - discountTotal, _G.Balances[testAddress])
+					assert.are.equal(discountTotal, _G.Balances[_G.ao.id])
+					assert.are.equal(demandBefore + discountTotal, demand.getCurrentPeriodRevenue())
 					assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 				end
 			)
@@ -388,8 +388,8 @@ describe("arns", function()
 			it("should apply ArNS discount for increasing undername limit for eligible gateways", function()
 				_G.GatewayRegistry[testAddress] = testGateway
 				_G.GatewayRegistry[testAddress].weights = {
-					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
-					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 				}
 				assert.is_true(gar.isEligibleForArNSDiscount(testAddress))
 
@@ -416,21 +416,21 @@ describe("arns", function()
 				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
 
-				local discountedCost = 25000000 - (math.floor(25000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+				local discountTotal = 25000000 - (math.floor(25000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
 
 				assert.is.equal(
 					_G.Balances[testAddress],
-					startBalance - discountedCost,
+					startBalance - discountTotal,
 					"Balance should be reduced by the purchase price"
 				)
 
 				assert.is.equal(
 					_G.Balances[_G.ao.id],
-					discountedCost,
+					discountTotal,
 					"Protocol balance should be increased by the purchase price"
 				)
 
-				assert.are.equal(demandBefore + discountedCost, demand.getCurrentPeriodRevenue())
+				assert.are.equal(demandBefore + discountTotal, demand.getCurrentPeriodRevenue())
 				assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 			end)
 		end)
@@ -572,8 +572,8 @@ describe("arns", function()
 			it("should apply ArNS discount to eligible gateways for extending leases", function()
 				_G.GatewayRegistry[testAddress] = testGateway
 				_G.GatewayRegistry[testAddress].weights = {
-					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
-					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 				}
 				local result = gar.isEligibleForArNSDiscount(testAddress)
 				assert.is_true(result)
@@ -610,21 +610,21 @@ describe("arns", function()
 					},
 				}, _G.NameRegistry.records)
 
-				local discountedCost = 400000000 - (math.floor(400000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+				local discountTotal = 400000000 - (math.floor(400000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
 
 				assert.is.equal(
 					_G.Balances[testAddress],
-					startBalance - discountedCost,
+					startBalance - discountTotal,
 					"Balance should be reduced by the purchase price"
 				)
 
 				assert.is.equal(
 					_G.Balances[_G.ao.id],
-					discountedCost,
+					discountTotal,
 					"Protocol balance should be increased by the discounted price"
 				)
 
-				assert.are.equal(demandBefore + discountedCost, demand.getCurrentPeriodRevenue())
+				assert.are.equal(demandBefore + discountTotal, demand.getCurrentPeriodRevenue())
 				assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 			end)
 		end)
@@ -792,8 +792,8 @@ describe("arns", function()
 		it("should return the correct token cost for an ArNS discount eligible address", function()
 			_G.GatewayRegistry[stubRandomAddress] = testGateway
 			_G.GatewayRegistry[stubRandomAddress].weights = {
-				tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
-				gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+				tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+				gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 			}
 			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
 			assert.is_true(result)
@@ -810,8 +810,8 @@ describe("arns", function()
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
 
-			local discountedCost = expectedCost - (math.floor(expectedCost * constants.ARNS_DISCOUNT_PERCENTAGE))
-			assert.are.equal(discountedCost, arns.getTokenCost(intendedAction).tokenCost)
+			local discountTotal = expectedCost - (math.floor(expectedCost * constants.ARNS_DISCOUNT_PERCENTAGE))
+			assert.are.equal(discountTotal, arns.getTokenCost(intendedAction).tokenCost)
 		end)
 
 		it("should not apply discount on a gateway that is found but does not meet the requirements", function()
@@ -900,8 +900,26 @@ describe("arns", function()
 		end)
 	end)
 
+	describe("getCostDetailsForAction", function()
+		it("should match getTokenCost logic but with { tokenCost: number, discounts: table } shape", function()
+			local baseFee = 500000000
+			local years = 2
+			local demandFactor = 0.974
+			local expectedCost = math.floor((years * baseFee * 0.20) + baseFee) * demandFactor
+			local intendedAction = {
+				intent = "Buy-Record",
+				purchaseType = "lease",
+				years = 2,
+				name = "test-name",
+				currentTimestamp = timestamp,
+			}
+			_G.DemandFactor.currentDemandFactor = demandFactor
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
+		end)
+	end)
+
 	describe("pruneRecords", function()
-		it("should prune records and create auctions for expired leased records", function()
+		it("should prune records older than the grace period", function()
 			local currentTimestamp = 2000000000
 
 			_G.NameRegistry = {
@@ -971,23 +989,6 @@ describe("arns", function()
 			}, _G.NameRegistry.records)
 			assert.are.same({
 				["expired-record"] = {
-					startTimestamp = 2000000000,
-					endTimestamp = 3209600000, -- plus 14 days
-					initiator = _G.ao.id,
-					baseFee = 400000000,
-					demandFactor = 1,
-					registrationFeeCalculator = arns.calculateRegistrationFee,
-					name = "expired-record",
-					settings = {
-						decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14),
-						scalingExponent = 190,
-						startPriceMultiplier = 50,
-						durationMs = 60 * 1000 * 60 * 24 * 14,
-					},
-				},
-			}, _G.NameRegistry.auctions)
-			assert.are.same({
-				["expired-record"] = {
 					endTimestamp = currentTimestamp - constants.gracePeriodMs - 1, -- expired and past the grace period
 					processId = "expired-process-id",
 					purchasePrice = 400000000,
@@ -1029,39 +1030,6 @@ describe("arns", function()
 					undernameLimit = 10,
 				},
 			}, _G.NameRegistry.records)
-			-- grace period record now joins the auction list and is pruned
-			assert.are.same({
-				["expired-record"] = {
-					startTimestamp = 2000000000,
-					endTimestamp = 3209600000, -- plus 14 days
-					initiator = _G.ao.id,
-					baseFee = 400000000,
-					demandFactor = 1,
-					registrationFeeCalculator = arns.calculateRegistrationFee,
-					name = "expired-record",
-					settings = {
-						decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14),
-						scalingExponent = 190,
-						startPriceMultiplier = 50,
-						durationMs = 60 * 1000 * 60 * 24 * 14,
-					},
-				},
-				["grace-period-record"] = {
-					baseFee = 400000000,
-					demandFactor = 1.0,
-					startTimestamp = currentTimestamp,
-					endTimestamp = currentTimestamp + 1209600000, -- plus 14 days
-					initiator = "test",
-					name = "grace-period-record",
-					registrationFeeCalculator = arns.calculateRegistrationFee,
-					settings = {
-						decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14),
-						scalingExponent = 190,
-						startPriceMultiplier = 50,
-						durationMs = 60 * 1000 * 60 * 24 * 14,
-					},
-				},
-			}, _G.NameRegistry.auctions)
 			assert.are.same({
 				["grace-period-record"] = {
 					endTimestamp = 790400010,
@@ -1159,17 +1127,6 @@ describe("arns", function()
 	end)
 
 	describe("auctions", function()
-		before_each(function()
-			_G.NameRegistry.records["test-name"] = {
-				endTimestamp = nil,
-				processId = "test-process-id",
-				purchasePrice = 600000000,
-				startTimestamp = 0,
-				type = "permabuy",
-				undernameLimit = 10,
-			}
-		end)
-
 		describe("createAuction", function()
 			it("should create an auction and remove any existing record", function()
 				local auction = arns.createAuction("test-name", 1000000, "test-initiator")
@@ -1199,11 +1156,27 @@ describe("arns", function()
 				assert.match("Auction already exists", error)
 			end)
 
-			it("should throw an error if the name is not registered", function()
-				_G.NameRegistry.records["test-name"] = nil
+			it("should throw an error if the name is reserved", function()
+				_G.NameRegistry.reserved["test-name"] = {
+					endTimestamp = 1000000,
+				}
 				local status, error = pcall(arns.createAuction, "test-name", 1000000, "test-initiator")
 				assert.is_false(status)
-				assert.match("Name is not registered", error)
+				assert.match("Name is reserved. Auctions can only be created for unregistered names.", error)
+			end)
+
+			it("should throw an error if the name is registered", function()
+				_G.NameRegistry.records["test-name"] = {
+					endTimestamp = nil,
+					processId = "test-process-id",
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "permabuy",
+					undernameLimit = 10,
+				}
+				local status, error = pcall(arns.createAuction, "test-name", 1000000, "test-initiator")
+				assert.is_false(status)
+				assert.match("Name is registered. Auctions can only be created for unregistered names.", error)
 			end)
 		end)
 
@@ -1326,8 +1299,8 @@ describe("arns", function()
 			it("should apply the ArNS discount to the upgrade cost", function()
 				_G.GatewayRegistry[stubRandomAddress] = testGateway
 				_G.GatewayRegistry[stubRandomAddress].weights = {
-					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
-					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 				}
 				_G.NameRegistry.records["upgrade-name"] = {
 					endTimestamp = 1000000,
@@ -1443,7 +1416,8 @@ describe("arns", function()
 						bidTimestamp,
 						"test-process-id",
 						"permabuy",
-						0
+						0,
+						"test-msg-id"
 					)
 					local totalDecay = auction.settings.decayRate * (bidTimestamp - startTimestamp)
 					local expectedPrice = math.floor(startPrice * ((1 - totalDecay) ^ auction.settings.scalingExponent))
@@ -1478,8 +1452,8 @@ describe("arns", function()
 			it("should apply ArNS discount on auction bids for eligible gateways", function()
 				_G.GatewayRegistry[testAddressArweave] = testGateway
 				_G.GatewayRegistry[testAddressArweave].weights = {
-					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_FACTOR,
-					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_FACTOR,
+					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 				}
 				assert(gar.isEligibleForArNSDiscount(testAddressArweave))
 				local startTimestamp = 1000000
@@ -1499,7 +1473,8 @@ describe("arns", function()
 					bidTimestamp,
 					"test-process-id",
 					"permabuy",
-					0
+					0,
+					"test-msg-id"
 				)
 				local totalDecay = auction.settings.decayRate * (bidTimestamp - startTimestamp)
 				local expectedPrice = math.floor(startPrice * ((1 - totalDecay) ^ auction.settings.scalingExponent))
@@ -1528,8 +1503,15 @@ describe("arns", function()
 			end)
 
 			it("should throw an error if the auction is not found", function()
-				local status, error =
-					pcall(arns.submitAuctionBid, "test-name-2", 1000000000, "test-bidder", 1000000, "test-process-id")
+				local status, error = pcall(
+					arns.submitAuctionBid,
+					"test-name-2",
+					1000000000,
+					"test-bidder",
+					1000000,
+					"test-process-id",
+					"test-msg-id"
+				)
 				assert.is_false(status)
 				assert.match("Auction not found", error)
 			end)
@@ -1547,7 +1529,8 @@ describe("arns", function()
 					startTimestamp,
 					"test-process-id",
 					"permabuy",
-					nil
+					nil,
+					"test-msg-id"
 				)
 				assert.is_false(status)
 				assert.match("Bid amount is less than the required bid of " .. startPrice, error)
@@ -1567,7 +1550,8 @@ describe("arns", function()
 					startTimestamp,
 					"test-process-id",
 					"permabuy",
-					nil
+					nil,
+					"test-msg-id"
 				)
 				assert.is_false(status)
 				assert.match("Insufficient balance", error)

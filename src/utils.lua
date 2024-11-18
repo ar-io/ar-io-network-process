@@ -9,7 +9,7 @@ end
 
 --- Checks if a value is an integer
 --- @param value any The value to check
---- @return boolean Whether the value is an integer
+--- @return boolean isInteger - whether the value is an integer
 function utils.isInteger(value)
 	if type(value) == "string" then
 		value = tonumber(value)
@@ -20,14 +20,14 @@ end
 --- Rounds a number to a given precision
 --- @param number number The number to round
 --- @param precision number The precision to round to
---- @return number The rounded number to the precision provided
+--- @return number roundedNumber - the rounded number to the precision provided
 function utils.roundToPrecision(number, precision)
 	return math.floor(number * (10 ^ precision) + 0.5) / (10 ^ precision)
 end
 
 --- Sums the values of a table
 --- @param tbl table The table to sum
---- @return number The sum of the table values
+--- @return number sum - the sum of the table values
 function utils.sumTableValues(tbl)
 	local sum = 0
 	for _, value in pairs(tbl) do
@@ -39,9 +39,9 @@ end
 --- Slices a table
 --- @param tbl table The table to slice
 --- @param first number The first index to slice from
---- @param last number The last index to slice to
---- @param step number The step to slice by
---- @return table The sliced table
+--- @param last number|nil The last index to slice to
+--- @param step number|nil The step to slice by
+--- @return table slicedTable - the sliced table
 function utils.slice(tbl, first, last, step)
 	local sliced = {}
 
@@ -52,14 +52,20 @@ function utils.slice(tbl, first, last, step)
 	return sliced
 end
 
+--- @class PaginationTags
+--- @field cursor string|nil The cursor to paginate from
+--- @field limit number The limit of results to return
+--- @field sortBy string|nil The field to sort by
+--- @field sortOrder string The order to sort by
+
 --- Parses the pagination tags from a message
 --- @param msg table The message provided to a handler (see ao docs for more info)
---- @return table The pagination tags
+--- @return PaginationTags paginationTags - the pagination tags
 function utils.parsePaginationTags(msg)
 	local cursor = msg.Tags.Cursor
 	local limit = tonumber(msg.Tags["Limit"]) or 100
 	local sortOrder = msg.Tags["Sort-Order"] and string.lower(msg.Tags["Sort-Order"]) or "desc"
-	local sortBy = msg.Tags["Sort-By"] and msg.Tags["Sort-By"]
+	local sortBy = msg.Tags["Sort-By"]
 	return {
 		cursor = cursor,
 		limit = limit,
@@ -74,7 +80,7 @@ end
 --- Supports nested fields using dot notation.
 --- @param prevTable table The table to sort
 --- @param fields table A list of fields with order specified, e.g., { { field = "name", order = "asc" } }
---- @return table The sorted table
+--- @return table sortedTable - the sorted table
 function utils.sortTableByFields(prevTable, fields)
 	-- Handle sorting for non-table values with possible nils
 	if fields[1].field == nil then
@@ -178,17 +184,17 @@ end
 --- @field totalItems number The total number of items
 --- @field sortBy string|nil The field to sort by, nil if sorting by the primitive items themselves
 --- @field sortOrder string The order to sort by
---- @field nextCursor string|nil The cursor to the next page
+--- @field nextCursor string|number|nil The cursor to the next page
 --- @field hasMore boolean Whether there is a next page
 
 --- Paginate a table with a cursor
 --- @param tableArray table The table to paginate
---- @param cursor string|nil The cursor to paginate from (optional)
+--- @param cursor string|number|nil The cursor to paginate from (optional)
 --- @param cursorField string|nil The field to use as the cursor or nil for lists of primitives
 --- @param limit number The limit of items to return
 --- @param sortBy string|nil The field to sort by. Nil if sorting by the primitive items themselves.
 --- @param sortOrder string The order to sort by ("asc" or "desc")
---- @return PaginatedTable The paginated table result
+--- @return PaginatedTable paginatedTable - the paginated table result
 function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, sortBy, sortOrder)
 	local sortedArray = utils.sortTableByFields(tableArray, { { order = sortOrder, field = sortBy } })
 
@@ -240,21 +246,21 @@ end
 
 --- Checks if an address is a valid Arweave address
 --- @param address string The address to check
---- @return boolean Whether the address is a valid Arweave address
+--- @return boolean isValidArweaveAddress - whether the address is a valid Arweave address
 function utils.isValidArweaveAddress(address)
 	return type(address) == "string" and #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
 end
 
 --- Checks if an address is a valid Ethereum address
 --- @param address string The address to check
---- @return boolean Whether the address is a valid Ethereum address
+--- @return boolean isValidEthAddress - whether the address is a valid Ethereum address
 function utils.isValidEthAddress(address)
 	return type(address) == "string" and #address == 42 and string.match(address, "^0x[%x]+$") ~= nil
 end
 
 --- Checks if an address is a valid AO address
 --- @param url string|nil The address to check
---- @return boolean Whether the address is a valid AO address
+--- @return boolean isValidAOAddress - whether the address is a valid AO address
 function utils.isValidAOAddress(url)
 	return url and (utils.isValidArweaveAddress(url) or utils.isValidEthAddress(url)) or false
 end
@@ -263,7 +269,7 @@ end
 --- Assumes address has been validated as a valid Ethereum address (see utils.isValidEthAddress)
 --- Reference: https://eips.ethereum.org/EIPS/eip-55
 --- @param address string The address to convert
---- @return string The EIP-55 checksum formatted address
+--- @return string formattedAddress - the EIP-55 checksum formatted address
 function utils.formatEIP55Address(address)
 	local hex = string.lower(string.sub(address, 3))
 
@@ -287,7 +293,7 @@ end
 
 --- Formats an address to EIP-55 checksum format if it is a valid Ethereum address
 --- @param address string The address to format
---- @return string The EIP-55 checksum formatted address
+--- @return string formattedAddress - the EIP-55 checksum formatted address
 function utils.formatAddress(address)
 	if utils.isValidEthAddress(address) then
 		return utils.formatEIP55Address(address)
@@ -297,7 +303,7 @@ end
 
 --- Safely decodes a JSON string
 --- @param jsonString string The JSON string to decode
---- @return table|nil The decoded JSON or nil if the string is nil or the decoding fails
+--- @return table|nil decodedJson - the decoded JSON or nil if the string is nil or the decoding fails
 function utils.safeDecodeJson(jsonString)
 	if not jsonString then
 		return nil
@@ -313,7 +319,7 @@ end
 --- Finds an element in an array that matches a predicate
 --- @param array table The array to search
 --- @param predicate function The predicate to match
---- @return number|nil The index of the found element or nil if the element is not found
+--- @return number|nil index - the index of the found element or nil if the element is not found
 function utils.findInArray(array, predicate)
 	for i = 1, #array do
 		if predicate(array[i]) then
@@ -324,8 +330,9 @@ function utils.findInArray(array, predicate)
 end
 
 --- Deep copies a table
---- @param original table The table to copy
---- @return table|nil The deep copy of the table or nil if the original is nil
+--- @generic T: table|nil
+--- @param original T The table to copy
+--- @return T The deep copy of the table or nil if the original is nil
 function utils.deepCopy(original)
 	if not original then
 		return nil
@@ -348,7 +355,7 @@ end
 
 --- Gets the length of a table
 --- @param table table The table to get the length of
---- @return number The length of the table
+--- @return number length - the length of the table
 function utils.lengthOfTable(table)
 	local count = 0
 	for _, val in pairs(table) do
@@ -391,7 +398,7 @@ end
 --- Splits a string by a delimiter and trims each token
 --- @param input string The string to split
 --- @param delimiter string The delimiter to split by
---- @return table The split and trimmed string
+--- @return table tokens - the split and trimmed string
 function utils.splitAndTrimString(input, delimiter)
 	local tokens = {}
 	for _, token in ipairs(utils.splitString(input, delimiter)) do
@@ -405,7 +412,7 @@ end
 
 --- Checks if a timestamp is an integer and converts it to milliseconds if it is in seconds
 --- @param timestamp number The timestamp to check and convert
---- @return number The timestamp in milliseconds
+--- @return number timestampInMs - the timestamp in milliseconds
 function utils.checkAndConvertTimestamptoMs(timestamp)
 	-- Check if the timestamp is an integer
 	assert(type(timestamp) == "number", "Timestamp must be a number")
