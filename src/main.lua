@@ -353,6 +353,17 @@ end, function(msg)
 	local epochIndex = epochs.getEpochIndexForTimestamp(msgTimestamp)
 	msg.ioEvent:addField("epochIndex", epochIndex)
 
+	local previousStateSupplies = {
+		protocolBalance = Balances[Protocol],
+		lastKnownCirculatingSupply = LastKnownCirculatingSupply,
+		lastKnownLockedSupply = LastKnownLockedSupply,
+		lastKnownStakedSupply = LastKnownStakedSupply,
+		lastKnownDelegatedSupply = LastKnownDelegatedSupply,
+		lastKnownWithdrawSupply = LastKnownWithdrawSupply,
+		lastKnownRequestSupply = LastKnownPnpRequestSupply,
+		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
+	}
+
 	local msgId = msg.Id
 	print("Pruning state at timestamp: " .. msgTimestamp)
 	local prunedStateResult = prune.pruneState(msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
@@ -418,7 +429,19 @@ end, function(msg)
 		end
 	end
 
-	addSupplyData(msg.ioEvent)
+	-- add supply data if it has changed since the last state
+	if
+		LastKnownCirculatingSupply ~= previousStateSupplies.lastKnownCirculatingSupply
+		or LastKnownLockedSupply ~= previousStateSupplies.lastKnownLockedSupply
+		or LastKnownStakedSupply ~= previousStateSupplies.lastKnownStakedSupply
+		or LastKnownDelegatedSupply ~= previousStateSupplies.lastKnownDelegatedSupply
+		or LastKnownWithdrawSupply ~= previousStateSupplies.lastKnownWithdrawSupply
+		or LastKnownPnpRequestSupply ~= previousStateSupplies.lastKnownRequestSupply
+		or Balances[Protocol] ~= previousStateSupplies.protocolBalance
+		or lastKnownTotalTokenSupply() ~= previousStateSupplies.lastKnownTotalSupply
+	then
+		addSupplyData(msg.ioEvent)
+	end
 
 	return prunedStateResult
 end)
