@@ -364,6 +364,25 @@ end, function(msg)
 		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
 	}
 
+	-- Format all incoming addresses
+	msg.From = utils.formatAddress(msg.From)
+
+	local knownAddressTags = {
+		"Recipient",
+		"Initiator",
+		"Target",
+		"Source",
+		"Address",
+		"Vault-Id",
+		"Process-Id",
+		"Observer-Address",
+	}
+	for _, tagName in ipairs(knownAddressTags) do
+		msg.Tags[tagName] = msg.Tags[tagName] and utils.formatAddress(msg.Tags[tagName]) or nil
+	end
+
+	msg.Tags.Quantity = msg.Tags.Quantity and tonumber(msg.Tags.Quantity) or nil
+
 	local msgId = msg.Id
 	print("Pruning state at timestamp: " .. msgTimestamp)
 	local prunedStateResult = prune.pruneState(msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
@@ -449,17 +468,16 @@ end)
 -- Write handlers
 addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
 	-- assert recipient is a valid arweave address
-	local from = utils.formatAddress(msg.From)
-	local recipient = utils.formatAddress(msg.Tags.Recipient)
-	local quantity = tonumber(msg.Tags.Quantity)
+	local recipient = msg.Tags.Recipient
+	local quantity = msg.Tags.Quantity
 	assert(utils.isValidAOAddress(recipient), "Invalid recipient")
 	assert(quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
 
 	msg.ioEvent:addField("RecipientFormatted", recipient)
 
-	local result = balances.transfer(recipient, from, quantity)
+	local result = balances.transfer(recipient, msg.From, quantity)
 	if result ~= nil then
-		local senderNewBalance = result[from]
+		local senderNewBalance = result[msg.From]
 		local recipientNewBalance = result[recipient]
 		msg.ioEvent:addField("SenderPreviousBalance", senderNewBalance + quantity)
 		msg.ioEvent:addField("SenderNewBalance", senderNewBalance)
@@ -508,8 +526,7 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 end)
 
 addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.CreateVault), function(msg)
-	local from = utils.formatAddress(msg.From)
-	local quantity = tonumber(msg.Tags.Quantity)
+	local quantity = msg.Tags.Quantity
 	local lockLengthMs = tonumber(msg.Tags["Lock-Length"])
 	local timestamp = tonumber(msg.Timestamp)
 	local msgId = msg.Id
@@ -519,7 +536,7 @@ addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionM
 	)
 	assert(quantity and quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
 	assert(timestamp, "Timestamp is required for a tick interaction")
-	local vault = vaults.createVault(from, quantity, lockLengthMs, timestamp, msgId)
+	local vault = vaults.createVault(msg.From, quantity, lockLengthMs, timestamp, msgId)
 
 	if vault ~= nil then
 		msg.ioEvent:addField("Vault-Id", msgId)
@@ -533,7 +550,7 @@ addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionM
 	addSupplyData(msg.ioEvent)
 
 	ao.send({
-		Target = from,
+		Target = msg.From,
 		Tags = {
 			Action = ActionMap.CreateVault .. "-Notice",
 			["Vault-Id"] = msgId,
@@ -543,9 +560,8 @@ addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionM
 end)
 
 addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap.VaultedTransfer), function(msg)
-	local from = utils.formatAddress(msg.From)
-	local recipient = utils.formatAddress(msg.Tags.Recipient)
-	local quantity = tonumber(msg.Tags.Quantity)
+	local recipient = msg.Tags.Recipient
+	local quantity = msg.Tags.Quantity
 	local lockLengthMs = tonumber(msg.Tags["Lock-Length"])
 	local timestamp = tonumber(msg.Timestamp)
 	local msgId = msg.Id
@@ -558,7 +574,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 	assert(quantity and quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
 	assert(timestamp, "Timestamp is required for a tick interaction")
 
-	local vault = vaults.vaultedTransfer(from, recipient, quantity, lockLengthMs, timestamp, msgId)
+	local vault = vaults.vaultedTransfer(msg.From, recipient, quantity, lockLengthMs, timestamp, msgId)
 
 	if vault ~= nil then
 		msg.ioEvent:addField("Vault-Id", msgId)
@@ -573,7 +589,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 
 	-- sender gets an immediate debit notice as the quantity is debited from their balance
 	ao.send({
-		Target = from,
+		Target = msg.From,
 		Recipient = recipient,
 		Quantity = quantity,
 		Tags = { Action = "Debit-Notice", ["Vault-Id"] = msgId },
@@ -583,7 +599,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 	ao.send({
 		Target = recipient,
 		Quantity = quantity,
-		Sender = from,
+		Sender = msg.From,
 		Tags = {
 			Action = ActionMap.CreateVault .. "-Notice",
 			["Vault-Id"] = msgId,
@@ -593,8 +609,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 end)
 
 addEventingHandler(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.ExtendVault), function(msg)
-	local from = utils.formatAddress(msg.From)
-	local vaultId = utils.formatAddress(msg.Tags["Vault-Id"])
+	local vaultId = msg.Tags["Vault-Id"]
 	local timestamp = tonumber(msg.Timestamp)
 	local extendLengthMs = tonumber(msg.Tags["Extend-Length"])
 	assert(utils.isValidAOAddress(vaultId), "Invalid vault id")
@@ -604,7 +619,7 @@ addEventingHandler(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionM
 	)
 	assert(timestamp, "Timestamp is required for a tick interaction")
 
-	local vault = vaults.extendVault(from, extendLengthMs, timestamp, vaultId)
+	local vault = vaults.extendVault(msg.From, extendLengthMs, timestamp, vaultId)
 
 	if vault ~= nil then
 		msg.ioEvent:addField("Vault-Id", vaultId)
@@ -622,13 +637,12 @@ addEventingHandler(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionM
 end)
 
 addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.IncreaseVault), function(msg)
-	local from = utils.formatAddress(msg.From)
-	local vaultId = utils.formatAddress(msg.Tags["Vault-Id"])
-	local quantity = tonumber(msg.Tags.Quantity)
+	local vaultId = msg.Tags["Vault-Id"]
+	local quantity = msg.Tags.Quantity
 	assert(utils.isValidAOAddress(vaultId), "Invalid vault id")
 	assert(quantity and quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
 
-	local vault = vaults.increaseVault(from, quantity, vaultId, msg.Timestamp)
+	local vault = vaults.increaseVault(msg.From, quantity, vaultId, msg.Timestamp)
 
 	if vault ~= nil then
 		msg.ioEvent:addField("Vault-Id", vaultId)
@@ -653,8 +667,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	local name = string.lower(msg.Tags.Name)
 	local purchaseType = msg.Tags["Purchase-Type"] and string.lower(msg.Tags["Purchase-Type"]) or "lease"
 	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
-	local from = utils.formatAddress(msg.From)
-	local processId = utils.formatAddress(msg.Tags["Process-Id"] or msg.From)
+	local processId = msg.Tags["Process-Id"] or msg.From
 	local timestamp = tonumber(msg.Timestamp)
 	local fundFrom = msg.Tags["Fund-From"]
 
@@ -673,7 +686,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 
 	msg.ioEvent:addField("nameLength", #msg.Tags.Name)
 
-	local result = arns.buyRecord(name, purchaseType, years, from, timestamp, processId, msg.Id, fundFrom)
+	local result = arns.buyRecord(name, purchaseType, years, msg.From, timestamp, processId, msg.Id, fundFrom)
 	local record = {}
 	if result ~= nil then
 		record = result.record
@@ -701,13 +714,12 @@ end)
 addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.UpgradeName), function(msg)
 	local fundFrom = msg.Tags["Fund-From"]
 	local name = string.lower(msg.Tags.Name)
-	local from = utils.formatAddress(msg.From)
 	local timestamp = tonumber(msg.Timestamp)
 	assert(type(name) == "string", "Invalid name")
 	assert(timestamp, "Timestamp is required")
 	assertValidFundFrom(fundFrom)
 
-	local result = arns.upgradeRecord(from, name, timestamp, msg.Id, fundFrom)
+	local result = arns.upgradeRecord(msg.From, name, timestamp, msg.Id, fundFrom)
 
 	local record = {}
 	if result ~= nil then
@@ -717,7 +729,7 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 	end
 
 	ao.send({
-		Target = from,
+		Target = msg.From,
 		Tags = { Action = ActionMap.UpgradeName .. "-Notice", Name = name },
 		Data = json.encode(fundFrom and result or {
 			name = name,
@@ -732,7 +744,6 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 end)
 
 addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.ExtendLease), function(msg)
-	local from = utils.formatAddress(msg.From)
 	local fundFrom = msg.Tags["Fund-From"]
 	local name = string.lower(msg.Tags.Name)
 	local years = tonumber(msg.Tags.Years)
@@ -744,7 +755,7 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 	)
 	assert(timestamp, "Timestamp is required")
 	assertValidFundFrom(fundFrom)
-	local result = arns.extendLease(from, name, years, timestamp, msg.Id, fundFrom)
+	local result = arns.extendLease(msg.From, name, years, timestamp, msg.Id, fundFrom)
 	local recordResult = {}
 	if result ~= nil then
 		msg.ioEvent:addField("Total-Extension-Fee", result.totalExtensionFee)
@@ -764,10 +775,9 @@ addEventingHandler(
 	ActionMap.IncreaseUndernameLimit,
 	utils.hasMatchingTag("Action", ActionMap.IncreaseUndernameLimit),
 	function(msg)
-		local from = utils.formatAddress(msg.From)
 		local fundFrom = msg.Tags["Fund-From"]
 		local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
-		local quantity = tonumber(msg.Tags.Quantity)
+		local quantity = msg.Tags.Quantity
 		local timestamp = tonumber(msg.Timestamp)
 		assert(type(name) == "string", "Invalid name")
 		assert(
@@ -777,12 +787,12 @@ addEventingHandler(
 		assert(timestamp, "Timestamp is required")
 		assertValidFundFrom(fundFrom)
 
-		local result = arns.increaseundernameLimit(from, name, quantity, timestamp, msg.Id, fundFrom)
+		local result = arns.increaseundernameLimit(msg.From, name, quantity, timestamp, msg.Id, fundFrom)
 		local recordResult = {}
 		if result ~= nil then
 			recordResult = result.record
 			addRecordResultFields(msg.ioEvent, result)
-			msg.ioEvent:addField("previousUndernameLimit", recordResult.undernameLimit - tonumber(msg.Tags.Quantity))
+			msg.ioEvent:addField("previousUndernameLimit", recordResult.undernameLimit - msg.Tags.Quantity)
 			msg.ioEvent:addField("additionalUndernameCost", result.additionalUndernameCost)
 			addSupplyData(msg.ioEvent)
 		end
@@ -819,17 +829,16 @@ function assertTokenCostTags(msg)
 
 	-- if quantity provided must be a number and integer greater than 0
 	if msg.Tags.Quantity then
-		assert(utils.isInteger(tonumber(msg.Tags.Quantity)), "Invalid quantity. Must be integer greater than 0")
+		assert(utils.isInteger(msg.Tags.Quantity), "Invalid quantity. Must be integer greater than 0")
 	end
 end
 
 addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap.TokenCost), function(msg)
 	assertTokenCostTags(msg)
-	local from = utils.formatAddress(msg.From)
 	local intent = msg.Tags.Intent
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
 	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
-	local quantity = msg.Tags.Quantity and tonumber(msg.Tags.Quantity) or nil
+	local quantity = msg.Tags.Quantity or nil
 	local purchaseType = msg.Tags["Purchase-Type"] or "lease"
 	local timestamp = tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp)
 
@@ -840,7 +849,7 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 		quantity = quantity,
 		purchaseType = purchaseType,
 		currentTimestamp = timestamp,
-		from = from,
+		from = msg.From,
 	}
 
 	local tokenCostResult = arns.getTokenCost(intendedAction)
@@ -855,10 +864,9 @@ end)
 
 addEventingHandler(ActionMap.CostDetails, utils.hasMatchingTag("Action", ActionMap.CostDetails), function(msg)
 	local fundFrom = msg.Tags["Fund-From"]
-	local from = utils.formatAddress(msg.From)
 	local name = string.lower(msg.Tags.Name)
 	local years = tonumber(msg.Tags.Years) or 1
-	local quantity = tonumber(msg.Tags.Quantity)
+	local quantity = msg.Tags.Quantity
 	local purchaseType = msg.Tags["Purchase-Type"] or "lease"
 	local timestamp = tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp)
 	assertTokenCostTags(msg)
@@ -871,7 +879,7 @@ addEventingHandler(ActionMap.CostDetails, utils.hasMatchingTag("Action", ActionM
 		quantity,
 		purchaseType,
 		timestamp,
-		from,
+		msg.From,
 		fundFrom
 	)
 	if not tokenCostAndFundingPlan then
@@ -920,19 +928,17 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 	}
 
 	local updatedServices = utils.safeDecodeJson(msg.Tags.Services)
-	local fromAddress = utils.formatAddress(msg.From)
+	local fromAddress = msg.From
 	local observerAddress = msg.Tags["Observer-Address"] or fromAddress
-	local formattedObserverAddress = utils.formatAddress(observerAddress)
 	local stake = tonumber(msg.Tags["Operator-Stake"])
 	local timestamp = tonumber(msg.Timestamp)
 
 	assert(not msg.Tags.Services or updatedServices, "Services must be a valid JSON string")
 
-	msg.ioEvent:addField("Resolved-Observer-Address", formattedObserverAddress)
+	msg.ioEvent:addField("Resolved-Observer-Address", observerAddress)
 	msg.ioEvent:addField("Sender-Previous-Balance", Balances[fromAddress] or 0)
 
-	local gateway =
-		gar.joinNetwork(fromAddress, stake, updatedSettings, updatedServices, formattedObserverAddress, timestamp)
+	local gateway = gar.joinNetwork(fromAddress, stake, updatedSettings, updatedServices, observerAddress, timestamp)
 	msg.ioEvent:addField("Sender-New-Balance", Balances[fromAddress] or 0)
 	if gateway ~= nil then
 		msg.ioEvent:addField("GW-Start-Timestamp", gateway.startTimestamp)
@@ -946,16 +952,15 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 	addSupplyData(msg.ioEvent)
 
 	ao.send({
-		Target = fromAddress,
+		Target = msg.From,
 		Tags = { Action = ActionMap.JoinNetwork .. "-Notice" },
 		Data = json.encode(gateway),
 	})
 end)
 
 addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", ActionMap.LeaveNetwork), function(msg)
-	local from = utils.formatAddress(msg.From)
 	local timestamp = tonumber(msg.Timestamp)
-	local unsafeGatewayBeforeLeaving = gar.getGatewayUnsafe(from)
+	local unsafeGatewayBeforeLeaving = gar.getGatewayUnsafe(msg.From)
 	local gwPrevTotalDelegatedStake = 0
 	local gwPrevStake = 0
 	if unsafeGatewayBeforeLeaving ~= nil then
@@ -966,7 +971,7 @@ addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", Action
 	assert(unsafeGatewayBeforeLeaving, "Gateway not found")
 	assert(timestamp, "Timestamp is required")
 
-	local gateway = gar.leaveNetwork(from, timestamp, msg.Id)
+	local gateway = gar.leaveNetwork(msg.From, timestamp, msg.Id)
 
 	if gateway ~= nil then
 		msg.ioEvent:addField("GW-Vaults-Count", utils.lengthOfTable(gateway.vaults or {}))
@@ -1016,15 +1021,14 @@ addEventingHandler(
 	ActionMap.IncreaseOperatorStake,
 	utils.hasMatchingTag("Action", ActionMap.IncreaseOperatorStake),
 	function(msg)
-		local from = utils.formatAddress(msg.From)
-		local quantity = tonumber(msg.Tags.Quantity)
+		local quantity = msg.Tags.Quantity
 		assert(
 			quantity and utils.isInteger(quantity) and quantity > 0,
 			"Invalid quantity. Must be integer greater than 0"
 		)
 
 		msg.ioEvent:addField("Sender-Previous-Balance", Balances[msg.From])
-		local gateway = gar.increaseOperatorStake(from, quantity)
+		local gateway = gar.increaseOperatorStake(msg.From, quantity)
 
 		msg.ioEvent:addField("Sender-New-Balance", Balances[msg.From])
 		if gateway ~= nil then
@@ -1048,8 +1052,7 @@ addEventingHandler(
 	ActionMap.DecreaseOperatorStake,
 	utils.hasMatchingTag("Action", ActionMap.DecreaseOperatorStake),
 	function(msg)
-		local from = utils.formatAddress(msg.From)
-		local quantity = tonumber(msg.Tags.Quantity)
+		local quantity = msg.Tags.Quantity
 		local instantWithdraw = msg.Tags.Instant and msg.Tags.Instant == "true" or false
 		local timestamp = tonumber(msg.Timestamp)
 		assert(timestamp, "Timestamp is required")
@@ -1064,7 +1067,7 @@ addEventingHandler(
 
 		msg.ioEvent:addField("Sender-Previous-Balance", Balances[msg.From])
 
-		local result = gar.decreaseOperatorStake(from, quantity, timestamp, msg.Id, instantWithdraw)
+		local result = gar.decreaseOperatorStake(msg.From, quantity, timestamp, msg.Id, instantWithdraw)
 		local decreaseOperatorStakeResult = {
 			gateway = result and result.gateway or {},
 			penaltyRate = result and result.penaltyRate or 0,
@@ -1114,26 +1117,25 @@ addEventingHandler(
 )
 
 addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", ActionMap.DelegateStake), function(msg)
-	local from = utils.formatAddress(msg.From)
-	local gatewayTarget = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
-	local quantity = tonumber(msg.Tags.Quantity)
+	local gatewayTarget = msg.Tags.Target or msg.Tags.Address
+	local quantity = msg.Tags.Quantity
 	local timestamp = tonumber(msg.Timestamp)
 	assert(utils.isValidAOAddress(gatewayTarget), "Invalid gateway address")
 	assert(
-		msg.Tags.Quantity and tonumber(msg.Tags.Quantity) > 0 and utils.isInteger(tonumber(msg.Tags.Quantity)),
+		msg.Tags.Quantity and msg.Tags.Quantity > 0 and utils.isInteger(msg.Tags.Quantity),
 		"Invalid quantity. Must be integer greater than 0"
 	)
 
 	msg.ioEvent:addField("Target-Formatted", gatewayTarget)
 
-	local gateway = gar.delegateStake(from, gatewayTarget, quantity, timestamp)
+	local gateway = gar.delegateStake(msg.From, gatewayTarget, quantity, timestamp)
 	local delegateResult = {}
 	if gateway ~= nil then
-		local newStake = gateway.delegates[from].delegatedStake
+		local newStake = gateway.delegates[msg.From].delegatedStake
 		msg.ioEvent:addField("Previous-Stake", newStake - quantity)
 		msg.ioEvent:addField("New-Stake", newStake)
 		msg.ioEvent:addField("Gateway-Total-Delegated-Stake", gateway.totalDelegatedStake)
-		delegateResult = gateway.delegates[from]
+		delegateResult = gateway.delegates[msg.From]
 	end
 
 	LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
@@ -1148,15 +1150,14 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 end)
 
 addEventingHandler(ActionMap.CancelWithdrawal, utils.hasMatchingTag("Action", ActionMap.CancelWithdrawal), function(msg)
-	local from = utils.formatAddress(msg.From)
-	local gatewayAddress = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From)
+	local gatewayAddress = msg.Tags.Target or msg.Tags.Address or msg.From
 	local vaultId = msg.Tags["Vault-Id"]
 	assert(utils.isValidAOAddress(gatewayAddress), "Invalid gateway address")
 	assert(utils.isValidAOAddress(vaultId), "Invalid vault id")
 
 	msg.ioEvent:addField("Target-Formatted", gatewayAddress)
 
-	local result = gar.cancelGatewayWithdrawal(from, gatewayAddress, vaultId)
+	local result = gar.cancelGatewayWithdrawal(msg.From, gatewayAddress, vaultId)
 	local updatedGateway = {}
 	if result ~= nil then
 		updatedGateway = result.gateway
@@ -1193,9 +1194,8 @@ addEventingHandler(
 	ActionMap.InstantWithdrawal,
 	utils.hasMatchingTag("Action", ActionMap.InstantWithdrawal),
 	function(msg)
-		local from = utils.formatAddress(msg.From)
-		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From) -- if not provided, use sender
-		local vaultId = utils.formatAddress(msg.Tags["Vault-Id"])
+		local target = msg.Tags.Target or msg.Tags.Address or msg.From -- if not provided, use sender
+		local vaultId = msg.Tags["Vault-Id"]
 		local timestamp = tonumber(msg.Timestamp)
 		msg.ioEvent:addField("Target-Formatted", target)
 
@@ -1203,7 +1203,7 @@ addEventingHandler(
 		assert(utils.isValidAOAddress(vaultId), "Invalid vault id")
 		assert(timestamp, "Timestamp is required")
 
-		local result = gar.instantGatewayWithdrawal(from, target, vaultId, timestamp)
+		local result = gar.instantGatewayWithdrawal(msg.From, target, vaultId, timestamp)
 		if result ~= nil then
 			local vaultBalance = result.vaultBalance
 			msg.ioEvent:addField("Stake-Amount-Withdrawn", vaultBalance)
@@ -1236,24 +1236,18 @@ addEventingHandler(
 	ActionMap.DecreaseDelegateStake,
 	utils.hasMatchingTag("Action", ActionMap.DecreaseDelegateStake),
 	function(msg)
-		local from = utils.formatAddress(msg.From)
-		local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address)
-		local quantity = tonumber(msg.Tags.Quantity)
+		local target = msg.Tags.Target or msg.Tags.Address
+		local quantity = msg.Tags.Quantity
 		local instantWithdraw = msg.Tags.Instant and msg.Tags.Instant == "true" or false
 		local timestamp = tonumber(msg.Timestamp)
-		local messageId = msg.Id
 		msg.ioEvent:addField("Target-Formatted", target)
 		msg.ioEvent:addField("Quantity", quantity)
-		assert(utils.isValidAOAddress(target), "Invalid gateway address")
 		assert(
-			quantity
-				and tonumber(msg.Tags.Quantity) > constants.minimumWithdrawalAmount
-				and utils.isInteger(msg.Tags.Quantity),
+			quantity and utils.isInteger(quantity) and quantity > constants.minimumWithdrawalAmount,
 			"Invalid quantity. Must be integer greater than " .. constants.minimumWithdrawalAmount
 		)
 
-		local result = gar.decreaseDelegateStake(target, from, quantity, timestamp, messageId, instantWithdraw)
-
+		local result = gar.decreaseDelegateStake(target, msg.From, quantity, timestamp, msg.Id, instantWithdraw)
 		local decreaseDelegateStakeResult = {
 			gateway = result and result.gateway or {},
 			penaltyRate = result and result.penaltyRate or 0,
@@ -1266,7 +1260,7 @@ addEventingHandler(
 		local delegateResult = {}
 		if result ~= nil and result.gateway ~= nil then
 			local gateway = result.gateway
-			local newStake = gateway.delegates[from].delegatedStake
+			local newStake = gateway.delegates[msg.From].delegatedStake
 			msg.ioEvent:addField("Previous-Stake", newStake + quantity)
 			msg.ioEvent:addField("New-Stake", newStake)
 			msg.ioEvent:addField("Gateway-Total-Delegated-Stake", gateway.totalDelegatedStake)
@@ -1278,7 +1272,7 @@ addEventingHandler(
 				msg.ioEvent:addField("Penalty-Rate", result.penaltyRate)
 			end
 
-			delegateResult = gateway.delegates[from]
+			delegateResult = gateway.delegates[msg.From]
 			local newDelegateVaults = delegateResult.vaults
 			if newDelegateVaults ~= nil then
 				msg.ioEvent:addField("Vaults-Count", utils.lengthOfTable(newDelegateVaults))
@@ -1300,7 +1294,7 @@ addEventingHandler(
 		addSupplyData(msg.ioEvent)
 
 		ao.send({
-			Target = from,
+			Target = msg.From,
 			Tags = {
 				Action = ActionMap.DecreaseDelegateStake .. "-Notice",
 				Address = target,
@@ -1362,17 +1356,9 @@ addEventingHandler(
 
 		-- TODO: we could standardize this on our prepended handler to inject and ensure formatted addresses and converted values
 		local observerAddress = msg.Tags["Observer-Address"] or unsafeGateway.observerAddress
-		local formattedAddress = utils.formatAddress(msg.From)
-		local formattedObserverAddress = utils.formatAddress(observerAddress)
 		local timestamp = tonumber(msg.Timestamp)
-		local result = gar.updateGatewaySettings(
-			formattedAddress,
-			updatedSettings,
-			updatedServices,
-			formattedObserverAddress,
-			timestamp,
-			msg.Id
-		)
+		local result =
+			gar.updateGatewaySettings(msg.From, updatedSettings, updatedServices, observerAddress, timestamp, msg.Id)
 		ao.send({
 			Target = msg.From,
 			Tags = { Action = ActionMap.UpdateGatewaySettings .. "-Notice" },
@@ -1382,10 +1368,9 @@ addEventingHandler(
 )
 
 addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", ActionMap.ReassignName), function(msg)
-	local from = utils.formatAddress(msg.From)
-	local newProcessId = utils.formatAddress(msg.Tags["Process-Id"])
+	local newProcessId = msg.Tags["Process-Id"]
 	local name = string.lower(msg.Tags.Name)
-	local initiator = utils.formatAddress(msg.Tags.Initiator)
+	local initiator = msg.Tags.Initiator
 	local timestamp = tonumber(msg.Timestamp)
 	assert(name and #name > 0, "Name is required")
 	assert(utils.isValidAOAddress(newProcessId), "Process Id must be a valid AO signer address..")
@@ -1394,7 +1379,7 @@ addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", Action
 		assert(utils.isValidAOAddress(initiator), "Invalid initiator address.")
 	end
 
-	local reassignment = arns.reassignName(name, from, timestamp, newProcessId)
+	local reassignment = arns.reassignName(name, msg.From, timestamp, newProcessId)
 
 	ao.send({
 		Target = msg.From,
@@ -1415,7 +1400,6 @@ addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", Action
 end)
 
 addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
-	local from = utils.formatAddress(msg.From)
 	local reportTxId = msg.Tags["Report-Tx-Id"]
 	local failedGateways = utils.splitAndTrimString(msg.Tags["Failed-Gateways"], ",")
 	local timestamp = tonumber(msg.Timestamp)
@@ -1424,7 +1408,7 @@ addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", Ac
 		assert(utils.isValidAOAddress(gateway), "Invalid failed gateway address: " .. gateway)
 	end
 
-	local observations = epochs.saveObservations(from, reportTxId, failedGateways, timestamp)
+	local observations = epochs.saveObservations(msg.From, reportTxId, failedGateways, timestamp)
 	if observations ~= nil then
 		local failureSummariesCount = utils.lengthOfTable(observations.failureSummaries or {})
 		if failureSummariesCount > 0 then
@@ -1445,6 +1429,7 @@ end)
 
 addEventingHandler(ActionMap.EpochSettings, utils.hasMatchingTag("Action", ActionMap.EpochSettings), function(msg)
 	local epochSettings = epochs.getSettings()
+
 	ao.send({
 		Target = msg.From,
 		Action = ActionMap.EpochSettings .. "-Notice",
@@ -1573,6 +1558,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
 	local tickedRewardDistributions = {}
 	local totalTickedRewardsDistributed = 0
+
 	local function tickEpoch(timestamp, blockHeight, hashchain, msgId)
 		-- update demand factor if necessary
 		local demandFactor = demand.updateDemandFactor(timestamp)
@@ -1736,6 +1722,7 @@ end)
 addEventingHandler(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", ActionMap.Info), function(msg)
 	local handlers = Handlers.list
 	local handlerNames = {}
+
 	for _, handler in ipairs(handlers) do
 		table.insert(handlerNames, handler.name)
 	end
@@ -1810,8 +1797,9 @@ addEventingHandler(ActionMap.Balances, Handlers.utils.hasMatchingTag("Action", A
 end)
 
 addEventingHandler(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMap.Balance), function(msg)
-	local target = utils.formatAddress(msg.Tags.Target or msg.Tags.Address or msg.From)
+	local target = msg.Tags.Target or msg.Tags.Address or msg.From
 	local balance = balances.getBalance(target)
+
 	-- must adhere to token.lua spec for arconnect compatibility
 	ao.send({
 		Target = msg.From,
@@ -1826,6 +1814,7 @@ end)
 addEventingHandler(ActionMap.DemandFactor, utils.hasMatchingTag("Action", ActionMap.DemandFactor), function(msg)
 	-- wrap in a protected call, and return the result or error accoringly to sender
 	local status, result = pcall(demand.getDemandFactor)
+
 	if status then
 		ao.send({ Target = msg.From, Action = "Demand-Factor-Notice", Data = json.encode(result) })
 	else
@@ -1901,6 +1890,7 @@ end)
 
 addEventingHandler(ActionMap.Epochs, utils.hasMatchingTag("Action", ActionMap.Epochs), function(msg)
 	local allEpochs = epochs.getEpochs()
+
 	ao.send({ Target = msg.From, Action = "Epochs-Notice", Data = json.encode(allEpochs) })
 end)
 
@@ -1916,7 +1906,11 @@ addEventingHandler(
 
 		local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
 		local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
-		ao.send({ Target = msg.From, Action = "Prescribed-Observers-Notice", Data = json.encode(prescribedObservers) })
+		ao.send({
+			Target = msg.From,
+			Action = "Prescribed-Observers-Notice",
+			Data = json.encode(prescribedObservers),
+		})
 	end
 )
 
@@ -1945,7 +1939,11 @@ addEventingHandler(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", Act
 
 	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
 	local prescribedNames = epochs.getPrescribedNamesForEpoch(epochIndex)
-	ao.send({ Target = msg.From, Action = "Prescribed-Names-Notice", Data = json.encode(prescribedNames) })
+	ao.send({
+		Target = msg.From,
+		Action = "Prescribed-Names-Notice",
+		Data = json.encode(prescribedNames),
+	})
 end)
 
 addEventingHandler(ActionMap.Distributions, utils.hasMatchingTag("Action", ActionMap.Distributions), function(msg)
@@ -1957,12 +1955,21 @@ addEventingHandler(ActionMap.Distributions, utils.hasMatchingTag("Action", Actio
 
 	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
 	local distributions = epochs.getDistributionsForEpoch(epochIndex)
-	ao.send({ Target = msg.From, Action = "Distributions-Notice", Data = json.encode(distributions) })
+	ao.send({
+		Target = msg.From,
+		Action = "Distributions-Notice",
+		Data = json.encode(distributions),
+	})
 end)
 
 addEventingHandler(ActionMap.ReservedNames, utils.hasMatchingTag("Action", ActionMap.ReservedNames), function(msg)
 	local reservedNames = arns.getReservedNames()
-	ao.send({ Target = msg.From, Action = "Reserved-Names-Notice", Data = json.encode(reservedNames) })
+
+	ao.send({
+		Target = msg.From,
+		Action = "Reserved-Names-Notice",
+		Data = json.encode(reservedNames),
+	})
 end)
 
 addEventingHandler(ActionMap.ReservedName, utils.hasMatchingTag("Action", ActionMap.ReservedName), function(msg)
@@ -1986,7 +1993,6 @@ addEventingHandler(ActionMap.Vault, utils.hasMatchingTag("Action", ActionMap.Vau
 	local vaultId = msg.Tags["Vault-Id"]
 	local vault = vaults.getVault(address, vaultId)
 	assert(vault, "Vault not found")
-
 	ao.send({
 		Target = msg.From,
 		Action = "Vault-Notice",
@@ -2002,6 +2008,7 @@ addEventingHandler("paginatedRecords", utils.hasMatchingTag("Action", "Paginated
 	local page = utils.parsePaginationTags(msg)
 	local status, result =
 		pcall(arns.getPaginatedRecords, page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
+
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -2023,6 +2030,7 @@ addEventingHandler("paginatedGateways", utils.hasMatchingTag("Action", "Paginate
 		page.sortBy or "startTimestamp",
 		page.sortOrder or "desc"
 	)
+
 	if not status then
 		ao.send({
 			Target = msg.From,
@@ -2108,7 +2116,11 @@ addEventingHandler(
 		if not shouldContinue then
 			return
 		end
-		ao.send({ Target = msg.From, Action = "Allowed-Delegates-Notice", Data = json.encode(result) })
+		ao.send({
+			Target = msg.From,
+			Action = "Allowed-Delegates-Notice",
+			Data = json.encode(result),
+		})
 	end
 )
 
@@ -2118,9 +2130,9 @@ addEventingHandler(
 addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.ReleaseName), function(msg)
 	-- validate the name and process id exist, then create the auction using the auction function
 	local name = string.lower(msg.Tags.Name)
-	local processId = utils.formatAddress(msg.From)
+	local processId = msg.From
 	local record = arns.getRecord(name)
-	local initiator = utils.formatAddress(msg.Tags.Initiator or msg.From)
+	local initiator = msg.Tags.Initiator or msg.From
 	local timestamp = tonumber(msg.Timestamp)
 
 	assert(name and #name > 0, "Name is required")
@@ -2179,7 +2191,6 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 		Name = name,
 		Data = json.encode(auction),
 	})
-	return
 end)
 
 -- AUCTIONS
@@ -2187,6 +2198,7 @@ addEventingHandler("auctions", utils.hasMatchingTag("Action", ActionMap.Auctions
 	local page = utils.parsePaginationTags(msg)
 	local auctions = arns.getAuctions()
 	local auctionsWithoutFunctions = {}
+
 	for _, v in ipairs(auctions) do
 		table.insert(auctionsWithoutFunctions, {
 			name = v.name,
@@ -2299,9 +2311,9 @@ end)
 addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.AuctionBid), function(msg)
 	local fundFrom = msg.Tags["Fund-From"]
 	local name = string.lower(msg.Tags.Name)
-	local bidAmount = msg.Tags.Quantity and tonumber(msg.Tags.Quantity) or nil -- if nil, we use the current bid price
-	local bidder = utils.formatAddress(msg.From)
-	local processId = utils.formatAddress(msg.Tags["Process-Id"])
+	local bidAmount = msg.Tags.Quantity or nil -- if nil, we use the current bid price
+	local bidder = msg.From
+	local processId = msg.Tags["Process-Id"]
 	local timestamp = tonumber(msg.Timestamp)
 	local type = msg.Tags["Purchase-Type"] or "permabuy"
 	local years = msg.Tags.Years and tonumber(msg.Tags.Years) or nil
@@ -2379,12 +2391,11 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 end)
 
 addEventingHandler("allowDelegates", utils.hasMatchingTag("Action", ActionMap.AllowDelegates), function(msg)
-	local from = utils.formatAddress(msg.From)
 	local allowedDelegates = msg.Tags["Allowed-Delegates"]
 		and utils.splitAndTrimString(msg.Tags["Allowed-Delegates"], ",")
 	assert(allowedDelegates and #allowedDelegates > 0, "Allowed-Delegates is required")
 	msg.ioEvent:addField("Input-New-Delegates-Count", utils.lengthOfTable(allowedDelegates))
-	local result = gar.allowDelegates(allowedDelegates, from)
+	local result = gar.allowDelegates(allowedDelegates, msg.From)
 
 	if result ~= nil then
 		msg.ioEvent:addField("New-Allowed-Delegates", result.newAllowedDelegates or {})
@@ -2404,13 +2415,12 @@ addEventingHandler("allowDelegates", utils.hasMatchingTag("Action", ActionMap.Al
 end)
 
 addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap.DisallowDelegates), function(msg)
-	local from = utils.formatAddress(msg.From)
 	local timestamp = tonumber(msg.Timestamp)
 	local disallowedDelegates = msg.Tags["Disallowed-Delegates"]
 		and utils.splitAndTrimString(msg.Tags["Disallowed-Delegates"], ",")
 	assert(disallowedDelegates and #disallowedDelegates > 0, "Disallowed-Delegates is required")
 	msg.ioEvent:addField("Input-Disallowed-Delegates-Count", utils.lengthOfTable(disallowedDelegates))
-	local result = gar.disallowDelegates(disallowedDelegates, from, msg.Id, timestamp)
+	local result = gar.disallowDelegates(disallowedDelegates, msg.From, msg.Id, timestamp)
 	if result ~= nil then
 		msg.ioEvent:addField("New-Disallowed-Delegates", result.removedDelegates or {})
 		msg.ioEvent:addField("New-Disallowed-Delegates-Count", utils.lengthOfTable(result.removedDelegates))
@@ -2429,7 +2439,7 @@ addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap
 end)
 
 addEventingHandler("paginatedDelegations", utils.hasMatchingTag("Action", "Paginated-Delegations"), function(msg)
-	local address = utils.formatAddress(msg.Tags.Address or msg.From)
+	local address = msg.Tags.Address or msg.From
 	local page = utils.parsePaginationTags(msg)
 
 	assert(utils.isValidAOAddress(address), "Invalid address.")
@@ -2446,7 +2456,7 @@ addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", Act
 	local sourceAddress = msg.Tags.Source
 	local targetAddress = msg.Tags.Target
 	local delegateAddress = msg.From
-	local quantity = msg.Tags.Quantity and tonumber(msg.Tags.Quantity) or nil
+	local quantity = msg.Tags.Quantity or nil
 	local vaultId = msg.Tags["Vault-Id"]
 	local timestamp = tonumber(msg.Timestamp)
 
@@ -2502,7 +2512,7 @@ addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", Act
 end)
 
 addEventingHandler(ActionMap.RedelegationFee, utils.hasMatchingTag("Action", ActionMap.RedelegationFee), function(msg)
-	local delegateAddress = msg.Tags.Address or utils.formatAddress(msg.From)
+	local delegateAddress = msg.Tags.Address or msg.From
 	assert(utils.isValidAOAddress(delegateAddress), "Invalid delegator address")
 	local feeResult = gar.getRedelegationFee(delegateAddress, tonumber(msg.Timestamp))
 	ao.send({
@@ -2515,11 +2525,10 @@ end)
 --- PRIMARY NAMES
 addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap.RemovePrimaryNames), function(msg)
 	local names = utils.splitAndTrimString(msg.Tags.Names, ",")
-	local from = utils.formatAddress(msg.From)
 	assert(names and #names > 0, "Names are required")
-	assert(from, "From is required")
+	assert(msg.From, "From is required")
 
-	local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNames(names, from)
+	local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNames(names, msg.From)
 
 	ao.send({
 		Target = msg.From,
@@ -2542,7 +2551,7 @@ end)
 addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMap.PrimaryNameRequest), function(msg)
 	local fundFrom = msg.Tags["Fund-From"]
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
-	local initiator = utils.formatAddress(msg.From) -- the process that is creating the claim
+	local initiator = msg.From -- the process that is creating the claim
 	local timestamp = tonumber(msg.Timestamp)
 	assert(name, "Name is required")
 	assert(initiator, "Initiator is required")
@@ -2564,7 +2573,7 @@ addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMa
 	end
 
 	if primaryNameResult.request then
-		--- send a notice to the from, and the base name owner
+		--- send a notice to the msg.From, and the base name owner
 		ao.send({
 			Target = msg.From,
 			Action = ActionMap.PrimaryNameRequest .. "-Notice",
@@ -2583,15 +2592,14 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", ActionMap.ApprovePrimaryNameRequest),
 	function(msg)
 		local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
-		local recipient = utils.formatAddress(msg.Tags.Recipient) or utils.formatAddress(msg.From)
-		local from = utils.formatAddress(msg.From) -- the recipient of the primary name
+		local recipient = msg.Tags.Recipient or msg.From
 		local timestamp = tonumber(msg.Timestamp)
 		assert(name, "Name is required")
 		assert(recipient, "Recipient is required")
-		assert(from, "From is required")
+		assert(msg.From, "From is required")
 		assert(timestamp, "Timestamp is required")
 
-		local approvedPrimaryNameResult = primaryNames.approvePrimaryNameRequest(recipient, name, from, timestamp)
+		local approvedPrimaryNameResult = primaryNames.approvePrimaryNameRequest(recipient, name, msg.From, timestamp)
 
 		--- send a notice to the from
 		ao.send({
@@ -2611,7 +2619,7 @@ addEventingHandler(
 --- Handles forward and reverse resolutions (e.g. name -> address and address -> name)
 addEventingHandler("getPrimaryNameData", utils.hasMatchingTag("Action", ActionMap.PrimaryName), function(msg)
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
-	local address = msg.Tags.Address and utils.formatAddress(msg.Tags.Address) or utils.formatAddress(msg.From)
+	local address = msg.Tags.Address or msg.From
 	local primaryNameData = name and primaryNames.getPrimaryNameDataWithOwnerFromName(name)
 		or address and primaryNames.getPrimaryNameDataWithOwnerFromAddress(address)
 	assert(primaryNameData, "Primary name data not found")
@@ -2661,8 +2669,13 @@ addEventingHandler(
 		local page = utils.parsePaginationTags(msg)
 		local gatewayAddress = utils.formatAddress(msg.Tags.Address or msg.From)
 		assert(utils.isValidAOAddress(gatewayAddress), "Invalid gateway address")
-		local result =
-			gar.getPaginatedVaultsForGateway(gatewayAddress, page.cursor, page.limit, page.sortBy, page.sortOrder)
+		local result = gar.getPaginatedVaultsForGateway(
+			gatewayAddress,
+			page.cursor,
+			page.limit,
+			page.sortBy or "endTimestamp",
+			page.sortOrder or "desc"
+		)
 		return ao.send({
 			Target = msg.From,
 			Action = "Gateway-Vaults-Notice",
