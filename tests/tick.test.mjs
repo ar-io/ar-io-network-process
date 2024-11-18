@@ -77,7 +77,6 @@ describe('Tick', async () => {
       },
       mem,
     );
-
     const realRecord = await handle(
       {
         Tags: [
@@ -87,7 +86,6 @@ describe('Tick', async () => {
       },
       buyRecordResult.Memory,
     );
-
     const buyRecordData = JSON.parse(realRecord.Messages[0].Data);
     assert.deepEqual(buyRecordData, {
       processId: ''.padEnd(43, 'a'),
