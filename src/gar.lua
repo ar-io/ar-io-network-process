@@ -147,6 +147,14 @@ function gar.joinNetwork(from, stake, settings, services, observerAddress, timeS
 		services = services or nil,
 		status = "joined",
 		observerAddress = observerAddress or from,
+		weights = {
+			stakeWeight = 0,
+			tenureWeight = 0,
+			gatewayRewardRatioWeight = 0,
+			observerRewardRatioWeight = 0,
+			compositeWeight = 0,
+			normalizedCompositeWeight = 0,
+		},
 	}
 
 	local gateway = gar.addGateway(from, newGateway)
