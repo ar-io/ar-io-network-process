@@ -1947,18 +1947,9 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", "Paginated-Records") or utils.hasMatchingTag("Action", ActionMap.Records),
 	function(msg)
 		local page = utils.parsePaginationTags(msg)
-		local status, result =
-			pcall(arns.getPaginatedRecords, page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
-		if not status then
-			ao.send({
-				Target = msg.From,
-				Action = "Invalid-Records-Notice",
-				Error = "Pagination-Error",
-				Data = json.encode(result),
-			})
-		else
-			ao.send({ Target = msg.From, Action = "Records-Notice", Data = json.encode(result) })
-		end
+		local result =
+			arns.getPaginatedRecords(page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
+		ao.send({ Target = msg.From, Action = "Records-Notice", Data = json.encode(result) })
 	end
 )
 
@@ -1967,41 +1958,18 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", "Paginated-Gateways") or utils.hasMatchingTag("Action", ActionMap.Gateways),
 	function(msg)
 		local page = utils.parsePaginationTags(msg)
-		local status, result = pcall(
-			gar.getPaginatedGateways,
-			page.cursor,
-			page.limit,
-			page.sortBy or "startTimestamp",
-			page.sortOrder or "desc"
-		)
-		if not status then
-			ao.send({
-				Target = msg.From,
-				Action = "Invalid-Gateways-Notice",
-				Error = "Pagination-Error",
-				Data = json.encode(result),
-			})
-		else
-			ao.send({ Target = msg.From, Action = "Gateways-Notice", Data = json.encode(result) })
-		end
+		local result =
+			gar.getPaginatedGateways(page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder or "desc")
+		ao.send({ Target = msg.From, Action = "Gateways-Notice", Data = json.encode(result) })
 	end
 )
 
 --- TODO: make this support `Balances` requests
 addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginated-Balances"), function(msg)
 	local page = utils.parsePaginationTags(msg)
-	local status, result =
-		pcall(balances.getPaginatedBalances, page.cursor, page.limit, page.sortBy or "balance", page.sortOrder)
-	if not status then
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-Balances-Notice",
-			Error = "Pagination-Error",
-			Data = json.encode(result),
-		})
-	else
-		ao.send({ Target = msg.From, Action = "Balances-Notice", Data = json.encode(result) })
-	end
+	local walletBalances =
+		balances.getPaginatedBalances(page.cursor, page.limit, page.sortBy or "balance", page.sortOrder)
+	ao.send({ Target = msg.From, Action = "Balances-Notice", Data = json.encode(walletBalances) })
 end)
 
 addEventingHandler(
@@ -2009,18 +1977,8 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", "Paginated-Vaults") or utils.hasMatchingTag("Action", ActionMap.Vaults),
 	function(msg)
 		local page = utils.parsePaginationTags(msg)
-		local status, result = pcall(vaults.getPaginatedVaults, page.cursor, page.limit, page.sortOrder, page.sortBy)
-
-		if not status then
-			ao.send({
-				Target = msg.From,
-				Action = "Invalid-Vaults-Notice",
-				Error = "Pagination-Error",
-				Data = json.encode(result),
-			})
-		else
-			ao.send({ Target = msg.From, Action = "Vaults-Notice", Data = json.encode(result) })
-		end
+		local pageVaults = vaults.getPaginatedVaults(page.cursor, page.limit, page.sortOrder, page.sortBy)
+		ao.send({ Target = msg.From, Action = "Vaults-Notice", Data = json.encode(pageVaults) })
 	end
 )
 
@@ -2029,26 +1987,13 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", "Paginated-Delegates") or utils.hasMatchingTag("Action", ActionMap.Delegates),
 	function(msg)
 		local page = utils.parsePaginationTags(msg)
-		local shouldContinue, result = eventingPcall(
-			msg.ioEvent,
-			function(error)
-				ao.send({
-					Target = msg.From,
-					Action = "Invalid-Delegates-Notice",
-					Error = "Pagination-Error",
-					Data = json.encode(error),
-				})
-			end,
-			gar.getPaginatedDelegates,
+		local result = gar.getPaginatedDelegates(
 			msg.Tags.Address or msg.From,
 			page.cursor,
 			page.limit,
 			page.sortBy or "startTimestamp",
 			page.sortOrder
 		)
-		if not shouldContinue then
-			return
-		end
 		ao.send({ Target = msg.From, Action = "Delegates-Notice", Data = json.encode(result) })
 	end
 )
@@ -2058,17 +2003,8 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", "Paginated-Allowed-Delegates"),
 	function(msg)
 		local page = utils.parsePaginationTags(msg)
-		local shouldContinue, result = eventingPcall(msg.ioEvent, function(error)
-			ao.send({
-				Target = msg.From,
-				Action = "Invalid-Allowed-Delegates-Notice",
-				Error = "Pagination-Error",
-				Data = json.encode(error),
-			})
-		end, gar.getPaginatedAllowedDelegates, msg.Tags.Address or msg.From, page.cursor, page.limit, page.sortOrder)
-		if not shouldContinue then
-			return
-		end
+		local result =
+			gar.getPaginatedAllowedDelegates(msg.Tags.Address or msg.From, page.cursor, page.limit, page.sortOrder)
 		ao.send({ Target = msg.From, Action = "Allowed-Delegates-Notice", Data = json.encode(result) })
 	end
 )
@@ -2175,18 +2111,11 @@ addEventingHandler("auctions", utils.hasMatchingTag("Action", ActionMap.Auctions
 	})
 end)
 
--- hadnler to get auction for a name
 addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.AuctionInfo), function(msg)
 	local name = string.lower(msg.Tags.Name)
 	local auction = arns.getAuction(name)
-	if not auction then
-		ao.send({
-			Target = msg.From,
-			Action = "Invalid-" .. ActionMap.AuctionInfo .. "-Notice",
-			Error = "Auction-Not-Found",
-		})
-		return
-	end
+
+	assert(auction, "Auction not found")
 
 	ao.send({
 		Target = msg.From,
