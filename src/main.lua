@@ -495,6 +495,7 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 	local quantity = msg.Tags.Quantity
 	assert(utils.isValidAOAddress(recipient), "Invalid recipient")
 	assert(quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
+	assert(recipient ~= msg.From, "Cannot transfer to self")
 
 	msg.ioEvent:addField("RecipientFormatted", recipient)
 
