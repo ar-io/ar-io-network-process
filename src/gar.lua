@@ -55,7 +55,14 @@ local gar = {}
 --- @field compositeWeight number
 --- @field normalizedCompositeWeight number
 
---- @alias GatewayServices table<string, any> TODO IS THIS CORRECT
+--- @alias GatewayServices table<'bundler', GatewayService>
+
+--- @class GatewayService
+--- @field fqdn string
+--- @field port number
+--- @field path string
+--- @field protocol string
+
 --- @alias MessageId string
 --- @alias Timestamp number
 
@@ -320,7 +327,7 @@ end
 
 --- @param from WalletAddress
 --- @param updatedSettings UpdateGatewaySettings
---- @param updatedServices GatewayServices -- TODO: IS THIS RIGHT?
+--- @param updatedServices GatewayServices
 --- @param observerAddress WalletAddress
 --- @param currentTimestamp Timestamp
 --- @param msgId MessageId
@@ -645,6 +652,10 @@ function gar.getActiveGatewaysBeforeTimestamp(startTimestamp)
 	return activeGatewayAddresses
 end
 
+--- Gets the weights of collection of gateways at a given timestamp
+--- @param gatewayAddresses string[] The gateway addresses to get the weights for
+--- @param timestamp number The timestamp to get the weights at
+--- @return WeightedGateway[] # The weighted gateways
 function gar.getGatewayWeightsAtTimestamp(gatewayAddresses, timestamp)
 	local weightedObservers = {}
 	local totalCompositeWeight = 0
@@ -858,6 +869,20 @@ function gar.addGateway(address, gateway)
 	GatewayRegistry[address] = gateway
 	return gateway
 end
+
+--- @class PrunedGatewaysResult
+--- @field prunedGateways Gateway[] The pruned gateways
+--- @field slashedGateways table<WalletAddress, number> The slashed gateways and their amounts
+--- @field gatewayStakeReturned number The gateway stake returned
+--- @field delegateStakeReturned number The delegate stake returned
+--- @field gatewayStakeWithdrawing number The gateway stake withdrawing
+--- @field delegateStakeWithdrawing number The delegate stake withdrawing
+--- @field stakeSlashed number The stake slashed
+
+--- Prunes gateways that have failed more than 30 consecutive epochs
+--- @param currentTimestamp number The current timestamp
+--- @param msgId string The message ID
+--- @return PrunedGatewaysResult # The result containing the pruned gateways, slashed gateways, and other stats
 function gar.pruneGateways(currentTimestamp, msgId)
 	local gateways = gar.getGateways()
 	local garSettings = gar.getSettings()

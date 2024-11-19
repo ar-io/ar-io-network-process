@@ -4109,11 +4109,11 @@ describe("gar", function()
 		end)
 
 		it(
-			"should allow delegates if allowDelegatedStaking is false and the allowedDelegatesLookup is not nil",
+			"should allow delegates if allowDelegatedStaking is true and the allowedDelegatesLookup is not nil",
 			function()
 				local gateway = {
 					delegates = {},
-					settings = { allowDelegatedStaking = "allowlist", allowedDelegatesLookup = {} },
+					settings = { allowDelegatedStaking = true, allowedDelegatesLookup = {} },
 				}
 				_G.GatewayRegistry = {
 					["test-gateway"] = gateway,
@@ -4123,7 +4123,7 @@ describe("gar", function()
 					gateway = {
 						delegates = {},
 						settings = {
-							allowDelegatedStaking = "allowlist",
+							allowDelegatedStaking = true,
 							allowedDelegatesLookup = {
 								[stubRandomAddress] = true,
 							},
@@ -4133,5 +4133,76 @@ describe("gar", function()
 				}, result)
 			end
 		)
+
+		describe("disallowDelegates", function()
+			it("should throw an error if the gateway is nil", function()
+				local status, error = pcall(function()
+					gar.disallowDelegates({ stubRandomAddress }, nil, "msgId", 1)
+				end)
+				assert(not status)
+				assert(error:find("Gateway not found") ~= nil)
+			end)
+			it(
+				"should not remove any delegates if allowDelegatedStaking is false and the allowedDelegatesLookup is not nil",
+				function()
+					local gateway = {
+						delegates = {},
+						settings = { allowDelegatedStaking = false, allowedDelegatesLookup = {} },
+					}
+					_G.GatewayRegistry = {
+						["test-gateway"] = gateway,
+					}
+					local result = gar.disallowDelegates({ stubRandomAddress }, "test-gateway", "msgId", 1)
+					assert.are.same({
+						gateway = {
+							delegates = {},
+							settings = { allowDelegatedStaking = false, allowedDelegatesLookup = {} },
+						},
+						removedDelegates = {},
+					}, result)
+				end
+			)
+
+			it("should throw an error if the allowedDelegatesLookup is nil", function()
+				local gateway = {
+					delegates = {},
+					settings = { allowDelegatedStaking = true, allowedDelegatesLookup = nil },
+				}
+				_G.GatewayRegistry = {
+					["test-gateway"] = gateway,
+				}
+				local status, error = pcall(function()
+					gar.disallowDelegates({ stubRandomAddress }, "test-gateway", "msgId", 1)
+				end)
+				print(error)
+				assert(not status)
+				assert(
+					error:find("Allow listing only possible when allowDelegatedStaking is set to 'allowlist'") ~= nil
+				)
+			end)
+			it(
+				"should disallow delegates if allowDelegatedStaking is true and the allowedDelegatesLookup is not nil",
+				function()
+					local gateway = {
+						delegates = {},
+						settings = {
+							allowDelegatedStaking = true,
+							allowedDelegatesLookup = { [stubRandomAddress] = true },
+						},
+					}
+					_G.GatewayRegistry = {
+						["test-gateway"] = gateway,
+					}
+					local result = gar.disallowDelegates({ stubRandomAddress }, "test-gateway", "msgId", 1)
+					assert.are.same({
+						gateway = {
+							delegates = {},
+							settings = { allowDelegatedStaking = true, allowedDelegatesLookup = {} },
+						},
+						removedDelegates = { stubRandomAddress },
+					}, result)
+				end
+			)
+		end)
 	end)
 end)

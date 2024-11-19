@@ -450,10 +450,7 @@ describe('Tick', async () => {
     );
 
     // assert no error tag
-    const tickErrorTag = newEpochTick.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(tickErrorTag, undefined);
+    assertNoResultError(newEpochTick);
 
     // assert the new epoch is created
     const epoch = await handle(
