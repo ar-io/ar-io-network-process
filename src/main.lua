@@ -335,11 +335,12 @@ local function addEventingHandler(handlerName, pattern, handleFn)
 			print("Error in " .. handlerName .. ": " .. tostring(error))
 		end, handleFn, msg)
 		if not status then
+			local errorEvent = IOEvent(msg)
 			-- We want to make sure the event data gets sent to the CU for processing, but that the memory is discarded on failures.
 			-- So we json encode the error and the event data and then throw, so the CU will discard the memory and still process the event data.
 			-- An alternative approach is to modify the implementation of ao.result - to also return the Output on error.
 			-- Reference: https://github.com/permaweb/ao/blob/76a618722b201430a372894b3e2753ac01e63d3d/dev-cli/src/starters/lua/ao.lua#L284-L287
-			local errorWithEvent = tostring(resultOrError) .. "\n" .. msg.ioEvent:toJSON()
+			local errorWithEvent = tostring(resultOrError) .. "\n" .. errorEvent:toJSON()
 			error(errorWithEvent, 0) -- 0 ensures not to include this line number in the error message
 		end
 		msg.ioEvent:printEvent()
