@@ -597,6 +597,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 	)
 	assert(quantity and quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
 	assert(timestamp, "Timestamp is required for a tick interaction")
+	assert(recipient ~= msg.From, "Cannot transfer to self")
 
 	local vault = vaults.vaultedTransfer(msg.From, recipient, quantity, lockLengthMs, timestamp, msgId)
 
