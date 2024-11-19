@@ -448,7 +448,7 @@ end
 --- Checks if a timestamp is an integer and converts it to milliseconds if it is in seconds
 --- @param timestamp number The timestamp to check and convert
 --- @return number timestampInMs - the timestamp in milliseconds
-function utils.checkAndConvertTimestamptoMs(timestamp)
+function utils.checkAndConvertTimestampToMs(timestamp)
 	-- Check if the timestamp is an integer
 	assert(type(timestamp) == "number", "Timestamp must be a number")
 	assert(utils.isInteger(timestamp), "Timestamp must be an integer")

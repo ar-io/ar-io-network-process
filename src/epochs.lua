@@ -313,11 +313,11 @@ end
 --- @param timestamp number The timestamp
 --- @return number # 	The epoch index
 function epochs.getEpochIndexForTimestamp(timestamp)
-	--- TODO: is this conversion still necessary? Confirm timestamps from the SU are unix and milliseconds
-	-- local timestampInMS = utils.checkAndConvertTimestampToMs(timestamp)
+	--- TODO: is this conversion still necessary? Confirm timestamps from the SU are unix and milliseconds and remove this
+	local timestampInMS = utils.checkAndConvertTimestampToMs(timestamp)
 	local epochZeroStartTimestamp = epochs.getSettings().epochZeroStartTimestamp
 	local epochLengthMs = epochs.getSettings().durationMs
-	local epochIndex = math.floor((timestamp - epochZeroStartTimestamp) / epochLengthMs)
+	local epochIndex = math.floor((timestampInMS - epochZeroStartTimestamp) / epochLengthMs)
 	return epochIndex
 end
 
@@ -578,8 +578,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 		return -- silently return
 	end
 
-	-- NOTE: these should match what was computed at the beginning of the epoch - use that instead of this
-	local activeGatewayAddresses = epochs.getEligibleRewardsForEpoch(epochIndex)
+	local eligibleGatewaysForEpoch = epochs.getEligibleRewardsForEpoch(epochIndex)
 	local prescribedObserversLookup = utils.reduce(
 		epochs.getPrescribedObserversForEpoch(epochIndex),
 		function(acc, _, observer)
@@ -595,7 +594,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	local totalEligibleGatewayReward = epoch.distributions.totalEligibleGatewayReward
 	local distributed = {}
 	local totalDistributed = 0
-	for gatewayAddress, totalEligibleRewardsForGateway in pairs(activeGatewayAddresses) do
+	for gatewayAddress, totalEligibleRewardsForGateway in pairs(eligibleGatewaysForEpoch) do
 		local gateway = gar.getGateway(gatewayAddress)
 		-- only operate if the gateway is found (it should be )
 		if gateway and totalEligibleRewardsForGateway then
