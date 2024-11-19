@@ -310,7 +310,6 @@ function utils.safeDecodeJson(jsonString)
 	end
 	local status, result = pcall(json.decode, jsonString)
 	if not status then
-		print("Failed to decode JSON: " .. jsonString)
 		return nil
 	end
 	return result
