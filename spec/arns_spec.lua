@@ -105,7 +105,7 @@ describe("arns", function()
 			)
 
 			it(
-				"should apply ArNS discount on lease buys when elgibility requirements are met[" .. addressType .. "]",
+				"should apply ArNS discount on lease buys when eligibility requirements are met[" .. addressType .. "]",
 				function()
 					_G.GatewayRegistry[testAddress] = testGateway
 					_G.GatewayRegistry[testAddress].weights = {
@@ -119,10 +119,8 @@ describe("arns", function()
 					local purchasesBefore = demand.getCurrentPeriodPurchases()
 					local discountTotal = 600000000 - (math.floor(600000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
 
-					local status, buyRecordResult =
-						pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
-
-					assert.is_true(status)
+					local buyRecordResult =
+						arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId)
 					assert.are.same({
 						purchasePrice = discountTotal,
 						type = "lease",
@@ -153,9 +151,7 @@ describe("arns", function()
 				function()
 					local demandBefore = demand.getCurrentPeriodRevenue()
 					local purchasesBefore = demand.getCurrentPeriodPurchases()
-					local status, result =
-						pcall(arns.buyRecord, "test-name", nil, nil, testAddress, timestamp, testProcessId)
-					assert.is_true(status)
+					local result = arns.buyRecord("test-name", nil, nil, testAddress, timestamp, testProcessId)
 					assert.are.same({
 						purchasePrice = 600000000,
 						type = "lease",
@@ -240,8 +236,7 @@ describe("arns", function()
 					target = testAddress,
 					endTimestamp = 1000,
 				}
-				local status, result =
-					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
+				local result = arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId)
 				local expectation = {
 					endTimestamp = timestamp + constants.oneYearMs,
 					processId = testProcessId,
@@ -250,7 +245,6 @@ describe("arns", function()
 					type = "lease",
 					undernameLimit = 10,
 				}
-				assert.is_true(status)
 				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
 
@@ -355,8 +349,7 @@ describe("arns", function()
 				}
 				local demandBefore = demand.getCurrentPeriodRevenue()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
-				local status, result =
-					pcall(arns.increaseundernameLimit, testAddress, "test-name", 50, timestamp, "msg-id")
+				local result = arns.increaseundernameLimit(testAddress, "test-name", 50, timestamp, "msg-id")
 				local expectation = {
 					endTimestamp = timestamp + constants.oneYearMs,
 					processId = testProcessId,
@@ -365,7 +358,6 @@ describe("arns", function()
 					type = "lease",
 					undernameLimit = 60,
 				}
-				assert.is_true(status)
 				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
 
@@ -403,7 +395,7 @@ describe("arns", function()
 				}
 				local demandBefore = demand.getCurrentPeriodRevenue()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
-				local status, result = pcall(arns.increaseundernameLimit, testAddress, "test-name", 50, timestamp)
+				local result = arns.increaseundernameLimit(testAddress, "test-name", 50, timestamp)
 				local expectation = {
 					endTimestamp = timestamp + constants.oneYearMs,
 					processId = testProcessId,
@@ -412,7 +404,6 @@ describe("arns", function()
 					type = "lease",
 					undernameLimit = 60,
 				}
-				assert.is_true(status)
 				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
 
@@ -507,8 +498,7 @@ describe("arns", function()
 				}
 				local demandBefore = demand.getCurrentPeriodRevenue()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
-				local status, result = pcall(arns.extendLease, testAddress, "test-name", 4, timestamp)
-				assert.is_true(status)
+				local result = arns.extendLease(testAddress, "test-name", 4, timestamp)
 				assert.are.same({
 					endTimestamp = timestamp + constants.oneYearMs * 5,
 					processId = testProcessId,
@@ -589,8 +579,7 @@ describe("arns", function()
 				}
 				local demandBefore = demand.getCurrentPeriodRevenue()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
-				local status, extendLeaseResult = pcall(arns.extendLease, testAddress, "test-name", 4, timestamp)
-				assert.is_true(status)
+				local extendLeaseResult = arns.extendLease(testAddress, "test-name", 4, timestamp)
 				assert.are.same({
 					endTimestamp = timestamp + constants.oneYearMs * 5,
 					processId = testProcessId,

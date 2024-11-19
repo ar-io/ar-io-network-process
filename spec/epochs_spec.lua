@@ -376,8 +376,7 @@ describe("epochs", function()
 					"test-this-is-valid-arweave-wallet-address-1",
 					"test-this-is-valid-arweave-wallet-address-3",
 				}
-				local status, result = pcall(epochs.saveObservations, observer, reportTxId, failedGateways, timestamp)
-				assert.is_true(status)
+				local result = epochs.saveObservations(observer, reportTxId, failedGateways, timestamp)
 				assert.are.same(result, {
 					reports = {
 						[observer] = reportTxId,
@@ -538,8 +537,7 @@ describe("epochs", function()
 						},
 					},
 				}
-				local status, result = pcall(epochs.createEpoch, timestamp, epochStartBlockHeight, hashchain)
-				assert.is_true(status)
+				local result = epochs.createEpoch(timestamp, epochStartBlockHeight, hashchain)
 				assert.are.same(expectation, result)
 				assert.are.same(expectation, epochs.getEpoch(epochIndex))
 				-- confirm the gateway weights were updated

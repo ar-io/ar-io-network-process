@@ -1722,8 +1722,7 @@ describe("gar", function()
 
 				-- Call pruneGateways
 				local protocolBalanceBefore = _G.Balances[ao.id] or 0
-				local status, result = pcall(gar.pruneGateways, currentTimestamp, msgId)
-				assert.is_true(status)
+				local result = gar.pruneGateways(currentTimestamp, msgId)
 				local expectedSlashedStake = math.floor(gar.getSettings().operators.minStake * 0.2)
 				assert.are.same({
 					prunedGateways = { "address1" },
