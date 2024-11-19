@@ -55,7 +55,14 @@ local gar = {}
 --- @field compositeWeight number
 --- @field normalizedCompositeWeight number
 
---- @alias GatewayServices table<string, any> TODO IS THIS CORRECT
+--- @alias GatewayServices table<'bundler', GatewayService>
+
+--- @class GatewayService
+--- @field fqdn string
+--- @field port number
+--- @field path string
+--- @field protocol string
+
 --- @alias MessageId string
 --- @alias Timestamp number
 
@@ -320,7 +327,7 @@ end
 
 --- @param from WalletAddress
 --- @param updatedSettings UpdateGatewaySettings
---- @param updatedServices GatewayServices -- TODO: IS THIS RIGHT?
+--- @param updatedServices GatewayServices
 --- @param observerAddress WalletAddress
 --- @param currentTimestamp Timestamp
 --- @param msgId MessageId
@@ -645,6 +652,10 @@ function gar.getActiveGatewaysBeforeTimestamp(startTimestamp)
 	return activeGatewayAddresses
 end
 
+--- Gets the weights of collection of gateways at a given timestamp
+--- @param gatewayAddresses string[] The gateway addresses to get the weights for
+--- @param timestamp number The timestamp to get the weights at
+--- @return WeightedGateway[] # The weighted gateways
 function gar.getGatewayWeightsAtTimestamp(gatewayAddresses, timestamp)
 	local weightedObservers = {}
 	local totalCompositeWeight = 0
