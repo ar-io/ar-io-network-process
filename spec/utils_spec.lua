@@ -767,6 +767,11 @@ describe("utils", function()
 			local result = utils.safeDecodeJson(input)
 			assert.are.same(nil, result)
 		end)
+
+		it("should return nil for a nil input", function()
+			local result = utils.safeDecodeJson(nil)
+			assert.are.same(nil, result)
+		end)
 	end)
 
 	describe("isInteger", function()
