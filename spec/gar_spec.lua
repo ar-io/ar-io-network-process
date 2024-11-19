@@ -829,8 +829,7 @@ describe("gar", function()
 				settings = updatedSettings,
 				status = testGateway.status,
 			}
-			local status, result = pcall(
-				gar.updateGatewaySettings,
+			local result = gar.updateGatewaySettings(
 				stubGatewayAddress,
 				updatedSettings,
 				nil, -- no additional services on this gateway
@@ -838,7 +837,6 @@ describe("gar", function()
 				startTimestamp,
 				stubMessageId
 			)
-			assert.is_true(status)
 			assert.are.same(expectation, result)
 			assert.are.same(expectation, _G.GatewayRegistry[stubGatewayAddress])
 		end)
@@ -889,8 +887,7 @@ describe("gar", function()
 				settings = expectedSettings,
 				status = testGateway.status,
 			}
-			local status, result = pcall(
-				gar.updateGatewaySettings,
+			local result = gar.updateGatewaySettings(
 				stubGatewayAddress,
 				inputUpdatedSettings,
 				nil, -- no additional services on this gateway
@@ -898,7 +895,6 @@ describe("gar", function()
 				startTimestamp,
 				stubMessageId
 			)
-			assert.is_true(status)
 			assert.are.same(expectation, result)
 			assert.are.same(expectation, _G.GatewayRegistry[stubGatewayAddress])
 		end)
@@ -922,8 +918,7 @@ describe("gar", function()
 				},
 			}
 
-			local status, result = pcall(
-				gar.updateGatewaySettings,
+			local result = gar.updateGatewaySettings(
 				stubGatewayAddress,
 				testGateway.settings,
 				updatedServices,
@@ -931,7 +926,6 @@ describe("gar", function()
 				testGateway.startTimestamp,
 				stubMessageId
 			)
-			assert.is_true(status)
 			assert.are.same({
 				operatorStake = gar.getSettings().operators.minStake,
 				totalDelegatedStake = 0,
@@ -1728,8 +1722,7 @@ describe("gar", function()
 
 				-- Call pruneGateways
 				local protocolBalanceBefore = _G.Balances[ao.id] or 0
-				local status, result = pcall(gar.pruneGateways, currentTimestamp, msgId)
-				assert.is_true(status)
+				local result = gar.pruneGateways(currentTimestamp, msgId)
 				local expectedSlashedStake = math.floor(gar.getSettings().operators.minStake * 0.2)
 				assert.are.same({
 					prunedGateways = { "address1" },
@@ -4091,5 +4084,54 @@ describe("gar", function()
 				},
 			}, nextPage)
 		end)
+	end)
+
+	describe("allowDelegates", function()
+		it("should throw an error if the gateway is nil", function()
+			local status, error = pcall(function()
+				gar.allowDelegates({ stubRandomAddress }, nil)
+			end)
+			assert(not status)
+			assert(error:find("Gateway not found") ~= nil)
+		end)
+		it("should throw an error if allowDelegatedStaking is false and allowedDelegatesLookup is nil", function()
+			local gateway = {
+				settings = { allowDelegatedStaking = false },
+			}
+			_G.GatewayRegistry = {
+				["test-gateway"] = gateway,
+			}
+			local status, error = pcall(function()
+				gar.allowDelegates({ stubRandomAddress }, "test-gateway")
+			end)
+			assert(not status)
+			assert(error:find("allowedDelegatesLookup should not be nil") ~= nil)
+		end)
+
+		it(
+			"should allow delegates if allowDelegatedStaking is false and the allowedDelegatesLookup is not nil",
+			function()
+				local gateway = {
+					delegates = {},
+					settings = { allowDelegatedStaking = "allowlist", allowedDelegatesLookup = {} },
+				}
+				_G.GatewayRegistry = {
+					["test-gateway"] = gateway,
+				}
+				local result = gar.allowDelegates({ stubRandomAddress }, "test-gateway")
+				assert.are.same({
+					gateway = {
+						delegates = {},
+						settings = {
+							allowDelegatedStaking = "allowlist",
+							allowedDelegatesLookup = {
+								[stubRandomAddress] = true,
+							},
+						},
+					},
+					addedDelegates = { stubRandomAddress },
+				}, result)
+			end
+		)
 	end)
 end)

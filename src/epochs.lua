@@ -95,18 +95,6 @@ function epochs.getSettings()
 	return utils.deepCopy(EpochSettings)
 end
 
---- Gets the observations for the current epoch
---- @return Observations The observations for the current epoch
-function epochs.getObservations()
-	return epochs.getCurrentEpoch().observations or {}
-end
-
---- Gets the current distribution
---- @return Distribution The current distribution
-function epochs.getDistribution()
-	return epochs.getCurrentEpoch().distributions or {}
-end
-
 --- Gets the prescribed observers for an epoch
 --- @param epochIndex number The epoch index
 --- @return WeightedGateway[] The prescribed observers for the epoch
@@ -429,29 +417,23 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	local epochStartTimestamp, _, epochDistributionTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 
 	-- avoid observations before the previous epoch distribution has occurred, as distributions affect weights of the current epoch
-	if timestamp < epochStartTimestamp + epochs.getSettings().distributionDelayMs then
-		error("Observations for the current epoch cannot be submitted before: " .. epochDistributionTimestamp)
-	end
+	assert(
+		timestamp >= epochStartTimestamp + epochs.getSettings().distributionDelayMs,
+		"Observations for the current epoch cannot be submitted before: " .. epochDistributionTimestamp
+	)
 
 	local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
-	if #prescribedObservers == 0 then
-		error("No prescribed observers for the current epoch.")
-	end
+	assert(#prescribedObservers > 0, "No prescribed observers for the current epoch.")
 
 	local observerIndex = utils.findInArray(prescribedObservers, function(prescribedObserver)
 		return prescribedObserver.observerAddress == observerAddress
 	end)
 
 	local observer = prescribedObservers[observerIndex]
-
-	if observer == nil then
-		error("Caller is not a prescribed observer for the current epoch.")
-	end
+	assert(observer, "Caller is not a prescribed observer for the current epoch.")
 
 	local observingGateway = gar.getGateway(observer.gatewayAddress)
-	if observingGateway == nil then
-		error("The associated gateway not found in the registry.")
-	end
+	assert(observingGateway, "The associated gateway not found in the registry.")
 
 	local epoch = epochs.getEpoch(epochIndex)
 
@@ -641,8 +623,8 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 			-- update the gateway stats, returns the updated gateway
 			gateway = gar.updateGatewayStats(gatewayAddress, gateway, updatedStats)
 
-			-- scenarioes
-			-- 1. Gateway passed and was prescribed and submittied an observation - it gets full gateway reward
+			-- Scenarios
+			-- 1. Gateway passed and was prescribed and submitted an observation - it gets full gateway reward
 			-- 2. Gateway passed and was prescribed and did not submit an observation - it gets only the gateway reward, docked by 25%
 			-- 2. Gateway passed and was not prescribed -- it gets full operator reward
 			-- 3. Gateway failed and was prescribed and did not submit observation -- it gets no reward
@@ -652,7 +634,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 			if not failed then
 				if isPrescribed then
 					if observationSubmitted then
-						-- 1. gateway passed and was prescribed and submittied an observation - it gets full reward
+						-- 1. gateway passed and was prescribed and submitted an observation - it gets full reward
 						earnedRewardForGatewayAndDelegates =
 							math.floor(totalEligibleGatewayReward + totalElgibleObserverReward)
 					else
@@ -707,7 +689,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 				if actualOperatorReward > 0 then
 					-- distribute the rewards to the gateway
 					balances.transfer(gatewayAddress, ao.id, actualOperatorReward)
-					-- move that balance to the gateway if autostaking is on
+					-- move that balance to the gateway if auto-staking is on
 					if gateway.settings.autoStake and gateway.status == "joined" then
 						-- only increase stake if the gateway is joined, otherwise it is leaving and cannot accept additional stake so distributed rewards to the operator directly
 						gar.increaseOperatorStake(gatewayAddress, actualOperatorReward)

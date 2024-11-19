@@ -754,4 +754,43 @@ describe("utils", function()
 			assert.are_not.equal(input, result)
 		end)
 	end)
+
+	describe("safeDecodeJson", function()
+		it("should decode a JSON string", function()
+			local input = '{"foo": "bar"}'
+			local result = utils.safeDecodeJson(input)
+			assert.are.same({ foo = "bar" }, result)
+		end)
+
+		it("should return nil for an invalid JSON string", function()
+			local input = "not a JSON string"
+			local result = utils.safeDecodeJson(input)
+			assert.are.same(nil, result)
+		end)
+
+		it("should return nil for a nil input", function()
+			local result = utils.safeDecodeJson(nil)
+			assert.are.same(nil, result)
+		end)
+	end)
+
+	describe("isInteger", function()
+		it("should return true for an integer", function()
+			local input = 1
+			local result = utils.isInteger(input)
+			assert.is_true(result)
+		end)
+
+		it("should return false for a non-integer", function()
+			local input = 1.234
+			local result = utils.isInteger(input)
+			assert.is_false(result)
+		end)
+
+		it("should convert string to integer", function()
+			local input = "1"
+			local result = utils.isInteger(input)
+			assert.is_true(result)
+		end)
+	end)
 end)
