@@ -3,12 +3,18 @@ local epochs = require("epochs")
 local demand = require("demand")
 local gar = require("gar")
 
+--- @class TickResult
+--- @field maybeDistributedEpoch Epoch | nil The distributed epoch
+--- @field maybeNewEpoch Epoch | nil The new epoch
+--- @field maybeDemandFactor number | nil The demand factor
+--- @field pruneGatewaysResult PrunedGatewaysResult The prune gateways result
+
 --- Ticks an epoch. A tick is the process of updating the demand factor, distributing rewards, pruning gateways, and creating a new epoch.
 --- @param timestamp number The timestamp
 --- @param blockHeight number The block height
 --- @param hashchain string The hashchain
 --- @param msgId string The message ID
---- @return table<string, any> # The ticked epoch
+--- @return TickResult # The ticked epoch
 function tick.tickEpoch(timestamp, blockHeight, hashchain, msgId)
 	-- update demand factor if necessary
 	local demandFactor = demand.updateDemandFactor(timestamp)

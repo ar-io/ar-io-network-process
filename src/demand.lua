@@ -108,9 +108,9 @@ function demand.getDemandFactorInfo()
 	return utils.deepCopy(DemandFactor)
 end
 
---- Updates the demand factor
+--- Updates the demand factor and returns the updated demand factor
 --- @param timestamp number The current timestamp
---- @return number | nil The updated demand factor or nil if it should not be updated
+--- @return number # The demand factor, updated if necessary
 function demand.updateDemandFactor(timestamp)
 	if not demand.shouldUpdateDemandFactor(timestamp) then
 		print("Not updating demand factor")

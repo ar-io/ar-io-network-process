@@ -869,6 +869,20 @@ function gar.addGateway(address, gateway)
 	GatewayRegistry[address] = gateway
 	return gateway
 end
+
+--- @class PrunedGatewaysResult
+--- @field prunedGateways Gateway[] The pruned gateways
+--- @field slashedGateways table<WalletAddress, number> The slashed gateways and their amounts
+--- @field gatewayStakeReturned number The gateway stake returned
+--- @field delegateStakeReturned number The delegate stake returned
+--- @field gatewayStakeWithdrawing number The gateway stake withdrawing
+--- @field delegateStakeWithdrawing number The delegate stake withdrawing
+--- @field stakeSlashed number The stake slashed
+
+--- Prunes gateways that have failed more than 30 consecutive epochs
+--- @param currentTimestamp number The current timestamp
+--- @param msgId string The message ID
+--- @return PrunedGatewaysResult # The result containing the pruned gateways, slashed gateways, and other stats
 function gar.pruneGateways(currentTimestamp, msgId)
 	local gateways = gar.getGateways()
 	local garSettings = gar.getSettings()
