@@ -33,6 +33,7 @@ local demand = require("demand")
 local epochs = require("epochs")
 local vaults = require("vaults")
 local prune = require("prune")
+local tick = require("tick")
 local primaryNames = require("primary_names")
 
 local ActionMap = {
@@ -398,6 +399,7 @@ end, function(msg)
 		"Delegate-Reward-Share-Ratio",
 		"Epoch-Index",
 		"Price-Interval-Ms",
+		"Block-Height",
 	}
 	for _, tagName in ipairs(knownNumberTags) do
 		-- Format all incoming numbers
@@ -1574,36 +1576,11 @@ end)
 
 -- TICK HANDLER - TODO: this may be better as a "Distribute" rewards handler instead of `Tick` tag
 addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
-	assert(msg.Timestamp, "Timestamp is required for a tick interaction")
 	local msgTimestamp = msg.Timestamp
-	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
-	local tickedRewardDistributions = {}
-	local totalTickedRewardsDistributed = 0
-
-	local function tickEpoch(timestamp, blockHeight, hashchain, msgId)
-		-- update demand factor if necessary
-		local demandFactor = demand.updateDemandFactor(timestamp)
-		-- distribute rewards for the epoch and increments stats for gateways, this closes the epoch if the timestamp is greater than the epochs required distribution timestamp
-		local distributedEpoch = epochs.distributeRewardsForEpoch(timestamp)
-		if distributedEpoch ~= nil and distributedEpoch.epochIndex ~= nil then
-			tickedRewardDistributions[tostring(distributedEpoch.epochIndex)] =
-				distributedEpoch.distributions.totalDistributedRewards
-			totalTickedRewardsDistributed = totalTickedRewardsDistributed
-				+ distributedEpoch.distributions.totalDistributedRewards
-		end
-		-- prune any gateway that has hit the failed 30 consecutive epoch threshold after the epoch has been distributed
-		local pruneGatewaysResult = gar.pruneGateways(timestamp, msgId)
-
-		-- now create the new epoch with the current message hashchain and block height
-		local newEpoch = epochs.createEpoch(timestamp, tonumber(blockHeight), hashchain)
-		return {
-			maybeEpoch = newEpoch,
-			maybeDemandFactor = demandFactor,
-			pruneGatewaysResult = pruneGatewaysResult,
-		}
-	end
 
 	local msgId = msg.Id
+	local blockHeight = tonumber(msg["Block-Height"])
+	local hashchain = msg["Hash-Chain"]
 	local lastTickedEpochIndex = LastTickedEpochIndex
 	local targetCurrentEpochIndex = epochs.getEpochIndexForTimestamp(msgTimestamp)
 	msg.ioEvent:addField("Last-Ticked-Epoch-Index", lastTickedEpochIndex)
@@ -1617,7 +1594,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 			Target = msg.From,
 			Action = "Tick-Notice",
 			LastTickedEpochIndex = LastTickedEpochIndex,
-			Data = json.encode("Genesis epocch has not started yet."),
+			Data = json.encode("Genesis epoch has not started yet."),
 		})
 	end
 
@@ -1626,24 +1603,19 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	local newEpochIndexes = {}
 	local newDemandFactors = {}
 	local newPruneGatewaysResults = {}
+	local tickedRewardDistributions = {}
+	local totalTickedRewardsDistributed = 0
+
+	--- tick to the newest epoch, and stub out any epochs that are not yet created
 	for i = lastTickedEpochIndex + 1, targetCurrentEpochIndex do
-		print("Ticking epoch: " .. i)
-		local previousState = {
-			Balances = utils.deepCopy(Balances),
-			GatewayRegistry = utils.deepCopy(GatewayRegistry),
-			Epochs = utils.deepCopy(Epochs), -- we probably only need to copy the last ticked epoch
-			DemandFactor = utils.deepCopy(DemandFactor),
-			LastTickedEpochIndex = LastTickedEpochIndex,
-		}
 		local _, _, epochDistributionTimestamp = epochs.getEpochTimestampsForIndex(i)
 		-- use the minimum of the msg timestamp or the epoch distribution timestamp, this ensures an epoch gets created for the genesis block
 		-- and that we don't try and distribute before an epoch is created
 		local tickTimestamp = math.min(msgTimestamp or 0, epochDistributionTimestamp)
 		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height,
 		-- we should set the prescribed observers and names to empty arrays and distribute rewards accordingly
-		local tickSuceeded, resultOrError =
-			pcall(tickEpoch, tickTimestamp, msg["Block-Height"], msg["Hash-Chain"], msgId)
-		if tickSuceeded then
+		local tickSucceeded, resultOrError = pcall(tick.tickEpoch, tickTimestamp, blockHeight, hashchain, msgId)
+		if tickSucceeded then
 			if tickTimestamp == epochDistributionTimestamp then
 				-- if we are distributing rewards, we should update the last ticked epoch index to the current epoch index
 				LastTickedEpochIndex = i
@@ -1655,7 +1627,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 				LastTickedEpochIndex = LastTickedEpochIndex,
 				Data = json.encode(resultOrError),
 			})
-			if resultOrError.maybeEpoch ~= nil then
+			if resultOrError.maybeNewEpoch ~= nil then
 				table.insert(newEpochIndexes, resultOrError.maybeEpoch.epochIndex)
 			end
 			if resultOrError.maybeDemandFactor ~= nil then
@@ -1664,13 +1636,14 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 			if resultOrError.pruneGatewaysResult ~= nil then
 				table.insert(newPruneGatewaysResults, resultOrError.pruneGatewaysResult)
 			end
+			if resultOrError.maybeDistributedEpoch ~= nil then
+				tickedRewardDistributions[tostring(resultOrError.maybeDistributedEpoch.epochIndex)] =
+					resultOrError.maybeDistributedEpoch.distributions.totalDistributedRewards
+				totalTickedRewardsDistributed = totalTickedRewardsDistributed
+					+ resultOrError.maybeDistributedEpoch.distributions.totalDistributedRewards
+			end
 		else
 			-- reset the state to previous state
-			Balances = previousState.Balances
-			GatewayRegistry = previousState.GatewayRegistry
-			Epochs = previousState.Epochs
-			DemandFactor = previousState.DemandFactor
-			LastTickedEpochIndex = previousState.LastTickedEpochIndex
 			ao.send({
 				Target = msg.From,
 				Action = "Invalid-Tick-Notice",
@@ -1696,7 +1669,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors, ";")
 	end
 	if #newPruneGatewaysResults > 0 then
-		-- Reduce the prune gatways results and then track changes
+		-- Reduce the prune gateways results and then track changes
 		local aggregatedPruneGatewaysResult = utils.reduce(
 			newPruneGatewaysResults,
 			function(acc, _, pruneGatewaysResult)
