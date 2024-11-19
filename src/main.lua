@@ -331,15 +331,18 @@ end
 local function addEventingHandler(handlerName, pattern, handleFn)
 	Handlers.add(handlerName, pattern, function(msg)
 		-- global handler for all eventing errors, so we can log them and send a notice to the sender
-		eventingPcall(msg.ioEvent, function(error)
-			ao.send({
-				Target = msg.From,
-				Action = "Invalid-" .. handlerName .. "-Notice",
-				Error = tostring(error),
-				Data = tostring(error),
-			})
+		local status, resultOrError = eventingPcall(msg.ioEvent, function(error)
+			print("Error in " .. handlerName .. ": " .. tostring(error))
+			-- if we throw an error on the CU, this message won't get sent
 		end, handleFn, msg)
+		--[[
+		-- If we throw an error on the CU, this message won't get sent. If we swallow the error, there is chance for partial state updates.
+		-- Need to look at if we can modify our CU to continue to forward eventing data even if there is an error that would throw away the memory.
+		--]]
 		msg.ioEvent:printEvent()
+		if not status then
+			error(tostring(resultOrError)) -- this ensures memory is thrown away on errors, but we lose eventing output
+		end
 	end)
 end
 

@@ -140,9 +140,7 @@ describe('Transfers', async () => {
     });
 
     // assert the error tag
-    const errorTag = transferResult.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
+    const errorTag = transferResult.Error;
     assert.ok(errorTag, 'Error tag should be present');
 
     // get balances

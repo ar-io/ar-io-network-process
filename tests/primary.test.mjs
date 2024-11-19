@@ -382,9 +382,7 @@ describe('primary names', function () {
         assert: false, // we expect an error here, don't throw
       });
 
-    const errorTag = primaryNameForAddressResult.Messages[0].Tags.find(
-      (tag) => tag.name === 'Error',
-    ).value;
+    const errorTag = primaryNameForAddressResult.Error;
     assert.ok(errorTag, 'Expected an error tag');
   });
 

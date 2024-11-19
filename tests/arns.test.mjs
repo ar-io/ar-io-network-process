@@ -189,14 +189,9 @@ describe('ArNS', async () => {
         buyRecordResult.Memory,
       );
 
-      const failedBuyRecordError = failedBuyRecordResult.Messages[0].Tags.find(
-        (t) => t.name === 'Error',
-      );
+      const failedBuyRecordError = failedBuyRecordResult.Error;
       assert.ok(failedBuyRecordError, 'Error tag should be present');
-      const alreadyRegistered = failedBuyRecordResult.Messages[0].Data.includes(
-        'Name is already registered',
-      );
-      assert(alreadyRegistered);
+      assert(failedBuyRecordError.includes('Name is already registered'));
     });
 
     it('should buy a record and default the name to lower case', async () => {
@@ -1459,9 +1454,7 @@ describe('ArNS', async () => {
       );
 
       // assert error
-      const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
+      const releaseNameErrorTag = reassignNameResult.Error;
       assert.ok(releaseNameErrorTag, 'Error tag should be present');
     });
 
@@ -1488,9 +1481,7 @@ describe('ArNS', async () => {
       );
 
       // assert error
-      const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
+      const releaseNameErrorTag = reassignNameResult.Error;
       assert.ok(releaseNameErrorTag, 'Error tag should be present');
     });
   });
