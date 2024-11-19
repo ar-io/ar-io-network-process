@@ -2,6 +2,15 @@ local constants = require("constants")
 local utils = require("utils")
 local demand = {}
 
+--- @class DemandFactor
+--- @field currentPeriod number The current period
+--- @field trailingPeriodPurchases number[] The trailing period purchases
+--- @field trailingPeriodRevenues number[] The trailing period revenues
+--- @field purchasesThisPeriod number The current period purchases
+--- @field revenueThisPeriod number The current period revenue
+--- @field currentDemandFactor number The current demand factor
+--- @field consecutivePeriodsWithMinDemandFactor number The number of consecutive periods with the minimum demand factor
+--- @field fees table<number, number> The fees for each name length
 DemandFactor = DemandFactor
 	or {
 		currentPeriod = 1, -- one based index of the current period
@@ -14,11 +23,21 @@ DemandFactor = DemandFactor
 		fees = constants.genesisFees,
 	}
 
+--- @class DemandFactorSettings
+--- @field periodZeroStartTimestamp number The timestamp of the start of period zero
+--- @field movingAvgPeriodCount number The number of periods to use for the moving average
+--- @field periodLengthMs number The length of a period in milliseconds
+--- @field demandFactorBaseValue number The base demand factor value
+--- @field demandFactorMin number The minimum demand factor value
+--- @field demandFactorUpAdjustment number The adjustment to the demand factor when it is increasing
+--- @field demandFactorDownAdjustment number The adjustment to the demand factor when it is decreasing
+--- @field stepDownThreshold number The threshold for the number of consecutive periods with the minimum demand factor before adjusting the demand factor
+--- @field criteria 'revenue' | 'purchases' The criteria to use for determining if the demand is increasing
 DemandFactorSettings = DemandFactorSettings
 	or {
 		periodZeroStartTimestamp = 1722837600000, -- 08/05/2024 @ 12:00am (UTC)
 		movingAvgPeriodCount = 7,
-		periodLengthMs = 60 * 60 * 1000 * 24, -- one day in milseconds
+		periodLengthMs = 60 * 60 * 1000 * 24, -- one day in milliseconds
 		demandFactorBaseValue = 1,
 		demandFactorMin = 0.5,
 		demandFactorUpAdjustment = 0.05, -- 5%
@@ -36,13 +55,13 @@ end
 
 --- Gets the base fee for a given name length
 --- @param nameLength number The length of the name
---- @return number The base fee for the name length
+--- @return number #The base fee for the name length
 function demand.baseFeeForNameLength(nameLength)
 	return demand.getFees()[nameLength]
 end
 
 --- Gets the moving average of trailing purchase counts
---- @return number The moving average of trailing purchase counts
+--- @return number # The moving average of trailing purchase counts
 function demand.mvgAvgTrailingPurchaseCounts()
 	local sum = 0
 	local trailingPeriodPurchases = demand.getTrailingPeriodPurchases()
@@ -53,7 +72,7 @@ function demand.mvgAvgTrailingPurchaseCounts()
 end
 
 --- Gets the moving average of trailing revenues
---- @return number The moving average of trailing revenues
+--- @return number 	# The moving average of trailing revenues
 function demand.mvgAvgTrailingRevenues()
 	local sum = 0
 	local trailingPeriodRevenues = demand.getTrailingPeriodRevenues()
@@ -64,7 +83,7 @@ function demand.mvgAvgTrailingRevenues()
 end
 
 --- Checks if the demand is increasing
---- @return boolean True if the demand is increasing, false otherwise
+--- @return boolean # true if the demand is increasing, false otherwise
 function demand.isDemandIncreasing()
 	local settings = demand.getSettings()
 
@@ -88,7 +107,7 @@ end
 
 --- Checks if the demand should update the demand factor
 --- @param currentTimestamp number The current timestamp
---- @return boolean True if the demand should update the demand factor, false otherwise
+--- @return boolean # True if the demand should update the demand factor, false otherwise
 function demand.shouldUpdateDemandFactor(currentTimestamp)
 	local settings = demand.getSettings()
 
@@ -103,7 +122,7 @@ function demand.shouldUpdateDemandFactor(currentTimestamp)
 end
 
 --- Gets the demand factor info
---- @return table The demand factor info
+--- @return DemandFactor # The demand factor info
 function demand.getDemandFactorInfo()
 	return utils.deepCopy(DemandFactor)
 end
@@ -160,10 +179,10 @@ end
 
 --- Updates the fees
 --- @param multiplier number The multiplier for the fees
---- @return table The updated fees
+--- @return table # The updated fees
 function demand.updateFees(multiplier)
 	local currentFees = demand.getFees()
-	-- update all fees multiply them by the demand factor minimim
+	-- update all fees multiply them by the demand factor minimum
 	for nameLength, fee in pairs(currentFees) do
 		local updatedFee = fee * multiplier
 		DemandFactor.fees[nameLength] = updatedFee
@@ -172,75 +191,75 @@ function demand.updateFees(multiplier)
 end
 
 --- Gets the demand factor
---- @return number The demand factor
+--- @return number # The demand factor
 function demand.getDemandFactor()
 	local demandFactor = utils.deepCopy(DemandFactor)
 	return demandFactor and demandFactor.currentDemandFactor or 1
 end
 
 --- Gets the current period revenue
---- @return number The current period revenue
+--- @return number # The current period revenue
 function demand.getCurrentPeriodRevenue()
 	local demandFactor = utils.deepCopy(DemandFactor)
 	return demandFactor and demandFactor.revenueThisPeriod or 0
 end
 
 --- Gets the current period purchases
---- @return number The current period purchases
+--- @return number # The current period purchases
 function demand.getCurrentPeriodPurchases()
 	local demandFactor = utils.deepCopy(DemandFactor)
 	return demandFactor and demandFactor.purchasesThisPeriod or 0
 end
 
 --- Gets the trailing period purchases
---- @return table The trailing period purchases
+--- @return table # The trailing period purchases
 function demand.getTrailingPeriodPurchases()
 	local demandFactor = utils.deepCopy(DemandFactor)
 	return demandFactor and demandFactor.trailingPeriodPurchases or { 0, 0, 0, 0, 0, 0, 0 }
 end
 
 --- Gets the trailing period revenues
---- @return table The trailing period revenues
+--- @return table # The trailing period revenues
 function demand.getTrailingPeriodRevenues()
 	local demandFactor = utils.deepCopy(DemandFactor)
 	return demandFactor and demandFactor.trailingPeriodRevenues or { 0, 0, 0, 0, 0, 0, 0 }
 end
 
 --- Gets the fees
---- @return table The fees
+--- @return table # The fees
 function demand.getFees()
 	local demandFactor = utils.deepCopy(DemandFactor)
 	return demandFactor and demandFactor.fees or {}
 end
 
 --- Gets the settings
---- @return table The settings
+--- @return DemandFactorSettings # The settings
 function demand.getSettings()
 	return utils.deepCopy(DemandFactorSettings)
 end
 
 --- Gets the consecutive periods with minimum demand factor
---- @return number The consecutive periods with minimum demand factor
+--- @return number # The consecutive periods with minimum demand factor
 function demand.getConsecutivePeriodsWithMinDemandFactor()
 	local demandFactor = utils.deepCopy(DemandFactor)
 	return demandFactor and demandFactor.consecutivePeriodsWithMinDemandFactor or 0
 end
 
 --- Gets the current period
---- @return number The current period
+--- @return number # The current period
 function demand.getCurrentPeriod()
 	local demandFactor = utils.deepCopy(DemandFactor)
 	return demandFactor and demandFactor.currentPeriod or 1
 end
 
 --- Sets the demand factor
---- @param demandFactor number The demand factor
+--- @param demandFactor number # The demand factor
 function demand.setDemandFactor(demandFactor)
 	DemandFactor.currentDemandFactor = demandFactor
 end
 
 --- Gets the period index
---- @return number The period index
+--- @return number # The period index
 function demand.getPeriodIndex()
 	local currentPeriod = demand.getCurrentPeriod()
 	local settings = demand.getSettings()
