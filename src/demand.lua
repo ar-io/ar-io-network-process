@@ -233,27 +233,6 @@ function demand.getCurrentPeriod()
 	return demandFactor and demandFactor.currentPeriod or 1
 end
 
---- Updates the settings
---- @param settings table The settings
-function demand.updateSettings(settings)
-	if not settings then
-		return
-	end
-	DemandFactorSettings = settings
-end
-
---- Updates the start timestamp
---- @param timestamp number The timestamp
-function demand.updateStartTimestamp(timestamp)
-	DemandFactorSettings.periodZeroStartTimestamp = timestamp
-end
-
---- Updates the current period
---- @param period number The period
-function demand.updateCurrentPeriod(period)
-	DemandFactor.currentPeriod = period
-end
-
 --- Sets the demand factor
 --- @param demandFactor number The demand factor
 function demand.setDemandFactor(demandFactor)
@@ -304,12 +283,6 @@ end
 --- @param revenue number The revenue to increment
 function demand.incrementRevenueThisPeriod(revenue)
 	DemandFactor.revenueThisPeriod = DemandFactor.revenueThisPeriod + revenue
-end
-
---- Updates the revenue this period
---- @param revenue number The revenue to update
-function demand.updateRevenueThisPeriod(revenue)
-	DemandFactor.revenueThisPeriod = revenue
 end
 
 --- Increments the current period
