@@ -101,12 +101,6 @@ function epochs.getObservations()
 	return epochs.getCurrentEpoch().observations or {}
 end
 
---- Gets the reports for the current epoch
---- @return Reports The reports for the current epoch
-function epochs.getReports()
-	return epochs.getObservations().reports or {}
-end
-
 --- Gets the current distribution
 --- @return Distribution The current distribution
 function epochs.getDistribution()
@@ -179,36 +173,6 @@ end
 --- @return Distribution The distribution for the epoch
 function epochs.getDistributionForEpoch(epochIndex)
 	return epochs.getEpoch(epochIndex).distributions or {}
-end
-
---- Gets the epoch from a timestamp
---- @param timestamp number The timestamp
---- @return Epoch The epoch
-function epochs.getEpochFromTimestamp(timestamp)
-	local epochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	return epochs.getEpoch(epochIndex)
-end
-
---- Sets the prescribed observers for an epoch
---- @param epochIndex number The epoch index
---- @param hashchain string The hashchain
-function epochs.setPrescribedObserversForEpoch(epochIndex, hashchain)
-	local prescribedObservers = epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
-	local epoch = epochs.getEpoch(epochIndex)
-	-- assign the prescribed observers and update the epoch
-	epoch.prescribedObservers = prescribedObservers
-	Epochs[epochIndex] = epoch
-end
-
---- Sets the prescribed names for an epoch
---- @param epochIndex number The epoch index
---- @param hashchain string The hashchain
-function epochs.setPrescribedNamesForEpoch(epochIndex, hashchain)
-	local prescribedNames = epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
-	local epoch = epochs.getEpoch(epochIndex)
-	-- assign the prescribed names and update the epoch
-	epoch.prescribedNames = prescribedNames
-	Epochs[epochIndex] = epoch
 end
 
 --- Computes the prescribed names for an epoch
@@ -536,12 +500,6 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	-- update the epoch
 	Epochs[epochIndex] = epoch
 	return epoch.observations
-end
-
---- Updates the epoch settings
---- @param newSettings EpochSettings The new settings
-function epochs.updateEpochSettings(newSettings)
-	EpochSettings = newSettings
 end
 
 --- @class ComputedRewards

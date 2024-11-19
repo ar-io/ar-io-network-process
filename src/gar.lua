@@ -927,12 +927,6 @@ function gar.addGateway(address, gateway)
 	GatewayRegistry[address] = gateway
 	return gateway
 end
-
--- for test purposes
-function gar.updateSettings(newSettings)
-	GatewayRegistrySettings = newSettings
-end
-
 function gar.pruneGateways(currentTimestamp, msgId)
 	local gateways = gar.getGateways()
 	local garSettings = gar.getSettings()
