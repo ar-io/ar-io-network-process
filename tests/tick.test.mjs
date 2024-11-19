@@ -342,7 +342,7 @@ describe('Tick', async () => {
     );
     // it should have an error tag
     const errorTag = prunedVault.Error;
-    assert.ok(errorTag, 'Error tag should be present');
+    assert.ok(errorTag, 'Error should be present');
 
     // Check that the balance is returned to the owner
     const ownerBalance = await handle(

@@ -141,7 +141,7 @@ describe('Transfers', async () => {
 
     // assert the error tag
     const errorTag = transferResult.Error;
-    assert.ok(errorTag, 'Error tag should be present');
+    assert.ok(errorTag, 'Error should be present');
 
     // get balances
     const result = await handle(

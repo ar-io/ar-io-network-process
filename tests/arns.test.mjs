@@ -190,7 +190,7 @@ describe('ArNS', async () => {
       );
 
       const failedBuyRecordError = failedBuyRecordResult.Error;
-      assert.ok(failedBuyRecordError, 'Error tag should be present');
+      assert.ok(failedBuyRecordError, 'Error should be present');
       assert(failedBuyRecordError.includes('Name is already registered'));
     });
 
@@ -1455,7 +1455,7 @@ describe('ArNS', async () => {
 
       // assert error
       const releaseNameErrorTag = reassignNameResult.Error;
-      assert.ok(releaseNameErrorTag, 'Error tag should be present');
+      assert.ok(releaseNameErrorTag, 'Error should be present');
     });
 
     it('should not reassign an arns name with invalid new process id', async () => {
@@ -1482,7 +1482,7 @@ describe('ArNS', async () => {
 
       // assert error
       const releaseNameErrorTag = reassignNameResult.Error;
-      assert.ok(releaseNameErrorTag, 'Error tag should be present');
+      assert.ok(releaseNameErrorTag, 'Error should be present');
     });
   });
 

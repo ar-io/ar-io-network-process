@@ -333,16 +333,16 @@ local function addEventingHandler(handlerName, pattern, handleFn)
 		-- global handler for all eventing errors, so we can log them and send a notice to the sender
 		local status, resultOrError = eventingPcall(msg.ioEvent, function(error)
 			print("Error in " .. handlerName .. ": " .. tostring(error))
-			-- if we throw an error on the CU, this message won't get sent
 		end, handleFn, msg)
-		--[[
-		-- If we throw an error on the CU, this message won't get sent. If we swallow the error, there is chance for partial state updates.
-		-- Need to look at if we can modify our CU to continue to forward eventing data even if there is an error that would throw away the memory.
-		--]]
-		msg.ioEvent:printEvent()
 		if not status then
-			error(tostring(resultOrError)) -- this ensures memory is thrown away on errors, but we lose eventing output
+			-- We want to make sure the event data gets sent to the CU for processing, but that the memory is discarded on failures.
+			-- So we json encode the error and the event data and then throw, so the CU will discard the memory and still process the event data.
+			-- An alternative approach is to modify the implementation of ao.result - to also return the Output on error.
+			-- Reference: https://github.com/permaweb/ao/blob/76a618722b201430a372894b3e2753ac01e63d3d/dev-cli/src/starters/lua/ao.lua#L284-L287
+			local errorWithEvent = tostring(resultOrError) .. "\n" .. msg.ioEvent:toJSON()
+			error(errorWithEvent, 0) -- 0 ensures not to include this line number in the error message
 		end
+		msg.ioEvent:printEvent()
 	end)
 end
 

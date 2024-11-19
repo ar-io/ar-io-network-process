@@ -1015,7 +1015,7 @@ describe('GatewayRegistry', async () => {
       });
 
       const error = result.Error;
-      assert.ok(error, 'Error tag should be present');
+      assert.ok(error, 'Error should be present');
       assert(
         error.includes(
           'Invalid quantity. Must be integer greater than 1000000',
@@ -1228,7 +1228,7 @@ describe('GatewayRegistry', async () => {
           assert: false,
         });
 
-      assert.ok(result.Error, 'Error tag should be present');
+      assert.ok(result.Error, 'Error should be present');
       assert(
         result.Error.includes(
           'Invalid quantity. Must be integer greater than 1000000',
