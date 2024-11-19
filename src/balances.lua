@@ -16,7 +16,7 @@ function balances.transfer(recipient, from, qty)
 	assert(type(recipient) == "string", "Recipient is required!")
 	assert(type(from) == "string", "From is required!")
 	assert(type(qty) == "number", "Quantity is required and must be a number!")
-	assert(utils.isInteger(qty), debug.traceback("Quantity must be an integer: " .. qty))
+	assert(utils.isInteger(qty), "Quantity must be an integer: " .. qty)
 
 	balances.reduceBalance(from, qty)
 	balances.increaseBalance(recipient, qty)
@@ -54,7 +54,7 @@ end
 --- @param target string The address to increase balance for
 --- @param qty number The amount to increase by (must be integer)
 function balances.increaseBalance(target, qty)
-	assert(utils.isInteger(qty), debug.traceback("Quantity must be an integer: " .. qty))
+	assert(utils.isInteger(qty), "Quantity must be an integer: " .. qty)
 	local prevBalance = balances.getBalance(target) or 0
 	Balances[target] = prevBalance + qty
 end

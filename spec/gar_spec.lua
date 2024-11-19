@@ -4085,4 +4085,53 @@ describe("gar", function()
 			}, nextPage)
 		end)
 	end)
+
+	describe("allowDelegates", function()
+		it("should throw an error if the gateway is nil", function()
+			local status, error = pcall(function()
+				gar.allowDelegates({ stubRandomAddress }, nil)
+			end)
+			assert(not status)
+			assert(error:find("Gateway not found") ~= nil)
+		end)
+		it("should throw an error if allowDelegatedStaking is false and allowedDelegatesLookup is nil", function()
+			local gateway = {
+				settings = { allowDelegatedStaking = false },
+			}
+			_G.GatewayRegistry = {
+				["test-gateway"] = gateway,
+			}
+			local status, error = pcall(function()
+				gar.allowDelegates({ stubRandomAddress }, "test-gateway")
+			end)
+			assert(not status)
+			assert(error:find("allowedDelegatesLookup should not be nil") ~= nil)
+		end)
+
+		it(
+			"should allow delegates if allowDelegatedStaking is false and the allowedDelegatesLookup is not nil",
+			function()
+				local gateway = {
+					delegates = {},
+					settings = { allowDelegatedStaking = "allowlist", allowedDelegatesLookup = {} },
+				}
+				_G.GatewayRegistry = {
+					["test-gateway"] = gateway,
+				}
+				local result = gar.allowDelegates({ stubRandomAddress }, "test-gateway")
+				assert.are.same({
+					gateway = {
+						delegates = {},
+						settings = {
+							allowDelegatedStaking = "allowlist",
+							allowedDelegatesLookup = {
+								[stubRandomAddress] = true,
+							},
+						},
+					},
+					addedDelegates = { stubRandomAddress },
+				}, result)
+			end
+		)
+	end)
 end)

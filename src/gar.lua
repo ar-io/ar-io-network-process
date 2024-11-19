@@ -1145,7 +1145,7 @@ function gar.allowDelegates(delegateAddresses, gatewayAddress)
 
 	-- Only allow modification of the allow list when allowDelegatedStaking is set to false or a current allow list is in place
 	assert(
-		gateway.settings.allowDelegatedStaking == true and not gateway.settings.allowedDelegatesLookup,
+		not gateway.settings.allowDelegatedStaking or gateway.settings.allowedDelegatesLookup,
 		"Allow listing only possible when allowDelegatedStaking is set to 'allowlist'"
 	)
 
@@ -1154,7 +1154,6 @@ function gar.allowDelegates(delegateAddresses, gatewayAddress)
 	local addedDelegates = {}
 	for _, delegateAddress in ipairs(delegateAddresses) do
 		assert(utils.isValidAOAddress(delegateAddress), "Invalid delegate address: " .. delegateAddress)
-
 		-- Skip over delegates that are already in the allow list or that have a stake balance
 		if not gar.delegateAllowedToStake(delegateAddress, gateway) then
 			gateway.settings.allowedDelegatesLookup[delegateAddress] = true
@@ -1194,7 +1193,7 @@ function gar.disallowDelegates(delegates, gatewayAddress, msgId, currentTimestam
 
 	-- Only allow modification of the allow list when allowDelegatedStaking is set to false or a current allow list is in place
 	assert(
-		gateway.settings.allowDelegatedStaking == true or not gateway.settings.allowedDelegatesLookup,
+		not gateway.settings.allowDelegatedStaking or gateway.settings.allowedDelegatesLookup,
 		"Allow listing only possible when allowDelegatedStaking is set to 'allowlist'"
 	)
 
