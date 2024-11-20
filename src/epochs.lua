@@ -592,12 +592,12 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	-- get the eligible rewards for the epoch
 	local totalEligibleObserverReward = epoch.distributions.totalEligibleObserverReward
 	local totalEligibleGatewayReward = epoch.distributions.totalEligibleGatewayReward
+	--- @type table<string, number>
 	local distributed = {}
-	local totalDistributed = 0
 	for gatewayAddress, totalEligibleRewardsForGateway in pairs(eligibleGatewaysForEpoch) do
 		local gateway = gar.getGateway(gatewayAddress)
-		-- only operate if the gateway is found (it should be )
-		if gateway and totalEligibleRewardsForGateway then
+		-- only distribute rewards if the gateway is found and not leaving
+		if gateway and totalEligibleRewardsForGateway and gateway.status ~= "leaving" then
 			-- check the observations to see if gateway passed, if 50% or more of the observers marked the gateway as failed, it is considered failed
 			local observersMarkedFailed = epoch.observations.failureSummaries
 					and epoch.observations.failureSummaries[gatewayAddress]
@@ -663,52 +663,53 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 					/ totalEligibleRewardsForGatewayAndDelegates -- percent of what was earned vs what was eligible
 				-- optimally this is 1, but if the gateway did not do what it was supposed to do, it will be less than 1 and thus all payouts will be less
 				local totalDistributedToDelegates = 0
+				local totalRewardsForMissingDelegates = 0
 				-- distribute all the predetermined rewards to the delegates
 				for delegateAddress, eligibleDelegateReward in pairs(totalEligibleRewardsForGateway.delegateRewards) do
 					local actualDelegateReward = math.floor(eligibleDelegateReward * percentOfEligibleEarned)
-					-- distribute the rewards to the delegate if greater than 0
+					-- distribute the rewards to the delegate if greater than 0 and the delegate still exists on the gateway
 					if actualDelegateReward > 0 then
-						-- increase the stake and decrease the protocol balance, returns the updated gateway
-						gateway = gar.increaseExistingDelegateStake(
-							gatewayAddress,
-							gateway,
-							delegateAddress,
-							actualDelegateReward
-						)
-						balances.reduceBalance(ao.id, actualDelegateReward)
+						if gateway.delegates[delegateAddress] then
+							-- increase the stake and decrease the protocol balance, returns the updated gateway
+							gateway = gar.increaseExistingDelegateStake(
+								gatewayAddress,
+								gateway,
+								delegateAddress,
+								actualDelegateReward
+							)
+							balances.reduceBalance(ao.id, actualDelegateReward)
+							-- update the distributed rewards for the delegate
+							distributed[delegateAddress] = (distributed[delegateAddress] or 0) + actualDelegateReward
+							totalDistributedToDelegates = totalDistributedToDelegates + actualDelegateReward
+						else
+							totalRewardsForMissingDelegates = totalRewardsForMissingDelegates + actualDelegateReward
+						end
 					end
-					-- increment the total distributed
-					totalDistributed = math.floor(totalDistributed + actualDelegateReward)
-					-- update the distributed rewards for the delegate
-					distributed[delegateAddress] = (distributed[delegateAddress] or 0) + actualDelegateReward
-					-- increment the total distributed for the epoch
-					totalDistributedToDelegates = totalDistributedToDelegates + actualDelegateReward
 				end
 				-- transfer the remaining rewards to the gateway
-				local actualOperatorReward =
-					math.floor(earnedRewardForGatewayAndDelegates - totalDistributedToDelegates)
+				local actualOperatorReward = math.floor(
+					earnedRewardForGatewayAndDelegates - totalDistributedToDelegates - totalRewardsForMissingDelegates
+				)
 				if actualOperatorReward > 0 then
 					-- distribute the rewards to the gateway
 					balances.transfer(gatewayAddress, ao.id, actualOperatorReward)
 					-- move that balance to the gateway if auto-staking is on
-					if gateway.settings.autoStake and gateway.status == "joined" then
-						-- only increase stake if the gateway is joined, otherwise it is leaving and cannot accept additional stake so distributed rewards to the operator directly
+					if gateway.settings.autoStake then
+						-- only increase stake if the gateway is joined, otherwise it is leaving and cannot accept additional stake so distribute rewards to the operator directly
 						gar.increaseOperatorStake(gatewayAddress, actualOperatorReward)
 					end
 				end
 				-- update the distributed rewards for the gateway
 				distributed[gatewayAddress] = (distributed[gatewayAddress] or 0) + actualOperatorReward
-				-- increment the total distributed for the epoch
-				totalDistributed = math.floor(totalDistributed + actualOperatorReward)
-			else
-				-- if the gateway did not earn any of it's own rewards, we still need to update the distributed rewards with it's current value or add it
-				distributed[gatewayAddress] = distributed[gatewayAddress] or 0
 			end
 		end
 	end
 
+	-- get the total distributed rewards for the epoch
+	local totalDistributedForEpoch = utils.sumTableValues(distributed)
+
 	-- set the distributions for the epoch
-	epoch.distributions.totalDistributedRewards = totalDistributed
+	epoch.distributions.totalDistributedRewards = totalDistributedForEpoch
 	epoch.distributions.distributedTimestamp = currentTimestamp
 	epoch.distributions.rewards = epoch.distributions.rewards or {
 		eligible = {},

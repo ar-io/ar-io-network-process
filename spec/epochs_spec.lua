@@ -595,11 +595,15 @@ describe("epochs", function()
 					totalEligibleRewards = 1250000000000,
 					rewards = {
 						eligible = {
+							["test-this-is-valid-arweave-wallet-address-1"] = {
+								operatorReward = 225000000000,
+								delegateRewards = { ["this-is-a-delegate"] = 25000000000 },
+							},
 							["test-this-is-valid-arweave-wallet-address-2"] = {
 								operatorReward = 225000000000,
 								delegateRewards = { ["this-is-a-delegate"] = 25000000000 },
 							},
-							["test-this-is-valid-arweave-wallet-address-1"] = {
+							["test-this-is-valid-arweave-wallet-address-3"] = {
 								operatorReward = 225000000000,
 								delegateRewards = { ["this-is-a-delegate"] = 25000000000 },
 							},
@@ -609,9 +613,14 @@ describe("epochs", function()
 							},
 							["test-this-is-valid-arweave-wallet-address-5"] = {
 								operatorReward = 225000000000,
-								delegateRewards = { ["this-is-a-delegate"] = 25000000000 },
+								delegateRewards = {
+									["this-is-a-delegate"] = 12500000000,
+									--- these rewards will stay in the protocol balance as the delegate no longer exists on the gateway
+									["this-delegate-left-the-gateway"] = 12500000000,
+								},
 							},
-							["test-this-is-valid-arweave-wallet-address-3"] = {
+							--- this gateway will be marked as leaving during the epoch, rewards should not be distributed
+							["test-this-is-valid-arweave-wallet-address-6"] = {
 								operatorReward = 225000000000,
 								delegateRewards = { ["this-is-a-delegate"] = 25000000000 },
 							},
@@ -621,77 +630,34 @@ describe("epochs", function()
 				prescribedNames = {},
 				prescribedObservers = {
 					{
-						tenureWeight = 4,
-						observerRewardRatioWeight = 0.5,
 						observerAddress = "test-this-very-valid-observer-wallet-addr-1",
-						stakeWeight = 1.002,
-						startTimestamp = 0,
-						normalizedCompositeWeight = 0.3448275862069,
-						compositeWeight = 2.004,
-						gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
-						gatewayRewardRatioWeight = 1,
-						stake = 50100000000,
 					},
 					{
-						tenureWeight = 4,
-						observerRewardRatioWeight = 0.33333333333333,
 						observerAddress = "test-this-very-valid-observer-wallet-addr-2",
-						stakeWeight = 1.002,
-						startTimestamp = 0,
-						normalizedCompositeWeight = 0.22988505747126,
-						compositeWeight = 1.336,
-						gatewayAddress = "test-this-is-valid-arweave-wallet-address-2",
-						gatewayRewardRatioWeight = 1,
-						stake = 50100000000,
 					},
 					{
-						tenureWeight = 4,
-						observerRewardRatioWeight = 0.25,
 						observerAddress = "test-this-very-valid-observer-wallet-addr-3",
-						stakeWeight = 1.002,
-						startTimestamp = 0,
-						normalizedCompositeWeight = 0.17241379310345,
-						compositeWeight = 1.002,
-						gatewayAddress = "test-this-is-valid-arweave-wallet-address-3",
-						gatewayRewardRatioWeight = 1,
-						stake = 50100000000,
 					},
 					{
-						tenureWeight = 4,
-						observerRewardRatioWeight = 0.2,
 						observerAddress = "test-this-very-valid-observer-wallet-addr-4",
-						stakeWeight = 1.002,
-						startTimestamp = 0,
-						normalizedCompositeWeight = 0.13793103448276,
-						compositeWeight = 0.8016,
-						gatewayAddress = "test-this-is-valid-arweave-wallet-address-4",
-						gatewayRewardRatioWeight = 1,
-						stake = 50100000000,
 					},
 					{
-						tenureWeight = 4,
-						observerRewardRatioWeight = 0.16666666666667,
 						observerAddress = "test-this-very-valid-observer-wallet-addr-5",
-						stakeWeight = 1.002,
-						startTimestamp = 0,
-						normalizedCompositeWeight = 0.11494252873563,
-						compositeWeight = 0.668,
-						gatewayAddress = "test-this-is-valid-arweave-wallet-address-5",
-						gatewayRewardRatioWeight = 1,
-						stake = 50100000000,
 					},
 				},
 			}
 
+			local originalOperatorStake = gar.getSettings().operators.minStake
+			local originalDelegateStake = 100000000
 			local epochIndex = 0
-			for i = 1, 5 do
+			for i = 1, 6 do
 				local gateway = {
-					operatorStake = gar.getSettings().operators.minStake,
-					totalDelegatedStake = 100000000,
+					operatorStake = originalOperatorStake,
+					totalDelegatedStake = originalDelegateStake,
 					vaults = {},
 					delegates = {
 						["this-is-a-delegate"] = {
-							delegatedStake = 100000000,
+							delegatedStake = originalDelegateStake,
 							startTimestamp = 0,
 							vaults = {},
 						},
@@ -723,6 +689,8 @@ describe("epochs", function()
 				}
 				gar.addGateway("test-this-is-valid-arweave-wallet-address-" .. i, gateway)
 			end
+			--- set the last gateway to leaving, rewards should not be distributed to it
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-6"].status = "leaving"
 			-- clear the balances for the gateways
 			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 0
 			local epoch = epochs.getEpoch(epochIndex)
@@ -790,6 +758,20 @@ describe("epochs", function()
 			local expectedGateway4TotalRewards = (expectedGatewayReward + expectedObserverReward)
 			local expectedGateway5TotalRewards = (expectedGatewayReward + expectedObserverReward)
 
+			local expectedDelegateRewardForGateway1 = 0 -- no rewards
+			local expectedDelegateRewardForGateway2 = math.floor(expectedGateway2TotalRewards * 0.10)
+			local expectedDelegateRewardForGateway3 = math.floor(expectedGateway3TotalRewards * 0.10)
+			local expectedDelegateRewardForGateway4 = math.floor(expectedGateway4TotalRewards * 0.10)
+			local expectedDelegateRewardForGateway5 = math.floor(expectedGateway5TotalRewards * 0.05) -- it splits with the gateway that left
+
+			local totalRewardForDelegateOfAllGateways = expectedDelegateRewardForGateway1
+				+ expectedDelegateRewardForGateway2
+				+ expectedDelegateRewardForGateway3
+				+ expectedDelegateRewardForGateway4
+				+ expectedDelegateRewardForGateway5
+
+			local rewardsForDelegatesThatLeft = 12500000000
+
 			-- check the epoch was updated
 			local distributions = epochs.getEpoch(epochIndex).distributions
 			local expectedTotalDistribution = math.floor(
@@ -797,22 +779,25 @@ describe("epochs", function()
 					+ expectedGateway2TotalRewards
 					+ expectedGateway3TotalRewards
 					+ expectedGateway4TotalRewards
-					+ expectedGateway5TotalRewards
-			)
+					+ expectedGateway5TotalRewards -- reward for leaving delegate is not distributed
+			) - rewardsForDelegatesThatLeft
 
 			-- the updated operator stakes after rewards are distributed and restaked for the delegate
-			local gateway1OperatorStake = 50000000000 -- no rewards
-			local gateway2OperatorStake = 50000000000 + math.floor(expectedGateway2TotalRewards * 0.90)
-			local gateway3OperatorStake = 50000000000 + math.floor(expectedGateway3TotalRewards * 0.90)
-			local gateway4OperatorStake = 50000000000 + math.floor(expectedGateway4TotalRewards * 0.90)
-			local gateway5OperatorStake = 50000000000
+			local gateway1OperatorStakeAfterRewards = originalOperatorStake -- no rewards
+			local gateway2OperatorStakeAfterRewards = originalOperatorStake
+				+ math.floor(expectedGateway2TotalRewards * 0.90)
+			local gateway3OperatorStakeAfterRewards = originalOperatorStake
+				+ math.floor(expectedGateway3TotalRewards * 0.90)
+			local gateway4OperatorStakeAfterRewards = originalOperatorStake
+				+ math.floor(expectedGateway4TotalRewards * 0.90)
+			local gateway5OperatorStakeAfterRewards = originalOperatorStake
 
 			-- the total delegations after rewards are distributed and restaked for the delegate
-			local gateway1DelegateRewards = 100000000 -- no rewards
-			local gateway2DelegateRewards = 100000000 + math.floor(expectedGateway2TotalRewards * 0.10)
-			local gateway3DelegateRewards = 100000000 + math.floor(expectedGateway3TotalRewards * 0.10)
-			local gateway4DelegateRewards = 100000000 + math.floor(expectedGateway4TotalRewards * 0.10)
-			local gateway5DelegateRewards = 100000000 + math.floor(expectedGateway5TotalRewards * 0.10)
+			local gateway1DelegateStakeAfterRewards = originalDelegateStake + expectedDelegateRewardForGateway1
+			local gateway2DelegateStakeAfterRewards = originalDelegateStake + expectedDelegateRewardForGateway2
+			local gateway3DelegateStakeAfterRewards = originalDelegateStake + expectedDelegateRewardForGateway3
+			local gateway4DelegateStakeAfterRewards = originalDelegateStake + expectedDelegateRewardForGateway4
+			local gateway5DelegateStakeAfterRewards = originalDelegateStake + expectedDelegateRewardForGateway5
 
 			-- balances after rewards are distributed and restaked for the delegate
 			local expectedGateway1Balance = 0 -- autostaking enabled
@@ -826,32 +811,33 @@ describe("epochs", function()
 			assert.are.equal(epoch.distributionTimestamp, distributions.distributedTimestamp)
 
 			assert.are.same({
-				["test-this-is-valid-arweave-wallet-address-1"] = expectedGateway1TotalRewards * 0.90,
+				--- gateway 1 did not earn any rewards, so it should not be in the distributed table
 				["test-this-is-valid-arweave-wallet-address-2"] = expectedGateway2TotalRewards * 0.90,
 				["test-this-is-valid-arweave-wallet-address-3"] = expectedGateway3TotalRewards * 0.90,
 				["test-this-is-valid-arweave-wallet-address-4"] = expectedGateway4TotalRewards * 0.90,
 				["test-this-is-valid-arweave-wallet-address-5"] = expectedGateway5TotalRewards * 0.90,
-				["this-is-a-delegate"] = expectedTotalDistribution * 0.10,
+				["this-is-a-delegate"] = totalRewardForDelegateOfAllGateways,
+				--- the delegate that left the gateway should not have any rewards and not be in the distributed table
 			}, distributions.rewards.distributed)
 			-- assert the gateway operator stakes are updated
 			assert.are.equal(
-				gateway1OperatorStake,
+				gateway1OperatorStakeAfterRewards,
 				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].operatorStake
 			) -- no rewards
 			assert.are.equal(
-				gateway2OperatorStake,
+				gateway2OperatorStakeAfterRewards,
 				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-2"].operatorStake
 			) -- autostake enabled
 			assert.are.equal(
-				gateway3OperatorStake,
+				gateway3OperatorStakeAfterRewards,
 				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-3"].operatorStake
 			) -- autostake enabled
 			assert.are.equal(
-				gateway4OperatorStake,
+				gateway4OperatorStakeAfterRewards,
 				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-4"].operatorStake
 			) -- autostake enabled
 			assert.are.equal(
-				gateway5OperatorStake,
+				gateway5OperatorStakeAfterRewards,
 				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-5"].operatorStake
 			) -- autostake DISABLED - return directly to owner
 
@@ -864,27 +850,27 @@ describe("epochs", function()
 
 			-- gateway 1 did not get any rewards, so the delegate stake should be the original amount
 			assert.are.equal(
-				gateway1DelegateRewards,
+				gateway1DelegateStakeAfterRewards,
 				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].delegates["this-is-a-delegate"].delegatedStake
 			)
 			-- delegate on gateway 2 gets 10% of the total rewards received by the gateway
 			assert.are.equal(
-				gateway2DelegateRewards,
+				gateway2DelegateStakeAfterRewards,
 				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-2"].delegates["this-is-a-delegate"].delegatedStake
 			)
 			-- delegate on gateway 3 gets 10% of the total rewards received by the gateway
 			assert.are.equal(
-				gateway3DelegateRewards,
+				gateway3DelegateStakeAfterRewards,
 				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-3"].delegates["this-is-a-delegate"].delegatedStake
 			)
 			-- delegate on gateway 4 gets 10% of the total rewards received by the gateway
 			assert.are.equal(
-				gateway4DelegateRewards,
+				gateway4DelegateStakeAfterRewards,
 				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-4"].delegates["this-is-a-delegate"].delegatedStake
 			)
 			-- delegate on gateway 5 gets 10% of the total rewards received by the gateway
 			assert.are.equal(
-				gateway5DelegateRewards,
+				gateway5DelegateStakeAfterRewards,
 				_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-5"].delegates["this-is-a-delegate"].delegatedStake
 			)
 			-- assert that the balance withdrawn from the protocol balance matches the total distributed rewards
