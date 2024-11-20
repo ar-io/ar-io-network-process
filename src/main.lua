@@ -36,7 +36,7 @@ local prune = require("prune")
 local tick = require("tick")
 local primaryNames = require("primary_names")
 
--- handlers that are critical and should discard the memory on error
+-- handlers that are critical should discard the memory on error (see prune for an example)
 local CRITICAL = true
 
 local ActionMap = {
