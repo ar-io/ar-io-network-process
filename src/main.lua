@@ -510,6 +510,7 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 	local quantity = msg.Tags.Quantity
 	assert(utils.isValidAOAddress(recipient), "Invalid recipient")
 	assert(quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
+	assert(recipient ~= msg.From, "Cannot transfer to self")
 
 	msg.ioEvent:addField("RecipientFormatted", recipient)
 
@@ -617,6 +618,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 		"Invalid quantity. Must be integer greater than or equal to " .. constants.MIN_VAULT_SIZE .. " mIO"
 	)
 	assert(timestamp, "Timestamp is required for a tick interaction")
+	assert(recipient ~= msg.From, "Cannot transfer to self")
 
 	local vault = vaults.vaultedTransfer(msg.From, recipient, quantity, lockLengthMs, timestamp, msgId)
 
