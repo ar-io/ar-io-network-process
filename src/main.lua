@@ -36,6 +36,9 @@ local prune = require("prune")
 local tick = require("tick")
 local primaryNames = require("primary_names")
 
+-- handlers that are critical and should discard the memory on error
+local CRITICAL = true
+
 local ActionMap = {
 	-- reads
 	Info = "Info",
@@ -328,15 +331,25 @@ local function assertValidFundFrom(fundFrom)
 	assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stake")
 end
 
-local function addEventingHandler(handlerName, pattern, handleFn)
+local function addEventingHandler(handlerName, pattern, handleFn, critical)
+	critical = critical or false
 	Handlers.add(handlerName, pattern, function(msg)
-		-- global handler for all eventing errors, so we can log them and send a notice to the sender
+		-- add an IOEvent to the message if it doesn't exist
+		msg.ioEvent = msg.ioEvent or IOEvent(msg)
+		-- global handler for all eventing errors, so we can log them and send a notice to the sender for non critical errors and discard the memory on critical errors
 		local status, resultOrError = eventingPcall(msg.ioEvent, function(error)
-			print("Error in " .. handlerName .. ": " .. tostring(error))
+			--- non critical errors will send an invalid notice back to the caller with the error information, memory is not discarded
+			ao.send({
+				Target = msg.From,
+				Action = "Invalid-" .. handlerName .. "-Notice",
+				Error = tostring(error),
+				Data = tostring(error),
+			})
 		end, handleFn, msg)
-		if not status then
+		if not status and critical then
 			local errorEvent = IOEvent(msg)
-			-- We want to make sure the event data gets sent to the CU for processing, but that the memory is discarded on failures.
+			-- For critical handlers we want to make sure the event data gets sent to the CU for processing, but that the memory is discarded on failures
+			-- These handlers (distribute, prune) severely modify global state, and partial updates are dangerous.
 			-- So we json encode the error and the event data and then throw, so the CU will discard the memory and still process the event data.
 			-- An alternative approach is to modify the implementation of ao.result - to also return the Output on error.
 			-- Reference: https://github.com/permaweb/ao/blob/76a618722b201430a372894b3e2753ac01e63d3d/dev-cli/src/starters/lua/ao.lua#L284-L287
@@ -348,14 +361,12 @@ local function addEventingHandler(handlerName, pattern, handleFn)
 end
 
 -- prune state before every interaction
-Handlers.add("prune", function()
+-- NOTE: THIS IS A CRITICAL HANDLER AND WILL DISCARD THE MEMORY ON ERROR
+addEventingHandler("prune", function()
 	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
 end, function(msg)
 	local msgTimestamp = tonumber(msg.Timestamp or msg.Tags.Timestamp)
 	assert(msgTimestamp, "Timestamp is required for a tick interaction")
-
-	-- Stash a new IOEvent with the message
-	msg.ioEvent = IOEvent(msg)
 	local epochIndex = epochs.getEpochIndexForTimestamp(msgTimestamp)
 	msg.ioEvent:addField("epochIndex", epochIndex)
 
@@ -490,7 +501,7 @@ end, function(msg)
 	end
 
 	return prunedStateResult
-end)
+end, CRITICAL)
 
 -- Write handlers
 addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
@@ -1578,7 +1589,8 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.
 	})
 end)
 
--- TICK HANDLER - TODO: this may be better as a "Distribute" rewards handler instead of `Tick` tag
+-- distribute rewards
+-- NOTE: THIS IS A CRITICAL HANDLER AND WILL DISCARD THE MEMORY ON ERROR
 addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	local msgTimestamp = msg.Timestamp
 
@@ -1713,7 +1725,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
 	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
 	addSupplyData(msg.ioEvent)
-end)
+end, CRITICAL)
 
 -- READ HANDLERS
 

@@ -1005,21 +1005,24 @@ describe('GatewayRegistry', async () => {
         43,
         '2',
       );
-      const { result } = await decreaseOperatorStake({
-        address: STUB_ADDRESS,
-        timestamp: decreaseTimestamp,
-        memory: sharedMemory,
-        messageId: decreaseMessageId,
-        decreaseQty,
-        assert: false,
-      });
+      const { memory: decreaseStakeMemory, result } =
+        await decreaseOperatorStake({
+          address: STUB_ADDRESS,
+          timestamp: decreaseTimestamp,
+          memory: sharedMemory,
+          messageId: decreaseMessageId,
+          decreaseQty,
+          assert: false,
+        });
 
-      const error = result.Error;
-      assert.ok(error, 'Error should be present');
       assert(
-        error.includes(
+        result.Messages[0].Data.includes(
           'Invalid quantity. Must be integer greater than 1000000',
         ),
+      );
+      assert(
+        result.Messages[0].Tags.find((t) => t.name === 'Error'),
+        'Error tag should be present',
       );
     });
 
@@ -1228,9 +1231,12 @@ describe('GatewayRegistry', async () => {
           assert: false,
         });
 
-      assert.ok(result.Error, 'Error should be present');
+      assert.ok(
+        result.Messages[0].Tags.find((t) => t.name === 'Error'),
+        'Error tag should be present',
+      );
       assert(
-        result.Error.includes(
+        result.Messages[0].Data.includes(
           'Invalid quantity. Must be integer greater than 1000000',
         ),
       );

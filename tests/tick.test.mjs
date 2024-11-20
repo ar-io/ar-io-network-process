@@ -341,8 +341,10 @@ describe('Tick', async () => {
       futureTick.Memory,
     );
     // it should have an error tag
-    const errorTag = prunedVault.Error;
-    assert.ok(errorTag, 'Error should be present');
+    assert.ok(
+      prunedVault.Messages[0].Tags.find((tag) => tag.name === 'Error'),
+      'Error tag should be present',
+    );
 
     // Check that the balance is returned to the owner
     const ownerBalance = await handle(

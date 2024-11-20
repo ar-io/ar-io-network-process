@@ -189,9 +189,14 @@ describe('ArNS', async () => {
         buyRecordResult.Memory,
       );
 
-      const failedBuyRecordError = failedBuyRecordResult.Error;
-      assert.ok(failedBuyRecordError, 'Error should be present');
-      assert(failedBuyRecordError.includes('Name is already registered'));
+      const failedBuyRecordError = failedBuyRecordResult.Messages[0].Tags.find(
+        (t) => t.name === 'Error',
+      );
+      assert.ok(failedBuyRecordError, 'Error tag should be present');
+      const alreadyRegistered = failedBuyRecordResult.Messages[0].Data.includes(
+        'Name is already registered',
+      );
+      assert(alreadyRegistered);
     });
 
     it('should buy a record and default the name to lower case', async () => {
@@ -1454,8 +1459,10 @@ describe('ArNS', async () => {
       );
 
       // assert error
-      const releaseNameErrorTag = reassignNameResult.Error;
-      assert.ok(releaseNameErrorTag, 'Error should be present');
+      const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Error',
+      );
+      assert.ok(releaseNameErrorTag, 'Error tag should be present');
     });
 
     it('should not reassign an arns name with invalid new process id', async () => {
@@ -1481,8 +1488,10 @@ describe('ArNS', async () => {
       );
 
       // assert error
-      const releaseNameErrorTag = reassignNameResult.Error;
-      assert.ok(releaseNameErrorTag, 'Error should be present');
+      const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Error',
+      );
+      assert.ok(releaseNameErrorTag, 'Error tag should be present');
     });
   });
 
