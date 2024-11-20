@@ -428,6 +428,41 @@ describe('Vaults', async () => {
         createdVaultData.startTimestamp + lockLengthMs,
       );
     });
+
+    it('should fail if the vault size is too small', async () => {
+      const quantity = 99999999;
+      const lockLengthMs = 1209600000;
+      const recipient = '0x0000000000000000000000000000000000000000';
+      const createVaultedTransferResult = await handle({
+        Tags: [
+          {
+            name: 'Action',
+            value: 'Vaulted-Transfer',
+          },
+          {
+            name: 'Quantity',
+            value: quantity.toString(),
+          },
+          {
+            name: 'Lock-Length',
+            value: lockLengthMs.toString(),
+          },
+          {
+            name: 'Recipient',
+            value: recipient,
+          },
+        ],
+      });
+
+      const errorTag = createVaultedTransferResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Error',
+      );
+      assert(
+        errorTag.value.includes(
+          'Invalid quantity. Must be integer greater than or equal to 100000000 mIO',
+        ),
+      );
+    });
   });
 
   describe('getPaginatedVaults', () => {
