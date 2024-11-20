@@ -136,6 +136,56 @@ describe('Vaults', async () => {
         createVaultResult.startTimestamp + lockLengthMs,
       );
     });
+
+    it('should throw an error if vault size is too small', async () => {
+      const lockLengthMs = 1209600000;
+      const quantity = 99999999;
+      const balanceBefore = await handle({
+        Tags: [{ name: 'Action', value: 'Balance' }],
+      });
+      const balanceBeforeData = JSON.parse(balanceBefore.Messages[0].Data);
+      const createVaultResult = await handle({
+        Tags: [
+          {
+            name: 'Action',
+            value: 'Create-Vault',
+          },
+          {
+            name: 'Quantity',
+            value: quantity.toString(),
+          },
+          {
+            name: 'Lock-Length',
+            value: lockLengthMs.toString(), // the minimum lock length is 14 days
+          },
+        ],
+      });
+
+      const actionTag = createVaultResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Action',
+      );
+      assert.strictEqual(actionTag.value, 'Invalid-Create-Vault-Notice');
+      const errorTag = createVaultResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Error',
+      );
+      assert(
+        errorTag.value.includes(
+          'Invalid quantity. Must be integer greater than or equal to 100000000 mIO',
+        ),
+      );
+
+      // assert the balance is deducted
+      const balanceAfterVault = await handle(
+        {
+          Tags: [{ name: 'Action', value: 'Balance' }],
+        },
+        createVaultResult.Memory,
+      );
+      const balanceAfterVaultData = JSON.parse(
+        balanceAfterVault.Messages[0].Data,
+      );
+      assert.deepEqual(balanceAfterVaultData, balanceBeforeData);
+    });
   });
 
   describe('extendVault', () => {
@@ -388,7 +438,7 @@ describe('Vaults', async () => {
 
     before(async () => {
       const { memory: updatedMemory } = await createVault({
-        quantity: 500,
+        quantity: 500000000,
         lockLengthMs: 1209600000,
         memory: startMemory,
         messageId: vaultId1,
@@ -399,7 +449,7 @@ describe('Vaults', async () => {
           Tags: [
             { name: 'Action', value: 'Transfer' },
             { name: 'Recipient', value: secondVaulter },
-            { name: 'Quantity', value: 600 },
+            { name: 'Quantity', value: 600000000 },
             { name: 'Cast', value: true },
           ],
         },
@@ -407,7 +457,7 @@ describe('Vaults', async () => {
       );
 
       const { memory: updatedMemory2 } = await createVault({
-        quantity: 600,
+        quantity: 600000000,
         lockLengthMs: 1209600000,
         memory: transferResult.Memory,
         from: secondVaulter,
@@ -444,14 +494,14 @@ describe('Vaults', async () => {
         {
           address: secondVaulter,
           vaultId: vaultId2,
-          balance: 600,
+          balance: 600000000,
           startTimestamp: 21600000,
           endTimestamp: 1231200000,
         },
         {
           address: PROCESS_OWNER,
           vaultId: vaultId1,
-          balance: 500,
+          balance: 500000000,
           startTimestamp: 21600000,
           endTimestamp: 1231200000,
         },
@@ -488,14 +538,14 @@ describe('Vaults', async () => {
         {
           address: PROCESS_OWNER,
           vaultId: vaultId1,
-          balance: 500,
+          balance: 500000000,
           startTimestamp: 21600000,
           endTimestamp: 1231200000,
         },
         {
           address: secondVaulter,
           vaultId: vaultId2,
-          balance: 600,
+          balance: 600000000,
           startTimestamp: 21600000,
           endTimestamp: 1231200000,
         },
