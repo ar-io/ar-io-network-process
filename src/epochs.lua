@@ -725,8 +725,9 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 				-- distribute all the predetermined rewards to the delegates
 				for delegateAddress, eligibleDelegateReward in pairs(totalEligibleRewardsForGateway.delegateRewards) do
 					local actualDelegateReward = math.floor(eligibleDelegateReward * percentOfEligibleEarned)
-					-- distribute the rewards to the delegate if greater than 0
-					if actualDelegateReward > 0 then
+					local distributedDelegateReward = 0
+					-- distribute the rewards to the delegate if greater than 0 and the delegate still exists on the gateway
+					if actualDelegateReward > 0 and gateway.delegates[delegateAddress] then
 						-- increase the stake and decrease the protocol balance, returns the updated gateway
 						gateway = gar.increaseExistingDelegateStake(
 							gatewayAddress,
@@ -735,13 +736,14 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 							actualDelegateReward
 						)
 						balances.reduceBalance(ao.id, actualDelegateReward)
+						distributedDelegateReward = actualDelegateReward
 					end
 					-- increment the total distributed
-					totalDistributed = math.floor(totalDistributed + actualDelegateReward)
+					totalDistributed = math.floor(totalDistributed + distributedDelegateReward)
 					-- update the distributed rewards for the delegate
-					distributed[delegateAddress] = (distributed[delegateAddress] or 0) + actualDelegateReward
+					distributed[delegateAddress] = (distributed[delegateAddress] or 0) + distributedDelegateReward
 					-- increment the total distributed for the epoch
-					totalDistributedToDelegates = totalDistributedToDelegates + actualDelegateReward
+					totalDistributedToDelegates = totalDistributedToDelegates + distributedDelegateReward
 				end
 				-- transfer the remaining rewards to the gateway
 				local actualOperatorReward =
