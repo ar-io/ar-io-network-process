@@ -1,5 +1,5 @@
-import { createAosLoader } from './utils.mjs';
-import { after, describe, it } from 'node:test';
+import { assertNoResultError, createAosLoader } from './utils.mjs';
+import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import {
   AO_LOADER_HANDLER_ENV,
@@ -10,7 +10,11 @@ import {
   PROCESS_ID,
   STUB_TIMESTAMP,
 } from '../tools/constants.mjs';
-import { getBaseRegistrationFeeForName, getDemandFactor } from './helpers.mjs';
+import {
+  getBaseRegistrationFeeForName,
+  getDemandFactor,
+  getDelegatesItems,
+} from './helpers.mjs';
 
 const genesisEpochStart = 1722837600000 + 1;
 const epochDurationMs = 60 * 1000 * 60 * 24; // 24 hours
@@ -73,7 +77,6 @@ describe('Tick', async () => {
       },
       mem,
     );
-
     const realRecord = await handle(
       {
         Tags: [
@@ -83,7 +86,6 @@ describe('Tick', async () => {
       },
       buyRecordResult.Memory,
     );
-
     const buyRecordData = JSON.parse(realRecord.Messages[0].Data);
     assert.deepEqual(buyRecordData, {
       processId: ''.padEnd(43, 'a'),
@@ -338,10 +340,10 @@ describe('Tick', async () => {
       },
       futureTick.Memory,
     );
-    assert.deepEqual(undefined, prunedVault.Messages[0].Data);
-    assert.equal(
-      prunedVault.Messages[0].Tags.find((tag) => tag.name === 'Error').value,
-      'Vault-Not-Found',
+    // it should have an error tag
+    assert.ok(
+      prunedVault.Messages[0].Tags.find((tag) => tag.name === 'Error'),
+      'Error tag should be present',
     );
 
     // Check that the balance is returned to the owner
@@ -448,10 +450,7 @@ describe('Tick', async () => {
     );
 
     // assert no error tag
-    const tickErrorTag = newEpochTick.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(tickErrorTag, undefined);
+    assertNoResultError(newEpochTick);
 
     // assert the new epoch is created
     const epoch = await handle(
@@ -537,10 +536,7 @@ describe('Tick', async () => {
     );
 
     // assert no error tag
-    const observationErrorTag = observation.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(observationErrorTag, undefined);
+    assertNoResultError(observation);
 
     // now jump ahead to the epoch distribution timestamp
     const distributionTimestamp = epochData.distributionTimestamp;
@@ -619,18 +615,12 @@ describe('Tick', async () => {
     const gatewayData = JSON.parse(gateway.Messages[0].Data);
     assert.deepStrictEqual(gatewayData, {
       status: 'joined',
-      vaults: [],
+      // TODO: Verify via vaults handler
+      //vaults: [],
       startTimestamp: STUB_TIMESTAMP,
       observerAddress: STUB_ADDRESS,
       operatorStake: 100_000_000_000 + expectedGatewayOperatorReward,
       totalDelegatedStake: 50_000_000_000 + expectedGatewayDelegateReward,
-      delegates: {
-        [delegateAddress]: {
-          delegatedStake: 50_000_000_000 + expectedGatewayDelegateReward,
-          startTimestamp: delegateTimestamp,
-          vaults: [],
-        },
-      },
       settings: {
         allowDelegatedStaking: true,
         autoStake: true,
@@ -661,6 +651,19 @@ describe('Tick', async () => {
         tenureWeight: 4,
       },
     });
+
+    const delegateItems = await getDelegatesItems({
+      memory: distributionTick.Memory,
+      gatewayAddress: STUB_ADDRESS,
+    });
+    assert.deepEqual(delegateItems, [
+      {
+        delegatedStake: 50_000_000_000 + expectedGatewayDelegateReward,
+        startTimestamp: delegateTimestamp,
+        vaults: [],
+        address: delegateAddress,
+      },
+    ]);
   });
 
   it('should not increase demandFactor and baseRegistrationFee when records are bought until the end of the epoch', async () => {

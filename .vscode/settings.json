@@ -36,5 +36,6 @@
     "editor.formatOnSave": true,
     "editor.formatOnPaste": true,
     "editor.formatOnSaveMode": "file"
-  }
+  },
+  "cSpell.words": ["hashchain", "redelegate"]
 }

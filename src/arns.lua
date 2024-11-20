@@ -7,11 +7,42 @@ local arns = {}
 local Auction = require("auctions")
 local gar = require("gar")
 
+--- @class NameRegistry
+--- @field reserved table<string, ReservedName> The reserved names
+--- @field records table<string, Record> The records
+--- @field auctions table<string, Auction> The auctions
+
 NameRegistry = NameRegistry or {
 	reserved = {},
 	records = {},
 	auctions = {},
 }
+
+--- @class StoredRecord
+--- @field processId string The process id of the record
+--- @field startTimestamp number The start timestamp of the record
+--- @field type 'lease' | 'permabuy' The type of the record (lease/permabuy)
+--- @field undernameLimit number The undername limit of the record
+--- @field purchasePrice number The purchase price of the record
+--- @field endTimestamp number|nil The end timestamp of the record
+
+--- @class Record : StoredRecord
+--- @field name string The name of the record
+
+--- @class ReservedName
+--- @field name string The name of the reserved record
+--- @field target string|nil The address of the target of the reserved record
+--- @field endTimestamp number|nil The time at which the record is no longer reserved
+
+--- @class BuyRecordResponse
+--- @field record Record The updated record
+--- @field totalRegistrationFee number The total registration fee
+--- @field baseRegistrationFee number The base registration fee
+--- @field remainingBalance number The remaining balance
+--- @field protocolBalance number The protocol balance
+--- @field df table The demand factor info
+--- @field fundingPlan table The funding plan
+--- @field fundingResult table The funding result
 
 --- Buys a record
 --- @param name string The name of the record
@@ -21,8 +52,8 @@ NameRegistry = NameRegistry or {
 --- @param timestamp number The current timestamp
 --- @param processId string The process id
 --- @param msgId string The current message id
---- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stakes". Default "balance"
---- @return table The updated record
+--- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
+--- @return BuyRecordResponse buyRecordResponse - The response including relevant metadata about the purchase
 function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
 	arns.assertValidBuyRecord(name, years, purchaseType, processId)
@@ -60,6 +91,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 	assert(not arns.getReservedName(name) or arns.getReservedName(name).target == from, "Name is reserved")
 	assert(not arns.getAuction(name), "Name is in auction")
 
+	--- @type StoredRecord
 	local newRecord = {
 		processId = processId,
 		startTimestamp = timestamp,
@@ -90,33 +122,73 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 	}
 end
 
+--- Adds a record to the registry
+--- @param name string The name of the record
+--- @param record StoredRecord The record to the name registry
 function arns.addRecord(name, record)
 	NameRegistry.records[name] = record
 
 	-- remove reserved name if it exists in reserved
-	if arns.getReservedName(record.name) then
+	if arns.getReservedName(name) then
 		NameRegistry.reserved[name] = nil
 	end
 end
 
+--- Gets paginated records
+--- @param cursor string|nil The cursor to paginate from
+--- @param limit number The limit of records to return
+--- @param sortBy string The field to sort by
+--- @param sortOrder string The order to sort by
+--- @return PaginatedTable<Record> The paginated records
 function arns.getPaginatedRecords(cursor, limit, sortBy, sortOrder)
-	local records = arns.getRecords()
+	--- @type Record[]
 	local recordsArray = {}
 	local cursorField = "name" -- the cursor will be the name
-	for name, record in pairs(records) do
-		record.name = name
-		table.insert(recordsArray, record)
+	for name, record in pairs(arns.getRecordsUnsafe()) do
+		local recordCopy = utils.deepCopy(record)
+		--- @diagnostic disable-next-line: inject-field
+		recordCopy.name = name
+		table.insert(recordsArray, recordCopy)
 	end
 
 	return utils.paginateTableWithCursor(recordsArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
----@param from string The address of the sender
----@param name string The name of the record
----@param years number The number of years to extend the lease
----@param currentTimestamp number The current timestamp
----@param msgId string The current message id
----@param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stakes". Default "balance"
+--- Get paginated reserved names
+--- @param cursor string|nil The cursor to paginate from
+--- @param limit number The limit of reserved names to return
+--- @param sortBy string The field to sort by
+--- @param sortOrder string The order to sort by
+--- @return PaginatedTable<ReservedName> The paginated reserved names
+function arns.getPaginatedReservedNames(cursor, limit, sortBy, sortOrder)
+	--- @type ReservedName[]
+	local reservedArray = {}
+	local cursorField = "name" -- the cursor will be the name
+	for name, reservedName in pairs(arns.getReservedNamesUnsafe()) do
+		local reservedNameCopy = utils.deepCopy(reservedName)
+		reservedNameCopy.name = name
+		table.insert(reservedArray, reservedNameCopy)
+	end
+	return utils.paginateTableWithCursor(reservedArray, cursor, cursorField, limit, sortBy, sortOrder)
+end
+
+--- @class ExtendLeaseResponse
+--- @field record Record The updated record
+--- @field totalExtensionFee number The total extension fee
+--- @field baseRegistrationFee number The base registration fee
+--- @field remainingBalance number The remaining balance
+--- @field protocolBalance number The protocol balance
+--- @field df table The demand factor info
+--- @field fundingPlan table The funding plan
+--- @field fundingResult table The funding result
+
+--- Extends the lease for a record
+--- @param from string The address of the sender
+--- @param name string The name of the record
+--- @param years number The number of years to extend the lease
+--- @param currentTimestamp number The current timestamp
+--- @param msgId string The current message id
+--- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
 function arns.extendLease(from, name, years, currentTimestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
 	local record = arns.getRecord(name)
@@ -156,20 +228,40 @@ function arns.extendLease(from, name, years, currentTimestamp, msgId, fundFrom)
 	}
 end
 
+--- Calculates the extension fee for a given base fee, years, and demand factor
+--- @param baseFee number The base fee for the name
+--- @param years number The number of years
+--- @param demandFactor number The demand factor
+--- @return number The extension fee
 function arns.calculateExtensionFee(baseFee, years, demandFactor)
 	local extensionFee = arns.calculateAnnualRenewalFee(baseFee, years)
 	return math.floor(demandFactor * extensionFee)
 end
 
+--- @class IncreaseUndernameResponse
+--- @field record Record The updated record
+--- @field additionalUndernameCost number The additional undername cost
+--- @field baseRegistrationFee number The base registration fee
+--- @field remainingBalance number The remaining balance
+--- @field protocolBalance number The protocol balance
+--- @field df table The demand factor info
+--- @field fundingPlan table The funding plan
+--- @field fundingResult table The funding result
+
+--- Increases the undername limit for a record
+--- @param from string The address of the sender
+--- @param name string The name of the record
+--- @param qty number The quantity to increase the undername limit by
+--- @param currentTimestamp number The current timestamp
+--- @param msgId string The current message id
+--- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
+--- @return IncreaseUndernameResponse The response
 function arns.increaseundernameLimit(from, name, qty, currentTimestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
-
 	-- validate record can increase undernames
 	local record = arns.getRecord(name)
 
-	if not record then
-		error("Name is not registered")
-	end
+	assert(record, "Name is not registered")
 
 	-- throws errors on invalid requests
 	arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
@@ -189,9 +281,7 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp, msgId, f
 		additionalUndernameCost = additionalUndernameCost - discount
 	end
 
-	if additionalUndernameCost < 0 then
-		error("Invalid undername cost")
-	end
+	assert(additionalUndernameCost >= 0, "Invalid undername cost")
 
 	local fundingPlan = gar.getFundingPlan(from, additionalUndernameCost, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
@@ -219,7 +309,7 @@ end
 
 --- Gets a record
 --- @param name string The name of the record
---- @return table|nil The a deep copy of the record or nil if it does not exist
+--- @return StoredRecord|nil # A deep copy of the record or nil if it does not exist
 function arns.getRecord(name)
 	return utils.deepCopy(NameRegistry.records[name])
 end
@@ -227,7 +317,7 @@ end
 --- Gets the active ARNS names between two timestamps
 --- @param startTimestamp number The start timestamp
 --- @param endTimestamp number The end timestamp
---- @return table The active ARNS names between the two timestamps
+--- @return table<string> The active ARNS names between the two timestamps
 function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
 	local records = arns.getRecords()
 	local activeNames = {}
@@ -248,23 +338,35 @@ function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
 	return activeNames
 end
 
---- Gets all records
---- @return table The a deep copy of the records table
+--- Gets deep copies of all records
+--- @return table<string, StoredRecord> # A deep copy of the records table
 function arns.getRecords()
 	local records = utils.deepCopy(NameRegistry.records)
 	return records or {}
 end
 
---- Gets all reserved names
---- @return table The a deep copy of the reserved names table
+--- Gets all records
+--- @return table<string, StoredRecord> # The actual records table
+function arns.getRecordsUnsafe()
+	return NameRegistry and NameRegistry.records or {}
+end
+
+--- Gets copies of all reserved names
+--- @return table<string, ReservedName> # A deep copy of the reserved names table
 function arns.getReservedNames()
 	local reserved = utils.deepCopy(NameRegistry.reserved)
 	return reserved or {}
 end
 
+--- Gets all reserved names
+--- @return table<string, ReservedName> # The actual reserved names table
+function arns.getReservedNamesUnsafe()
+	return NameRegistry and NameRegistry.reserved or {}
+end
+
 --- Gets a reserved name
 --- @param name string The name of the reserved record
---- @return table|nil The a deep copy of the reserved name or nil if it does not exist
+--- @return table|nil # A deep copy of the reserved name or nil if it does not exist
 function arns.getReservedName(name)
 	return utils.deepCopy(NameRegistry.reserved[name])
 end
@@ -272,7 +374,7 @@ end
 --- Modifies the undername limit for a record
 --- @param name string The name of the record
 --- @param qty number The quantity to increase the undername limit by
---- @return table The updated record
+--- @return StoredRecord|nil # The updated record
 function arns.modifyRecordundernameLimit(name, qty)
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
@@ -283,7 +385,7 @@ end
 --- Modifies the process id for a record
 --- @param name string The name of the record
 --- @param processId string The new process id
---- @return table The updated record
+--- @return StoredRecord|nil # The updated record
 function arns.modifyProcessId(name, processId)
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
@@ -294,7 +396,7 @@ end
 --- Modifies the end timestamp for a record
 --- @param name string The name of the record
 --- @param newEndTimestamp number The new end timestamp
---- @return table The updated record
+--- @return StoredRecord|nil # The updated record
 function arns.modifyRecordEndTimestamp(name, newEndTimestamp)
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
@@ -309,7 +411,7 @@ end
 --- @param baseFee number The base fee for the name
 --- @param years number The number of years
 --- @param demandFactor number The demand factor
---- @return number The lease fee
+--- @return number leaseFee - the lease fee
 function arns.calculateLeaseFee(baseFee, years, demandFactor)
 	local annualRegistrationFee = arns.calculateAnnualRenewalFee(baseFee, years)
 	local totalLeaseCost = baseFee + annualRegistrationFee
@@ -319,7 +421,7 @@ end
 ---Calculates the annual renewal fee for a given base fee and years
 --- @param baseFee number The base fee for the name
 --- @param years number The number of years
---- @return number The annual renewal fee
+--- @return number annualRenewalFee - the annual renewal fee
 function arns.calculateAnnualRenewalFee(baseFee, years)
 	local totalAnnualRenewalCost = baseFee * constants.ANNUAL_PERCENTAGE_FEE * years
 	return math.floor(totalAnnualRenewalCost)
@@ -328,7 +430,7 @@ end
 ---Calculates the permabuy fee for a given base fee and demand factor
 --- @param baseFee number The base fee for the name
 --- @param demandFactor number The demand factor
---- @return number The permabuy fee
+--- @return number permabuyFee - the permabuy fee
 function arns.calculatePermabuyFee(baseFee, demandFactor)
 	local permabuyPrice = baseFee + arns.calculateAnnualRenewalFee(baseFee, constants.PERMABUY_LEASE_FEE_LENGTH)
 	return math.floor(demandFactor * permabuyPrice)
@@ -339,7 +441,7 @@ end
 --- @param baseFee number The base fee for the name
 --- @param years number|nil The number of years, may be empty for permabuy
 --- @param demandFactor number The demand factor
---- @return number The registration fee
+--- @return number registrationFee - the registration fee
 function arns.calculateRegistrationFee(purchaseType, baseFee, years, demandFactor)
 	assert(purchaseType == "lease" or purchaseType == "permabuy", "Invalid purchase type")
 	local registrationFee = purchaseType == "lease" and arns.calculateLeaseFee(baseFee, years, demandFactor)
@@ -354,7 +456,7 @@ end
 --- @param registrationType string The registration type (lease/permabuy)
 --- @param years number The number of years
 --- @param demandFactor number The demand factor
---- @return number The undername cost
+--- @return number undernameCost - the undername cost
 function arns.calculateUndernameCost(baseFee, increaseQty, registrationType, years, demandFactor)
 	assert(registrationType == "lease" or registrationType == "permabuy", "Invalid registration type")
 	local undernamePercentageFee = registrationType == "lease" and constants.UNDERNAME_LEASE_FEE_PERCENTAGE
@@ -366,7 +468,7 @@ end
 --- Calculates the number of years between two timestamps
 --- @param startTimestamp number The start timestamp
 --- @param endTimestamp number The end timestamp
---- @return number The number of years between the two timestamps
+--- @return number yearsBetweenTimestamps - the number of years between the two timestamps
 function arns.calculateYearsBetweenTimestamps(startTimestamp, endTimestamp)
 	local yearsRemainingFloat = (endTimestamp - startTimestamp) / constants.oneYearMs
 	return yearsRemainingFloat
@@ -432,8 +534,12 @@ function arns.getMaxAllowedYearsExtensionForRecord(record, currentTimestamp)
 	return constants.maxLeaseLengthYears - yearsRemainingOnLease
 end
 
+--- @class RegistrationFee
+--- @field lease table<number, number> Lease fees by year
+--- @field permabuy number Cost for permanent purchase
+
 --- Gets the registration fees for all name lengths and years
---- @return table registrationFees A table containing registration fees for each name length, with the following structure:
+--- @return RegistrationFee registrationFees - a table containing registration fees for each name length, with the following structure:
 ---   - [nameLength]: table The fees for names of this length
 ---     - lease: table Lease fees by year
 ---       - ["1"]: number Cost for 1 year lease
@@ -536,9 +642,7 @@ function arns.getTokenCost(intendedAction)
 	end
 
 	-- if token Cost is less than 0, throw an error
-	if tokenCost < 0 then
-		error("Invalid token cost for " .. intendedAction.intent)
-	end
+	assert(tokenCost >= 0, "Invalid token cost for " .. intendedAction.intent)
 
 	return {
 		tokenCost = tokenCost,
@@ -599,13 +703,22 @@ function arns.assertValidUpgradeName(record, currentTimestamp)
 	)
 end
 
+--- @class UpgradeRecordResult
+--- @field name string The name of the record
+--- @field record Record The updated record
+--- @field totalUpgradeFee number The total upgrade fee
+--- @field baseRegistrationFee number The base registration fee
+--- @field remainingBalance number The remaining balance of the sender
+--- @field protocolBalance number The protocol balance
+--- @field df table The demand factor information
+
 --- Upgrades a leased record to permanently owned
 --- @param from string The address of the sender
 --- @param name string The name of the record
 --- @param currentTimestamp number The current timestamp
 --- @param msgId string The current message id
 --- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stakes". Default "balance"
---- @return table The upgraded record with name and record fields
+--- @return UpgradeRecordResult upgradeRecordResult - the upgraded record with name and record fields
 function arns.upgradeRecord(from, name, currentTimestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
 	local record = arns.getRecord(name)
@@ -695,43 +808,52 @@ end
 --- @param name string The name of the auction
 --- @param timestamp number The timestamp to start the auction
 --- @param initiator string The address of the initiator of the auction
---- @return Auction|nil The auction instance
+--- @return Auction|nil auction - the auction instance
 function arns.createAuction(name, timestamp, initiator)
-	assert(arns.getRecord(name), "Name is not registered. Auctions can only be created for registered names.")
+	assert(not arns.getRecord(name), "Name is registered. Auctions can only be created for unregistered names.")
+	assert(not arns.getReservedName(name), "Name is reserved. Auctions can only be created for unregistered names.")
 	assert(not arns.getAuction(name), "Auction already exists for name")
 	local baseFee = demand.baseFeeForNameLength(#name)
 	local demandFactor = demand.getDemandFactor()
 	local auction = Auction:new(name, timestamp, demandFactor, baseFee, initiator, arns.calculateRegistrationFee)
 	NameRegistry.auctions[name] = auction
-	-- ensure the name is removed from the registry
-	arns.removeRecord(name)
 	return auction
 end
 
 --- Gets an auction by name
 --- @param name string The name of the auction
---- @return Auction|nil The auction instance
+--- @return Auction|nil auction - the auction instance
 function arns.getAuction(name)
 	return NameRegistry.auctions[name]
 end
 
 --- Gets all auctions
---- @return table The auctions
+--- @return table<string, Auction> auctions - the auctions
 function arns.getAuctions()
 	return NameRegistry.auctions or {}
 end
 
+--- @class AuctionBidResult
+--- @field auction Auction The auction instance
+--- @field bidder string The address of the bidder
+--- @field bidAmount number The amount of the bid
+--- @field rewardForInitiator number The reward for the initiator
+--- @field rewardForProtocol number The reward for the protocol
+--- @field record Record The record instance
+--- @field fundingPlan table The funding plan
+--- @field fundingResult table The funding result
+
 --- Submits a bid to an auction
 --- @param name string The name of the auction
---- @param bidAmount number The amount of the bid
+--- @param bidAmount number|nil The amount of the bid
 --- @param bidder string The address of the bidder
 --- @param timestamp number The timestamp of the bid
 --- @param processId string The processId of the bid
 --- @param type string The type of the bid
---- @param years number The number of years for the bid
+--- @param years number|nil The number of years for the bid
 --- @param msgId string The current messageId
 --- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stakes". Default "balance"
---- @return table The result of the bid including the auction, bidder, bid amount, reward for initiator, reward for protocol, record, fundingPlan, and fundingResult
+--- @return AuctionBidResult auctionBidResult The result of the bid
 function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, type, years, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
 	local auction = arns.getAuction(name)
@@ -800,7 +922,7 @@ end
 
 --- Removes an auction by name
 --- @param name string The name of the auction
---- @return Auction|nil The auction instance
+--- @return Auction|nil auction - the auction instance
 function arns.removeAuction(name)
 	local auction = arns.getAuction(name)
 	NameRegistry.auctions[name] = nil
@@ -809,7 +931,7 @@ end
 
 --- Removes a record by name
 --- @param name string The name of the record
---- @return table|nil The record instance
+--- @return Record|nil record - the record instance
 function arns.removeRecord(name)
 	local record = NameRegistry.records[name]
 	NameRegistry.records[name] = nil
@@ -818,7 +940,7 @@ end
 
 --- Removes a reserved name by name
 --- @param name string The name of the reserved name
---- @return table|nil The reserved name instance
+--- @return ReservedName|nil reservedName - the reserved name instance
 function arns.removeReservedName(name)
 	local reserved = NameRegistry.reserved[name]
 	NameRegistry.reserved[name] = nil
@@ -828,23 +950,22 @@ end
 --- Prunes records that have expired
 --- @param currentTimestamp number The current timestamp
 --- @param lastGracePeriodEntryEndTimestamp number The end timestamp of the last known record to have entered its grace period
---- @return table # The pruned records
---- @return number # The end timestamp of the last known record to have entered its grace period
+--- @return table<string, Record> prunedRecords - the pruned records
+--- @return table<string, Record> recordsInGracePeriod - the records that have entered their grace period
 function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 	lastGracePeriodEntryEndTimestamp = lastGracePeriodEntryEndTimestamp or 0
 	local prunedRecords = {}
 	local newGracePeriodRecords = {}
 	-- identify any records that are leases and that have expired, account for a one week grace period in seconds
 	for name, record in pairs(arns.getRecords()) do
-		if record.type == "lease" and currentTimestamp > record.endTimestamp then
-			if currentTimestamp >= record.endTimestamp + constants.gracePeriodMs then
-				-- lease is outside the grade period. start a dutch auction. it will get pruned out if it expires with no bids
-				prunedRecords[name] = record
-				arns.createAuction(name, currentTimestamp, ao.id)
-			elseif record.endTimestamp > lastGracePeriodEntryEndTimestamp then
-				-- lease is newly recognized as being within the grace period
-				newGracePeriodRecords[name] = record
-			end
+		if arns.recordExpired(record, currentTimestamp) then
+			prunedRecords[name] = record
+			NameRegistry.records[name] = nil
+		elseif
+			arns.recordInGracePeriod(record, currentTimestamp)
+			and record.endTimestamp > lastGracePeriodEntryEndTimestamp
+		then
+			newGracePeriodRecords[name] = record
 		end
 	end
 	return prunedRecords, newGracePeriodRecords
@@ -852,7 +973,7 @@ end
 
 --- Prunes auctions that have expired
 --- @param currentTimestamp number The current timestamp
---- @return table The pruned auctions
+--- @return Auction[] prunedAuctions - the pruned auctions
 function arns.pruneAuctions(currentTimestamp)
 	local prunedAuctions = {}
 	for name, auction in pairs(arns.getAuctions()) do
@@ -865,7 +986,7 @@ end
 
 --- Prunes reserved names that have expired
 --- @param currentTimestamp number The current timestamp
---- @return table The pruned reserved names
+--- @return ReservedName[] prunedReservedNames - the pruned reserved names
 function arns.pruneReservedNames(currentTimestamp)
 	local prunedReserved = {}
 	for name, details in pairs(arns.getReservedNames()) do
@@ -877,7 +998,7 @@ function arns.pruneReservedNames(currentTimestamp)
 end
 
 --- Asserts that a name can be reassigned
---- @param record table The record to check
+--- @param record StoredRecord The record to check
 --- @param currentTimestamp number The current timestamp
 --- @param from string The address of the sender
 --- @param newProcessId string The new process id
@@ -903,7 +1024,7 @@ end
 --- @param from string The address of the sender
 --- @param currentTimestamp number The current timestamp
 --- @param newProcessId string The new process id
---- @return table The updated record
+--- @return StoredRecord|nil updatedRecord - the updated record
 function arns.reassignName(name, from, currentTimestamp, newProcessId)
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")

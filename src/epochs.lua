@@ -27,6 +27,7 @@ local epochs = {}
 
 --- @class WeightedGateway
 --- @field gatewayAddress string The gateway address
+--- @field observerAddress string The observer address
 --- @field stakeWeight number The stake weight
 --- @field tenureWeight number The tenure weight
 --- @field gatewayRewardRatioWeight number The gateway reward ratio weight
@@ -77,52 +78,34 @@ end
 
 --- Gets an epoch by index
 --- @param epochIndex number The epoch index
---- @return Epoch The epoch
+--- @return Epoch # The epoch
 function epochs.getEpoch(epochIndex)
 	local epoch = utils.deepCopy(Epochs[epochIndex]) or {}
 	return epoch
 end
 
 --- Gets the current epoch
---- @return Epoch The current epoch
+--- @return Epoch # The current epoch
 function epochs.getCurrentEpoch()
 	return epochs.getEpoch(epochs.getEpochIndexForTimestamp(os.time()))
 end
 
 --- Gets the epoch settings
---- @return EpochSettings|nil The epoch settings
+--- @return EpochSettings|nil # The epoch settings
 function epochs.getSettings()
 	return utils.deepCopy(EpochSettings)
 end
 
---- Gets the observations for the current epoch
---- @return Observations The observations for the current epoch
-function epochs.getObservations()
-	return epochs.getCurrentEpoch().observations or {}
-end
-
---- Gets the reports for the current epoch
---- @return Reports The reports for the current epoch
-function epochs.getReports()
-	return epochs.getObservations().reports or {}
-end
-
---- Gets the current distribution
---- @return Distribution The current distribution
-function epochs.getDistribution()
-	return epochs.getCurrentEpoch().distributions or {}
-end
-
 --- Gets the prescribed observers for an epoch
 --- @param epochIndex number The epoch index
---- @return WeightedGateway[] The prescribed observers for the epoch
+--- @return WeightedGateway[] # The prescribed observers for the epoch
 function epochs.getPrescribedObserversForEpoch(epochIndex)
 	return epochs.getEpoch(epochIndex).prescribedObservers or {}
 end
 
 --- Gets the eligible rewards for an epoch
 --- @param epochIndex number The epoch index
---- @return Rewards The eligible rewards for the epoch
+--- @return Rewards # T	he eligible rewards for the epoch
 function epochs.getEligibleRewardsForEpoch(epochIndex)
 	local epoch = epochs.getEpoch(epochIndex)
 	local eligible = epoch
@@ -135,7 +118,7 @@ end
 
 --- Gets the distributed rewards for an epoch
 --- @param epochIndex number The epoch index
---- @return Rewards The distributed rewards for the epoch
+--- @return Rewards # The distributed rewards for the epoch
 function epochs.getDistributedRewardsForEpoch(epochIndex)
 	local epoch = epochs.getEpoch(epochIndex)
 	local distributed = epoch
@@ -148,73 +131,43 @@ end
 
 --- Gets the observations for an epoch
 --- @param epochIndex number The epoch index
---- @return Observations The observations for the epoch
+--- @return Observations # The observations for the epoch
 function epochs.getObservationsForEpoch(epochIndex)
 	return epochs.getEpoch(epochIndex).observations or {}
 end
 
 --- Gets the distributions for an epoch
 --- @param epochIndex number The epoch index
---- @return Distribution The distributions for the epoch
+--- @return Distribution # The distributions for the epoch
 function epochs.getDistributionsForEpoch(epochIndex)
 	return epochs.getEpoch(epochIndex).distributions or {}
 end
 
 --- Gets the prescribed names for an epoch
 --- @param epochIndex number The epoch index
---- @return string[] The prescribed names for the epoch
+--- @return string[] # 	The prescribed names for the epoch
 function epochs.getPrescribedNamesForEpoch(epochIndex)
 	return epochs.getEpoch(epochIndex).prescribedNames or {}
 end
 
 --- Gets the reports for an epoch
 --- @param epochIndex number The epoch index
---- @return table<string, Report> The reports for the epoch
+--- @return table<string, Report> # The reports for the epoch
 function epochs.getReportsForEpoch(epochIndex)
 	return epochs.getEpoch(epochIndex).observations.reports or {}
 end
 
 --- Gets the distribution for an epoch
 --- @param epochIndex number The epoch index
---- @return Distribution The distribution for the epoch
+--- @return Distribution # The distribution for the epoch
 function epochs.getDistributionForEpoch(epochIndex)
 	return epochs.getEpoch(epochIndex).distributions or {}
-end
-
---- Gets the epoch from a timestamp
---- @param timestamp number The timestamp
---- @return Epoch The epoch
-function epochs.getEpochFromTimestamp(timestamp)
-	local epochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	return epochs.getEpoch(epochIndex)
-end
-
---- Sets the prescribed observers for an epoch
---- @param epochIndex number The epoch index
---- @param hashchain string The hashchain
-function epochs.setPrescribedObserversForEpoch(epochIndex, hashchain)
-	local prescribedObservers = epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
-	local epoch = epochs.getEpoch(epochIndex)
-	-- assign the prescribed observers and update the epoch
-	epoch.prescribedObservers = prescribedObservers
-	Epochs[epochIndex] = epoch
-end
-
---- Sets the prescribed names for an epoch
---- @param epochIndex number The epoch index
---- @param hashchain string The hashchain
-function epochs.setPrescribedNamesForEpoch(epochIndex, hashchain)
-	local prescribedNames = epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
-	local epoch = epochs.getEpoch(epochIndex)
-	-- assign the prescribed names and update the epoch
-	epoch.prescribedNames = prescribedNames
-	Epochs[epochIndex] = epoch
 end
 
 --- Computes the prescribed names for an epoch
 --- @param epochIndex number The epoch index
 --- @param hashchain string The hashchain
---- @return string[] The prescribed names for the epoch
+--- @return string[] # The prescribed names for the epoch
 function epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
 	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 	local activeArNSNames = arns.getActiveArNSNamesBetweenTimestamps(epochStartTimestamp, epochEndTimestamp)
@@ -265,7 +218,7 @@ end
 --- Computes the prescribed observers for an epoch
 --- @param epochIndex number The epoch index
 --- @param hashchain string The hashchain
---- @return WeightedGateway[], WeightedGateway[] The prescribed observers for the epoch, and all the gateways with weights
+--- @return WeightedGateway[], WeightedGateway[] # The prescribed observers for the epoch, and all the gateways with weights
 function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	assert(epochIndex >= 0, "Epoch index must be greater than or equal to 0")
 	assert(type(hashchain) == "string", "Hashchain must be a string")
@@ -347,7 +300,7 @@ end
 
 --- Gets the epoch timestamps for an epoch index
 --- @param epochIndex number The epoch index
---- @return number, number, number The epoch start timestamp, epoch end timestamp, and epoch distribution timestamp
+--- @return number, number, number # 	The epoch start timestamp, epoch end timestamp, and epoch distribution timestamp
 function epochs.getEpochTimestampsForIndex(epochIndex)
 	local epochStartTimestamp = epochs.getSettings().epochZeroStartTimestamp
 		+ epochs.getSettings().durationMs * epochIndex
@@ -358,9 +311,10 @@ end
 
 --- Gets the epoch index for a given timestamp
 --- @param timestamp number The timestamp
---- @return number The epoch index
+--- @return number # 	The epoch index
 function epochs.getEpochIndexForTimestamp(timestamp)
-	local timestampInMS = utils.checkAndConvertTimestamptoMs(timestamp)
+	--- TODO: is this conversion still necessary? Confirm timestamps from the SU are unix and milliseconds and remove this
+	local timestampInMS = utils.checkAndConvertTimestampToMs(timestamp)
 	local epochZeroStartTimestamp = epochs.getSettings().epochZeroStartTimestamp
 	local epochLengthMs = epochs.getSettings().durationMs
 	local epochIndex = math.floor((timestampInMS - epochZeroStartTimestamp) / epochLengthMs)
@@ -368,10 +322,10 @@ function epochs.getEpochIndexForTimestamp(timestamp)
 end
 
 --- Creates a new epoch and updates the gateway weights
---- @param timestamp number The timestamp
+--- @param timestamp number The timestamp in milliseconds
 --- @param blockHeight number The block height
 --- @param hashchain string The hashchain
---- @return Epoch|nil The created epoch, or nil if an epoch already exists for the index
+--- @return Epoch|nil # The created epoch, or nil if an epoch already exists for the index
 function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	assert(type(timestamp) == "number", "Timestamp must be a number")
 	assert(type(blockHeight) == "number", "Block height must be a number")
@@ -388,7 +342,7 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	local prevEpoch = epochs.getEpoch(prevEpochIndex)
 	-- if the previous epoch is not the genesis epoch and we have not distributed rewards, we cannot create a new epoch
 	if
-		prevEpochIndex > 0 -- only validate distributions occured if previous epoch is not the genesis epoch
+		prevEpochIndex > 0 -- only validate distributions occurred if previous epoch is not the genesis epoch
 		and (
 			prevEpoch.distributions == nil
 			or prevEpoch.distributions.distributedTimestamp == nil
@@ -397,7 +351,7 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	then
 		-- silently return
 		print(
-			"Distributions have not occured for the previous epoch. A new epoch will not be created until those are complete: "
+			"Distributions have not occurred for the previous epoch. A new epoch will not be created until those are complete: "
 				.. prevEpochIndex
 		)
 		return
@@ -448,7 +402,7 @@ end
 --- @param reportTxId string The report transaction ID
 --- @param failedGatewayAddresses string[] The failed gateway addresses
 --- @param timestamp number The timestamp
---- @return Observations The updated observations for the epoch
+--- @return Observations # The updated observations for the epoch
 function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddresses, timestamp)
 	-- assert report tx id is valid arweave address
 	assert(utils.isValidArweaveAddress(reportTxId), "Report transaction ID is not a valid Arweave address")
@@ -465,29 +419,23 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	local epochStartTimestamp, _, epochDistributionTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 
 	-- avoid observations before the previous epoch distribution has occurred, as distributions affect weights of the current epoch
-	if timestamp < epochStartTimestamp + epochs.getSettings().distributionDelayMs then
-		error("Observations for the current epoch cannot be submitted before: " .. epochDistributionTimestamp)
-	end
+	assert(
+		timestamp >= epochStartTimestamp + epochs.getSettings().distributionDelayMs,
+		"Observations for the current epoch cannot be submitted before: " .. epochDistributionTimestamp
+	)
 
 	local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
-	if #prescribedObservers == 0 then
-		error("No prescribed observers for the current epoch.")
-	end
+	assert(#prescribedObservers > 0, "No prescribed observers for the current epoch.")
 
 	local observerIndex = utils.findInArray(prescribedObservers, function(prescribedObserver)
 		return prescribedObserver.observerAddress == observerAddress
 	end)
 
 	local observer = prescribedObservers[observerIndex]
-
-	if observer == nil then
-		error("Caller is not a prescribed observer for the current epoch.")
-	end
+	assert(observer, "Caller is not a prescribed observer for the current epoch.")
 
 	local observingGateway = gar.getGateway(observer.gatewayAddress)
-	if observingGateway == nil then
-		error("The associated gateway not found in the registry.")
-	end
+	assert(observingGateway, "The associated gateway not found in the registry.")
 
 	local epoch = epochs.getEpoch(epochIndex)
 
@@ -538,12 +486,6 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	return epoch.observations
 end
 
---- Updates the epoch settings
---- @param newSettings EpochSettings The new settings
-function epochs.updateEpochSettings(newSettings)
-	EpochSettings = newSettings
-end
-
 --- @class ComputedRewards
 --- @field totalEligibleRewards number The total eligible rewards
 --- @field perGatewayReward number The per gateway reward
@@ -552,8 +494,8 @@ end
 
 --- Computes the total eligible rewards for an epoch based on the protocol balance and the reward percentage and prescribed observers
 --- @param epochIndex number The epoch index
---- @param prescribedObservers Observer[] The prescribed observers
---- @return ComputedRewards The total eligible rewards
+--- @param prescribedObservers WeightedGateway[] The prescribed observers for the epoch
+--- @return ComputedRewards # The total eligible rewards
 function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
 	local epochStartTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 	local activeGatewayAddresses = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
@@ -576,11 +518,11 @@ function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObserv
 				potentialReward = potentialReward + eligibleObserverReward -- add observer reward if it is a prescribed observer
 			end
 			-- if any delegates are present, distribute the rewards to the delegates
-			local eligbibleDelegateRewards = gateway.totalDelegatedStake > 0
+			local eligibleDelegateRewards = gateway.totalDelegatedStake > 0
 					and math.floor(potentialReward * (gateway.settings.delegateRewardShareRatio / 100))
 				or 0
 			-- set the potential reward for the gateway
-			local eligibleOperatorRewards = potentialReward - eligbibleDelegateRewards
+			local eligibleOperatorRewards = potentialReward - eligibleDelegateRewards
 			local eligibleRewardsForGateway = {
 				operatorReward = eligibleOperatorRewards,
 				delegateRewards = {},
@@ -589,7 +531,7 @@ function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObserv
 			for delegateAddress, delegate in pairs(gateway.delegates) do
 				if gateway.totalDelegatedStake > 0 then
 					local delegateReward =
-						math.floor((delegate.delegatedStake / gateway.totalDelegatedStake) * eligbibleDelegateRewards)
+						math.floor((delegate.delegatedStake / gateway.totalDelegatedStake) * eligibleDelegateRewards)
 					if delegateReward > 0 then
 						eligibleRewardsForGateway.delegateRewards[delegateAddress] = delegateReward
 					end
@@ -609,12 +551,12 @@ end
 --- Distributes the rewards for an epoch
 --- 1. Get gateways participated in full epoch based on start and end timestamp
 --- 2. Get the prescribed observers for the relevant epoch
---- 3. Calcualte the rewards for the epoch based on protocol balance
+--- 3. Calculate the rewards for the epoch based on protocol balance
 --- 4. Allocate 95% of the rewards for passed gateways, 5% for observers - based on total gateways during the epoch and # of prescribed observers
 --- 5. Distribute the rewards to the gateways and observers
 --- 6. Increment the epoch stats for the gateways
 --- @param currentTimestamp number The current timestamp
---- @return Epoch|nil The updated epoch with the distributed rewards, or nil if no rewards were distributed
+--- @return Epoch|nil # The updated epoch with the distributed rewards, or nil if no rewards were distributed
 function epochs.distributeRewardsForEpoch(currentTimestamp)
 	local epochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp - epochs.getSettings().durationMs) -- go back to previous epoch
 	local epoch = epochs.getEpoch(epochIndex)
@@ -636,8 +578,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 		return -- silently return
 	end
 
-	-- NOTE: these should match what was computed at the beginning of the epoch - use that instead of this
-	local activeGatewayAddresses = epochs.getEligibleRewardsForEpoch(epochIndex)
+	local eligibleGatewaysForEpoch = epochs.getEligibleRewardsForEpoch(epochIndex)
 	local prescribedObserversLookup = utils.reduce(
 		epochs.getPrescribedObserversForEpoch(epochIndex),
 		function(acc, _, observer)
@@ -649,11 +590,11 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	local totalObservationsSubmitted = utils.lengthOfTable(epoch.observations.reports) or 0
 
 	-- get the eligible rewards for the epoch
-	local totalElgibleObserverReward = epoch.distributions.totalEligibleObserverReward
+	local totalEligibleObserverReward = epoch.distributions.totalEligibleObserverReward
 	local totalEligibleGatewayReward = epoch.distributions.totalEligibleGatewayReward
 	--- @type table<string, number>
 	local distributed = {}
-	for gatewayAddress, totalEligibleRewardsForGateway in pairs(activeGatewayAddresses) do
+	for gatewayAddress, totalEligibleRewardsForGateway in pairs(eligibleGatewaysForEpoch) do
 		local gateway = gar.getGateway(gatewayAddress)
 		-- only distribute rewards if the gateway is found and not leaving
 		if gateway and totalEligibleRewardsForGateway and gateway.status ~= "leaving" then
@@ -683,8 +624,8 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 			-- update the gateway stats, returns the updated gateway
 			gateway = gar.updateGatewayStats(gatewayAddress, gateway, updatedStats)
 
-			-- scenarioes
-			-- 1. Gateway passed and was prescribed and submittied an observation - it gets full gateway reward
+			-- Scenarios
+			-- 1. Gateway passed and was prescribed and submitted an observation - it gets full gateway reward
 			-- 2. Gateway passed and was prescribed and did not submit an observation - it gets only the gateway reward, docked by 25%
 			-- 2. Gateway passed and was not prescribed -- it gets full operator reward
 			-- 3. Gateway failed and was prescribed and did not submit observation -- it gets no reward
@@ -694,9 +635,9 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 			if not failed then
 				if isPrescribed then
 					if observationSubmitted then
-						-- 1. gateway passed and was prescribed and submittied an observation - it gets full reward
+						-- 1. gateway passed and was prescribed and submitted an observation - it gets full reward
 						earnedRewardForGatewayAndDelegates =
-							math.floor(totalEligibleGatewayReward + totalElgibleObserverReward)
+							math.floor(totalEligibleGatewayReward + totalEligibleObserverReward)
 					else
 						-- 2. gateway passed and was prescribed and did not submit an observation - it gets only the gateway reward, docked by 25%
 						earnedRewardForGatewayAndDelegates = math.floor(totalEligibleGatewayReward * 0.75)
@@ -709,7 +650,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 				if isPrescribed then
 					if observationSubmitted then
 						-- 3. gateway failed and was prescribed and did submit an observation -- it gets the observer reward
-						earnedRewardForGatewayAndDelegates = math.floor(totalElgibleObserverReward)
+						earnedRewardForGatewayAndDelegates = math.floor(totalEligibleObserverReward)
 					end
 				end
 			end
@@ -782,7 +723,7 @@ end
 
 --- Prunes epochs older than the cutoff epoch index
 --- @param timestamp number The timestamp to prune epochs older than
---- @return Epoch[] The pruned epochs
+--- @return Epoch[] # The pruned epochs
 function epochs.pruneEpochs(timestamp)
 	local prunedEpochs = {}
 	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)

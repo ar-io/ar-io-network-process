@@ -1,6 +1,5 @@
 local Bit = require(".crypto.util.bit")
 local Queue = require(".crypto.util.queue")
-local Stream = require(".crypto.util.stream")
 
 local CONSTANTS = {
 	0x428a2f98,

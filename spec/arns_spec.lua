@@ -105,7 +105,7 @@ describe("arns", function()
 			)
 
 			it(
-				"should apply ArNS discount on lease buys when elgibility requirements are met[" .. addressType .. "]",
+				"should apply ArNS discount on lease buys when eligibility requirements are met[" .. addressType .. "]",
 				function()
 					_G.GatewayRegistry[testAddress] = testGateway
 					_G.GatewayRegistry[testAddress].weights = {
@@ -119,10 +119,8 @@ describe("arns", function()
 					local purchasesBefore = demand.getCurrentPeriodPurchases()
 					local discountTotal = 600000000 - (math.floor(600000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
 
-					local status, buyRecordResult =
-						pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
-
-					assert.is_true(status)
+					local buyRecordResult =
+						arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId)
 					assert.are.same({
 						purchasePrice = discountTotal,
 						type = "lease",
@@ -153,9 +151,7 @@ describe("arns", function()
 				function()
 					local demandBefore = demand.getCurrentPeriodRevenue()
 					local purchasesBefore = demand.getCurrentPeriodPurchases()
-					local status, result =
-						pcall(arns.buyRecord, "test-name", nil, nil, testAddress, timestamp, testProcessId)
-					assert.is_true(status)
+					local result = arns.buyRecord("test-name", nil, nil, testAddress, timestamp, testProcessId)
 					assert.are.same({
 						purchasePrice = 600000000,
 						type = "lease",
@@ -240,8 +236,7 @@ describe("arns", function()
 					target = testAddress,
 					endTimestamp = 1000,
 				}
-				local status, result =
-					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
+				local result = arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId)
 				local expectation = {
 					endTimestamp = timestamp + constants.oneYearMs,
 					processId = testProcessId,
@@ -250,7 +245,6 @@ describe("arns", function()
 					type = "lease",
 					undernameLimit = 10,
 				}
-				assert.is_true(status)
 				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
 
@@ -355,8 +349,7 @@ describe("arns", function()
 				}
 				local demandBefore = demand.getCurrentPeriodRevenue()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
-				local status, result =
-					pcall(arns.increaseundernameLimit, testAddress, "test-name", 50, timestamp, "msg-id")
+				local result = arns.increaseundernameLimit(testAddress, "test-name", 50, timestamp, "msg-id")
 				local expectation = {
 					endTimestamp = timestamp + constants.oneYearMs,
 					processId = testProcessId,
@@ -365,7 +358,6 @@ describe("arns", function()
 					type = "lease",
 					undernameLimit = 60,
 				}
-				assert.is_true(status)
 				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
 
@@ -403,7 +395,7 @@ describe("arns", function()
 				}
 				local demandBefore = demand.getCurrentPeriodRevenue()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
-				local status, result = pcall(arns.increaseundernameLimit, testAddress, "test-name", 50, timestamp)
+				local result = arns.increaseundernameLimit(testAddress, "test-name", 50, timestamp)
 				local expectation = {
 					endTimestamp = timestamp + constants.oneYearMs,
 					processId = testProcessId,
@@ -412,7 +404,6 @@ describe("arns", function()
 					type = "lease",
 					undernameLimit = 60,
 				}
-				assert.is_true(status)
 				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
 
@@ -507,8 +498,7 @@ describe("arns", function()
 				}
 				local demandBefore = demand.getCurrentPeriodRevenue()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
-				local status, result = pcall(arns.extendLease, testAddress, "test-name", 4, timestamp)
-				assert.is_true(status)
+				local result = arns.extendLease(testAddress, "test-name", 4, timestamp)
 				assert.are.same({
 					endTimestamp = timestamp + constants.oneYearMs * 5,
 					processId = testProcessId,
@@ -589,8 +579,7 @@ describe("arns", function()
 				}
 				local demandBefore = demand.getCurrentPeriodRevenue()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
-				local status, extendLeaseResult = pcall(arns.extendLease, testAddress, "test-name", 4, timestamp)
-				assert.is_true(status)
+				local extendLeaseResult = arns.extendLease(testAddress, "test-name", 4, timestamp)
 				assert.are.same({
 					endTimestamp = timestamp + constants.oneYearMs * 5,
 					processId = testProcessId,
@@ -919,7 +908,7 @@ describe("arns", function()
 	end)
 
 	describe("pruneRecords", function()
-		it("should prune records and create auctions for expired leased records", function()
+		it("should prune records older than the grace period", function()
 			local currentTimestamp = 2000000000
 
 			_G.NameRegistry = {
@@ -989,23 +978,6 @@ describe("arns", function()
 			}, _G.NameRegistry.records)
 			assert.are.same({
 				["expired-record"] = {
-					startTimestamp = 2000000000,
-					endTimestamp = 3209600000, -- plus 14 days
-					initiator = _G.ao.id,
-					baseFee = 400000000,
-					demandFactor = 1,
-					registrationFeeCalculator = arns.calculateRegistrationFee,
-					name = "expired-record",
-					settings = {
-						decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14),
-						scalingExponent = 190,
-						startPriceMultiplier = 50,
-						durationMs = 60 * 1000 * 60 * 24 * 14,
-					},
-				},
-			}, _G.NameRegistry.auctions)
-			assert.are.same({
-				["expired-record"] = {
 					endTimestamp = currentTimestamp - constants.gracePeriodMs - 1, -- expired and past the grace period
 					processId = "expired-process-id",
 					purchasePrice = 400000000,
@@ -1047,39 +1019,6 @@ describe("arns", function()
 					undernameLimit = 10,
 				},
 			}, _G.NameRegistry.records)
-			-- grace period record now joins the auction list and is pruned
-			assert.are.same({
-				["expired-record"] = {
-					startTimestamp = 2000000000,
-					endTimestamp = 3209600000, -- plus 14 days
-					initiator = _G.ao.id,
-					baseFee = 400000000,
-					demandFactor = 1,
-					registrationFeeCalculator = arns.calculateRegistrationFee,
-					name = "expired-record",
-					settings = {
-						decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14),
-						scalingExponent = 190,
-						startPriceMultiplier = 50,
-						durationMs = 60 * 1000 * 60 * 24 * 14,
-					},
-				},
-				["grace-period-record"] = {
-					baseFee = 400000000,
-					demandFactor = 1.0,
-					startTimestamp = currentTimestamp,
-					endTimestamp = currentTimestamp + 1209600000, -- plus 14 days
-					initiator = "test",
-					name = "grace-period-record",
-					registrationFeeCalculator = arns.calculateRegistrationFee,
-					settings = {
-						decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14),
-						scalingExponent = 190,
-						startPriceMultiplier = 50,
-						durationMs = 60 * 1000 * 60 * 24 * 14,
-					},
-				},
-			}, _G.NameRegistry.auctions)
 			assert.are.same({
 				["grace-period-record"] = {
 					endTimestamp = 790400010,
@@ -1177,17 +1116,6 @@ describe("arns", function()
 	end)
 
 	describe("auctions", function()
-		before_each(function()
-			_G.NameRegistry.records["test-name"] = {
-				endTimestamp = nil,
-				processId = "test-process-id",
-				purchasePrice = 600000000,
-				startTimestamp = 0,
-				type = "permabuy",
-				undernameLimit = 10,
-			}
-		end)
-
 		describe("createAuction", function()
 			it("should create an auction and remove any existing record", function()
 				local auction = arns.createAuction("test-name", 1000000, "test-initiator")
@@ -1217,11 +1145,27 @@ describe("arns", function()
 				assert.match("Auction already exists", error)
 			end)
 
-			it("should throw an error if the name is not registered", function()
-				_G.NameRegistry.records["test-name"] = nil
+			it("should throw an error if the name is reserved", function()
+				_G.NameRegistry.reserved["test-name"] = {
+					endTimestamp = 1000000,
+				}
 				local status, error = pcall(arns.createAuction, "test-name", 1000000, "test-initiator")
 				assert.is_false(status)
-				assert.match("Name is not registered", error)
+				assert.match("Name is reserved. Auctions can only be created for unregistered names.", error)
+			end)
+
+			it("should throw an error if the name is registered", function()
+				_G.NameRegistry.records["test-name"] = {
+					endTimestamp = nil,
+					processId = "test-process-id",
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "permabuy",
+					undernameLimit = 10,
+				}
+				local status, error = pcall(arns.createAuction, "test-name", 1000000, "test-initiator")
+				assert.is_false(status)
+				assert.match("Name is registered. Auctions can only be created for unregistered names.", error)
 			end)
 		end)
 
@@ -1725,6 +1669,36 @@ describe("arns", function()
 					},
 				},
 			}, paginatedRecords4)
+		end)
+	end)
+
+	describe("getPaginatedReservedNames", function()
+		before_each(function()
+			_G.NameRegistry.reserved = {
+				["reserved-name-1"] = {
+					target = "reserved-name-1-target",
+				},
+				["reserved-name-2"] = {
+					target = "reserved-name-2-target",
+				},
+			}
+		end)
+		it("should return the correct paginated reserved names", function()
+			local paginatedReservedNames = arns.getPaginatedReservedNames(nil, 1, "name", "desc")
+			assert.are.same({
+				limit = 1,
+				sortBy = "name",
+				sortOrder = "desc",
+				hasMore = true,
+				totalItems = 2,
+				nextCursor = "reserved-name-2",
+				items = {
+					{
+						name = "reserved-name-2",
+						target = "reserved-name-2-target",
+					},
+				},
+			}, paginatedReservedNames)
 		end)
 	end)
 end)

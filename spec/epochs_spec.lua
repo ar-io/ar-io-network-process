@@ -39,7 +39,7 @@ describe("epochs", function()
 			records = {},
 			reserved = {},
 		}
-		epochs.updateEpochSettings({
+		_G.EpochSettings = {
 			prescribedNameCount = 5,
 			maxObservers = 5,
 			epochZeroStartTimestamp = 1704092400000, -- 2024-01-01T00:00:00.000Z
@@ -47,7 +47,7 @@ describe("epochs", function()
 			distributionDelayMs = 15,
 			rewardPercentage = 0.0025, -- 0.25%
 			pruneEpochsCount = 14,
-		})
+		}
 	end)
 
 	describe("computePrescribedObserversForEpoch", function()
@@ -93,12 +93,12 @@ describe("epochs", function()
 
 		it("should return the maximum number of gateways if more are enrolled in network", function()
 			local testHashchain = "c29tZSBzYW1wbGUgaGFzaA==" -- base64 of "some sample hash"
-			epochs.updateEpochSettings({
+			_G.EpochSettings = {
 				maxObservers = 2, -- limit to 2 observers
 				epochZeroStartTimestamp = startTimestamp,
 				durationMs = 60 * 1000 * 60 * 24, -- 24 hours
 				distributionDelayMs = 60 * 1000 * 2 * 15, -- 15 blocks
-			})
+			}
 			for i = 1, 3 do
 				local gateway = {
 					operatorStake = gar.getSettings().operators.minStake,
@@ -376,8 +376,7 @@ describe("epochs", function()
 					"test-this-is-valid-arweave-wallet-address-1",
 					"test-this-is-valid-arweave-wallet-address-3",
 				}
-				local status, result = pcall(epochs.saveObservations, observer, reportTxId, failedGateways, timestamp)
-				assert.is_true(status)
+				local result = epochs.saveObservations(observer, reportTxId, failedGateways, timestamp)
 				assert.are.same(result, {
 					reports = {
 						[observer] = reportTxId,
@@ -538,8 +537,7 @@ describe("epochs", function()
 						},
 					},
 				}
-				local status, result = pcall(epochs.createEpoch, timestamp, epochStartBlockHeight, hashchain)
-				assert.is_true(status)
+				local result = epochs.createEpoch(timestamp, epochStartBlockHeight, hashchain)
 				assert.are.same(expectation, result)
 				assert.are.same(expectation, epochs.getEpoch(epochIndex))
 				-- confirm the gateway weights were updated
