@@ -1601,12 +1601,15 @@ end)
 -- NOTE: THIS IS A CRITICAL HANDLER AND WILL DISCARD THE MEMORY ON ERROR
 addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
 	local msgTimestamp = msg.Timestamp
-
 	local msgId = msg.Id
 	local blockHeight = tonumber(msg["Block-Height"])
 	local hashchain = msg["Hash-Chain"]
 	local lastTickedEpochIndex = LastTickedEpochIndex
 	local targetCurrentEpochIndex = epochs.getEpochIndexForTimestamp(msgTimestamp)
+
+	assert(blockHeight, "Block height is required")
+	assert(hashchain, "Hash chain is required")
+
 	msg.ioEvent:addField("Last-Ticked-Epoch-Index", lastTickedEpochIndex)
 	msg.ioEvent:addField("Current-Epoch-Index", lastTickedEpochIndex + 1)
 	msg.ioEvent:addField("Target-Current-Epoch-Index", targetCurrentEpochIndex)
@@ -1620,6 +1623,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 			LastTickedEpochIndex = LastTickedEpochIndex,
 			Data = json.encode("Genesis epoch has not started yet."),
 		})
+		return
 	end
 
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
@@ -1638,43 +1642,32 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 		local tickTimestamp = math.min(msgTimestamp or 0, epochDistributionTimestamp)
 		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height,
 		-- we should set the prescribed observers and names to empty arrays and distribute rewards accordingly
-		local tickSucceeded, resultOrError = pcall(tick.tickEpoch, tickTimestamp, blockHeight, hashchain, msgId)
-		if tickSucceeded then
-			if tickTimestamp == epochDistributionTimestamp then
-				-- if we are distributing rewards, we should update the last ticked epoch index to the current epoch index
-				LastTickedEpochIndex = i
-				table.insert(tickedEpochIndexes, i)
-			end
-			ao.send({
-				Target = msg.From,
-				Action = "Tick-Notice",
-				LastTickedEpochIndex = LastTickedEpochIndex,
-				Data = json.encode(resultOrError),
-			})
-			if resultOrError.maybeNewEpoch ~= nil then
-				table.insert(newEpochIndexes, resultOrError.maybeEpoch.epochIndex)
-			end
-			if resultOrError.maybeDemandFactor ~= nil then
-				table.insert(newDemandFactors, resultOrError.maybeDemandFactor)
-			end
-			if resultOrError.pruneGatewaysResult ~= nil then
-				table.insert(newPruneGatewaysResults, resultOrError.pruneGatewaysResult)
-			end
-			if resultOrError.maybeDistributedEpoch ~= nil then
-				tickedRewardDistributions[tostring(resultOrError.maybeDistributedEpoch.epochIndex)] =
-					resultOrError.maybeDistributedEpoch.distributions.totalDistributedRewards
-				totalTickedRewardsDistributed = totalTickedRewardsDistributed
-					+ resultOrError.maybeDistributedEpoch.distributions.totalDistributedRewards
-			end
-		else
-			-- reset the state to previous state
-			ao.send({
-				Target = msg.From,
-				Action = "Invalid-Tick-Notice",
-				Error = "Invalid-Tick",
-				Data = json.encode(resultOrError),
-			})
-			-- TODO: But keep ticking ahead?!? We just need be to robust against potential failures here
+		local resultOrError = tick.tickEpoch(tickTimestamp, blockHeight, hashchain, msgId)
+		if tickTimestamp == epochDistributionTimestamp then
+			-- if we are distributing rewards, we should update the last ticked epoch index to the current epoch index
+			LastTickedEpochIndex = i
+			table.insert(tickedEpochIndexes, i)
+		end
+		ao.send({
+			Target = msg.From,
+			Action = "Tick-Notice",
+			LastTickedEpochIndex = LastTickedEpochIndex,
+			Data = json.encode(resultOrError),
+		})
+		if resultOrError.maybeNewEpoch ~= nil then
+			table.insert(newEpochIndexes, resultOrError.maybeNewEpoch.epochIndex)
+		end
+		if resultOrError.maybeDemandFactor ~= nil then
+			table.insert(newDemandFactors, resultOrError.maybeDemandFactor)
+		end
+		if resultOrError.pruneGatewaysResult ~= nil then
+			table.insert(newPruneGatewaysResults, resultOrError.pruneGatewaysResult)
+		end
+		if resultOrError.maybeDistributedEpoch ~= nil then
+			tickedRewardDistributions[tostring(resultOrError.maybeDistributedEpoch.epochIndex)] =
+				resultOrError.maybeDistributedEpoch.distributions.totalDistributedRewards
+			totalTickedRewardsDistributed = totalTickedRewardsDistributed
+				+ resultOrError.maybeDistributedEpoch.distributions.totalDistributedRewards
 		end
 	end
 	if #tickedEpochIndexes > 0 then
