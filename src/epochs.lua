@@ -651,8 +651,8 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	-- get the eligible rewards for the epoch
 	local totalElgibleObserverReward = epoch.distributions.totalEligibleObserverReward
 	local totalEligibleGatewayReward = epoch.distributions.totalEligibleGatewayReward
+	--- @type table<string, number>
 	local distributed = {}
-	local totalDistributed = 0
 	for gatewayAddress, totalEligibleRewardsForGateway in pairs(activeGatewayAddresses) do
 		local gateway = gar.getGateway(gatewayAddress)
 		-- only operate if the gateway is found and not leaving
@@ -661,7 +661,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 			local observersMarkedFailed = epoch.observations.failureSummaries
 					and epoch.observations.failureSummaries[gatewayAddress]
 				or {}
-			local failed = #observersMarkedFailed > (totalObservationsSubmitted / 2) -- more than 50% of observerations submitted marked gateway as failed
+			local failed = #observersMarkedFailed > (totalObservationsSubmitted / 2) -- more than 50% of observations submitted marked gateway as failed
 
 			-- if prescribed, we'll update the prescribed stats as well - find if the observer address is in prescribed observers
 			local isPrescribed = prescribedObserversLookup[gateway.observerAddress]
@@ -726,7 +726,6 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 				-- distribute all the predetermined rewards to the delegates
 				for delegateAddress, eligibleDelegateReward in pairs(totalEligibleRewardsForGateway.delegateRewards) do
 					local actualDelegateReward = math.floor(eligibleDelegateReward * percentOfEligibleEarned)
-					local distributedToDelegate = 0
 					-- distribute the rewards to the delegate if greater than 0 and the delegate still exists on the gateway
 					if actualDelegateReward > 0 then
 						if gateway.delegates[delegateAddress] then
@@ -738,17 +737,13 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 								actualDelegateReward
 							)
 							balances.reduceBalance(ao.id, actualDelegateReward)
-							distributedToDelegate = actualDelegateReward
+							-- update the distributed rewards for the delegate
+							distributed[delegateAddress] = (distributed[delegateAddress] or 0) + actualDelegateReward
+							totalDistributedToDelegates = totalDistributedToDelegates + actualDelegateReward
 						else
 							totalRewardsForMissingDelegates = totalRewardsForMissingDelegates + actualDelegateReward
 						end
 					end
-					-- increment the total distributed
-					totalDistributed = math.floor(totalDistributed + distributedToDelegate)
-					-- update the distributed rewards for the delegate
-					distributed[delegateAddress] = (distributed[delegateAddress] or 0) + distributedToDelegate
-					-- increment the total distributed for the epoch
-					totalDistributedToDelegates = totalDistributedToDelegates + distributedToDelegate
 				end
 				-- transfer the remaining rewards to the gateway
 				local actualOperatorReward = math.floor(
@@ -765,17 +760,15 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 				end
 				-- update the distributed rewards for the gateway
 				distributed[gatewayAddress] = (distributed[gatewayAddress] or 0) + actualOperatorReward
-				-- increment the total distributed for the epoch
-				totalDistributed = math.floor(totalDistributed + actualOperatorReward)
-			else
-				-- if the gateway did not earn any of it's own rewards, we still need to update the distributed rewards with it's current value or add it
-				distributed[gatewayAddress] = distributed[gatewayAddress] or 0
 			end
 		end
 	end
 
+	-- get the total distributed rewards for the epoch
+	local totalDistributedForEpoch = utils.sumTableValues(distributed)
+
 	-- set the distributions for the epoch
-	epoch.distributions.totalDistributedRewards = totalDistributed
+	epoch.distributions.totalDistributedRewards = totalDistributedForEpoch
 	epoch.distributions.distributedTimestamp = currentTimestamp
 	epoch.distributions.rewards = epoch.distributions.rewards or {
 		eligible = {},

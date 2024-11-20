@@ -813,13 +813,13 @@ describe("epochs", function()
 			assert.are.equal(epoch.distributionTimestamp, distributions.distributedTimestamp)
 
 			assert.are.same({
-				["test-this-is-valid-arweave-wallet-address-1"] = expectedGateway1TotalRewards * 0.90,
+				--- gateway 1 did not earn any rewards, so it should not be in the distributed table
 				["test-this-is-valid-arweave-wallet-address-2"] = expectedGateway2TotalRewards * 0.90,
 				["test-this-is-valid-arweave-wallet-address-3"] = expectedGateway3TotalRewards * 0.90,
 				["test-this-is-valid-arweave-wallet-address-4"] = expectedGateway4TotalRewards * 0.90,
 				["test-this-is-valid-arweave-wallet-address-5"] = expectedGateway5TotalRewards * 0.90,
 				["this-is-a-delegate"] = totalRewardForDelegateOfAllGateways,
-				["this-delegate-left-the-gateway"] = 0,
+				--- the delegate that left the gateway should not have any rewards and not be in the distributed table
 			}, distributions.rewards.distributed)
 			-- assert the gateway operator stakes are updated
 			assert.are.equal(
