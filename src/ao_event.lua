@@ -92,9 +92,13 @@ local function AOEvent(initialData)
 	end
 
 	function event:printEvent()
+		print(self:toJSON())
+	end
+
+	function event:toJSON()
 		-- The _e: 1 flag signifies that this is an event. Ensure it is set.
 		self.data["_e"] = 1
-		print(json.encode(self.data))
+		return json.encode(self.data)
 	end
 
 	return event

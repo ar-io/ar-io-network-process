@@ -4174,7 +4174,6 @@ describe("gar", function()
 				local status, error = pcall(function()
 					gar.disallowDelegates({ stubRandomAddress }, "test-gateway", "msgId", 1)
 				end)
-				print(error)
 				assert(not status)
 				assert(
 					error:find("Allow listing only possible when allowDelegatedStaking is set to 'allowlist'") ~= nil
