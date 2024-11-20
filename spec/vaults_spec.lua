@@ -9,7 +9,7 @@ describe("vaults", function()
 			["test-this-is-valid-arweave-wallet-address-1"] = 100,
 		}
 		_G.Vaults = {}
-		_G.NextPruneTimestamp = nil
+		_G.NextBalanceVaultsPruneTimestamp = nil
 	end)
 
 	describe("createVault", function()
@@ -28,7 +28,7 @@ describe("vaults", function()
 				endTimestamp = startTimestamp + constants.MIN_TOKEN_LOCK_TIME_MS,
 			}
 			assert.is_true(status)
-			assert.are.same(_G.NextPruneTimestamp, expectation.endTimestamp)
+			assert.are.same(_G.NextBalanceVaultsPruneTimestamp, expectation.endTimestamp)
 			assert.are.same(expectation, result)
 			assert.are.same(expectation, vaults.getVault("test-this-is-valid-arweave-wallet-address-1", "msgId"))
 		end)
@@ -45,7 +45,7 @@ describe("vaults", function()
 			)
 			assert.is_false(status)
 			assert.match("Insufficient balance", result)
-			assert.are.equal(_G.NextPruneTimestamp, nil)
+			assert.are.equal(_G.NextBalanceVaultsPruneTimestamp, nil)
 		end)
 
 		it("should throw an error if the lock length would be larger than the maximum", function()
@@ -58,7 +58,7 @@ describe("vaults", function()
 				"msgId"
 			)
 			assert.is_false(status)
-			assert.are.equal(_G.NextPruneTimestamp, nil)
+			assert.are.equal(_G.NextBalanceVaultsPruneTimestamp, nil)
 		end)
 
 		it("should throw an error if the lock length is less than the minimum", function()
@@ -71,7 +71,7 @@ describe("vaults", function()
 				"msgId"
 			)
 			assert.is_false(status)
-			assert.are.equal(_G.NextPruneTimestamp, nil)
+			assert.are.equal(_G.NextBalanceVaultsPruneTimestamp, nil)
 		end)
 
 		it("should throw an error if the vault already exists", function()
@@ -84,7 +84,7 @@ describe("vaults", function()
 				"msgId"
 			)
 			assert.is_true(status)
-			assert.are.equal(_G.NextPruneTimestamp, startTimestamp + constants.MIN_TOKEN_LOCK_TIME_MS)
+			assert.are.equal(_G.NextBalanceVaultsPruneTimestamp, startTimestamp + constants.MIN_TOKEN_LOCK_TIME_MS)
 			local secondStatus, result = pcall(
 				vaults.createVault,
 				"test-this-is-valid-arweave-wallet-address-1",
@@ -95,7 +95,7 @@ describe("vaults", function()
 			)
 			assert.is_false(secondStatus)
 			assert.match("Vault with id msgId already exists", result)
-			assert.are.equal(_G.NextPruneTimestamp, startTimestamp + constants.MIN_TOKEN_LOCK_TIME_MS)
+			assert.are.equal(_G.NextBalanceVaultsPruneTimestamp, startTimestamp + constants.MIN_TOKEN_LOCK_TIME_MS)
 		end)
 	end)
 
@@ -156,11 +156,11 @@ describe("vaults", function()
 			local lockLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
 			local vaultId = "msgId"
 			local vault = vaults.createVault(vaultOwner, 100, lockLengthMs, startTimestamp, vaultId)
-			assert.are.equal(_G.NextPruneTimestamp, startTimestamp + lockLengthMs)
+			assert.are.equal(_G.NextBalanceVaultsPruneTimestamp, startTimestamp + lockLengthMs)
 			local extendLengthMs = constants.MIN_TOKEN_LOCK_TIME_MS
 			local currentTimestamp = vault.startTimestamp + 1000
 			local extendedVault = vaults.extendVault(vaultOwner, extendLengthMs, currentTimestamp, vaultId)
-			assert.are.equal(_G.NextPruneTimestamp, startTimestamp + lockLengthMs)
+			assert.are.equal(_G.NextBalanceVaultsPruneTimestamp, startTimestamp + lockLengthMs)
 			assert.are.same(100, extendedVault.balance)
 			assert.are.same(startTimestamp, extendedVault.startTimestamp)
 			assert.are.same(startTimestamp + lockLengthMs + extendLengthMs, extendedVault.endTimestamp)
@@ -271,7 +271,7 @@ describe("vaults", function()
 	describe("pruneVaults", function()
 		it("should prune expired vaults and return balance to owners", function()
 			local currentTimestamp = 1000000
-			_G.NextPruneTimestamp = 0
+			_G.NextBalanceVaultsPruneTimestamp = 0
 
 			-- Set up test vaults
 			_G.Vaults = {
@@ -309,7 +309,7 @@ describe("vaults", function()
 			assert.is_nil(_G.Vaults["owner1"]["msgId1"])
 			assert.is_not_nil(_G.Vaults["owner1"]["msgId2"])
 			assert.is_nil(_G.Vaults["owner2"]["msgId3"])
-			assert.are.equal(_G.NextPruneTimestamp, currentTimestamp + 1000)
+			assert.are.equal(_G.NextBalanceVaultsPruneTimestamp, currentTimestamp + 1000)
 
 			-- Check that balances were returned to owners
 			assert.are.equal(600, _G.Balances["owner1"]) -- 500 + 100 from expired vault
@@ -318,7 +318,7 @@ describe("vaults", function()
 
 		it("should skip pruning when unnecessary", function()
 			local currentTimestamp = 1000000
-			_G.NextPruneTimestamp = currentTimestamp + 1
+			_G.NextBalanceVaultsPruneTimestamp = currentTimestamp + 1
 
 			-- Set up test vaults
 			_G.Vaults = {
@@ -356,7 +356,7 @@ describe("vaults", function()
 			assert.are.same({}, prunedVaults)
 			assert.are.same(2, utils.lengthOfTable(_G.Vaults))
 			assert.are.same(2, utils.lengthOfTable(_G.Vaults["owner1"]))
-			assert.are.equal(_G.NextPruneTimestamp, currentTimestamp + 1001) --- should be corrected to this
+			assert.are.equal(_G.NextBalanceVaultsPruneTimestamp, currentTimestamp + 1) --- should be corrected to this
 
 			-- Check that balances were unchanged
 			assert.are.equal(500, _G.Balances["owner1"])

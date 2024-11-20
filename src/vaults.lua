@@ -7,7 +7,7 @@ local utils = require("utils")
 local constants = require("constants")
 
 --- @type Timestamp|nil
-NextPruneTimestamp = NextPruneTimestamp or 0
+NextBalanceVaultsPruneTimestamp = NextBalanceVaultsPruneTimestamp or 0
 
 --- @class Vault
 --- @field balance number The balance of the vault
@@ -43,7 +43,8 @@ function vaults.createVault(from, qty, lockLengthMs, currentTimestamp, vaultId)
 	})
 	-- A nil NextPruneTimestamp means we're not expecting anything to prune, so set it if necessary
 	-- Otherwise, this new endTimestamp might be earlier than the next known for pruning. If so, set it.
-	NextPruneTimestamp = math.min(NextPruneTimestamp or newVault.endTimestamp, newVault.endTimestamp)
+	NextBalanceVaultsPruneTimestamp =
+		math.min(NextBalanceVaultsPruneTimestamp or newVault.endTimestamp, newVault.endTimestamp)
 	return newVault
 end
 
@@ -193,7 +194,7 @@ end
 --- @param currentTimestamp number The current timestamp
 --- @return Vault[] The pruned vaults
 function vaults.pruneVaults(currentTimestamp)
-	if not NextPruneTimestamp or currentTimestamp < NextPruneTimestamp then
+	if not NextBalanceVaultsPruneTimestamp or currentTimestamp < NextBalanceVaultsPruneTimestamp then
 		-- No known pruning work to do
 		return {}
 	end
@@ -216,7 +217,7 @@ function vaults.pruneVaults(currentTimestamp)
 		end
 	end
 
-	NextPruneTimestamp = minNextEndTimestamp
+	NextBalanceVaultsPruneTimestamp = minNextEndTimestamp
 
 	-- set the vaults to the updated vaults
 	Vaults = allVaults
