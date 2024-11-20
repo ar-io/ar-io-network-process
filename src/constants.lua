@@ -43,6 +43,7 @@ constants.demandSettings = {
 }
 
 -- VAULTS
+constants.MIN_VAULT_SIZE = 100000000 -- 100 IO
 constants.MAX_TOKEN_LOCK_TIME_MS = 12 * 365 * 24 * 60 * 60 * 1000 -- The maximum amount of blocks tokens can be locked in a vault (12 years of blocks)
 constants.MIN_TOKEN_LOCK_TIME_MS = 14 * 24 * 60 * 60 * 1000 -- The minimum amount of blocks tokens can be locked in a vault (14 days of blocks)
 
