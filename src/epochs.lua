@@ -655,7 +655,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	local distributed = {}
 	for gatewayAddress, totalEligibleRewardsForGateway in pairs(activeGatewayAddresses) do
 		local gateway = gar.getGateway(gatewayAddress)
-		-- only operate if the gateway is found and not leaving
+		-- only distribute rewards if the gateway is found and not leaving
 		if gateway and totalEligibleRewardsForGateway and gateway.status ~= "leaving" then
 			-- check the observations to see if gateway passed, if 50% or more of the observers marked the gateway as failed, it is considered failed
 			local observersMarkedFailed = epoch.observations.failureSummaries
