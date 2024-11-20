@@ -1642,7 +1642,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 		local tickTimestamp = math.min(msgTimestamp or 0, epochDistributionTimestamp)
 		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height,
 		-- we should set the prescribed observers and names to empty arrays and distribute rewards accordingly
-		local resultOrError = tick.tickEpoch(tickTimestamp, blockHeight, hashchain, msgId)
+		local tickResult = tick.tickEpoch(tickTimestamp, blockHeight, hashchain, msgId)
 		if tickTimestamp == epochDistributionTimestamp then
 			-- if we are distributing rewards, we should update the last ticked epoch index to the current epoch index
 			LastTickedEpochIndex = i
@@ -1652,22 +1652,22 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 			Target = msg.From,
 			Action = "Tick-Notice",
 			LastTickedEpochIndex = LastTickedEpochIndex,
-			Data = json.encode(resultOrError),
+			Data = json.encode(tickResult),
 		})
-		if resultOrError.maybeNewEpoch ~= nil then
-			table.insert(newEpochIndexes, resultOrError.maybeNewEpoch.epochIndex)
+		if tickResult.maybeNewEpoch ~= nil then
+			table.insert(newEpochIndexes, tickResult.maybeNewEpoch.epochIndex)
 		end
-		if resultOrError.maybeDemandFactor ~= nil then
-			table.insert(newDemandFactors, resultOrError.maybeDemandFactor)
+		if tickResult.maybeDemandFactor ~= nil then
+			table.insert(newDemandFactors, tickResult.maybeDemandFactor)
 		end
-		if resultOrError.pruneGatewaysResult ~= nil then
-			table.insert(newPruneGatewaysResults, resultOrError.pruneGatewaysResult)
+		if tickResult.pruneGatewaysResult ~= nil then
+			table.insert(newPruneGatewaysResults, tickResult.pruneGatewaysResult)
 		end
-		if resultOrError.maybeDistributedEpoch ~= nil then
-			tickedRewardDistributions[tostring(resultOrError.maybeDistributedEpoch.epochIndex)] =
-				resultOrError.maybeDistributedEpoch.distributions.totalDistributedRewards
+		if tickResult.maybeDistributedEpoch ~= nil then
+			tickedRewardDistributions[tostring(tickResult.maybeDistributedEpoch.epochIndex)] =
+				tickResult.maybeDistributedEpoch.distributions.totalDistributedRewards
 			totalTickedRewardsDistributed = totalTickedRewardsDistributed
-				+ resultOrError.maybeDistributedEpoch.distributions.totalDistributedRewards
+				+ tickResult.maybeDistributedEpoch.distributions.totalDistributedRewards
 		end
 	end
 	if #tickedEpochIndexes > 0 then
