@@ -1517,90 +1517,88 @@ addEventingHandler(
 	end
 )
 
-addEventingHandler(
-	"totalTokenSupply",
-	utils.hasMatchingTag("Action", ActionMap.TotalSupply) or utils.hasMatchingTag("Action", "Total-Token-Supply"), -- TODO: remove this once we migrate all downstream apps to the new tag
-	function(msg)
-		-- add all the balances
-		local totalSupply = 0
-		local circulatingSupply = 0
-		local lockedSupply = 0
-		local stakedSupply = 0
-		local delegatedSupply = 0
-		local withdrawSupply = 0
-		local protocolBalance = balances.getBalance(Protocol)
-		local userBalances = balances.getBalances()
+addEventingHandler("totalTokenSupply", function(msg)
+	return msg.Action == "Total-Token-Supply" or msg.Action == ActionMap.TotalSupply -- TODO: remove this once we migrate all downstream apps to the new tag
+end, function(msg)
+	-- add all the balances
+	local totalSupply = 0
+	local circulatingSupply = 0
+	local lockedSupply = 0
+	local stakedSupply = 0
+	local delegatedSupply = 0
+	local withdrawSupply = 0
+	local protocolBalance = balances.getBalance(Protocol)
+	local userBalances = balances.getBalances()
 
-		-- tally circulating supply
-		for _, balance in pairs(userBalances) do
-			circulatingSupply = circulatingSupply + balance
-		end
-		circulatingSupply = circulatingSupply - protocolBalance
-		totalSupply = totalSupply + protocolBalance + circulatingSupply
+	-- tally circulating supply
+	for _, balance in pairs(userBalances) do
+		circulatingSupply = circulatingSupply + balance
+	end
+	circulatingSupply = circulatingSupply - protocolBalance
+	totalSupply = totalSupply + protocolBalance + circulatingSupply
 
-		-- tally supply stashed in gateways and delegates
-		for _, gateway in pairs(gar.getGatewaysUnsafe()) do
-			totalSupply = totalSupply + gateway.operatorStake + gateway.totalDelegatedStake
-			stakedSupply = stakedSupply + gateway.operatorStake
-			delegatedSupply = delegatedSupply + gateway.totalDelegatedStake
-			for _, delegate in pairs(gateway.delegates) do
-				-- tally delegates' vaults
-				for _, vault in pairs(delegate.vaults) do
-					totalSupply = totalSupply + vault.balance
-					withdrawSupply = withdrawSupply + vault.balance
-				end
-			end
-			-- tally gateway's own vaults
-			for _, vault in pairs(gateway.vaults) do
+	-- tally supply stashed in gateways and delegates
+	for _, gateway in pairs(gar.getGatewaysUnsafe()) do
+		totalSupply = totalSupply + gateway.operatorStake + gateway.totalDelegatedStake
+		stakedSupply = stakedSupply + gateway.operatorStake
+		delegatedSupply = delegatedSupply + gateway.totalDelegatedStake
+		for _, delegate in pairs(gateway.delegates) do
+			-- tally delegates' vaults
+			for _, vault in pairs(delegate.vaults) do
 				totalSupply = totalSupply + vault.balance
 				withdrawSupply = withdrawSupply + vault.balance
 			end
 		end
-
-		-- user vaults
-		local userVaults = vaults.getVaults()
-		for _, vaultsForAddress in pairs(userVaults) do
-			-- they may have several vaults iterate through them
-			for _, vault in pairs(vaultsForAddress) do
-				totalSupply = totalSupply + vault.balance
-				lockedSupply = lockedSupply + vault.balance
-			end
+		-- tally gateway's own vaults
+		for _, vault in pairs(gateway.vaults) do
+			totalSupply = totalSupply + vault.balance
+			withdrawSupply = withdrawSupply + vault.balance
 		end
-
-		LastKnownCirculatingSupply = circulatingSupply
-		LastKnownLockedSupply = lockedSupply
-		LastKnownStakedSupply = stakedSupply
-		LastKnownDelegatedSupply = delegatedSupply
-		LastKnownWithdrawSupply = withdrawSupply
-
-		addSupplyData(msg.ioEvent, {
-			totalTokenSupply = totalSupply,
-		})
-		msg.ioEvent:addField("Last-Known-Total-Token-Supply", lastKnownTotalTokenSupply())
-
-		Send(msg, {
-			Target = msg.From,
-			Action = ActionMap.TotalSupply .. "-Notice",
-			["Total-Supply"] = tostring(totalSupply),
-			["Circulating-Supply"] = tostring(circulatingSupply),
-			["Locked-Supply"] = tostring(lockedSupply),
-			["Staked-Supply"] = tostring(stakedSupply),
-			["Delegated-Supply"] = tostring(delegatedSupply),
-			["Withdraw-Supply"] = tostring(withdrawSupply),
-			["Protocol-Balance"] = tostring(protocolBalance),
-			Data = json.encode({
-				-- TODO: we are losing precision on these values unexpectedly. This has been brought to the AO team - for now the tags should be correct as they are stringified
-				total = totalSupply,
-				circulating = circulatingSupply,
-				locked = lockedSupply,
-				staked = stakedSupply,
-				delegated = delegatedSupply,
-				withdrawn = withdrawSupply,
-				protocolBalance = protocolBalance,
-			}),
-		})
 	end
-)
+
+	-- user vaults
+	local userVaults = vaults.getVaults()
+	for _, vaultsForAddress in pairs(userVaults) do
+		-- they may have several vaults iterate through them
+		for _, vault in pairs(vaultsForAddress) do
+			totalSupply = totalSupply + vault.balance
+			lockedSupply = lockedSupply + vault.balance
+		end
+	end
+
+	LastKnownCirculatingSupply = circulatingSupply
+	LastKnownLockedSupply = lockedSupply
+	LastKnownStakedSupply = stakedSupply
+	LastKnownDelegatedSupply = delegatedSupply
+	LastKnownWithdrawSupply = withdrawSupply
+
+	addSupplyData(msg.ioEvent, {
+		totalTokenSupply = totalSupply,
+	})
+	msg.ioEvent:addField("Last-Known-Total-Token-Supply", lastKnownTotalTokenSupply())
+
+	Send(msg, {
+		Target = msg.From,
+		Action = ActionMap.TotalSupply .. "-Notice",
+		["Total-Supply"] = tostring(totalSupply),
+		["Circulating-Supply"] = tostring(circulatingSupply),
+		["Locked-Supply"] = tostring(lockedSupply),
+		["Staked-Supply"] = tostring(stakedSupply),
+		["Delegated-Supply"] = tostring(delegatedSupply),
+		["Withdraw-Supply"] = tostring(withdrawSupply),
+		["Protocol-Balance"] = tostring(protocolBalance),
+		Data = json.encode({
+			-- TODO: we are losing precision on these values unexpectedly. This has been brought to the AO team - for now the tags should be correct as they are stringified
+			total = totalSupply,
+			circulating = circulatingSupply,
+			locked = lockedSupply,
+			staked = stakedSupply,
+			delegated = delegatedSupply,
+			withdrawn = withdrawSupply,
+			protocolBalance = protocolBalance,
+		}),
+	})
+end)
 
 -- distribute rewards
 -- NOTE: THIS IS A CRITICAL HANDLER AND WILL DISCARD THE MEMORY ON ERROR
@@ -1957,27 +1955,22 @@ end)
 
 -- Pagination handlers
 
-addEventingHandler(
-	"paginatedRecords",
-	utils.hasMatchingTag("Action", "Paginated-Records") or utils.hasMatchingTag("Action", ActionMap.Records),
-	function(msg)
-		local page = utils.parsePaginationTags(msg)
-		local result =
-			arns.getPaginatedRecords(page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
-		Send(msg, { Target = msg.From, Action = "Records-Notice", Data = json.encode(result) })
-	end
-)
+addEventingHandler("paginatedRecords", function(msg)
+	return msg.Action == "Paginated-Records" or msg.Action == ActionMap.Records
+end, function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local result = arns.getPaginatedRecords(page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
+	Send(msg, { Target = msg.From, Action = "Records-Notice", Data = json.encode(result) })
+end)
 
-addEventingHandler(
-	"paginatedGateways",
-	utils.hasMatchingTag("Action", "Paginated-Gateways") or utils.hasMatchingTag("Action", ActionMap.Gateways),
-	function(msg)
-		local page = utils.parsePaginationTags(msg)
-		local result =
-			gar.getPaginatedGateways(page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder or "desc")
-		Send(msg, { Target = msg.From, Action = "Gateways-Notice", Data = json.encode(result) })
-	end
-)
+addEventingHandler("paginatedGateways", function(msg)
+	return msg.Action == "Paginated-Gateways" or msg.Action == ActionMap.Gateways
+end, function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local result =
+		gar.getPaginatedGateways(page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder or "desc")
+	Send(msg, { Target = msg.From, Action = "Gateways-Notice", Data = json.encode(result) })
+end)
 
 --- TODO: make this support `Balances` requests
 addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginated-Balances"), function(msg)
@@ -1987,31 +1980,27 @@ addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginate
 	Send(msg, { Target = msg.From, Action = "Balances-Notice", Data = json.encode(walletBalances) })
 end)
 
-addEventingHandler(
-	"paginatedVaults",
-	utils.hasMatchingTag("Action", "Paginated-Vaults") or utils.hasMatchingTag("Action", ActionMap.Vaults),
-	function(msg)
-		local page = utils.parsePaginationTags(msg)
-		local pageVaults = vaults.getPaginatedVaults(page.cursor, page.limit, page.sortOrder, page.sortBy)
-		Send(msg, { Target = msg.From, Action = "Vaults-Notice", Data = json.encode(pageVaults) })
-	end
-)
+addEventingHandler("paginatedVaults", function(msg)
+	return msg.Action == "Paginated-Vaults" or msg.Action == ActionMap.Vaults
+end, function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local pageVaults = vaults.getPaginatedVaults(page.cursor, page.limit, page.sortOrder, page.sortBy)
+	Send(msg, { Target = msg.From, Action = "Vaults-Notice", Data = json.encode(pageVaults) })
+end)
 
-addEventingHandler(
-	"paginatedDelegates",
-	utils.hasMatchingTag("Action", "Paginated-Delegates") or utils.hasMatchingTag("Action", ActionMap.Delegates),
-	function(msg)
-		local page = utils.parsePaginationTags(msg)
-		local result = gar.getPaginatedDelegates(
-			msg.Tags.Address or msg.From,
-			page.cursor,
-			page.limit,
-			page.sortBy or "startTimestamp",
-			page.sortOrder
-		)
-		Send(msg, { Target = msg.From, Action = "Delegates-Notice", Data = json.encode(result) })
-	end
-)
+addEventingHandler("paginatedDelegates", function(msg)
+	return msg.Action == "Paginated-Delegates" or msg.Action == ActionMap.Delegates
+end, function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local result = gar.getPaginatedDelegates(
+		msg.Tags.Address or msg.From,
+		page.cursor,
+		page.limit,
+		page.sortBy or "startTimestamp",
+		page.sortOrder
+	)
+	Send(msg, { Target = msg.From, Action = "Delegates-Notice", Data = json.encode(result) })
+end)
 
 addEventingHandler(
 	"paginatedAllowedDelegates",

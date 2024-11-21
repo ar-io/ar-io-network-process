@@ -80,6 +80,10 @@ describe('handlers', async () => {
         (tag) => tag.name === 'Action' && tag.value === 'Total-Supply-Notice',
       );
       assert.ok(notice, 'should have a Total-Supply-Notice tag');
+      const notice2 = supplyResult2.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Action' && tag.value === 'Total-Supply-Notice',
+      );
+      assert.ok(notice2, 'should have a Total-Supply-Notice tag');
 
       const supplyData = JSON.parse(supplyResult.Messages?.[0]?.Data);
 
