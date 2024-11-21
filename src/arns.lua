@@ -483,7 +483,6 @@ function arns.assertValidBuyRecord(name, years, purchaseType, processId)
 	assert(type(name) == "string", "Name is required and must be a string.")
 	assert(#name >= 1 and #name <= 51, "Name pattern is invalid.")
 	assert(name:match("^%w") and name:match("%w$") and name:match("^[%w-]+$"), "Name pattern is invalid.")
-	assert(not utils.isValidAOAddress(name), "Name cannot be a wallet address.")
 
 	-- assert purchase type if present is lease or permabuy
 	assert(purchaseType == nil or purchaseType == "lease" or purchaseType == "permabuy", "Purchase-Type is invalid.")
@@ -499,7 +498,7 @@ function arns.assertValidBuyRecord(name, years, purchaseType, processId)
 
 	-- assert processId is valid pattern
 	assert(type(processId) == "string", "Process id is required and must be a string.")
-	assert(utils.isValidAOAddress(processId), "Process Id must be a valid AO signer address..")
+	assert(utils.isValidAddress(processId), "Process Id must be a valid address.")
 end
 
 --- Asserts that a record is valid for extending the lease
@@ -1005,7 +1004,7 @@ end
 function arns.assertValidReassignName(record, currentTimestamp, from, newProcessId)
 	assert(record, "Name is not registered")
 	assert(currentTimestamp, "Timestamp is required")
-	assert(utils.isValidAOAddress(newProcessId), "Invalid Process-Id")
+	assert(utils.isValidAddress(newProcessId), "Invalid Process-Id")
 	assert(record.processId == from, "Not authorized to reassign this name")
 
 	if record.endTimestamp then

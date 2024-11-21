@@ -246,7 +246,7 @@ end
 
 --- Checks if an address is a valid Arweave address
 --- @param address string The address to check
---- @return boolean isValidArweaveAddress - whether the address is a valid Arweave address
+--- @return boolean isValidAddress - whether the address is a valid Arweave address
 function utils.isValidArweaveAddress(address)
 	return type(address) == "string" and #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
 end
@@ -259,10 +259,14 @@ function utils.isValidEthAddress(address)
 end
 
 --- Checks if an address is a valid AO address
---- @param url string|nil The address to check
---- @return boolean isValidAOAddress - whether the address is a valid AO address
-function utils.isValidAOAddress(url)
-	return url and (utils.isValidArweaveAddress(url) or utils.isValidEthAddress(url)) or false
+--- @param address string|nil The address to check
+--- @return boolean isValidAddress - whether the address is a valid AO address
+function utils.isValidAddress(address)
+	if not address then
+		return false
+	end
+	local match = string.match(address, "^[%w_-]+$")
+	return match ~= nil and #address >= 1 and #address <= 128
 end
 
 --- Converts an address to EIP-55 checksum format

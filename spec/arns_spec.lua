@@ -283,14 +283,6 @@ describe("arns", function()
 				assert.match("Name is in auction", result)
 				assert.are.same({}, _G.NameRegistry.records)
 			end)
-
-			it("should throw an error if the name looks like a wallet address [" .. addressType .. "]", function()
-				local status, result =
-					pcall(arns.buyRecord, testAddress, "lease", 1, testAddress, timestamp, testProcessId)
-				assert.is_false(status)
-				assert.match("Name cannot be a wallet address", result)
-				assert.are.same({}, _G.NameRegistry.records)
-			end)
 		end)
 
 		describe("increaseundernameLimit [" .. addressType .. "]", function()
