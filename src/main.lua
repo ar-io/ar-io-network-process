@@ -548,7 +548,7 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 			Action = "Debit-Notice",
 			Recipient = recipient,
 			Quantity = msg.Tags.Quantity,
-			["Allow-Unsafe-Addresses"] = tostring(allowUnsafeAddresses),
+			["Allow-Unsafe-Addresses"] = allowUnsafeAddresses,
 			Data = "You transferred " .. msg.Tags.Quantity .. " to " .. recipient,
 		}
 		-- Credit-Notice message template, that is sent to the Recipient of the transfer
@@ -557,7 +557,7 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 			Action = "Credit-Notice",
 			Sender = msg.From,
 			Quantity = msg.Tags.Quantity,
-			["Allow-Unsafe-Addresses"] = tostring(allowUnsafeAddresses),
+			["Allow-Unsafe-Addresses"] = allowUnsafeAddresses,
 			Data = "You received " .. msg.Tags.Quantity .. " from " .. msg.From,
 		}
 
@@ -657,7 +657,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 		Target = msg.From,
 		Recipient = recipient,
 		Quantity = quantity,
-		Tags = { Action = "Debit-Notice", ["Vault-Id"] = msgId },
+		Tags = { Action = "Debit-Notice", ["Vault-Id"] = msgId, ["Allow-Unsafe-Addresses"] = allowUnsafeAddresses },
 		Data = json.encode(vault),
 	})
 	-- to the receiver, they get a vault notice
@@ -668,6 +668,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 		Tags = {
 			Action = ActionMap.CreateVault .. "-Notice",
 			["Vault-Id"] = msgId,
+			["Allow-Unsafe-Addresses"] = allowUnsafeAddresses,
 		},
 		Data = json.encode(vault),
 	})
