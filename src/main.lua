@@ -430,6 +430,13 @@ end, function(msg)
 		msg.Tags[tagName] = msg.Tags[tagName] and tonumber(msg.Tags[tagName]) or nil
 	end
 
+	local knownBooleanTags = {
+		"Allow-Unsafe-Addresses",
+	}
+	for _, tagName in ipairs(knownBooleanTags) do
+		msg.Tags[tagName] = msg.Tags[tagName] and msg.Tags[tagName] == "true" or false
+	end
+
 	local msgId = msg.Id
 	print("Pruning state at timestamp: " .. msgTimestamp)
 	local prunedStateResult = prune.pruneState(msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
@@ -516,13 +523,14 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 	-- assert recipient is a valid arweave address
 	local recipient = msg.Tags.Recipient
 	local quantity = msg.Tags.Quantity
-	assert(utils.isValidAddress(recipient), "Invalid recipient")
+	local allowUnsafeAddresses = msg.Tags["Allow-Unsafe-Addresses"]
+	assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
 	assert(quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
 	assert(recipient ~= msg.From, "Cannot transfer to self")
 
 	msg.ioEvent:addField("RecipientFormatted", recipient)
 
-	local result = balances.transfer(recipient, msg.From, quantity)
+	local result = balances.transfer(recipient, msg.From, quantity, allowUnsafeAddresses)
 	if result ~= nil then
 		local senderNewBalance = result[msg.From]
 		local recipientNewBalance = result[recipient]
@@ -540,6 +548,7 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 			Action = "Debit-Notice",
 			Recipient = recipient,
 			Quantity = msg.Tags.Quantity,
+			["Allow-Unsafe-Addresses"] = tostring(allowUnsafeAddresses),
 			Data = "You transferred " .. msg.Tags.Quantity .. " to " .. recipient,
 		}
 		-- Credit-Notice message template, that is sent to the Recipient of the transfer
@@ -548,6 +557,7 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 			Action = "Credit-Notice",
 			Sender = msg.From,
 			Quantity = msg.Tags.Quantity,
+			["Allow-Unsafe-Addresses"] = tostring(allowUnsafeAddresses),
 			Data = "You received " .. msg.Tags.Quantity .. " from " .. msg.From,
 		}
 
@@ -615,8 +625,8 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 	local lockLengthMs = msg.Tags["Lock-Length"]
 	local timestamp = msg.Timestamp
 	local msgId = msg.Id
-
-	assert(utils.isValidAddress(recipient), "Invalid recipient")
+	local allowUnsafeAddresses = msg.Tags["Allow-Unsafe-Addresses"]
+	assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
 	assert(
 		lockLengthMs and lockLengthMs > 0 and utils.isInteger(lockLengthMs),
 		"Invalid lock length. Must be integer greater than 0"
@@ -628,7 +638,8 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 	assert(timestamp, "Timestamp is required for a tick interaction")
 	assert(recipient ~= msg.From, "Cannot transfer to self")
 
-	local vault = vaults.vaultedTransfer(msg.From, recipient, quantity, lockLengthMs, timestamp, msgId)
+	local vault =
+		vaults.vaultedTransfer(msg.From, recipient, quantity, lockLengthMs, timestamp, msgId, allowUnsafeAddresses)
 
 	if vault ~= nil then
 		msg.ioEvent:addField("Vault-Id", msgId)
@@ -724,14 +735,12 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	local processId = msg.Tags["Process-Id"] or msg.From
 	local timestamp = msg.Timestamp
 	local fundFrom = msg.Tags["Fund-From"]
-
 	assert(
 		type(purchaseType) == "string" and purchaseType == "lease" or purchaseType == "permabuy",
 		"Invalid purchase type"
 	)
 	assert(timestamp, "Timestamp is required for a tick interaction")
-	assert(type(name) == "string" and #name > 0 and #name <= 51 and not utils.isValidAddress(name), "Invalid name")
-	assert(type(processId) == "string", "Process id is required and must be a string.")
+	arns.assertValidArNSName(name)
 	assert(utils.isValidAddress(processId), "Process Id must be a valid address.")
 	if years then
 		assert(years >= 1 and years <= 5 and utils.isInteger(years), "Invalid years. Must be integer between 1 and 5")
@@ -875,7 +884,7 @@ function assertTokenCostTags(msg)
 		"Intent must be valid registry interaction (e.g. BuyRecord, ExtendLease, IncreaseUndernameLimit, UpgradeName). Provided intent: "
 			.. (intentType or "nil")
 	)
-	assert(msg.Tags.Name, "Name is required")
+	arns.assertValidArNSName(msg.Tags.Name)
 	-- if years is provided, assert it is a number and integer between 1 and 5
 	if msg.Tags.Years then
 		assert(utils.isInteger(msg.Tags.Years), "Invalid years. Must be integer between 1 and 5")
@@ -2024,7 +2033,7 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	local initiator = msg.Tags.Initiator or msg.From
 	local timestamp = msg.Timestamp
 
-	assert(name and #name > 0, "Name is required")
+	assert(name and #name > 0, "Name is required") --- this could be an undername, so we don't want to assertValidArNSName
 	assert(processId and utils.isValidAddress(processId), "Process-Id must be a valid address")
 	assert(initiator and utils.isValidAddress(initiator), "Initiator is required")
 	assert(record, "Record not found")

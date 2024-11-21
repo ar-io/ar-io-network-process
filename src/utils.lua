@@ -258,15 +258,26 @@ function utils.isValidEthAddress(address)
 	return type(address) == "string" and #address == 42 and string.match(address, "^0x[%x]+$") ~= nil
 end
 
---- Checks if an address is a valid AO address
---- @param address string|nil The address to check
---- @return boolean isValidAddress - whether the address is a valid AO address
-function utils.isValidAddress(address)
+function utils.isValidUnsafeAddress(address)
 	if not address then
 		return false
 	end
 	local match = string.match(address, "^[%w_-]+$")
 	return match ~= nil and #address >= 1 and #address <= 128
+end
+
+--- Checks if an address is a valid AO address
+--- @param address string|nil The address to check
+--- @return boolean isValidAddress - whether the address is a valid AO address
+function utils.isValidAddress(address, allowUnsafe)
+	allowUnsafe = allowUnsafe or false -- default to false, only allow unsafe addresses if explicitly set
+	if not address then
+		return false
+	end
+	if allowUnsafe then
+		return utils.isValidUnsafeAddress(address)
+	end
+	return utils.isValidArweaveAddress(address) or utils.isValidEthAddress(address)
 end
 
 --- Converts an address to EIP-55 checksum format

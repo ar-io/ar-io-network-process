@@ -14,6 +14,9 @@ constants.minimumWithdrawalAmount = constants.mIOPerIO -- the minimum amount tha
 constants.redelegationFeeResetIntervalMs = 1000 * 60 * 60 * 24 * 7 -- 7 epochs
 
 -- ARNS
+constants.MAX_NAME_LENGTH = 51
+constants.MIN_NAME_LENGTH = 1
+constants.ARNS_NAME_REGEX = "^%w[%w-]*%w$"
 constants.DEFAULT_UNDERNAME_COUNT = 10
 constants.DEADLINE_DURATION_MS = 60 * 60 * 1000 -- One hour of miliseconds
 constants.PERMABUY_LEASE_FEE_LENGTH = 20 -- 20 years

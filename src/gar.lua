@@ -113,7 +113,7 @@ GatewayRegistrySettings = GatewayRegistrySettings
 --- @param from WalletAddress The address from which the request is made
 --- @param stake mIO: The amount of stake to be used
 --- @param settings JoinGatewaySettings The settings for joining the network
---- @param services GatewayServices The services to be used in the network
+--- @param services GatewayServices|nil The services to be used in the network
 --- @param observerAddress WalletAddress The address of the observer
 --- @param timeStamp Timestamp The timestamp of the request
 --- @return Gateway # Returns the newly joined gateway

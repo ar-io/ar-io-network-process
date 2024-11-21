@@ -474,15 +474,21 @@ function arns.calculateYearsBetweenTimestamps(startTimestamp, endTimestamp)
 	return yearsRemainingFloat
 end
 
+--- Asserts that a name is a valid ARNS name
+--- @param name string The name to check
+function arns.assertValidArNSName(name)
+	assert(type(name) == "string", "Name is required and must be a string.")
+	assert(#name >= constants.MIN_NAME_LENGTH and #name <= constants.MAX_NAME_LENGTH, "Name pattern is invalid.")
+	assert(name:match(constants.ARNS_NAME_REGEX), "Name pattern is invalid.")
+end
+
 --- Asserts that a buy record is valid
 --- @param name string The name of the record
 --- @param years number|nil The number of years to check
 --- @param purchaseType string|nil The purchase type to check
 --- @param processId string|nil The processId of the record
 function arns.assertValidBuyRecord(name, years, purchaseType, processId)
-	assert(type(name) == "string", "Name is required and must be a string.")
-	assert(#name >= 1 and #name <= 51, "Name pattern is invalid.")
-	assert(name:match("^%w") and name:match("%w$") and name:match("^[%w-]+$"), "Name pattern is invalid.")
+	arns.assertValidArNSName(name)
 
 	-- assert purchase type if present is lease or permabuy
 	assert(purchaseType == nil or purchaseType == "lease" or purchaseType == "permabuy", "Purchase-Type is invalid.")

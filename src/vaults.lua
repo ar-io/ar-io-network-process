@@ -34,7 +34,6 @@ function vaults.createVault(from, qty, lockLengthMs, currentTimestamp, vaultId)
 			.. constants.MAX_TOKEN_LOCK_TIME_MS
 			.. " ms"
 	)
-
 	balances.reduceBalance(from, qty)
 	local newVault = vaults.setVault(from, vaultId, {
 		balance = qty,
@@ -55,8 +54,10 @@ end
 --- @param lockLengthMs number The lock length in milliseconds
 --- @param currentTimestamp number The current timestamp
 --- @param vaultId string The vault id
+--- @param allowUnsafeAddresses boolean Whether to allow unsafe addresses, since this results in funds eventually being sent to an invalid address
 --- @return Vault The created vault
-function vaults.vaultedTransfer(from, recipient, qty, lockLengthMs, currentTimestamp, vaultId)
+function vaults.vaultedTransfer(from, recipient, qty, lockLengthMs, currentTimestamp, vaultId, allowUnsafeAddresses)
+	assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
 	assert(balances.walletHasSufficientBalance(from, qty), "Insufficient balance")
 	assert(not vaults.getVault(recipient, vaultId), "Vault with id " .. vaultId .. " already exists")
 	assert(

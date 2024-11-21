@@ -7,6 +7,7 @@ import {
   PROCESS_OWNER,
   STUB_OPERATOR_ADDRESS,
   STUB_TIMESTAMP,
+  STUB_MESSAGE_ID,
   validGatewayTags,
 } from '../tools/constants.mjs';
 
@@ -266,4 +267,87 @@ export const getGatewayVaultsItems = async ({ memory, gatewayAddress }) => {
   );
   assertNoResultError(gatewayVaultsResult);
   return JSON.parse(gatewayVaultsResult.Messages?.[0]?.Data).items;
+};
+
+export const createVault = async ({
+  memory,
+  quantity,
+  lockLengthMs,
+  from = PROCESS_OWNER,
+  msgId = STUB_MESSAGE_ID,
+  timestamp = STUB_TIMESTAMP,
+  assert = true,
+}) => {
+  const createVaultResult = await handle(
+    {
+      Id: msgId,
+      From: from,
+      Owner: from,
+      Timestamp: timestamp,
+      Tags: [
+        {
+          name: 'Action',
+          value: 'Create-Vault',
+        },
+        {
+          name: 'Quantity',
+          value: quantity.toString(),
+        },
+        {
+          name: 'Lock-Length',
+          value: lockLengthMs.toString(),
+        },
+      ],
+    },
+    memory,
+  );
+
+  if (assert) {
+    assertNoResultError(createVaultResult);
+  }
+
+  return { result: createVaultResult, memory: createVaultResult.Memory };
+};
+
+export const createVaultedTransfer = async ({
+  memory,
+  quantity,
+  lockLengthMs,
+  recipient,
+  allowUnsafeAddresses,
+  msgId = STUB_MESSAGE_ID,
+  timestamp = STUB_TIMESTAMP,
+  from = PROCESS_OWNER,
+  assert = true,
+}) => {
+  const createVaultedTransferResult = await handle(
+    {
+      Id: msgId,
+      From: from,
+      Owner: from,
+      Tags: [
+        { name: 'Action', value: 'Vaulted-Transfer' },
+        { name: 'Recipient', value: recipient },
+        { name: 'Quantity', value: quantity.toString() },
+        { name: 'Lock-Length', value: lockLengthMs.toString() },
+        ...(allowUnsafeAddresses !== undefined
+          ? [
+              {
+                name: 'Allow-Unsafe-Addresses',
+                value: allowUnsafeAddresses.toString(),
+              },
+            ]
+          : []),
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  );
+  if (assert) {
+    assertNoResultError(createVaultedTransferResult);
+  }
+  return {
+    result: createVaultedTransferResult,
+    memory: createVaultedTransferResult.Memory,
+  };
 };
