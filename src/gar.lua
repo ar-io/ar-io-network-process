@@ -847,11 +847,6 @@ function gar.updateGatewayStats(address, gateway, stats)
 	assert(stats.failedConsecutiveEpochs, "failedConsecutiveEpochs is required")
 	assert(stats.passedConsecutiveEpochs, "passedConsecutiveEpochs is required")
 
-	if stats.failedConsecutiveEpochs >= gar.getSettings().operators.failedEpochCountMax then
-		-- Ensure pruning takes place at the next opportunity
-		NextGatewaysPruneTimestamp = 0
-	end
-
 	gateway.stats = stats
 	GatewayRegistry[address] = gateway
 	return gateway
