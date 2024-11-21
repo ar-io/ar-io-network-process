@@ -42,7 +42,7 @@ local CRITICAL = true
 local ActionMap = {
 	-- reads
 	Info = "Info",
-	TotalTokenSupply = "Total-Token-Supply",
+	TotalSupply = "Total-Supply",
 	State = "State",
 	Transfer = "Transfer",
 	Balance = "Balance",
@@ -119,14 +119,12 @@ LastKnownLockedSupply = LastKnownLockedSupply or 0 -- total vault balance across
 LastKnownStakedSupply = LastKnownStakedSupply or 0 -- total operator stake across all gateways
 LastKnownDelegatedSupply = LastKnownDelegatedSupply or 0 -- total delegated stake across all gateways
 LastKnownWithdrawSupply = LastKnownWithdrawSupply or 0 -- total withdraw supply across all gateways (gateways and delegates)
-LastKnownPnpRequestSupply = LastKnownPnpRequestSupply or 0 -- total supply stashed in outstanding Primary Name Protocol requests
 local function lastKnownTotalTokenSupply()
 	return LastKnownCirculatingSupply
 		+ LastKnownLockedSupply
 		+ LastKnownStakedSupply
 		+ LastKnownDelegatedSupply
 		+ LastKnownWithdrawSupply
-		+ LastKnownPnpRequestSupply
 		+ Balances[Protocol]
 end
 LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
@@ -252,7 +250,6 @@ local function addSupplyData(ioEvent, supplyData)
 	ioEvent:addField("Staked-Supply", supplyData.stakedSupply or LastKnownStakedSupply)
 	ioEvent:addField("Delegated-Supply", supplyData.delegatedSupply or LastKnownDelegatedSupply)
 	ioEvent:addField("Withdraw-Supply", supplyData.withdrawSupply or LastKnownWithdrawSupply)
-	ioEvent:addField("Request-Supply", supplyData.requestSupply or LastKnownPnpRequestSupply)
 	ioEvent:addField("Total-Token-Supply", supplyData.totalTokenSupply or lastKnownTotalTokenSupply())
 	ioEvent:addField("Protocol-Balance", Balances[Protocol])
 end
@@ -377,7 +374,6 @@ end, function(msg)
 		lastKnownStakedSupply = LastKnownStakedSupply,
 		lastKnownDelegatedSupply = LastKnownDelegatedSupply,
 		lastKnownWithdrawSupply = LastKnownWithdrawSupply,
-		lastKnownRequestSupply = LastKnownPnpRequestSupply,
 		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
 	}
 
@@ -493,7 +489,6 @@ end, function(msg)
 		or LastKnownStakedSupply ~= previousStateSupplies.lastKnownStakedSupply
 		or LastKnownDelegatedSupply ~= previousStateSupplies.lastKnownDelegatedSupply
 		or LastKnownWithdrawSupply ~= previousStateSupplies.lastKnownWithdrawSupply
-		or LastKnownPnpRequestSupply ~= previousStateSupplies.lastKnownRequestSupply
 		or Balances[Protocol] ~= previousStateSupplies.protocolBalance
 		or lastKnownTotalTokenSupply() ~= previousStateSupplies.lastKnownTotalSupply
 	then
@@ -1509,93 +1504,90 @@ addEventingHandler(
 	end
 )
 
-addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.TotalTokenSupply), function(msg)
-	-- add all the balances
-	local totalSupply = 0
-	local circulatingSupply = 0
-	local lockedSupply = 0
-	local stakedSupply = 0
-	local delegatedSupply = 0
-	local withdrawSupply = 0
-	local pnpRequestSupply = 0
-	local protocolBalance = balances.getBalance(Protocol)
-	local userBalances = balances.getBalances()
+addEventingHandler(
+	"totalTokenSupply",
+	utils.hasMatchingTag("Action", ActionMap.TotalSupply) or utils.hasMatchingTag("Action", "Total-Token-Supply"), -- TODO: remove this once we migrate all downstream apps to the new tag
+	function(msg)
+		-- add all the balances
+		local totalSupply = 0
+		local circulatingSupply = 0
+		local lockedSupply = 0
+		local stakedSupply = 0
+		local delegatedSupply = 0
+		local withdrawSupply = 0
+		local protocolBalance = balances.getBalance(Protocol)
+		local userBalances = balances.getBalances()
 
-	-- tally circulating supply
-	for _, balance in pairs(userBalances) do
-		circulatingSupply = circulatingSupply + balance
-	end
-	circulatingSupply = circulatingSupply - protocolBalance
-	totalSupply = totalSupply + protocolBalance + circulatingSupply
+		-- tally circulating supply
+		for _, balance in pairs(userBalances) do
+			circulatingSupply = circulatingSupply + balance
+		end
+		circulatingSupply = circulatingSupply - protocolBalance
+		totalSupply = totalSupply + protocolBalance + circulatingSupply
 
-	-- tally supply stashed in gateways and delegates
-	for _, gateway in pairs(gar.getGatewaysUnsafe()) do
-		totalSupply = totalSupply + gateway.operatorStake + gateway.totalDelegatedStake
-		stakedSupply = stakedSupply + gateway.operatorStake
-		delegatedSupply = delegatedSupply + gateway.totalDelegatedStake
-		for _, delegate in pairs(gateway.delegates) do
-			-- tally delegates' vaults
-			for _, vault in pairs(delegate.vaults) do
+		-- tally supply stashed in gateways and delegates
+		for _, gateway in pairs(gar.getGatewaysUnsafe()) do
+			totalSupply = totalSupply + gateway.operatorStake + gateway.totalDelegatedStake
+			stakedSupply = stakedSupply + gateway.operatorStake
+			delegatedSupply = delegatedSupply + gateway.totalDelegatedStake
+			for _, delegate in pairs(gateway.delegates) do
+				-- tally delegates' vaults
+				for _, vault in pairs(delegate.vaults) do
+					totalSupply = totalSupply + vault.balance
+					withdrawSupply = withdrawSupply + vault.balance
+				end
+			end
+			-- tally gateway's own vaults
+			for _, vault in pairs(gateway.vaults) do
 				totalSupply = totalSupply + vault.balance
 				withdrawSupply = withdrawSupply + vault.balance
 			end
 		end
-		-- tally gateway's own vaults
-		for _, vault in pairs(gateway.vaults) do
-			totalSupply = totalSupply + vault.balance
-			withdrawSupply = withdrawSupply + vault.balance
+
+		-- user vaults
+		local userVaults = vaults.getVaults()
+		for _, vaultsForAddress in pairs(userVaults) do
+			-- they may have several vaults iterate through them
+			for _, vault in pairs(vaultsForAddress) do
+				totalSupply = totalSupply + vault.balance
+				lockedSupply = lockedSupply + vault.balance
+			end
 		end
+
+		LastKnownCirculatingSupply = circulatingSupply
+		LastKnownLockedSupply = lockedSupply
+		LastKnownStakedSupply = stakedSupply
+		LastKnownDelegatedSupply = delegatedSupply
+		LastKnownWithdrawSupply = withdrawSupply
+
+		addSupplyData(msg.ioEvent, {
+			totalTokenSupply = totalSupply,
+		})
+		msg.ioEvent:addField("Last-Known-Total-Token-Supply", lastKnownTotalTokenSupply())
+
+		ao.send({
+			Target = msg.From,
+			Action = ActionMap.TotalSupply .. "-Notice",
+			["Total-Supply"] = tostring(totalSupply),
+			["Circulating-Supply"] = tostring(circulatingSupply),
+			["Locked-Supply"] = tostring(lockedSupply),
+			["Staked-Supply"] = tostring(stakedSupply),
+			["Delegated-Supply"] = tostring(delegatedSupply),
+			["Withdraw-Supply"] = tostring(withdrawSupply),
+			["Protocol-Balance"] = tostring(protocolBalance),
+			Data = json.encode({
+				-- TODO: we are losing precision on these values unexpectedly. This has been brought to the AO team - for now the tags should be correct as they are stringified
+				total = totalSupply,
+				circulating = circulatingSupply,
+				locked = lockedSupply,
+				staked = stakedSupply,
+				delegated = delegatedSupply,
+				withdrawn = withdrawSupply,
+				protocolBalance = protocolBalance,
+			}),
+		})
 	end
-
-	-- user vaults
-	local userVaults = vaults.getVaults()
-	for _, vaultsForAddress in pairs(userVaults) do
-		-- they may have several vaults iterate through them
-		for _, vault in pairs(vaultsForAddress) do
-			totalSupply = totalSupply + vault.balance
-			lockedSupply = lockedSupply + vault.balance
-		end
-	end
-
-	-- pnp requests
-	for _, pnpRequest in pairs(primaryNames.getUnsafePrimaryNameRequests()) do
-		pnpRequestSupply = pnpRequestSupply + pnpRequest.balance
-	end
-
-	LastKnownCirculatingSupply = circulatingSupply
-	LastKnownLockedSupply = lockedSupply
-	LastKnownStakedSupply = stakedSupply
-	LastKnownDelegatedSupply = delegatedSupply
-	LastKnownWithdrawSupply = withdrawSupply
-	LastKnownPnpRequestSupply = pnpRequestSupply
-
-	addSupplyData(msg.ioEvent, {
-		totalTokenSupply = totalSupply,
-	})
-	msg.ioEvent:addField("Last-Known-Total-Token-Supply", lastKnownTotalTokenSupply())
-
-	ao.send({
-		Target = msg.From,
-		Action = ActionMap.TotalTokenSupply .. "-Notice",
-		["Total-Token-Supply"] = tostring(totalSupply),
-		["Circulating-Supply"] = tostring(circulatingSupply),
-		["Locked-Supply"] = tostring(lockedSupply),
-		["Staked-Supply"] = tostring(stakedSupply),
-		["Delegated-Supply"] = tostring(delegatedSupply),
-		["Withdraw-Supply"] = tostring(withdrawSupply),
-		["Protocol-Balance"] = tostring(protocolBalance),
-		Data = json.encode({
-			-- TODO: we are losing precision on these values unexpectedly. This has been brought to the AO team - for now the tags should be correct as they are stringified
-			total = totalSupply,
-			circulating = circulatingSupply,
-			locked = lockedSupply,
-			staked = stakedSupply,
-			delegated = delegatedSupply,
-			withdrawn = withdrawSupply,
-			protocolBalance = protocolBalance,
-		}),
-	})
-end)
+)
 
 -- distribute rewards
 -- NOTE: THIS IS A CRITICAL HANDLER AND WILL DISCARD THE MEMORY ON ERROR
