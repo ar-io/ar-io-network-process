@@ -2940,6 +2940,11 @@ describe("gar", function()
 			}
 			targetGateway.totalDelegatedStake = qty
 
+			sourceGateway.delegates = nil
+			sourceGateway.vaults = nil
+			targetGateway.delegates = nil
+			targetGateway.vaults = nil
+
 			assert.are.same({
 				sourceGateway = sourceGateway,
 				targetGateway = targetGateway,
@@ -2984,6 +2989,11 @@ describe("gar", function()
 				vaults = {},
 			}
 			targetGateway.totalDelegatedStake = qty
+
+			sourceGateway.delegates = nil
+			sourceGateway.vaults = nil
+			targetGateway.delegates = nil
+			targetGateway.vaults = nil
 
 			assert.are.same({
 				sourceGateway = sourceGateway,
@@ -3038,6 +3048,11 @@ describe("gar", function()
 					vaults = {},
 				}
 				targetGateway.totalDelegatedStake = initialStakeNeeded - redelegationFee
+
+				sourceGateway.delegates = nil
+				sourceGateway.vaults = nil
+				targetGateway.delegates = nil
+				targetGateway.vaults = nil
 
 				assert.are.same({
 					sourceGateway = sourceGateway,
@@ -3099,6 +3114,12 @@ describe("gar", function()
 					vaults = {},
 				}
 				targetGateway.totalDelegatedStake = stakeToBeDelegated
+
+				sourceGateway.delegates = nil
+				sourceGateway.vaults = nil
+				targetGateway.delegates = nil
+				targetGateway.vaults = nil
+
 				assert.are.same({
 					sourceGateway = sourceGateway,
 					targetGateway = targetGateway,
@@ -3138,6 +3159,11 @@ describe("gar", function()
 			sourceGateway.delegates[testRedelegatorAddress] = nil
 			sourceGateway.totalDelegatedStake = 0
 			targetGateway.operatorStake = minOperatorStake + minDelegatedStake
+
+			sourceGateway.delegates = nil
+			sourceGateway.vaults = nil
+			targetGateway.delegates = nil
+			targetGateway.vaults = nil
 
 			assert.are.same({
 				sourceGateway = sourceGateway,
@@ -3188,6 +3214,11 @@ describe("gar", function()
 					vaults = {},
 				}
 				targetGateway.totalDelegatedStake = minDelegatedStake
+
+				sourceGateway.delegates = nil
+				sourceGateway.vaults = nil
+				targetGateway.delegates = nil
+				targetGateway.vaults = nil
 
 				assert.are.same({
 					sourceGateway = sourceGateway,
@@ -3358,6 +3389,11 @@ describe("gar", function()
 			}
 			targetGateway.totalDelegatedStake = minDelegatedStake
 
+			sourceGateway.delegates = nil
+			sourceGateway.vaults = nil
+			targetGateway.delegates = nil
+			targetGateway.vaults = nil
+
 			assert.are.same({
 				sourceGateway = sourceGateway,
 				targetGateway = targetGateway,
@@ -3456,6 +3492,11 @@ describe("gar", function()
 				vaults = {},
 			}
 			targetGateway.totalDelegatedStake = minDelegatedStake + 1
+
+			sourceGateway.delegates = nil
+			sourceGateway.vaults = nil
+			targetGateway.delegates = nil
+			targetGateway.vaults = nil
 
 			assert.are.same({
 				sourceGateway = sourceGateway,
@@ -3655,6 +3696,11 @@ describe("gar", function()
 			}
 			targetGateway.totalDelegatedStake = minDelegatedStake
 
+			sourceGateway.delegates = nil
+			sourceGateway.vaults = nil
+			targetGateway.delegates = nil
+			targetGateway.vaults = nil
+
 			assert.are.same({
 				sourceGateway = sourceGateway,
 				targetGateway = targetGateway,
@@ -3704,6 +3750,10 @@ describe("gar", function()
 				vaults = {},
 			}
 			targetGateway.totalDelegatedStake = minDelegatedStake
+			sourceGateway.delegates = nil
+			sourceGateway.vaults = nil
+			targetGateway.delegates = nil
+			targetGateway.vaults = nil
 
 			assert.are.same({
 				sourceGateway = sourceGateway,
@@ -3747,7 +3797,10 @@ describe("gar", function()
 				vaults = {},
 			}
 			targetGateway.totalDelegatedStake = minDelegatedStake
-			sourceGateway.vaults = {}
+			sourceGateway.delegates = nil
+			sourceGateway.vaults = nil
+			targetGateway.delegates = nil
+			targetGateway.vaults = nil
 
 			assert.are.same({
 				sourceGateway = sourceGateway,
@@ -3837,6 +3890,11 @@ describe("gar", function()
 				vaults = {},
 			}
 			targetGateway.totalDelegatedStake = minDelegatedStake
+
+			sourceGateway.delegates = nil
+			sourceGateway.vaults = nil
+			targetGateway.delegates = nil
+			targetGateway.vaults = nil
 
 			assert.are.same({
 				sourceGateway = sourceGateway,

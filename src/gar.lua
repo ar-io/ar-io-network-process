@@ -1848,8 +1848,8 @@ function gar.redelegateStake(params)
 	GatewayRegistry[targetAddress] = targetGateway
 
 	return {
-		sourceGateway = sourceGateway,
-		targetGateway = targetGateway,
+		sourceGateway = utils.deepCopy(sourceGateway, { "delegates", "vaults", "settings.allowedDelegatesLookup" }),
+		targetGateway = utils.deepCopy(targetGateway, { "delegates", "vaults", "settings.allowedDelegatesLookup" }),
 		redelegationFee = redelegationFee,
 		feeResetTimestamp = currentTimestamp + constants.redelegationFeeResetIntervalMs,
 		redelegationsSinceFeeReset = Redelegations[delegateAddress].redelegations,
