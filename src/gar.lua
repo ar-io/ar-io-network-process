@@ -1836,23 +1836,22 @@ function gar.redelegateStake(params)
 	-- Move redelegation fee to protocol balance
 	balances.increaseBalance(ao.id, redelegationFee)
 
+	local redelegationsSinceFeeReset = (previousRedelegations and previousRedelegations.redelegations or 0) + 1
+
+	-- update the source and target gateways, and the delegator's redelegation fee data
+	GatewayRegistry[sourceAddress] = sourceGateway
+	GatewayRegistry[targetAddress] = targetGateway
 	Redelegations[delegateAddress] = {
 		timestamp = currentTimestamp,
-		redelegations = (previousRedelegations and previousRedelegations.redelegations or 0) + 1,
+		redelegations = redelegationsSinceFeeReset,
 	}
 
-	-- update the gateway
-	GatewayRegistry[sourceAddress] = sourceGateway
-
-	-- update the target gateway
-	GatewayRegistry[targetAddress] = targetGateway
-
 	return {
-		sourceGateway = sourceGateway,
-		targetGateway = targetGateway,
+		sourceAddress = sourceAddress,
+		targetAddress = targetAddress,
 		redelegationFee = redelegationFee,
 		feeResetTimestamp = currentTimestamp + constants.redelegationFeeResetIntervalMs,
-		redelegationsSinceFeeReset = Redelegations[delegateAddress].redelegations,
+		redelegationsSinceFeeReset = redelegationsSinceFeeReset,
 	}
 end
 
