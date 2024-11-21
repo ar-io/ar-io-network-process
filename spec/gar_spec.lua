@@ -2930,6 +2930,19 @@ describe("gar", function()
 				currentTimestamp = timestamp,
 			})
 
+			assert.are.same({
+				sourceAddress = testSourceAddress,
+				targetAddress = testTargetAddress,
+				redelegationFee = 0,
+				feeResetTimestamp = timestamp + sevenDays,
+				redelegationsSinceFeeReset = 1,
+			}, result)
+
+			assert.are.same({
+				timestamp = timestamp,
+				redelegations = 1,
+			}, _G.Redelegations[testRedelegatorAddress])
+
 			-- setup expectations on gateway tables
 			sourceGateway.delegates[testRedelegatorAddress] = nil
 			sourceGateway.totalDelegatedStake = 0
@@ -2940,23 +2953,8 @@ describe("gar", function()
 			}
 			targetGateway.totalDelegatedStake = qty
 
-			sourceGateway.delegates = nil
-			sourceGateway.vaults = nil
-			targetGateway.delegates = nil
-			targetGateway.vaults = nil
-
-			assert.are.same({
-				sourceGateway = sourceGateway,
-				targetGateway = targetGateway,
-				redelegationFee = 0,
-				feeResetTimestamp = timestamp + sevenDays,
-				redelegationsSinceFeeReset = 1,
-			}, result)
-
-			assert.are.same({
-				timestamp = timestamp,
-				redelegations = 1,
-			}, _G.Redelegations[testRedelegatorAddress])
+			assert.are.same(sourceGateway, _G.GatewayRegistry[testSourceAddress])
+			assert.are.same(targetGateway, _G.GatewayRegistry[testTargetAddress])
 		end)
 
 		it("should redelegate stake from its own gateway into another gateway", function()
@@ -2990,18 +2988,16 @@ describe("gar", function()
 			}
 			targetGateway.totalDelegatedStake = qty
 
-			sourceGateway.delegates = nil
-			sourceGateway.vaults = nil
-			targetGateway.delegates = nil
-			targetGateway.vaults = nil
-
 			assert.are.same({
-				sourceGateway = sourceGateway,
-				targetGateway = targetGateway,
+				sourceAddress = testRedelegatorAddress,
+				targetAddress = testTargetAddress,
 				redelegationFee = 0,
 				feeResetTimestamp = timestamp + sevenDays,
 				redelegationsSinceFeeReset = 1,
 			}, result)
+
+			assert.are.same(sourceGateway, _G.GatewayRegistry[testRedelegatorAddress])
+			assert.are.same(targetGateway, _G.GatewayRegistry[testTargetAddress])
 		end)
 
 		it(
@@ -3039,6 +3035,18 @@ describe("gar", function()
 					currentTimestamp = timestamp,
 				})
 
+				assert.are.same({
+					sourceAddress = testSourceAddress,
+					targetAddress = testTargetAddress,
+					redelegationFee = redelegationFee,
+					feeResetTimestamp = timestamp + sevenDays,
+					redelegationsSinceFeeReset = 2,
+				}, result)
+				assert.are.same({
+					timestamp = timestamp, -- new timestamp
+					redelegations = 2,
+				}, _G.Redelegations[testRedelegatorAddress])
+
 				-- setup expectations on gateway tables
 				sourceGateway.delegates[testRedelegatorAddress] = nil
 				sourceGateway.totalDelegatedStake = 0
@@ -3049,22 +3057,8 @@ describe("gar", function()
 				}
 				targetGateway.totalDelegatedStake = initialStakeNeeded - redelegationFee
 
-				sourceGateway.delegates = nil
-				sourceGateway.vaults = nil
-				targetGateway.delegates = nil
-				targetGateway.vaults = nil
-
-				assert.are.same({
-					sourceGateway = sourceGateway,
-					targetGateway = targetGateway,
-					redelegationFee = redelegationFee,
-					feeResetTimestamp = timestamp + sevenDays,
-					redelegationsSinceFeeReset = 2,
-				}, result)
-				assert.are.same({
-					timestamp = timestamp, -- new timestamp
-					redelegations = 2,
-				}, _G.Redelegations[testRedelegatorAddress])
+				assert.are.same(sourceGateway, _G.GatewayRegistry[testSourceAddress])
+				assert.are.same(targetGateway, _G.GatewayRegistry[testTargetAddress])
 			end
 		)
 
@@ -3115,14 +3109,9 @@ describe("gar", function()
 				}
 				targetGateway.totalDelegatedStake = stakeToBeDelegated
 
-				sourceGateway.delegates = nil
-				sourceGateway.vaults = nil
-				targetGateway.delegates = nil
-				targetGateway.vaults = nil
-
 				assert.are.same({
-					sourceGateway = sourceGateway,
-					targetGateway = targetGateway,
+					sourceAddress = testSourceAddress,
+					targetAddress = testTargetAddress,
 					redelegationFee = redelegationFee,
 					feeResetTimestamp = timestamp + sevenDays,
 					redelegationsSinceFeeReset = 8,
@@ -3155,23 +3144,21 @@ describe("gar", function()
 				currentTimestamp = timestamp,
 			})
 
+			assert.are.same({
+				sourceAddress = testSourceAddress,
+				targetAddress = testRedelegatorAddress,
+				redelegationFee = 0,
+				feeResetTimestamp = timestamp + sevenDays,
+				redelegationsSinceFeeReset = 1,
+			}, result)
+
 			-- setup expectations on gateway tables
 			sourceGateway.delegates[testRedelegatorAddress] = nil
 			sourceGateway.totalDelegatedStake = 0
 			targetGateway.operatorStake = minOperatorStake + minDelegatedStake
 
-			sourceGateway.delegates = nil
-			sourceGateway.vaults = nil
-			targetGateway.delegates = nil
-			targetGateway.vaults = nil
-
-			assert.are.same({
-				sourceGateway = sourceGateway,
-				targetGateway = targetGateway,
-				redelegationFee = 0,
-				feeResetTimestamp = timestamp + sevenDays,
-				redelegationsSinceFeeReset = 1,
-			}, result)
+			assert.are.same(sourceGateway, _G.GatewayRegistry[testSourceAddress])
+			assert.are.same(targetGateway, _G.GatewayRegistry[testRedelegatorAddress])
 		end)
 
 		it(
@@ -3201,6 +3188,14 @@ describe("gar", function()
 					currentTimestamp = timestamp,
 				})
 
+				assert.are.same({
+					sourceAddress = testSourceAddress,
+					targetAddress = testTargetAddress,
+					redelegationFee = 0,
+					feeResetTimestamp = timestamp + sevenDays,
+					redelegationsSinceFeeReset = 1,
+				}, result)
+
 				-- setup expectations on gateway tables
 				sourceGateway.delegates[testRedelegatorAddress] = {
 					delegatedStake = minDelegatedStake,
@@ -3215,18 +3210,8 @@ describe("gar", function()
 				}
 				targetGateway.totalDelegatedStake = minDelegatedStake
 
-				sourceGateway.delegates = nil
-				sourceGateway.vaults = nil
-				targetGateway.delegates = nil
-				targetGateway.vaults = nil
-
-				assert.are.same({
-					sourceGateway = sourceGateway,
-					targetGateway = targetGateway,
-					redelegationFee = 0,
-					feeResetTimestamp = timestamp + sevenDays,
-					redelegationsSinceFeeReset = 1,
-				}, result)
+				assert.are.same(sourceGateway, _G.GatewayRegistry[testSourceAddress])
+				assert.are.same(targetGateway, _G.GatewayRegistry[testTargetAddress])
 			end
 		)
 
@@ -3379,6 +3364,14 @@ describe("gar", function()
 				currentTimestamp = timestamp,
 			})
 
+			assert.are.same({
+				sourceAddress = testSourceAddress,
+				targetAddress = testTargetAddress,
+				redelegationFee = 0,
+				feeResetTimestamp = timestamp + sevenDays,
+				redelegationsSinceFeeReset = 1,
+			}, result)
+
 			-- setup expectations on gateway tables
 			sourceGateway.delegates[testRedelegatorAddress] = nil
 			sourceGateway.totalDelegatedStake = 0
@@ -3389,18 +3382,8 @@ describe("gar", function()
 			}
 			targetGateway.totalDelegatedStake = minDelegatedStake
 
-			sourceGateway.delegates = nil
-			sourceGateway.vaults = nil
-			targetGateway.delegates = nil
-			targetGateway.vaults = nil
-
-			assert.are.same({
-				sourceGateway = sourceGateway,
-				targetGateway = targetGateway,
-				redelegationFee = 0,
-				feeResetTimestamp = timestamp + sevenDays,
-				redelegationsSinceFeeReset = 1,
-			}, result)
+			assert.are.same(sourceGateway, _G.GatewayRegistry[testSourceAddress])
+			assert.are.same(targetGateway, _G.GatewayRegistry[testTargetAddress])
 		end)
 
 		it("should not redelegate stake if target gateway does not allow delegates", function()
@@ -3484,6 +3467,14 @@ describe("gar", function()
 				currentTimestamp = timestamp,
 			})
 
+			assert.are.same({
+				sourceAddress = testRedelegatorAddress,
+				targetAddress = testTargetAddress,
+				redelegationFee = 0,
+				feeResetTimestamp = timestamp + sevenDays,
+				redelegationsSinceFeeReset = 1,
+			}, result)
+
 			-- setup expectations on gateway tables
 			sourceGateway.operatorStake = minOperatorStake
 			targetGateway.delegates[testRedelegatorAddress] = {
@@ -3493,18 +3484,8 @@ describe("gar", function()
 			}
 			targetGateway.totalDelegatedStake = minDelegatedStake + 1
 
-			sourceGateway.delegates = nil
-			sourceGateway.vaults = nil
-			targetGateway.delegates = nil
-			targetGateway.vaults = nil
-
-			assert.are.same({
-				sourceGateway = sourceGateway,
-				targetGateway = targetGateway,
-				redelegationFee = 0,
-				feeResetTimestamp = timestamp + sevenDays,
-				redelegationsSinceFeeReset = 1,
-			}, result)
+			assert.are.same(sourceGateway, _G.GatewayRegistry[testRedelegatorAddress])
+			assert.are.same(targetGateway, _G.GatewayRegistry[testTargetAddress])
 		end)
 
 		it(
@@ -3687,7 +3668,15 @@ describe("gar", function()
 				vaultId = "vault-1",
 			})
 
-			-- setup expectations on gateway tables
+			assert.are.same({
+				sourceAddress = testSourceAddress,
+				targetAddress = testTargetAddress,
+				redelegationFee = 0,
+				feeResetTimestamp = timestamp + sevenDays,
+				redelegationsSinceFeeReset = 1,
+			}, result)
+
+			-- setup redelegation expectations on gateway tables
 			sourceGateway.delegates[testRedelegatorAddress] = stubDelegation
 			targetGateway.delegates[testRedelegatorAddress] = {
 				delegatedStake = minDelegatedStake,
@@ -3696,18 +3685,8 @@ describe("gar", function()
 			}
 			targetGateway.totalDelegatedStake = minDelegatedStake
 
-			sourceGateway.delegates = nil
-			sourceGateway.vaults = nil
-			targetGateway.delegates = nil
-			targetGateway.vaults = nil
-
-			assert.are.same({
-				sourceGateway = sourceGateway,
-				targetGateway = targetGateway,
-				redelegationFee = 0,
-				feeResetTimestamp = timestamp + sevenDays,
-				redelegationsSinceFeeReset = 1,
-			}, result)
+			assert.are.same(sourceGateway, _G.GatewayRegistry[testSourceAddress])
+			assert.are.same(targetGateway, _G.GatewayRegistry[testTargetAddress])
 		end)
 
 		it("should remove the delegate when the last vault is emptied from a redelegation", function()
@@ -3742,6 +3721,14 @@ describe("gar", function()
 				vaultId = "vault-1",
 			})
 
+			assert.are.same({
+				sourceAddress = testSourceAddress,
+				targetAddress = testTargetAddress,
+				redelegationFee = 0,
+				feeResetTimestamp = timestamp + sevenDays,
+				redelegationsSinceFeeReset = 1,
+			}, result)
+
 			-- setup expectations on gateway tables
 			sourceGateway.delegates[testRedelegatorAddress] = nil
 			targetGateway.delegates[testRedelegatorAddress] = {
@@ -3750,18 +3737,8 @@ describe("gar", function()
 				vaults = {},
 			}
 			targetGateway.totalDelegatedStake = minDelegatedStake
-			sourceGateway.delegates = nil
-			sourceGateway.vaults = nil
-			targetGateway.delegates = nil
-			targetGateway.vaults = nil
-
-			assert.are.same({
-				sourceGateway = sourceGateway,
-				targetGateway = targetGateway,
-				redelegationFee = 0,
-				feeResetTimestamp = timestamp + sevenDays,
-				redelegationsSinceFeeReset = 1,
-			}, result)
+			assert.are.same(sourceGateway, _G.GatewayRegistry[testSourceAddress])
+			assert.are.same(targetGateway, _G.GatewayRegistry[testTargetAddress])
 		end)
 
 		it("should redelegate stake from a valid vault ID on the source operator", function()
@@ -3790,6 +3767,14 @@ describe("gar", function()
 				vaultId = "vault-1",
 			})
 
+			assert.are.same({
+				sourceAddress = testRedelegatorAddress,
+				targetAddress = testTargetAddress,
+				redelegationFee = 0,
+				feeResetTimestamp = timestamp + sevenDays,
+				redelegationsSinceFeeReset = 1,
+			}, result)
+
 			-- setup expectations on gateway tables
 			targetGateway.delegates[testRedelegatorAddress] = {
 				delegatedStake = minDelegatedStake,
@@ -3797,18 +3782,10 @@ describe("gar", function()
 				vaults = {},
 			}
 			targetGateway.totalDelegatedStake = minDelegatedStake
-			sourceGateway.delegates = nil
-			sourceGateway.vaults = nil
-			targetGateway.delegates = nil
-			targetGateway.vaults = nil
+			sourceGateway.vaults = {}
 
-			assert.are.same({
-				sourceGateway = sourceGateway,
-				targetGateway = targetGateway,
-				redelegationFee = 0,
-				feeResetTimestamp = timestamp + sevenDays,
-				redelegationsSinceFeeReset = 1,
-			}, result)
+			assert.are.same(sourceGateway, _G.GatewayRegistry[testRedelegatorAddress])
+			assert.are.same(targetGateway, _G.GatewayRegistry[testTargetAddress])
 		end)
 
 		it("should not redelegate stake from when the quantity exceeds the balance of the vault", function()
@@ -3882,6 +3859,14 @@ describe("gar", function()
 				vaultId = "vault-1",
 			})
 
+			assert.are.same({
+				sourceAddress = testSourceAddress,
+				targetAddress = testTargetAddress,
+				redelegationFee = 0,
+				feeResetTimestamp = timestamp + sevenDays,
+				redelegationsSinceFeeReset = 1,
+			}, result)
+
 			-- setup expectations on gateway tables
 			sourceGateway.delegates[testRedelegatorAddress].vaults["vault-1"].balance = minDelegatedStake
 			targetGateway.delegates[testRedelegatorAddress] = {
@@ -3891,18 +3876,8 @@ describe("gar", function()
 			}
 			targetGateway.totalDelegatedStake = minDelegatedStake
 
-			sourceGateway.delegates = nil
-			sourceGateway.vaults = nil
-			targetGateway.delegates = nil
-			targetGateway.vaults = nil
-
-			assert.are.same({
-				sourceGateway = sourceGateway,
-				targetGateway = targetGateway,
-				redelegationFee = 0,
-				feeResetTimestamp = timestamp + sevenDays,
-				redelegationsSinceFeeReset = 1,
-			}, result)
+			assert.are.same(sourceGateway, _G.GatewayRegistry[testSourceAddress])
+			assert.are.same(targetGateway, _G.GatewayRegistry[testTargetAddress])
 		end)
 	end)
 
