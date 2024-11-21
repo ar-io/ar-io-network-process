@@ -1765,6 +1765,46 @@ describe("gar", function()
 			local gateways = gar.getGateways()
 			assert.equals(0, utils.lengthOfTable(gateways))
 		end)
+
+		it("should skip pruning when there is no known pruning work to do", function()
+			local currentTimestamp = 1000000
+			_G.NextGatewaysPruneTimestamp = currentTimestamp + 1
+			local msgId = "msgId"
+
+			-- Set up test gateways
+			_G.GatewayRegistry = {
+				["address2"] = {
+					startTimestamp = currentTimestamp - 100,
+					endTimestamp = currentTimestamp + 100, -- Not expired, failedConsecutiveEpochs is 20
+					status = "joined",
+					operatorStake = gar.getSettings().operators.minStake,
+					vaults = {},
+					delegates = {},
+					stats = {
+						failedConsecutiveEpochs = 20,
+					},
+					totalDelegatedStake = 0,
+					-- Other gateway properties...
+				},
+			}
+
+			-- Call pruneGateways
+			_G.Balances[ao.id] = _G.Balances[ao.id] or 0
+			local protocolBalanceBefore = _G.Balances[ao.id]
+			local result = gar.pruneGateways(currentTimestamp, msgId)
+			assert.are.same({
+				prunedGateways = {},
+				slashedGateways = {},
+				stakeSlashed = 0,
+				delegateStakeReturned = 0,
+				gatewayStakeReturned = 0,
+				delegateStakeWithdrawing = 0,
+				gatewayStakeWithdrawing = 0,
+			}, result)
+
+			assert.is_not_nil(_G.GatewayRegistry["address2"]) -- not changed
+			assert.are.equal(protocolBalanceBefore, _G.Balances[ao.id])
+		end)
 	end)
 
 	describe("cancelGatewayWithdrawal", function()
