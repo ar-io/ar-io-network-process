@@ -96,6 +96,9 @@ GatewayRegistrySettings = GatewayRegistrySettings
 		},
 	}
 
+--- @type Timestamp|nil
+NextGatewaysPruneTimestamp = NextGatewaysPruneTimestamp or 0
+
 --- @class JoinGatewaySettings
 --- @field allowDelegatedStaking boolean | nil
 --- @field allowedDelegates WalletAddress[] | nil
@@ -192,6 +195,7 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 			startTimestamp = currentTimestamp,
 			endTimestamp = gatewayEndTimestamp,
 		}
+		-- pruning scheduling for this vault is captured below
 
 		-- if there is more than the minimum staked tokens, we need to vault the rest but on shorter term
 		local remainingStake = gateway.operatorStake - gar.getSettings().operators.minStake
@@ -202,12 +206,14 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 				startTimestamp = currentTimestamp,
 				endTimestamp = gatewayStakeWithdrawTimestamp,
 			}
+			gar.scheduleNextGatewaysPruning(gatewayStakeWithdrawTimestamp)
 		end
 	end
 
 	gateway.status = "leaving"
 	gateway.endTimestamp = gatewayEndTimestamp
 	gateway.operatorStake = 0
+	gar.scheduleNextGatewaysPruning(gatewayEndTimestamp)
 
 	-- Add tokens from each delegate to a vault that unlocks after the delegate withdrawal period ends
 	for address, _ in pairs(gateway.delegates) do
@@ -304,6 +310,7 @@ function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWi
 			startTimestamp = currentTimestamp,
 			endTimestamp = currentTimestamp + gar.getSettings().operators.withdrawLengthMs,
 		}
+		gar.scheduleNextGatewaysPruning(gateway.vaults[msgId].endTimestamp)
 	end
 
 	-- Update the gateway
@@ -500,11 +507,13 @@ end
 --- @param startTimestamp number # the timestamp when the vault was created
 --- @return Vault # a vault with the specified balance, start timestamp, and computed end timestamp
 function gar.createDelegateVault(balance, startTimestamp)
-	return {
+	local vault = {
 		balance = balance,
 		startTimestamp = startTimestamp,
 		endTimestamp = startTimestamp + gar.getSettings().delegates.withdrawLengthMs,
 	}
+	gar.scheduleNextGatewaysPruning(vault.endTimestamp)
+	return vault
 end
 
 function gar.delegateStake(from, target, qty, currentTimestamp)
@@ -884,8 +893,6 @@ end
 --- @param msgId string The message ID
 --- @return PrunedGatewaysResult # The result containing the pruned gateways, slashed gateways, and other stats
 function gar.pruneGateways(currentTimestamp, msgId)
-	local gateways = gar.getGateways()
-	local garSettings = gar.getSettings()
 	local result = {
 		prunedGateways = {},
 		slashedGateways = {},
@@ -895,12 +902,23 @@ function gar.pruneGateways(currentTimestamp, msgId)
 		delegateStakeWithdrawing = 0,
 		stakeSlashed = 0,
 	}
-
-	if next(gateways) == nil then
+	if not NextGatewaysPruneTimestamp or currentTimestamp < NextGatewaysPruneTimestamp then
+		-- No known pruning work to do
 		return result
 	end
 
-	-- we take a deep copy so we can operate directly on the gateway object
+	-- we take a deep copy so we can operate directly on the gateway objects
+	local gateways = gar.getGateways()
+	local garSettings = gar.getSettings()
+
+	if next(gateways) == nil then
+		-- No pruning work to do going forward until next gateway joins
+		NextGatewaysPruneTimestamp = nil
+		return result
+	end
+
+	--- @type Timestamp|nil
+	local minNextEndTimestamp
 	for address, gateway in pairs(gateways) do
 		if gateway then
 			-- first, return any expired vaults regardless of the gateway status
@@ -909,6 +927,9 @@ function gar.pruneGateways(currentTimestamp, msgId)
 					balances.increaseBalance(address, vault.balance)
 					result.gatewayStakeReturned = result.gatewayStakeReturned + vault.balance
 					gateway.vaults[vaultId] = nil
+				else
+					-- find the next prune timestamp
+					minNextEndTimestamp = math.min(minNextEndTimestamp or vault.endTimestamp, vault.endTimestamp)
 				end
 			end
 			-- return any delegated vaults and return the stake to the delegate
@@ -918,6 +939,9 @@ function gar.pruneGateways(currentTimestamp, msgId)
 						balances.increaseBalance(delegateAddress, vault.balance)
 						result.delegateStakeReturned = result.delegateStakeReturned + vault.balance
 						delegate.vaults[vaultId] = nil
+					else
+						-- find the next prune timestamp
+						minNextEndTimestamp = math.min(minNextEndTimestamp or vault.endTimestamp, vault.endTimestamp)
 					end
 				end
 			end
@@ -952,10 +976,22 @@ function gar.pruneGateways(currentTimestamp, msgId)
 					-- if the timestamp is after gateway end timestamp, mark the gateway as nil
 					GatewayRegistry[address] = nil
 					table.insert(result.prunedGateways, address)
+				elseif gateway.endTimestamp ~= nil then
+					-- find the next prune timestamp
+					minNextEndTimestamp =
+						--- @diagnostic disable-next-line: param-type-mismatch
+						math.min(minNextEndTimestamp or gateway.endTimestamp, gateway.endTimestamp)
 				end
 			end
 		end
 	end
+
+	-- Reset the next pruning timestamp now that pruning has completed
+	NextGatewaysPruneTimestamp = nil
+	if minNextEndTimestamp then
+		gar.scheduleNextGatewaysPruning(minNextEndTimestamp)
+	end
+
 	return result
 end
 
@@ -1534,6 +1570,7 @@ function gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
 						startTimestamp = vault.startTimestamp,
 						endTimestamp = vault.endTimestamp,
 					}
+					gar.scheduleNextGatewaysPruning(vault.endTimestamp)
 					assert(acc[vaultId].balance > 0, "Vault balance should be greater than 0")
 				end
 				appliedPlan.totalFunded = appliedPlan.totalFunded + delegationPlan.vaults[vaultId]
@@ -1902,6 +1939,11 @@ function gar.getPaginatedVaultsForGateway(gatewayAddress, cursor, limit, sortBy,
 		sortBy or "startTimestamp",
 		sortOrder or "asc"
 	)
+end
+
+--- @param timestamp Timestamp
+function gar.scheduleNextGatewaysPruning(timestamp)
+	NextGatewaysPruneTimestamp = math.min(NextGatewaysPruneTimestamp or timestamp, timestamp)
 end
 
 return gar
