@@ -42,7 +42,7 @@ local CRITICAL = true
 local ActionMap = {
 	-- reads
 	Info = "Info",
-	TotalTokenSupply = "Total-Token-Supply",
+	TotalSupply = "Total-Supply",
 	State = "State",
 	Transfer = "Transfer",
 	Balance = "Balance",
@@ -119,17 +119,28 @@ LastKnownLockedSupply = LastKnownLockedSupply or 0 -- total vault balance across
 LastKnownStakedSupply = LastKnownStakedSupply or 0 -- total operator stake across all gateways
 LastKnownDelegatedSupply = LastKnownDelegatedSupply or 0 -- total delegated stake across all gateways
 LastKnownWithdrawSupply = LastKnownWithdrawSupply or 0 -- total withdraw supply across all gateways (gateways and delegates)
-LastKnownPnpRequestSupply = LastKnownPnpRequestSupply or 0 -- total supply stashed in outstanding Primary Name Protocol requests
 local function lastKnownTotalTokenSupply()
 	return LastKnownCirculatingSupply
 		+ LastKnownLockedSupply
 		+ LastKnownStakedSupply
 		+ LastKnownDelegatedSupply
 		+ LastKnownWithdrawSupply
-		+ LastKnownPnpRequestSupply
 		+ Balances[Protocol]
 end
 LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
+
+--- @alias Message table<string, any> -- an AO message TODO - update this type with the actual Message type
+
+--- @param msg Message
+--- @param response any
+local function Send(msg, response)
+	if msg.reply then
+		--- Reference: https://github.com/permaweb/aos/blob/main/blueprints/patch-legacy-reply.lua
+		msg.reply(response)
+	else
+		ao.send(response)
+	end
+end
 
 local function eventingPcall(ioEvent, onError, fnToCall, ...)
 	local status, result = pcall(fnToCall, ...)
@@ -252,7 +263,6 @@ local function addSupplyData(ioEvent, supplyData)
 	ioEvent:addField("Staked-Supply", supplyData.stakedSupply or LastKnownStakedSupply)
 	ioEvent:addField("Delegated-Supply", supplyData.delegatedSupply or LastKnownDelegatedSupply)
 	ioEvent:addField("Withdraw-Supply", supplyData.withdrawSupply or LastKnownWithdrawSupply)
-	ioEvent:addField("Request-Supply", supplyData.requestSupply or LastKnownPnpRequestSupply)
 	ioEvent:addField("Total-Token-Supply", supplyData.totalTokenSupply or lastKnownTotalTokenSupply())
 	ioEvent:addField("Protocol-Balance", Balances[Protocol])
 end
@@ -339,7 +349,7 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical)
 		-- global handler for all eventing errors, so we can log them and send a notice to the sender for non critical errors and discard the memory on critical errors
 		local status, resultOrError = eventingPcall(msg.ioEvent, function(error)
 			--- non critical errors will send an invalid notice back to the caller with the error information, memory is not discarded
-			ao.send({
+			Send(msg, {
 				Target = msg.From,
 				Action = "Invalid-" .. handlerName .. "-Notice",
 				Error = tostring(error),
@@ -377,7 +387,6 @@ end, function(msg)
 		lastKnownStakedSupply = LastKnownStakedSupply,
 		lastKnownDelegatedSupply = LastKnownDelegatedSupply,
 		lastKnownWithdrawSupply = LastKnownWithdrawSupply,
-		lastKnownRequestSupply = LastKnownPnpRequestSupply,
 		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
 	}
 
@@ -493,7 +502,6 @@ end, function(msg)
 		or LastKnownStakedSupply ~= previousStateSupplies.lastKnownStakedSupply
 		or LastKnownDelegatedSupply ~= previousStateSupplies.lastKnownDelegatedSupply
 		or LastKnownWithdrawSupply ~= previousStateSupplies.lastKnownWithdrawSupply
-		or LastKnownPnpRequestSupply ~= previousStateSupplies.lastKnownRequestSupply
 		or Balances[Protocol] ~= previousStateSupplies.protocolBalance
 		or lastKnownTotalTokenSupply() ~= previousStateSupplies.lastKnownTotalSupply
 	then
@@ -559,8 +567,8 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 		end
 
 		-- Send Debit-Notice and Credit-Notice
-		ao.send(debitNotice)
-		ao.send(creditNotice)
+		Send(msg, debitNotice)
+		Send(msg, creditNotice)
 	end
 end)
 
@@ -591,7 +599,7 @@ addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionM
 	LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
 	addSupplyData(msg.ioEvent)
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = {
 			Action = ActionMap.CreateVault .. "-Notice",
@@ -634,7 +642,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 	addSupplyData(msg.ioEvent)
 
 	-- sender gets an immediate debit notice as the quantity is debited from their balance
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Recipient = recipient,
 		Quantity = quantity,
@@ -642,7 +650,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 		Data = json.encode(vault),
 	})
 	-- to the receiver, they get a vault notice
-	ao.send({
+	Send(msg, {
 		Target = recipient,
 		Quantity = quantity,
 		Sender = msg.From,
@@ -675,7 +683,7 @@ addEventingHandler(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionM
 		msg.ioEvent:addField("Vault-Prev-End-Timestamp", vault.endTimestamp - extendLengthMs)
 	end
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.ExtendVault .. "-Notice" },
 		Data = json.encode(vault),
@@ -702,7 +710,7 @@ addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", Actio
 	LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
 	addSupplyData(msg.ioEvent)
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.IncreaseVault .. "-Notice" },
 		Data = json.encode(vault),
@@ -743,7 +751,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
 
 	-- TODO: Send back fundingPlan and fundingResult as well?
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.BuyRecord .. "-Notice", Name = name },
 		Data = json.encode(fundFrom and result or {
@@ -774,7 +782,7 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 		addSupplyData(msg.ioEvent)
 	end
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.UpgradeName .. "-Notice", Name = name },
 		Data = json.encode(fundFrom and result or {
@@ -810,7 +818,7 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 		recordResult = result.record
 	end
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.ExtendLease .. "-Notice", Name = string.lower(msg.Tags.Name) },
 		Data = json.encode(fundFrom and result or recordResult),
@@ -843,7 +851,7 @@ addEventingHandler(
 			addSupplyData(msg.ioEvent)
 		end
 
-		ao.send({
+		Send(msg, {
 			Target = msg.From,
 			Tags = {
 				Action = ActionMap.IncreaseUndernameLimit .. "-Notice",
@@ -901,7 +909,7 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 	local tokenCostResult = arns.getTokenCost(intendedAction)
 	local tokenCost = tokenCostResult.tokenCost
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.TokenCost .. "-Notice", ["Token-Cost"] = tostring(tokenCost) },
 		Data = json.encode(tokenCost),
@@ -932,7 +940,7 @@ addEventingHandler(ActionMap.CostDetails, utils.hasMatchingTag("Action", ActionM
 		return
 	end
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.CostDetails .. "-Notice" },
 		Data = json.encode(tokenCostAndFundingPlan),
@@ -945,7 +953,7 @@ addEventingHandler(
 	function(msg)
 		local priceList = arns.getRegistrationFees()
 
-		ao.send({
+		Send(msg, {
 			Target = msg.From,
 			Tags = { Action = ActionMap.GetRegistrationFees .. "-Notice" },
 			Data = json.encode(priceList),
@@ -997,7 +1005,7 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 	LastKnownStakedSupply = LastKnownStakedSupply + stake
 	addSupplyData(msg.ioEvent)
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.JoinNetwork .. "-Notice" },
 		Data = json.encode(gateway),
@@ -1056,7 +1064,7 @@ addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", Action
 	LastKnownWithdrawSupply = LastKnownWithdrawSupply + gwPrevStake + gwPrevTotalDelegatedStake
 	addSupplyData(msg.ioEvent)
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.LeaveNetwork .. "-Notice" },
 		Data = json.encode(gateway),
@@ -1086,7 +1094,7 @@ addEventingHandler(
 		LastKnownStakedSupply = LastKnownStakedSupply + quantity
 		addSupplyData(msg.ioEvent)
 
-		ao.send({
+		Send(msg, {
 			Target = msg.From,
 			Tags = { Action = ActionMap.IncreaseOperatorStake .. "-Notice" },
 			Data = json.encode(gateway),
@@ -1149,7 +1157,7 @@ addEventingHandler(
 		LastKnownWithdrawSupply = LastKnownWithdrawSupply + quantity
 		addSupplyData(msg.ioEvent)
 
-		ao.send({
+		Send(msg, {
 			Target = msg.From,
 			Tags = {
 				Action = ActionMap.DecreaseOperatorStake .. "-Notice",
@@ -1188,7 +1196,7 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 	LastKnownDelegatedSupply = LastKnownDelegatedSupply + quantity
 	addSupplyData(msg.ioEvent)
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.DelegateStake .. "-Notice", Gateway = msg.Tags.Target },
 		Data = json.encode(delegateResult),
@@ -1225,7 +1233,7 @@ addEventingHandler(ActionMap.CancelWithdrawal, utils.hasMatchingTag("Action", Ac
 		addSupplyData(msg.ioEvent)
 	end
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = {
 			Action = ActionMap.CancelWithdrawal .. "-Notice",
@@ -1262,7 +1270,7 @@ addEventingHandler(
 			LastKnownCirculatingSupply = LastKnownCirculatingSupply + result.amountWithdrawn
 			LastKnownWithdrawSupply = LastKnownWithdrawSupply - result.amountWithdrawn - result.expeditedWithdrawalFee
 			addSupplyData(msg.ioEvent)
-			ao.send({
+			Send(msg, {
 				Target = msg.From,
 				Tags = {
 					Action = ActionMap.InstantWithdrawal .. "-Notice",
@@ -1339,7 +1347,7 @@ addEventingHandler(
 		LastKnownCirculatingSupply = LastKnownCirculatingSupply + decreaseDelegateStakeResult.amountWithdrawn
 		addSupplyData(msg.ioEvent)
 
-		ao.send({
+		Send(msg, {
 			Target = msg.From,
 			Tags = {
 				Action = ActionMap.DecreaseDelegateStake .. "-Notice",
@@ -1405,7 +1413,7 @@ addEventingHandler(
 		local timestamp = msg.Timestamp
 		local result =
 			gar.updateGatewaySettings(msg.From, updatedSettings, updatedServices, observerAddress, timestamp, msg.Id)
-		ao.send({
+		Send(msg, {
 			Target = msg.From,
 			Tags = { Action = ActionMap.UpdateGatewaySettings .. "-Notice" },
 			Data = json.encode(result),
@@ -1427,7 +1435,7 @@ addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", Action
 
 	local reassignment = arns.reassignName(name, msg.From, timestamp, newProcessId)
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = ActionMap.ReassignName .. "-Notice",
 		Name = name,
@@ -1435,7 +1443,7 @@ addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", Action
 	})
 
 	if initiator ~= nil then
-		ao.send({
+		Send(msg, {
 			Target = initiator,
 			Action = ActionMap.ReassignName .. "-Notice",
 			Name = name,
@@ -1466,7 +1474,7 @@ addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", Ac
 		end
 	end
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = ActionMap.SaveObservations .. "-Notice",
 		Data = json.encode(observations),
@@ -1476,7 +1484,7 @@ end)
 addEventingHandler(ActionMap.EpochSettings, utils.hasMatchingTag("Action", ActionMap.EpochSettings), function(msg)
 	local epochSettings = epochs.getSettings()
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = ActionMap.EpochSettings .. "-Notice",
 		Data = json.encode(epochSettings),
@@ -1488,7 +1496,7 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", ActionMap.DemandFactorSettings),
 	function(msg)
 		local demandFactorSettings = demand.getSettings()
-		ao.send({
+		Send(msg, {
 			Target = msg.From,
 			Action = ActionMap.DemandFactorSettings .. "-Notice",
 			Data = json.encode(demandFactorSettings),
@@ -1501,7 +1509,7 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", ActionMap.GatewayRegistrySettings),
 	function(msg)
 		local gatewayRegistrySettings = gar.getSettings()
-		ao.send({
+		Send(msg, {
 			Target = msg.From,
 			Action = ActionMap.GatewayRegistrySettings .. "-Notice",
 			Data = json.encode(gatewayRegistrySettings),
@@ -1509,7 +1517,9 @@ addEventingHandler(
 	end
 )
 
-addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.TotalTokenSupply), function(msg)
+addEventingHandler("totalTokenSupply", function(msg)
+	return msg.Action == "Total-Token-Supply" or msg.Action == ActionMap.TotalSupply -- TODO: remove this once we migrate all downstream apps to the new tag
+end, function(msg)
 	-- add all the balances
 	local totalSupply = 0
 	local circulatingSupply = 0
@@ -1517,7 +1527,6 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.
 	local stakedSupply = 0
 	local delegatedSupply = 0
 	local withdrawSupply = 0
-	local pnpRequestSupply = 0
 	local protocolBalance = balances.getBalance(Protocol)
 	local userBalances = balances.getBalances()
 
@@ -1557,27 +1566,21 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.
 		end
 	end
 
-	-- pnp requests
-	for _, pnpRequest in pairs(primaryNames.getUnsafePrimaryNameRequests()) do
-		pnpRequestSupply = pnpRequestSupply + pnpRequest.balance
-	end
-
 	LastKnownCirculatingSupply = circulatingSupply
 	LastKnownLockedSupply = lockedSupply
 	LastKnownStakedSupply = stakedSupply
 	LastKnownDelegatedSupply = delegatedSupply
 	LastKnownWithdrawSupply = withdrawSupply
-	LastKnownPnpRequestSupply = pnpRequestSupply
 
 	addSupplyData(msg.ioEvent, {
 		totalTokenSupply = totalSupply,
 	})
 	msg.ioEvent:addField("Last-Known-Total-Token-Supply", lastKnownTotalTokenSupply())
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
-		Action = ActionMap.TotalTokenSupply .. "-Notice",
-		["Total-Token-Supply"] = tostring(totalSupply),
+		Action = ActionMap.TotalSupply .. "-Notice",
+		["Total-Supply"] = tostring(totalSupply),
 		["Circulating-Supply"] = tostring(circulatingSupply),
 		["Locked-Supply"] = tostring(lockedSupply),
 		["Staked-Supply"] = tostring(stakedSupply),
@@ -1617,7 +1620,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	-- if epoch index is -1 then we are before the genesis epoch and we should not tick
 	if targetCurrentEpochIndex < 0 then
 		-- do nothing and just send a notice back to the sender
-		ao.send({
+		Send(msg, {
 			Target = msg.From,
 			Action = "Tick-Notice",
 			LastTickedEpochIndex = LastTickedEpochIndex,
@@ -1648,7 +1651,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 			LastTickedEpochIndex = i
 			table.insert(tickedEpochIndexes, i)
 		end
-		ao.send({
+		Send(msg, {
 			Target = msg.From,
 			Action = "Tick-Notice",
 			LastTickedEpochIndex = LastTickedEpochIndex,
@@ -1738,7 +1741,7 @@ addEventingHandler(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", Actio
 		table.insert(handlerNames, handler.name)
 	end
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = "Info-Notice",
 		Tags = {
@@ -1764,7 +1767,7 @@ end)
 
 addEventingHandler(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", ActionMap.Gateway), function(msg)
 	local gateway = gar.getCompactGateway(msg.Tags.Address or msg.From)
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = "Gateway-Notice",
 		Gateway = msg.Tags.Address or msg.From,
@@ -1774,7 +1777,7 @@ end)
 
 --- TODO: we want to remove this but need to ensure we don't break downstream apps
 addEventingHandler(ActionMap.Balances, Handlers.utils.hasMatchingTag("Action", ActionMap.Balances), function(msg)
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = "Balances-Notice",
 		Data = json.encode(Balances),
@@ -1786,7 +1789,7 @@ addEventingHandler(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", Ac
 	local balance = balances.getBalance(target)
 
 	-- must adhere to token.lua spec for arconnect compatibility
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = "Balance-Notice",
 		Data = balance,
@@ -1798,7 +1801,7 @@ end)
 
 addEventingHandler(ActionMap.DemandFactor, utils.hasMatchingTag("Action", ActionMap.DemandFactor), function(msg)
 	local demandFactor = demand.getDemandFactor()
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = "Demand-Factor-Notice",
 		Data = json.encode(demandFactor),
@@ -1807,7 +1810,7 @@ end)
 
 addEventingHandler(ActionMap.DemandFactorInfo, utils.hasMatchingTag("Action", ActionMap.DemandFactorInfo), function(msg)
 	local result = demand.getDemandFactorInfo()
-	ao.send({ Target = msg.From, Action = "Demand-Factor-Info-Notice", Data = json.encode(result) })
+	Send(msg, { Target = msg.From, Action = "Demand-Factor-Info-Notice", Data = json.encode(result) })
 end)
 
 addEventingHandler(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Record), function(msg)
@@ -1829,7 +1832,7 @@ addEventingHandler(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Re
 	end
 
 	-- Send Record-Notice
-	ao.send(recordNotice)
+	Send(msg, recordNotice)
 end)
 
 addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
@@ -1841,13 +1844,13 @@ addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epo
 
 	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
 	local epoch = epochs.getEpoch(epochIndex)
-	ao.send({ Target = msg.From, Action = "Epoch-Notice", Data = json.encode(epoch) })
+	Send(msg, { Target = msg.From, Action = "Epoch-Notice", Data = json.encode(epoch) })
 end)
 
 addEventingHandler(ActionMap.Epochs, utils.hasMatchingTag("Action", ActionMap.Epochs), function(msg)
 	local allEpochs = epochs.getEpochs()
 
-	ao.send({ Target = msg.From, Action = "Epochs-Notice", Data = json.encode(allEpochs) })
+	Send(msg, { Target = msg.From, Action = "Epochs-Notice", Data = json.encode(allEpochs) })
 end)
 
 addEventingHandler(
@@ -1862,7 +1865,7 @@ addEventingHandler(
 
 		local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
 		local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
-		ao.send({
+		Send(msg, {
 			Target = msg.From,
 			Action = "Prescribed-Observers-Notice",
 			Data = json.encode(prescribedObservers),
@@ -1878,7 +1881,7 @@ addEventingHandler(ActionMap.Observations, utils.hasMatchingTag("Action", Action
 
 	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
 	local observations = epochs.getObservationsForEpoch(epochIndex)
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = "Observations-Notice",
 		EpochIndex = tostring(epochIndex),
@@ -1895,7 +1898,7 @@ addEventingHandler(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", Act
 
 	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
 	local prescribedNames = epochs.getPrescribedNamesForEpoch(epochIndex)
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = "Prescribed-Names-Notice",
 		Data = json.encode(prescribedNames),
@@ -1911,7 +1914,7 @@ addEventingHandler(ActionMap.Distributions, utils.hasMatchingTag("Action", Actio
 
 	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
 	local distributions = epochs.getDistributionsForEpoch(epochIndex)
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = "Distributions-Notice",
 		Data = json.encode(distributions),
@@ -1921,14 +1924,14 @@ end)
 addEventingHandler("paginatedReservedNames", utils.hasMatchingTag("Action", ActionMap.ReservedNames), function(msg)
 	local page = utils.parsePaginationTags(msg)
 	local reservedNames = arns.getPaginatedReservedNames(page.cursor, page.limit, page.sortBy or "name", page.sortOrder)
-	ao.send({ Target = msg.From, Action = "Reserved-Names-Notice", Data = json.encode(reservedNames) })
+	Send(msg, { Target = msg.From, Action = "Reserved-Names-Notice", Data = json.encode(reservedNames) })
 end)
 
 addEventingHandler(ActionMap.ReservedName, utils.hasMatchingTag("Action", ActionMap.ReservedName), function(msg)
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name)
 	assert(name, "Name is required")
 	local reservedName = arns.getReservedName(name)
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = "Reserved-Name-Notice",
 		ReservedName = msg.Tags.Name,
@@ -1941,7 +1944,7 @@ addEventingHandler(ActionMap.Vault, utils.hasMatchingTag("Action", ActionMap.Vau
 	local vaultId = msg.Tags["Vault-Id"]
 	local vault = vaults.getVault(address, vaultId)
 	assert(vault, "Vault not found")
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = "Vault-Notice",
 		Address = address,
@@ -1952,61 +1955,52 @@ end)
 
 -- Pagination handlers
 
-addEventingHandler(
-	"paginatedRecords",
-	utils.hasMatchingTag("Action", "Paginated-Records") or utils.hasMatchingTag("Action", ActionMap.Records),
-	function(msg)
-		local page = utils.parsePaginationTags(msg)
-		local result =
-			arns.getPaginatedRecords(page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
-		ao.send({ Target = msg.From, Action = "Records-Notice", Data = json.encode(result) })
-	end
-)
+addEventingHandler("paginatedRecords", function(msg)
+	return msg.Action == "Paginated-Records" or msg.Action == ActionMap.Records
+end, function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local result = arns.getPaginatedRecords(page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
+	Send(msg, { Target = msg.From, Action = "Records-Notice", Data = json.encode(result) })
+end)
 
-addEventingHandler(
-	"paginatedGateways",
-	utils.hasMatchingTag("Action", "Paginated-Gateways") or utils.hasMatchingTag("Action", ActionMap.Gateways),
-	function(msg)
-		local page = utils.parsePaginationTags(msg)
-		local result =
-			gar.getPaginatedGateways(page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder or "desc")
-		ao.send({ Target = msg.From, Action = "Gateways-Notice", Data = json.encode(result) })
-	end
-)
+addEventingHandler("paginatedGateways", function(msg)
+	return msg.Action == "Paginated-Gateways" or msg.Action == ActionMap.Gateways
+end, function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local result =
+		gar.getPaginatedGateways(page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder or "desc")
+	Send(msg, { Target = msg.From, Action = "Gateways-Notice", Data = json.encode(result) })
+end)
 
 --- TODO: make this support `Balances` requests
 addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginated-Balances"), function(msg)
 	local page = utils.parsePaginationTags(msg)
 	local walletBalances =
 		balances.getPaginatedBalances(page.cursor, page.limit, page.sortBy or "balance", page.sortOrder)
-	ao.send({ Target = msg.From, Action = "Balances-Notice", Data = json.encode(walletBalances) })
+	Send(msg, { Target = msg.From, Action = "Balances-Notice", Data = json.encode(walletBalances) })
 end)
 
-addEventingHandler(
-	"paginatedVaults",
-	utils.hasMatchingTag("Action", "Paginated-Vaults") or utils.hasMatchingTag("Action", ActionMap.Vaults),
-	function(msg)
-		local page = utils.parsePaginationTags(msg)
-		local pageVaults = vaults.getPaginatedVaults(page.cursor, page.limit, page.sortOrder, page.sortBy)
-		ao.send({ Target = msg.From, Action = "Vaults-Notice", Data = json.encode(pageVaults) })
-	end
-)
+addEventingHandler("paginatedVaults", function(msg)
+	return msg.Action == "Paginated-Vaults" or msg.Action == ActionMap.Vaults
+end, function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local pageVaults = vaults.getPaginatedVaults(page.cursor, page.limit, page.sortOrder, page.sortBy)
+	Send(msg, { Target = msg.From, Action = "Vaults-Notice", Data = json.encode(pageVaults) })
+end)
 
-addEventingHandler(
-	"paginatedDelegates",
-	utils.hasMatchingTag("Action", "Paginated-Delegates") or utils.hasMatchingTag("Action", ActionMap.Delegates),
-	function(msg)
-		local page = utils.parsePaginationTags(msg)
-		local result = gar.getPaginatedDelegates(
-			msg.Tags.Address or msg.From,
-			page.cursor,
-			page.limit,
-			page.sortBy or "startTimestamp",
-			page.sortOrder
-		)
-		ao.send({ Target = msg.From, Action = "Delegates-Notice", Data = json.encode(result) })
-	end
-)
+addEventingHandler("paginatedDelegates", function(msg)
+	return msg.Action == "Paginated-Delegates" or msg.Action == ActionMap.Delegates
+end, function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local result = gar.getPaginatedDelegates(
+		msg.Tags.Address or msg.From,
+		page.cursor,
+		page.limit,
+		page.sortBy or "startTimestamp",
+		page.sortOrder
+	)
+	Send(msg, { Target = msg.From, Action = "Delegates-Notice", Data = json.encode(result) })
+end)
 
 addEventingHandler(
 	"paginatedAllowedDelegates",
@@ -2015,7 +2009,7 @@ addEventingHandler(
 		local page = utils.parsePaginationTags(msg)
 		local result =
 			gar.getPaginatedAllowedDelegates(msg.Tags.Address or msg.From, page.cursor, page.limit, page.sortOrder)
-		ao.send({ Target = msg.From, Action = "Allowed-Delegates-Notice", Data = json.encode(result) })
+		Send(msg, { Target = msg.From, Action = "Allowed-Delegates-Notice", Data = json.encode(result) })
 	end
 )
 
@@ -2074,13 +2068,13 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	}
 
 	-- send to the initiator and the process that released the name
-	ao.send({
+	Send(msg, {
 		Target = initiator,
 		Action = "Auction-Notice",
 		Name = name,
 		Data = json.encode(auction),
 	})
-	ao.send({
+	Send(msg, {
 		Target = processId,
 		Action = "Auction-Notice",
 		Name = name,
@@ -2114,7 +2108,7 @@ addEventingHandler("auctions", utils.hasMatchingTag("Action", ActionMap.Auctions
 		page.sortBy or "endTimestamp",
 		page.sortOrder or "asc"
 	)
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = ActionMap.Auctions .. "-Notice",
 		Data = json.encode(paginatedAuctions),
@@ -2127,7 +2121,7 @@ addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.Aucti
 
 	assert(auction, "Auction not found")
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = ActionMap.AuctionInfo .. "-Notice",
 		Data = json.encode({
@@ -2182,7 +2176,7 @@ addEventingHandler("auctionPrices", utils.hasMatchingTag("Action", ActionMap.Auc
 		jsonPrices[tostring(k)] = v
 	end
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = ActionMap.AuctionPrices .. "-Notice",
 		Data = json.encode({
@@ -2246,7 +2240,7 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 		msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
 		msg.ioEvent:addField("Auctions-Count", utils.lengthOfTable(NameRegistry.auctions))
 		-- send buy record notice and auction close notice
-		ao.send({
+		Send(msg, {
 			Target = result.bidder,
 			Action = ActionMap.BuyRecord .. "-Notice",
 			Data = json.encode({
@@ -2262,7 +2256,7 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 			}),
 		})
 
-		ao.send({
+		Send(msg, {
 			Target = result.auction.initiator,
 			Action = "Debit-Notice",
 			Quantity = tostring(result.rewardForInitiator),
@@ -2295,7 +2289,7 @@ addEventingHandler("allowDelegates", utils.hasMatchingTag("Action", ActionMap.Al
 		)
 	end
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.AllowDelegates .. "-Notice" },
 		Data = json.encode(result and result.newAllowedDelegates or {}),
@@ -2319,7 +2313,7 @@ addEventingHandler("disallowDelegates", utils.hasMatchingTag("Action", ActionMap
 		)
 	end
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.DisallowDelegates .. "-Notice" },
 		Data = json.encode(result and result.removedDelegates or {}),
@@ -2333,7 +2327,7 @@ addEventingHandler("paginatedDelegations", utils.hasMatchingTag("Action", "Pagin
 	assert(utils.isValidAOAddress(address), "Invalid address.")
 
 	local result = gar.getPaginatedDelegations(address, page.cursor, page.limit, page.sortBy, page.sortOrder)
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.Delegations .. "-Notice" },
 		Data = json.encode(result),
@@ -2392,7 +2386,7 @@ addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", Act
 	LastKnownCirculatingSupply = LastKnownCirculatingSupply - redelegationResult.redelegationFee
 	addSupplyData(msg.ioEvent)
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.RedelegateStake .. "-Notice", Gateway = msg.Tags.Target },
 		Data = json.encode(redelegationResult),
@@ -2403,7 +2397,7 @@ addEventingHandler(ActionMap.RedelegationFee, utils.hasMatchingTag("Action", Act
 	local delegateAddress = msg.Tags.Address or msg.From
 	assert(utils.isValidAOAddress(delegateAddress), "Invalid delegator address")
 	local feeResult = gar.getRedelegationFee(delegateAddress, msg.Timestamp)
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.RedelegationFee .. "-Notice" },
 		Data = json.encode(feeResult),
@@ -2418,7 +2412,7 @@ addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap
 
 	local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNames(names, msg.From)
 
-	ao.send({
+	Send(msg, {
 		Target = msg.From,
 		Action = ActionMap.RemovePrimaryNames .. "-Notice",
 		Data = json.encode(removedPrimaryNamesAndOwners),
@@ -2427,7 +2421,7 @@ addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap
 	-- TODO: send messages to the recipients of the claims? we could index on unique recipients and send one per recipient to avoid multiple messages
 	-- OR ANTS are responsible for sending messages to the recipients of the claims
 	for _, removedPrimaryNameAndOwner in pairs(removedPrimaryNamesAndOwners) do
-		ao.send({
+		Send(msg, {
 			Target = removedPrimaryNameAndOwner.owner,
 			Action = ActionMap.RemovePrimaryNames .. "-Notice",
 			Tags = { Name = removedPrimaryNameAndOwner.name },
@@ -2452,7 +2446,7 @@ addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMa
 
 	--- if the from is the new owner, then send an approved notice to the from
 	if primaryNameResult.newPrimaryName then
-		ao.send({
+		Send(msg, {
 			Target = msg.From,
 			Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
 			Data = json.encode(primaryNameResult),
@@ -2462,12 +2456,12 @@ addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMa
 
 	if primaryNameResult.request then
 		--- send a notice to the msg.From, and the base name owner
-		ao.send({
+		Send(msg, {
 			Target = msg.From,
 			Action = ActionMap.PrimaryNameRequest .. "-Notice",
 			Data = json.encode(primaryNameResult),
 		})
-		ao.send({
+		Send(msg, {
 			Target = primaryNameResult.baseNameOwner,
 			Action = ActionMap.PrimaryNameRequest .. "-Notice",
 			Data = json.encode(primaryNameResult),
@@ -2490,13 +2484,13 @@ addEventingHandler(
 		local approvedPrimaryNameResult = primaryNames.approvePrimaryNameRequest(recipient, name, msg.From, timestamp)
 
 		--- send a notice to the from
-		ao.send({
+		Send(msg, {
 			Target = msg.From,
 			Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
 			Data = json.encode(approvedPrimaryNameResult),
 		})
 		--- send a notice to the owner
-		ao.send({
+		Send(msg, {
 			Target = approvedPrimaryNameResult.newPrimaryName.owner,
 			Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
 			Data = json.encode(approvedPrimaryNameResult),
@@ -2511,7 +2505,7 @@ addEventingHandler("getPrimaryNameData", utils.hasMatchingTag("Action", ActionMa
 	local primaryNameData = name and primaryNames.getPrimaryNameDataWithOwnerFromName(name)
 		or address and primaryNames.getPrimaryNameDataWithOwnerFromAddress(address)
 	assert(primaryNameData, "Primary name data not found")
-	return ao.send({
+	return Send(msg, {
 		Target = msg.From,
 		Action = ActionMap.PrimaryName .. "-Notice",
 		Tags = { Owner = primaryNameData.owner, Name = primaryNameData.name },
@@ -2530,7 +2524,7 @@ addEventingHandler(
 			page.sortBy or "startTimestamp",
 			page.sortOrder or "asc"
 		)
-		return ao.send({
+		return Send(msg, {
 			Target = msg.From,
 			Action = ActionMap.PrimaryNameRequests .. "-Notice",
 			Data = json.encode(result),
@@ -2543,7 +2537,7 @@ addEventingHandler("getPaginatedPrimaryNames", utils.hasMatchingTag("Action", Ac
 	local result =
 		primaryNames.getPaginatedPrimaryNames(page.cursor, page.limit, page.sortBy or "name", page.sortOrder or "asc")
 
-	return ao.send({
+	return Send(msg, {
 		Target = msg.From,
 		Action = ActionMap.PrimaryNames .. "-Notice",
 		Data = json.encode(result),
@@ -2564,7 +2558,7 @@ addEventingHandler(
 			page.sortBy or "endTimestamp",
 			page.sortOrder or "desc"
 		)
-		return ao.send({
+		return Send(msg, {
 			Target = msg.From,
 			Action = "Gateway-Vaults-Notice",
 			Data = json.encode(result),
