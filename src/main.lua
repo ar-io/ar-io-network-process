@@ -134,9 +134,9 @@ LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
 --- @param msg Message
 --- @param response any
 local function Send(msg, response)
-	if msg.Reply then
+	if msg.reply then
 		--- Reference: https://github.com/permaweb/aos/blob/main/blueprints/patch-legacy-reply.lua
-		msg.Reply(response)
+		msg.reply(response)
 	else
 		ao.send(response)
 	end
