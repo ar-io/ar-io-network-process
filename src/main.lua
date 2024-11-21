@@ -523,7 +523,7 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 	-- assert recipient is a valid arweave address
 	local recipient = msg.Tags.Recipient
 	local quantity = msg.Tags.Quantity
-	local allowUnsafeAddresses = msg.Tags["Allow-Unsafe-Addresses"]
+	local allowUnsafeAddresses = msg.Tags["Allow-Unsafe-Addresses"] or false
 	assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
 	assert(quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
 	assert(recipient ~= msg.From, "Cannot transfer to self")
@@ -625,7 +625,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 	local lockLengthMs = msg.Tags["Lock-Length"]
 	local timestamp = msg.Timestamp
 	local msgId = msg.Id
-	local allowUnsafeAddresses = msg.Tags["Allow-Unsafe-Addresses"]
+	local allowUnsafeAddresses = msg.Tags["Allow-Unsafe-Addresses"] or false
 	assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
 	assert(
 		lockLengthMs and lockLengthMs > 0 and utils.isInteger(lockLengthMs),
@@ -678,7 +678,7 @@ addEventingHandler(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionM
 	local vaultId = msg.Tags["Vault-Id"]
 	local timestamp = msg.Timestamp
 	local extendLengthMs = msg.Tags["Extend-Length"]
-	assert(utils.isValidAddress(vaultId), "Invalid vault id")
+	assert(utils.isValidAddress(vaultId, true), "Invalid vault id")
 	assert(
 		extendLengthMs and extendLengthMs > 0 and utils.isInteger(extendLengthMs),
 		"Invalid extension length. Must be integer greater than 0"
@@ -705,7 +705,7 @@ end)
 addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.IncreaseVault), function(msg)
 	local vaultId = msg.Tags["Vault-Id"]
 	local quantity = msg.Tags.Quantity
-	assert(utils.isValidAddress(vaultId), "Invalid vault id")
+	assert(utils.isValidAddress(vaultId, true), "Invalid vault id")
 	assert(quantity and quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
 
 	local vault = vaults.increaseVault(msg.From, quantity, vaultId, msg.Timestamp)
@@ -742,7 +742,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	)
 	assert(timestamp, "Timestamp is required for a tick interaction")
 	arns.assertValidArNSName(name)
-	assert(utils.isValidAddress(processId), "Process Id must be a valid address.")
+	assert(utils.isValidAddress(processId, true), "Process Id must be a valid address.")
 	if years then
 		assert(years >= 1 and years <= 5 and utils.isInteger(years), "Invalid years. Must be integer between 1 and 5")
 	end
@@ -1184,7 +1184,7 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 	local gatewayTarget = msg.Tags.Target or msg.Tags.Address
 	local quantity = msg.Tags.Quantity
 	local timestamp = msg.Timestamp
-	assert(utils.isValidAddress(gatewayTarget), "Invalid gateway address")
+	assert(utils.isValidAddress(gatewayTarget, true), "Invalid gateway address")
 	assert(
 		msg.Tags.Quantity and msg.Tags.Quantity > 0 and utils.isInteger(msg.Tags.Quantity),
 		"Invalid quantity. Must be integer greater than 0"
@@ -1216,8 +1216,8 @@ end)
 addEventingHandler(ActionMap.CancelWithdrawal, utils.hasMatchingTag("Action", ActionMap.CancelWithdrawal), function(msg)
 	local gatewayAddress = msg.Tags.Target or msg.Tags.Address or msg.From
 	local vaultId = msg.Tags["Vault-Id"]
-	assert(utils.isValidAddress(gatewayAddress), "Invalid gateway address")
-	assert(utils.isValidAddress(vaultId), "Invalid vault id")
+	assert(utils.isValidAddress(gatewayAddress, true), "Invalid gateway address")
+	assert(utils.isValidAddress(vaultId, true), "Invalid vault id")
 
 	msg.ioEvent:addField("Target-Formatted", gatewayAddress)
 
@@ -1262,9 +1262,8 @@ addEventingHandler(
 		local vaultId = msg.Tags["Vault-Id"]
 		local timestamp = msg.Timestamp
 		msg.ioEvent:addField("Target-Formatted", target)
-
-		assert(utils.isValidAddress(target), "Invalid gateway address")
-		assert(utils.isValidAddress(vaultId), "Invalid vault id")
+		assert(utils.isValidAddress(target, true), "Invalid gateway address")
+		assert(utils.isValidAddress(vaultId, true), "Invalid vault id")
 		assert(timestamp, "Timestamp is required")
 
 		local result = gar.instantGatewayWithdrawal(msg.From, target, vaultId, timestamp)
@@ -1437,10 +1436,10 @@ addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", Action
 	local initiator = msg.Tags.Initiator
 	local timestamp = msg.Timestamp
 	assert(name and #name > 0, "Name is required")
-	assert(utils.isValidAddress(newProcessId), "Process Id must be a valid address.")
+	assert(utils.isValidAddress(newProcessId, true), "Process Id must be a valid address.")
 	assert(timestamp, "Timestamp is required")
 	if initiator ~= nil then
-		assert(utils.isValidAddress(initiator), "Invalid initiator address.")
+		assert(utils.isValidAddress(initiator, true), "Invalid initiator address.")
 	end
 
 	local reassignment = arns.reassignName(name, msg.From, timestamp, newProcessId)
@@ -1467,9 +1466,9 @@ addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", Ac
 	local reportTxId = msg.Tags["Report-Tx-Id"]
 	local failedGateways = utils.splitAndTrimString(msg.Tags["Failed-Gateways"], ",")
 	local timestamp = msg.Timestamp
-	assert(utils.isValidAddress(reportTxId), "Invalid report tx id")
+	assert(utils.isValidArweaveAddress(reportTxId), "Invalid report tx id. Must be a valid Arweave address.")
 	for _, gateway in ipairs(failedGateways) do
-		assert(utils.isValidAddress(gateway), "Invalid failed gateway address: " .. gateway)
+		assert(utils.isValidAddress(gateway, true), "Invalid failed gateway address: " .. gateway)
 	end
 
 	local observations = epochs.saveObservations(msg.From, reportTxId, failedGateways, timestamp)
@@ -2035,8 +2034,8 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	local timestamp = msg.Timestamp
 
 	assert(name and #name > 0, "Name is required") --- this could be an undername, so we don't want to assertValidArNSName
-	assert(processId and utils.isValidAddress(processId), "Process-Id must be a valid address")
-	assert(initiator and utils.isValidAddress(initiator), "Initiator is required")
+	assert(processId and utils.isValidAddress(processId, true), "Process-Id must be a valid address")
+	assert(initiator and utils.isValidAddress(initiator, true), "Initiator is required")
 	assert(record, "Record not found")
 	assert(record.type == "permabuy", "Only permabuy names can be released")
 	assert(record.processId == processId, "Process-Id mismatch")
@@ -2212,8 +2211,8 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 
 	-- assert name, bidder, processId are provided
 	assert(name and #name > 0, "Name is required")
-	assert(bidder and utils.isValidAddress(bidder), "Bidder is required")
-	assert(processId and utils.isValidAddress(processId), "Process-Id must be a valid Arweave address")
+	assert(bidder and utils.isValidAddress(bidder, true), "Bidder is required")
+	assert(processId and utils.isValidAddress(processId, true), "Process-Id must be a valid Arweave address")
 	assert(timestamp and timestamp > 0, "Timestamp is required")
 	-- if bidAmount is not nil assert that it is a number
 	if bidAmount then
@@ -2334,7 +2333,7 @@ addEventingHandler("paginatedDelegations", utils.hasMatchingTag("Action", "Pagin
 	local address = msg.Tags.Address or msg.From
 	local page = utils.parsePaginationTags(msg)
 
-	assert(utils.isValidAddress(address), "Invalid address.")
+	assert(utils.isValidAddress(address, true), "Invalid address.")
 
 	local result = gar.getPaginatedDelegations(address, page.cursor, page.limit, page.sortBy, page.sortOrder)
 	Send(msg, {
@@ -2352,12 +2351,12 @@ addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", Act
 	local vaultId = msg.Tags["Vault-Id"]
 	local timestamp = msg.Timestamp
 
-	assert(utils.isValidAddress(sourceAddress), "Invalid source gateway address")
-	assert(utils.isValidAddress(targetAddress), "Invalid target gateway address")
-	assert(utils.isValidAddress(delegateAddress), "Invalid delegator address")
+	assert(utils.isValidAddress(sourceAddress, true), "Invalid source gateway address")
+	assert(utils.isValidAddress(targetAddress, true), "Invalid target gateway address")
+	assert(utils.isValidAddress(delegateAddress, true), "Invalid delegator address")
 	assert(timestamp, "Timestamp is required")
 	if vaultId then
-		assert(utils.isValidAddress(vaultId), "Invalid vault id")
+		assert(utils.isValidAddress(vaultId, true), "Invalid vault id")
 	end
 
 	assert(quantity and quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
@@ -2405,7 +2404,7 @@ end)
 
 addEventingHandler(ActionMap.RedelegationFee, utils.hasMatchingTag("Action", ActionMap.RedelegationFee), function(msg)
 	local delegateAddress = msg.Tags.Address or msg.From
-	assert(utils.isValidAddress(delegateAddress), "Invalid delegator address")
+	assert(utils.isValidAddress(delegateAddress, true), "Invalid delegator address")
 	local feeResult = gar.getRedelegationFee(delegateAddress)
 	Send(msg, {
 		Target = msg.From,
@@ -2560,7 +2559,7 @@ addEventingHandler(
 	function(msg)
 		local page = utils.parsePaginationTags(msg)
 		local gatewayAddress = utils.formatAddress(msg.Tags.Address or msg.From)
-		assert(utils.isValidAddress(gatewayAddress), "Invalid gateway address")
+		assert(utils.isValidAddress(gatewayAddress, true), "Invalid gateway address")
 		local result = gar.getPaginatedVaultsForGateway(
 			gatewayAddress,
 			page.cursor,

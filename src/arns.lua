@@ -504,7 +504,7 @@ function arns.assertValidBuyRecord(name, years, purchaseType, processId)
 
 	-- assert processId is valid pattern
 	assert(type(processId) == "string", "Process id is required and must be a string.")
-	assert(utils.isValidAddress(processId), "Process Id must be a valid address.")
+	assert(utils.isValidAddress(processId, true), "Process Id must be a valid address.")
 end
 
 --- Asserts that a record is valid for extending the lease
@@ -1010,7 +1010,7 @@ end
 function arns.assertValidReassignName(record, currentTimestamp, from, newProcessId)
 	assert(record, "Name is not registered")
 	assert(currentTimestamp, "Timestamp is required")
-	assert(utils.isValidAddress(newProcessId), "Invalid Process-Id")
+	assert(utils.isValidAddress(newProcessId, true), "Invalid Process-Id") -- allow unsafe addresses for processId
 	assert(record.processId == from, "Not authorized to reassign this name")
 
 	if record.endTimestamp then

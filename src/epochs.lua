@@ -406,10 +406,10 @@ end
 function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddresses, timestamp)
 	-- Note: one of the only places we use arweave addresses, as the protocol requires the report to be stored on arweave. This would be a significant change to OIP if changed.
 	assert(utils.isValidArweaveAddress(reportTxId), "Report transaction ID is not a valid address")
-	assert(utils.isValidAddress(observerAddress), "Observer address is not a valid address")
+	assert(utils.isValidAddress(observerAddress, true), "Observer address is not a valid address") -- allow unsafe addresses for observer address
 	assert(type(failedGatewayAddresses) == "table", "Failed gateway addresses is required")
 	for _, address in ipairs(failedGatewayAddresses) do
-		assert(utils.isValidAddress(address), "Failed gateway address is not a valid address")
+		assert(utils.isValidAddress(address, true), "Failed gateway address is not a valid address") -- allow unsafe addresses for failed gateway addresses
 	end
 	assert(type(timestamp) == "number", "Timestamp is required")
 
