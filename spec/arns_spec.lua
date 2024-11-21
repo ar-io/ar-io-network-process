@@ -1041,6 +1041,41 @@ describe("arns", function()
 				},
 			}, newGracePeriodRecords)
 		end)
+
+		it("should skip pruning when possible", function()
+			local currentTimestamp = 2000000000
+			--- force an invariant case (next prune timestamp after next prunable end timestmap) to prove the point
+			_G.NextRecordsPruneTimestamp = currentTimestamp + 1
+			_G.NameRegistry = {
+				auctions = {},
+				reserved = {},
+				records = {
+					["expired-record"] = {
+						endTimestamp = 790399999, -- expired and past the grace period
+						processId = "expired-process-id",
+						purchasePrice = 400000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 5,
+					},
+				},
+			}
+			local prunedRecords, newGracePeriodRecords = arns.pruneRecords(currentTimestamp)
+			assert.are.same({
+				-- escaped pruning due to the forced invariance
+				["expired-record"] = {
+					endTimestamp = 790399999,
+					processId = "expired-process-id",
+					purchasePrice = 400000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 5,
+				},
+			}, _G.NameRegistry.records)
+			assert.are.same({}, prunedRecords)
+			assert.are.same({}, newGracePeriodRecords)
+			assert.are.equal(currentTimestamp + 1, _G.NextRecordsPruneTimestamp)
+		end)
 	end)
 
 	describe("pruneReservedNames", function()
