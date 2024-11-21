@@ -970,6 +970,9 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 		return prunedRecords, newGracePeriodRecords
 	end
 
+	--- @type Timestamp|nil
+	local minNextEndTimestamp
+
 	-- identify any records that are leases and that have expired, account for a one week grace period in seconds
 	for name, record in pairs(arns.getRecords()) do
 		if arns.recordExpired(record, currentTimestamp) then
@@ -982,7 +985,17 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 			newGracePeriodRecords[name] = record
 			-- Make sure we prune when the grace period is over
 			arns.scheduleNextRecordsPrune(record.endTimestamp + constants.gracePeriodMs)
+		elseif record.endTimestamp then
+			-- find the next prune timestamp
+			--- @diagnostic disable-next-line: param-type-mismatch
+			minNextEndTimestamp = math.min(minNextEndTimestamp or record.endTimestamp, record.endTimestamp)
 		end
+	end
+
+	-- Reset the next pruning timestamp now that pruning has completed
+	NextRecordsPruneTimestamp = nil
+	if minNextEndTimestamp then
+		arns.scheduleNextRecordsPrune(minNextEndTimestamp)
 	end
 	return prunedRecords, newGracePeriodRecords
 end
