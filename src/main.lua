@@ -1,6 +1,7 @@
 -- Adjust package.path to include the current directory
 local process = { _version = "0.0.1" }
 local constants = require("constants")
+local token = require("token")
 local IOEvent = require("io_event")
 
 Name = Name or "Testnet IO"
@@ -22,6 +23,7 @@ GatewayRegistry = GatewayRegistry or {}
 NameRegistry = NameRegistry or {}
 Epochs = Epochs or {}
 LastTickedEpochIndex = LastTickedEpochIndex or -1
+LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
 
 local utils = require("utils")
 local json = require("json")
@@ -42,7 +44,8 @@ local CRITICAL = true
 local ActionMap = {
 	-- reads
 	Info = "Info",
-	TotalSupply = "Total-Supply",
+	TotalSupply = "Total-Supply", -- for token.lua spec compatibility, gives just the total supply (circulating + locked + staked + delegated + withdraw)
+	TotalTokenSupply = "Total-Token-Supply", -- gives the total token supply, including the protocol balance, locked supply, staked supply, delegated supply, and withdraw supply
 	State = "State",
 	Transfer = "Transfer",
 	Balance = "Balance",
@@ -113,24 +116,7 @@ local ActionMap = {
 	PrimaryName = "Primary-Name",
 }
 
--- Low fidelity trackers
-LastKnownCirculatingSupply = LastKnownCirculatingSupply or 0 -- total circulating supply (e.g. balances - protocol balance)
-LastKnownLockedSupply = LastKnownLockedSupply or 0 -- total vault balance across all vaults
-LastKnownStakedSupply = LastKnownStakedSupply or 0 -- total operator stake across all gateways
-LastKnownDelegatedSupply = LastKnownDelegatedSupply or 0 -- total delegated stake across all gateways
-LastKnownWithdrawSupply = LastKnownWithdrawSupply or 0 -- total withdraw supply across all gateways (gateways and delegates)
-local function lastKnownTotalTokenSupply()
-	return LastKnownCirculatingSupply
-		+ LastKnownLockedSupply
-		+ LastKnownStakedSupply
-		+ LastKnownDelegatedSupply
-		+ LastKnownWithdrawSupply
-		+ Balances[Protocol]
-end
-LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
-
 --- @alias Message table<string, any> -- an AO message TODO - update this type with the actual Message type
-
 --- @param msg Message
 --- @param response any
 local function Send(msg, response)
@@ -263,7 +249,7 @@ local function addSupplyData(ioEvent, supplyData)
 	ioEvent:addField("Staked-Supply", supplyData.stakedSupply or LastKnownStakedSupply)
 	ioEvent:addField("Delegated-Supply", supplyData.delegatedSupply or LastKnownDelegatedSupply)
 	ioEvent:addField("Withdraw-Supply", supplyData.withdrawSupply or LastKnownWithdrawSupply)
-	ioEvent:addField("Total-Token-Supply", supplyData.totalTokenSupply or lastKnownTotalTokenSupply())
+	ioEvent:addField("Total-Token-Supply", supplyData.totalTokenSupply or token.lastKnownTotalTokenSupply())
 	ioEvent:addField("Protocol-Balance", Balances[Protocol])
 end
 
@@ -387,7 +373,7 @@ end, function(msg)
 		lastKnownStakedSupply = LastKnownStakedSupply,
 		lastKnownDelegatedSupply = LastKnownDelegatedSupply,
 		lastKnownWithdrawSupply = LastKnownWithdrawSupply,
-		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
+		lastKnownTotalSupply = token.lastKnownTotalTokenSupply(),
 	}
 
 	msg.From = utils.formatAddress(msg.From)
@@ -503,7 +489,7 @@ end, function(msg)
 		or LastKnownDelegatedSupply ~= previousStateSupplies.lastKnownDelegatedSupply
 		or LastKnownWithdrawSupply ~= previousStateSupplies.lastKnownWithdrawSupply
 		or Balances[Protocol] ~= previousStateSupplies.protocolBalance
-		or lastKnownTotalTokenSupply() ~= previousStateSupplies.lastKnownTotalSupply
+		or token.lastKnownTotalTokenSupply() ~= previousStateSupplies.lastKnownTotalSupply
 	then
 		addSupplyData(msg.ioEvent)
 	end
@@ -1517,85 +1503,47 @@ addEventingHandler(
 	end
 )
 
-addEventingHandler("totalTokenSupply", function(msg)
-	return msg.Action == "Total-Token-Supply" or msg.Action == ActionMap.TotalSupply -- TODO: remove this once we migrate all downstream apps to the new tag
-end, function(msg)
-	-- add all the balances
-	local totalSupply = 0
-	local circulatingSupply = 0
-	local lockedSupply = 0
-	local stakedSupply = 0
-	local delegatedSupply = 0
-	local withdrawSupply = 0
-	local protocolBalance = balances.getBalance(Protocol)
-	local userBalances = balances.getBalances()
-
-	-- tally circulating supply
-	for _, balance in pairs(userBalances) do
-		circulatingSupply = circulatingSupply + balance
-	end
-	circulatingSupply = circulatingSupply - protocolBalance
-	totalSupply = totalSupply + protocolBalance + circulatingSupply
-
-	-- tally supply stashed in gateways and delegates
-	for _, gateway in pairs(gar.getGatewaysUnsafe()) do
-		totalSupply = totalSupply + gateway.operatorStake + gateway.totalDelegatedStake
-		stakedSupply = stakedSupply + gateway.operatorStake
-		delegatedSupply = delegatedSupply + gateway.totalDelegatedStake
-		for _, delegate in pairs(gateway.delegates) do
-			-- tally delegates' vaults
-			for _, vault in pairs(delegate.vaults) do
-				totalSupply = totalSupply + vault.balance
-				withdrawSupply = withdrawSupply + vault.balance
-			end
-		end
-		-- tally gateway's own vaults
-		for _, vault in pairs(gateway.vaults) do
-			totalSupply = totalSupply + vault.balance
-			withdrawSupply = withdrawSupply + vault.balance
-		end
-	end
-
-	-- user vaults
-	local userVaults = vaults.getVaults()
-	for _, vaultsForAddress in pairs(userVaults) do
-		-- they may have several vaults iterate through them
-		for _, vault in pairs(vaultsForAddress) do
-			totalSupply = totalSupply + vault.balance
-			lockedSupply = lockedSupply + vault.balance
-		end
-	end
-
-	LastKnownCirculatingSupply = circulatingSupply
-	LastKnownLockedSupply = lockedSupply
-	LastKnownStakedSupply = stakedSupply
-	LastKnownDelegatedSupply = delegatedSupply
-	LastKnownWithdrawSupply = withdrawSupply
-
+-- Reference: https://github.com/permaweb/aos/blob/main/blueprints/token.lua#L264-L280
+addEventingHandler("totalSupply", utils.hasMatchingTag("Action", ActionMap.TotalSupply), function(msg)
+	assert(msg.From ~= ao.id, "Cannot call Total-Supply from the same process!")
+	local totalSupplyDetails = token.computeTotalSupply()
 	addSupplyData(msg.ioEvent, {
-		totalTokenSupply = totalSupply,
+		totalTokenSupply = totalSupplyDetails.totalSupply,
 	})
-	msg.ioEvent:addField("Last-Known-Total-Token-Supply", lastKnownTotalTokenSupply())
+	msg.ioEvent:addField("Last-Known-Total-Token-Supply", token.lastKnownTotalTokenSupply())
+	Send(msg, {
+		Action = "Total-Supply",
+		Data = totalSupplyDetails.totalSupply,
+		Ticker = Ticker,
+	})
+end)
+
+addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.TotalTokenSupply), function(msg)
+	local totalSupplyDetails = token.computeTotalSupply()
+	addSupplyData(msg.ioEvent, {
+		totalTokenSupply = totalSupplyDetails.totalSupply,
+	})
+	msg.ioEvent:addField("Last-Known-Total-Token-Supply", token.lastKnownTotalTokenSupply())
 
 	Send(msg, {
 		Target = msg.From,
-		Action = ActionMap.TotalSupply .. "-Notice",
-		["Total-Supply"] = tostring(totalSupply),
-		["Circulating-Supply"] = tostring(circulatingSupply),
-		["Locked-Supply"] = tostring(lockedSupply),
-		["Staked-Supply"] = tostring(stakedSupply),
-		["Delegated-Supply"] = tostring(delegatedSupply),
-		["Withdraw-Supply"] = tostring(withdrawSupply),
-		["Protocol-Balance"] = tostring(protocolBalance),
+		Action = ActionMap.TotalTokenSupply .. "-Notice",
+		["Total-Supply"] = tostring(totalSupplyDetails.totalSupply),
+		["Circulating-Supply"] = tostring(totalSupplyDetails.circulatingSupply),
+		["Locked-Supply"] = tostring(totalSupplyDetails.lockedSupply),
+		["Staked-Supply"] = tostring(totalSupplyDetails.stakedSupply),
+		["Delegated-Supply"] = tostring(totalSupplyDetails.delegatedSupply),
+		["Withdraw-Supply"] = tostring(totalSupplyDetails.withdrawSupply),
+		["Protocol-Balance"] = tostring(totalSupplyDetails.protocolBalance),
 		Data = json.encode({
 			-- TODO: we are losing precision on these values unexpectedly. This has been brought to the AO team - for now the tags should be correct as they are stringified
-			total = totalSupply,
-			circulating = circulatingSupply,
-			locked = lockedSupply,
-			staked = stakedSupply,
-			delegated = delegatedSupply,
-			withdrawn = withdrawSupply,
-			protocolBalance = protocolBalance,
+			total = totalSupplyDetails.totalSupply,
+			circulating = totalSupplyDetails.circulatingSupply,
+			locked = totalSupplyDetails.lockedSupply,
+			staked = totalSupplyDetails.stakedSupply,
+			delegated = totalSupplyDetails.delegatedSupply,
+			withdrawn = totalSupplyDetails.withdrawSupply,
+			protocolBalance = totalSupplyDetails.protocolBalance,
 		}),
 	})
 end)
