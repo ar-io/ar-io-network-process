@@ -477,9 +477,16 @@ end
 --- Asserts that a name is a valid ARNS name
 --- @param name string The name to check
 function arns.assertValidArNSName(name)
-	assert(type(name) == "string", "Name is required and must be a string.")
-	assert(#name >= constants.MIN_NAME_LENGTH and #name <= constants.MAX_NAME_LENGTH, "Name pattern is invalid.")
-	assert(name:match(constants.ARNS_NAME_REGEX), "Name pattern is invalid.")
+	assert(name and type(name) == "string", "Name is required and must be a string.")
+	assert(
+		#name >= constants.MIN_NAME_LENGTH and #name <= constants.MAX_NAME_LENGTH,
+		"Name length is invalid. Must be between "
+			.. constants.MIN_NAME_LENGTH
+			.. " and "
+			.. constants.MAX_NAME_LENGTH
+			.. " characters."
+	)
+	assert(name:match(constants.ARNS_NAME_REGEX), "Name pattern is invalid. Must match " .. constants.ARNS_NAME_REGEX)
 end
 
 --- Asserts that a buy record is valid
