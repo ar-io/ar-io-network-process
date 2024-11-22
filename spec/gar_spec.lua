@@ -3953,6 +3953,7 @@ describe("gar", function()
 	describe("pruneRedelegationFeeData", function()
 		before_each(function()
 			_G.Redelegations = {}
+			_G.NextRedelegationsPruneTimestamp = 0
 		end)
 
 		it("should return an empty array when there are no tracked redelegations", function()
@@ -3988,6 +3989,30 @@ describe("gar", function()
 					redelegations = 1,
 				},
 			}, _G.Redelegations)
+		end)
+
+		it("should skip pruning when possible", function()
+			_G.NextRedelegationsPruneTimestamp = 604800002 -- force an invariant state for testing purposes
+			local expectedRedelegations = {
+				["recently-delegated"] = {
+					timestamp = 100000000,
+					redelegations = 1,
+				},
+				["delegated-two-weeks-ago"] = {
+					timestamp = 1,
+					redelegations = 2,
+				},
+				["delegated-over-two-weeks-ago"] = {
+					timestamp = 0,
+					redelegations = 2,
+				},
+			}
+			_G.Redelegations = expectedRedelegations
+			local prunedRedelegations = gar.pruneRedelegationFeeData(604800001)
+			table.sort(prunedRedelegations)
+			assert.are.same({}, prunedRedelegations)
+			assert.are.same(expectedRedelegations, _G.Redelegations)
+			assert.are.same(604800002, _G.NextRedelegationsPruneTimestamp)
 		end)
 	end)
 
