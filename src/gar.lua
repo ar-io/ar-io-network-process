@@ -1048,6 +1048,7 @@ function gar.getPaginatedDelegates(address, cursor, limit, sortBy, sortOrder)
 	for delegateAddress, delegate in pairs(gateway.delegates) do
 		--- @diagnostic disable-next-line: inject-field
 		delegate.address = delegateAddress
+		delegate.vaults = nil -- remove vaults to avoid sending an unbounded array, we can fetch them if needed via getPaginatedDelegations
 		table.insert(delegatesArray, delegate)
 	end
 

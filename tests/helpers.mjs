@@ -229,6 +229,20 @@ export const getDelegatesItems = async ({ memory, gatewayAddress }) => {
   return JSON.parse(result.Messages?.[0]?.Data).items;
 };
 
+export const getDelegations = async ({ memory, address }) => {
+  const result = await handle(
+    {
+      Tags: [
+        { name: 'Action', value: 'Paginated-Delegations' },
+        { name: 'Address', value: address },
+      ],
+    },
+    memory,
+  );
+  assertNoResultError(result);
+  return JSON.parse(result.Messages?.[0]?.Data);
+};
+
 export const getVaults = async ({
   memory,
   cursor,
