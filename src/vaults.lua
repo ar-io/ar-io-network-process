@@ -6,6 +6,9 @@ local balances = require("balances")
 local utils = require("utils")
 local constants = require("constants")
 
+--- @type Timestamp|nil
+NextBalanceVaultsPruneTimestamp = NextBalanceVaultsPruneTimestamp or 0
+
 --- @class Vault
 --- @field balance number The balance of the vault
 --- @field startTimestamp number The start timestamp of the vault
@@ -38,6 +41,10 @@ function vaults.createVault(from, qty, lockLengthMs, currentTimestamp, vaultId)
 		startTimestamp = currentTimestamp,
 		endTimestamp = currentTimestamp + lockLengthMs,
 	})
+	-- A nil NextPruneTimestamp means we're not expecting anything to prune, so set it if necessary
+	-- Otherwise, this new endTimestamp might be earlier than the next known for pruning. If so, set it.
+	NextBalanceVaultsPruneTimestamp =
+		math.min(NextBalanceVaultsPruneTimestamp or newVault.endTimestamp, newVault.endTimestamp)
 	return newVault
 end
 
@@ -91,6 +98,10 @@ function vaults.extendVault(from, extendLengthMs, currentTimestamp, vaultId)
 
 	vault.endTimestamp = vault.endTimestamp + extendLengthMs
 	Vaults[from][vaultId] = vault
+
+	--- The NextPruneTimestamp might have been from this vault, but figuring out which one
+	--- comes next is a linear walk of the vaults anyway, so just leave it as is and the next
+	--- prune will figure it out.
 	return vault
 end
 
@@ -183,17 +194,31 @@ end
 --- @param currentTimestamp number The current timestamp
 --- @return Vault[] The pruned vaults
 function vaults.pruneVaults(currentTimestamp)
+	if not NextBalanceVaultsPruneTimestamp or currentTimestamp < NextBalanceVaultsPruneTimestamp then
+		-- No known pruning work to do
+		return {}
+	end
+
 	local allVaults = vaults.getVaults()
 	local prunedVaults = {}
+	--- @type Timestamp|nil
+	local minNextEndTimestamp
 	for owner, ownersVaults in pairs(allVaults) do
 		for id, nestedVault in pairs(ownersVaults) do
 			if currentTimestamp >= nestedVault.endTimestamp then
 				balances.increaseBalance(owner, nestedVault.balance)
 				ownersVaults[id] = nil
 				prunedVaults[id] = nestedVault
+			else
+				--- find the next prune timestamp
+				minNextEndTimestamp =
+					math.min(minNextEndTimestamp or nestedVault.endTimestamp, nestedVault.endTimestamp)
 			end
 		end
 	end
+
+	NextBalanceVaultsPruneTimestamp = minNextEndTimestamp
+
 	-- set the vaults to the updated vaults
 	Vaults = allVaults
 	return prunedVaults

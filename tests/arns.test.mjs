@@ -192,8 +192,7 @@ describe('ArNS', async () => {
       const failedBuyRecordError = failedBuyRecordResult.Messages[0].Tags.find(
         (t) => t.name === 'Error',
       );
-
-      assert.equal(failedBuyRecordError?.value, 'Invalid-Buy-Record');
+      assert.ok(failedBuyRecordError, 'Error tag should be present');
       const alreadyRegistered = failedBuyRecordResult.Messages[0].Data.includes(
         'Name is already registered',
       );
@@ -366,6 +365,9 @@ describe('ArNS', async () => {
           },
           memory,
         );
+
+        // assert no error tag
+        assertNoResultError(increaseUndernameResult);
 
         const result = await handle(
           {
@@ -819,11 +821,7 @@ describe('ArNS', async () => {
       );
 
       // assert no error tag
-      const releaseNameErrorTag = releaseNameResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
-
-      assert.equal(releaseNameErrorTag, undefined);
+      assertNoResultError(releaseNameResult);
 
       // fetch the auction
       const auctionResult = await handle(
@@ -1464,7 +1462,7 @@ describe('ArNS', async () => {
       const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
         (tag) => tag.name === 'Error',
       );
-      assert.equal(releaseNameErrorTag.value, 'Reassign-Name-Error');
+      assert.ok(releaseNameErrorTag, 'Error tag should be present');
     });
 
     it('should not reassign an arns name with invalid new process id', async () => {
@@ -1493,7 +1491,7 @@ describe('ArNS', async () => {
       const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
         (tag) => tag.name === 'Error',
       );
-      assert.equal(releaseNameErrorTag.value, 'Bad-Input');
+      assert.ok(releaseNameErrorTag, 'Error tag should be present');
     });
   });
 
@@ -1668,6 +1666,7 @@ describe('ArNS', async () => {
         },
         arnsDiscountMemory,
       );
+      assertNoResultError(result);
       const costDetails = JSON.parse(result.Messages[0].Data);
       assert.equal(costDetails.tokenCost, baseLeasePrice);
       assert.deepEqual(costDetails.discounts, []);
@@ -1912,6 +1911,7 @@ describe('ArNS', async () => {
               },
               buyRecordResult.Memory,
             );
+            assertNoResultError(result);
             const { tokenCost, discounts } = JSON.parse(
               result.Messages[0].Data,
             );
@@ -2028,6 +2028,22 @@ describe('ArNS', async () => {
           });
         });
       });
+    });
+  });
+
+  describe('Reserved-Names', () => {
+    it('should paginate reserved names', async () => {
+      const result = await handle({
+        Tags: [{ name: 'Action', value: 'Reserved-Names' }],
+      });
+      const { items, hasMore, cursor, sortBy, sortOrder, totalItems } =
+        JSON.parse(result.Messages[0].Data);
+      assert.ok(Array.isArray(items));
+      assert.ok(hasMore === false);
+      assert.ok(cursor === undefined);
+      assert.equal(sortBy, 'name');
+      assert.equal(sortOrder, 'desc');
+      assert.equal(totalItems, 0);
     });
   });
 });

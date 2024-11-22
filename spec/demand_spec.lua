@@ -14,7 +14,7 @@ describe("demand", function()
 			consecutivePeriodsWithMinDemandFactor = 0,
 			fees = constants.genesisFees,
 		}
-		demand.updateSettings({
+		_G.DemandFactorSettings = {
 			periodZeroStartTimestamp = 0,
 			movingAvgPeriodCount = 7,
 			periodLengthMs = 60 * 1000 * 24, -- one day
@@ -24,7 +24,7 @@ describe("demand", function()
 			demandFactorDownAdjustment = 0.025,
 			stepDownThreshold = 3,
 			criteria = "revenue",
-		})
+		}
 	end)
 
 	it("should tally name purchase", function()
@@ -131,7 +131,7 @@ describe("demand", function()
 
 	describe("purchase count criteria", function()
 		before_each(function()
-			demand.updateSettings({
+			_G.DemandFactorSettings = {
 				periodZeroStartTimestamp = 0,
 				movingAvgPeriodCount = 7,
 				periodLengthMs = 60 * 1000 * 24, -- one day
@@ -141,7 +141,7 @@ describe("demand", function()
 				demandFactorDownAdjustment = 0.025,
 				stepDownThreshold = 3,
 				criteria = "purchases",
-			})
+			}
 		end)
 
 		it("isDemandIncreasing() should return true when demand is increasing for purchases based criteria", function()

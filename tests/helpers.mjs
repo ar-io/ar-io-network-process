@@ -193,3 +193,77 @@ export const getDemandFactor = async ({ memory, timestamp }) => {
   assertNoResultError(result);
   return result.Messages[0].Data;
 };
+
+export const getDelegates = async ({
+  memory,
+  from,
+  timestamp,
+  gatewayAddress,
+}) => {
+  const delegatesResult = await handle(
+    {
+      From: from,
+      Owner: from,
+      Tags: [
+        { name: 'Action', value: 'Paginated-Delegates' },
+        { name: 'Address', value: gatewayAddress },
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  );
+  assertNoResultError(delegatesResult);
+  return {
+    result: delegatesResult,
+    memory: delegatesResult.Memory,
+  };
+};
+
+export const getDelegatesItems = async ({ memory, gatewayAddress }) => {
+  const { result } = await getDelegates({
+    memory,
+    from: STUB_ADDRESS,
+    timestamp: STUB_TIMESTAMP,
+    gatewayAddress,
+  });
+  return JSON.parse(result.Messages?.[0]?.Data).items;
+};
+
+export const getVaults = async ({
+  memory,
+  cursor,
+  limit,
+  sortBy,
+  sortOrder,
+}) => {
+  const { Memory, ...rest } = await handle(
+    {
+      Tags: [
+        { name: 'Action', value: 'Paginated-Vaults' },
+        ...(cursor ? [{ name: 'Cursor', value: cursor }] : []),
+        ...(limit ? [{ name: 'Limit', value: limit }] : []),
+        ...(sortBy ? [{ name: 'Sort-By', value: sortBy }] : []),
+        ...(sortOrder ? [{ name: 'Sort-Order', value: sortOrder }] : []),
+      ],
+    },
+    memory,
+  );
+  return {
+    result: rest,
+    memory: Memory,
+  };
+};
+
+export const getGatewayVaultsItems = async ({ memory, gatewayAddress }) => {
+  const gatewayVaultsResult = await handle(
+    {
+      Tags: [
+        { name: 'Action', value: 'Paginated-Gateway-Vaults' },
+        { name: 'Address', value: gatewayAddress },
+      ],
+    },
+    memory,
+  );
+  assertNoResultError(gatewayVaultsResult);
+  return JSON.parse(gatewayVaultsResult.Messages?.[0]?.Data).items;
+};
