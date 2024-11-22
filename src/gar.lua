@@ -99,6 +99,9 @@ GatewayRegistrySettings = GatewayRegistrySettings
 --- @type Timestamp|nil
 NextGatewaysPruneTimestamp = NextGatewaysPruneTimestamp or 0
 
+--- @type Timestamp|nil
+NextRedelegationsPruneTimestamp = NextRedelegationsPruneTimestamp or 0
+
 --- @class JoinGatewaySettings
 --- @field allowDelegatedStaking boolean | nil
 --- @field allowedDelegates WalletAddress[] | nil
@@ -1680,16 +1683,31 @@ Redelegations = Redelegations or {}
 
 function gar.pruneRedelegationFeeData(currentTimestamp)
 	local delegatorsWithFeesReset = {}
+	if not NextRedelegationsPruneTimestamp or currentTimestamp < NextRedelegationsPruneTimestamp then
+		-- No known pruning work to do
+		return delegatorsWithFeesReset
+	end
+
+	local minNextEndTimestamp = nil
 	local pruningThreshold = currentTimestamp - constants.redelegationFeeResetIntervalMs
 
 	Redelegations = utils.reduce(gar.getRedelgationsUnsafe(), function(acc, delegateAddress, redelegationData)
 		if redelegationData.timestamp > pruningThreshold then
 			acc[delegateAddress] = redelegationData
+			local eligibleForPruneAt = redelegationData.timestamp + constants.redelegationFeeResetIntervalMs
+			minNextEndTimestamp = math.min(minNextEndTimestamp or eligibleForPruneAt, eligibleForPruneAt)
 		else
 			table.insert(delegatorsWithFeesReset, delegateAddress)
 		end
 		return acc
 	end, {})
+
+	-- Reset the next pruning timestamp
+	NextRedelegationsPruneTimestamp = nil
+	if minNextEndTimestamp then
+		gar.scheduleNextRedelegationsPruning(minNextEndTimestamp)
+	end
+
 	return delegatorsWithFeesReset
 end
 
@@ -1882,6 +1900,7 @@ function gar.redelegateStake(params)
 		timestamp = currentTimestamp,
 		redelegations = redelegationsSinceFeeReset,
 	}
+	gar.scheduleNextRedelegationsPruning(currentTimestamp + constants.redelegationFeeResetIntervalMs)
 
 	return {
 		sourceAddress = sourceAddress,
@@ -1944,6 +1963,11 @@ end
 --- @param timestamp Timestamp
 function gar.scheduleNextGatewaysPruning(timestamp)
 	NextGatewaysPruneTimestamp = math.min(NextGatewaysPruneTimestamp or timestamp, timestamp)
+end
+
+--- @param timestamp Timestamp
+function gar.scheduleNextRedelegationsPruning(timestamp)
+	NextRedelegationsPruneTimestamp = math.min(NextRedelegationsPruneTimestamp or timestamp, timestamp)
 end
 
 return gar

@@ -3953,6 +3953,7 @@ describe("gar", function()
 	describe("pruneRedelegationFeeData", function()
 		before_each(function()
 			_G.Redelegations = {}
+			_G.NextRedelegationsPruneTimestamp = 0
 		end)
 
 		it("should return an empty array when there are no tracked redelegations", function()
