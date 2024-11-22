@@ -7,6 +7,9 @@ local arns = {}
 local Auction = require("auctions")
 local gar = require("gar")
 
+--- @type Timestamp|nil
+NextRecordsPruneTimestamp = NextRecordsPruneTimestamp or 0
+
 --- @class NameRegistry
 --- @field reserved table<string, ReservedName> The reserved names
 --- @field records table<string, Record> The records
@@ -131,6 +134,10 @@ function arns.addRecord(name, record)
 	-- remove reserved name if it exists in reserved
 	if arns.getReservedName(name) then
 		NameRegistry.reserved[name] = nil
+	end
+
+	if record.endTimestamp then
+		arns.scheduleNextRecordsPrune(record.endTimestamp)
 	end
 end
 
@@ -404,6 +411,8 @@ function arns.modifyRecordEndTimestamp(name, newEndTimestamp)
 	local maxEndTimestamp = record.startTimestamp + maxLeaseLength
 	assert(newEndTimestamp <= maxEndTimestamp, "Cannot extend lease beyond 5 years")
 	NameRegistry.records[name].endTimestamp = newEndTimestamp
+	-- Guard against the invariant case where record may not expire sooner
+	arns.scheduleNextRecordsPrune(newEndTimestamp)
 	return arns.getRecord(name)
 end
 
@@ -742,6 +751,7 @@ function arns.upgradeRecord(from, name, currentTimestamp, msgId, fundFrom)
 	demand.tallyNamePurchase(upgradeCost)
 
 	record.endTimestamp = nil
+	-- figuring out the next prune timestamp would require a full scan of all records anyway so don't reschedule
 	record.type = "permabuy"
 	record.purchasePrice = upgradeCost
 
@@ -956,6 +966,13 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 	lastGracePeriodEntryEndTimestamp = lastGracePeriodEntryEndTimestamp or 0
 	local prunedRecords = {}
 	local newGracePeriodRecords = {}
+	if not NextRecordsPruneTimestamp or NextRecordsPruneTimestamp > currentTimestamp then
+		return prunedRecords, newGracePeriodRecords
+	end
+
+	--- @type Timestamp|nil
+	local minNextEndTimestamp
+
 	-- identify any records that are leases and that have expired, account for a one week grace period in seconds
 	for name, record in pairs(arns.getRecords()) do
 		if arns.recordExpired(record, currentTimestamp) then
@@ -966,7 +983,19 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 			and record.endTimestamp > lastGracePeriodEntryEndTimestamp
 		then
 			newGracePeriodRecords[name] = record
+			-- Make sure we prune when the grace period is over
+			arns.scheduleNextRecordsPrune(record.endTimestamp + constants.gracePeriodMs)
+		elseif record.endTimestamp then
+			-- find the next prune timestamp
+			--- @diagnostic disable-next-line: param-type-mismatch
+			minNextEndTimestamp = math.min(minNextEndTimestamp or record.endTimestamp, record.endTimestamp)
 		end
+	end
+
+	-- Reset the next pruning timestamp now that pruning has completed
+	NextRecordsPruneTimestamp = nil
+	if minNextEndTimestamp then
+		arns.scheduleNextRecordsPrune(minNextEndTimestamp)
 	end
 	return prunedRecords, newGracePeriodRecords
 end
@@ -1031,6 +1060,11 @@ function arns.reassignName(name, from, currentTimestamp, newProcessId)
 	arns.assertValidReassignName(record, currentTimestamp, from, newProcessId)
 	local updatedRecord = arns.modifyProcessId(name, newProcessId)
 	return updatedRecord
+end
+
+--- @param timestamp Timestamp
+function arns.scheduleNextRecordsPrune(timestamp)
+	NextRecordsPruneTimestamp = math.min(NextRecordsPruneTimestamp or timestamp, timestamp)
 end
 
 return arns
