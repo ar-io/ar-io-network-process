@@ -1503,7 +1503,7 @@ addEventingHandler(
 	end
 )
 
--- Reference: https://github.com/permaweb/aos/blob/main/blueprints/token.lua#L264-L280
+-- Reference: https://github.com/permaweb/aos/blob/eea71b68a4f89ac14bf6797804f97d0d39612258/blueprints/token.lua#L264-L280
 addEventingHandler("totalSupply", utils.hasMatchingTag("Action", ActionMap.TotalSupply), function(msg)
 	assert(msg.From ~= ao.id, "Cannot call Total-Supply from the same process!")
 	local totalSupplyDetails = token.computeTotalSupply()
