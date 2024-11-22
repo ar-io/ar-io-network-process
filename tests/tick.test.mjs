@@ -615,8 +615,6 @@ describe('Tick', async () => {
     const gatewayData = JSON.parse(gateway.Messages[0].Data);
     assert.deepStrictEqual(gatewayData, {
       status: 'joined',
-      // TODO: Verify via vaults handler
-      //vaults: [],
       startTimestamp: STUB_TIMESTAMP,
       observerAddress: STUB_ADDRESS,
       operatorStake: 100_000_000_000 + expectedGatewayOperatorReward,
@@ -660,7 +658,6 @@ describe('Tick', async () => {
       {
         delegatedStake: 50_000_000_000 + expectedGatewayDelegateReward,
         startTimestamp: delegateTimestamp,
-        vaults: [],
         address: delegateAddress,
       },
     ]);

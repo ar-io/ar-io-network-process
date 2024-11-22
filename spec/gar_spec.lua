@@ -2164,7 +2164,6 @@ describe("gar", function()
 							address = stubDelegate2Address,
 							delegatedStake = 2,
 							startTimestamp = 2000,
-							vaults = {},
 						}, -- should be first because it has a higher startTimestamp
 					},
 				}, delegates)
@@ -2183,7 +2182,6 @@ describe("gar", function()
 							address = stubRandomAddress,
 							delegatedStake = 1,
 							startTimestamp = 1000,
-							vaults = {},
 						},
 					},
 				}, nextDelegates)
