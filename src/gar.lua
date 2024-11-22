@@ -334,7 +334,7 @@ end
 
 --- @param from WalletAddress
 --- @param updatedSettings UpdateGatewaySettings
---- @param updatedServices GatewayServices
+--- @param updatedServices GatewayServices|nil
 --- @param observerAddress WalletAddress
 --- @param currentTimestamp Timestamp
 --- @param msgId MessageId

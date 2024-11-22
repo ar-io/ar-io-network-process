@@ -525,16 +525,16 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 			Target = msg.From,
 			Action = "Debit-Notice",
 			Recipient = recipient,
-			Quantity = msg.Tags.Quantity,
-			Data = "You transferred " .. msg.Tags.Quantity .. " to " .. recipient,
+			Quantity = tostring(quantity),
+			Data = "You transferred " .. tostring(quantity) .. " to " .. recipient,
 		}
 		-- Credit-Notice message template, that is sent to the Recipient of the transfer
 		local creditNotice = {
 			Target = recipient,
 			Action = "Credit-Notice",
 			Sender = msg.From,
-			Quantity = msg.Tags.Quantity,
-			Data = "You received " .. msg.Tags.Quantity .. " from " .. msg.From,
+			Quantity = tostring(quantity),
+			Data = "You received " .. tostring(quantity) .. " from " .. msg.From,
 		}
 
 		-- Add forwarded tags to the credit and debit notice messages
@@ -785,7 +785,7 @@ end)
 
 addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.ExtendLease), function(msg)
 	local fundFrom = msg.Tags["Fund-From"]
-	local name = string.lower(msg.Tags.Name)
+	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
 	local years = msg.Tags.Years
 	local timestamp = msg.Timestamp
 	assert(type(name) == "string", "Invalid name")
@@ -806,7 +806,7 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 
 	Send(msg, {
 		Target = msg.From,
-		Tags = { Action = ActionMap.ExtendLease .. "-Notice", Name = string.lower(msg.Tags.Name) },
+		Tags = { Action = ActionMap.ExtendLease .. "-Notice", Name = name },
 		Data = json.encode(fundFrom and result or recordResult),
 	})
 end)
@@ -841,7 +841,7 @@ addEventingHandler(
 			Target = msg.From,
 			Tags = {
 				Action = ActionMap.IncreaseUndernameLimit .. "-Notice",
-				Name = string.lower(msg.Tags.Name),
+				Name = name,
 			},
 			Data = json.encode(fundFrom and result or recordResult),
 		})
@@ -1184,7 +1184,7 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 
 	Send(msg, {
 		Target = msg.From,
-		Tags = { Action = ActionMap.DelegateStake .. "-Notice", Gateway = msg.Tags.Target },
+		Tags = { Action = ActionMap.DelegateStake .. "-Notice", Gateway = gatewayTarget },
 		Data = json.encode(delegateResult),
 	})
 end)
@@ -1262,9 +1262,9 @@ addEventingHandler(
 					Action = ActionMap.InstantWithdrawal .. "-Notice",
 					Address = target,
 					["Vault-Id"] = vaultId,
-					["Amount-Withdrawn"] = result.amountWithdrawn,
-					["Penalty-Rate"] = result.penaltyRate,
-					["Expedited-Withdrawal-Fee"] = result.expeditedWithdrawalFee,
+					["Amount-Withdrawn"] = tostring(result.amountWithdrawn),
+					["Penalty-Rate"] = tostring(result.penaltyRate),
+					["Expedited-Withdrawal-Fee"] = tostring(result.expeditedWithdrawalFee),
 				},
 				Data = json.encode(result),
 			})
@@ -1320,7 +1320,7 @@ addEventingHandler(
 				if newDelegateVault ~= nil then
 					msg.ioEvent:addField("Vault-Id", msg.Id)
 					msg.ioEvent:addField("Vault-Balance", newDelegateVault.balance)
-					msg.ioEvent:addField("Vaul-Start-Timestamp", newDelegateVault.startTimestamp)
+					msg.ioEvent:addField("Vault-Start-Timestamp", newDelegateVault.startTimestamp)
 					msg.ioEvent:addField("Vault-End-Timestamp", newDelegateVault.endTimestamp)
 				end
 			end
@@ -1513,7 +1513,7 @@ addEventingHandler("totalSupply", utils.hasMatchingTag("Action", ActionMap.Total
 	msg.ioEvent:addField("Last-Known-Total-Token-Supply", token.lastKnownTotalTokenSupply())
 	Send(msg, {
 		Action = "Total-Supply",
-		Data = totalSupplyDetails.totalSupply,
+		Data = tostring(totalSupplyDetails.totalSupply),
 		Ticker = Ticker,
 	})
 end)
@@ -1602,7 +1602,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 		Send(msg, {
 			Target = msg.From,
 			Action = "Tick-Notice",
-			LastTickedEpochIndex = LastTickedEpochIndex,
+			LastTickedEpochIndex = tostring(LastTickedEpochIndex),
 			Data = json.encode(tickResult),
 		})
 		if tickResult.maybeNewEpoch ~= nil then
@@ -1741,7 +1741,7 @@ addEventingHandler(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", Ac
 		Target = msg.From,
 		Action = "Balance-Notice",
 		Data = balance,
-		Balance = balance,
+		Balance = tostring(balance),
 		Ticker = Ticker,
 		Address = target,
 	})
@@ -1966,7 +1966,7 @@ addEventingHandler(
 -- AUCTION HANDLER
 addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.ReleaseName), function(msg)
 	-- validate the name and process id exist, then create the auction using the auction function
-	local name = string.lower(msg.Tags.Name)
+	local name = msg.Tags.Name and string.lower(msg.Tags.Name)
 	local processId = msg.From
 	local record = arns.getRecord(name)
 	local initiator = msg.Tags.Initiator or msg.From
@@ -2336,7 +2336,9 @@ addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", Act
 
 	Send(msg, {
 		Target = msg.From,
-		Tags = { Action = ActionMap.RedelegateStake .. "-Notice", Gateway = msg.Tags.Target },
+		Tags = {
+			Action = ActionMap.RedelegateStake .. "-Notice",
+		},
 		Data = json.encode(redelegationResult),
 	})
 end)
@@ -2344,7 +2346,7 @@ end)
 addEventingHandler(ActionMap.RedelegationFee, utils.hasMatchingTag("Action", ActionMap.RedelegationFee), function(msg)
 	local delegateAddress = msg.Tags.Address or msg.From
 	assert(utils.isValidAOAddress(delegateAddress), "Invalid delegator address")
-	local feeResult = gar.getRedelegationFee(delegateAddress, msg.Timestamp)
+	local feeResult = gar.getRedelegationFee(delegateAddress)
 	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.RedelegationFee .. "-Notice" },
