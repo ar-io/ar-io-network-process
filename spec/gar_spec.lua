@@ -2107,6 +2107,27 @@ describe("gar", function()
 		end)
 	end)
 
+	describe("isDelegateEligibleForDistributions", function()
+		it("should return false if delegate is not found", function()
+			local result = gar.isDelegateEligibleForDistributions(testGateway, stubRandomAddress)
+			assert.is_false(result)
+		end)
+
+		it("should return false if delegate stake is 0", function()
+			local gateway = utils.deepCopy(testGateway)
+			gateway.delegates = {
+				[stubRandomAddress] = {
+					delegatedStake = 0,
+				},
+			}
+			_G.GatewayRegistry = {
+				[stubGatewayAddress] = gateway,
+			}
+			local result = gar.isDelegateEligibleForDistributions(testGateway, stubRandomAddress)
+			assert.is_false(result)
+		end)
+	end)
+
 	describe("getPaginatedDelegates", function()
 		it(
 			"should return paginated delegates sorted, by defualt, by startTimestamp in descending order (newest first)",
