@@ -70,6 +70,9 @@ EpochSettings = EpochSettings
 		distributionDelayMs = 60 * 1000 * 40, -- 40 minutes (~ 20 arweave blocks)
 	}
 
+--- @type Timestamp|nil
+NextEpochsPruneTimestamp = NextEpochsPruneTimestamp or 0
+
 --- Gets a deep copy of all the epochs
 --- @return table<number, Epoch> # A deep copy of the epochs indexed by their epoch index
 function epochs.getEpochs()
@@ -400,6 +403,10 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 			gar.updateGatewayWeights(weightedGateway)
 		end
 	end
+
+	-- Force schedule a pruning JIC
+	NextEpochsPruneTimestamp = NextEpochsPruneTimestamp or 0
+
 	return epoch
 end
 
@@ -730,6 +737,13 @@ end
 --- @return Epoch[] # The pruned epochs
 function epochs.pruneEpochs(timestamp)
 	local prunedEpochIndexes = {}
+	if not NextEpochsPruneTimestamp or timestamp < NextEpochsPruneTimestamp then
+		-- No known pruning work to do
+		return prunedEpochIndexes
+	end
+
+	--- Reset the next pruning timestamp
+	NextEpochsPruneTimestamp = nil
 	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)
 	local cutoffEpochIndex = currentEpochIndex - epochs.getSettings().maxCachedEpochsCount
 	local unsafeEpochs = epochs.getEpochsUnsafe()
@@ -739,6 +753,9 @@ function epochs.pruneEpochs(timestamp)
 			table.insert(prunedEpochIndexes, nextEpochIndex)
 			-- Safe to assign to nil during next() iteration
 			Epochs[nextEpochIndex] = nil
+		else
+			local _, endTimestamp = epochs.getEpochTimestampsForIndex(nextEpochIndex)
+			NextEpochsPruneTimestamp = math.min(NextEpochsPruneTimestamp or endTimestamp, endTimestamp)
 		end
 		nextEpochIndex = next(unsafeEpochs, nextEpochIndex)
 	end
