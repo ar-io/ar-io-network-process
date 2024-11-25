@@ -17,7 +17,7 @@ local epochs = {}
 --- @field distributions Distribution The distributions of the epoch
 
 --- @class EpochSettings
---- @field maxCachedEpochsCount number The number of epochs to prune
+--- @field pruneEpochsCount number The number of epochs to prune
 --- @field prescribedNameCount number The number of prescribed names
 --- @field rewardPercentage number The reward percentage
 --- @field maxObservers number The maximum number of observers
@@ -61,7 +61,7 @@ local epochs = {}
 Epochs = Epochs or {}
 EpochSettings = EpochSettings
 	or {
-		maxCachedEpochsCount = 14, -- prune epochs older than 14 days
+		pruneEpochsCount = 14, -- prune epochs older than 14 days
 		prescribedNameCount = 2,
 		rewardPercentage = 0.0005, -- 0.05%
 		maxObservers = 50,
@@ -747,7 +747,7 @@ function epochs.pruneEpochs(timestamp)
 	--- Reset the next pruning timestamp
 	NextEpochsPruneTimestamp = nil
 	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	local cutoffEpochIndex = currentEpochIndex - epochs.getSettings().maxCachedEpochsCount
+	local cutoffEpochIndex = currentEpochIndex - epochs.getSettings().pruneEpochsCount
 	local unsafeEpochs = epochs.getEpochsUnsafe()
 	local nextEpochIndex = next(unsafeEpochs)
 	while nextEpochIndex do
