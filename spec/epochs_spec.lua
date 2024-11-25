@@ -46,7 +46,7 @@ describe("epochs", function()
 			durationMs = 100,
 			distributionDelayMs = 15,
 			rewardPercentage = 0.0025, -- 0.25%
-			maxCachedEpochsCount = 14,
+			pruneEpochsCount = 14,
 		}
 	end)
 
