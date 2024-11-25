@@ -109,6 +109,7 @@ local ActionMap = {
 	Delegations = "Delegations",
 	-- PRIMARY NAMES
 	RemovePrimaryNames = "Remove-Primary-Names",
+	RequestPrimaryName = "Request-Primary-Name",
 	PrimaryNameRequest = "Primary-Name-Request",
 	PrimaryNameRequests = "Primary-Name-Requests",
 	ApprovePrimaryNameRequest = "Approve-Primary-Name-Request",
@@ -2380,10 +2381,10 @@ addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap
 	end
 end)
 
-addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMap.PrimaryNameRequest), function(msg)
+addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMap.RequestPrimaryName), function(msg)
 	local fundFrom = msg.Tags["Fund-From"]
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
-	local initiator = msg.From -- the process that is creating the claim
+	local initiator = msg.From
 	local timestamp = msg.Timestamp
 	assert(name, "Name is required")
 	assert(initiator, "Initiator is required")
@@ -2460,6 +2461,22 @@ addEventingHandler("getPrimaryNameData", utils.hasMatchingTag("Action", ActionMa
 		Action = ActionMap.PrimaryName .. "-Notice",
 		Tags = { Owner = primaryNameData.owner, Name = primaryNameData.name },
 		Data = json.encode(primaryNameData),
+	})
+end)
+
+addEventingHandler("getPrimaryNameRequest", utils.hasMatchingTag("Action", ActionMap.PrimaryNameRequest), function(msg)
+	local initiator = msg.Tags.Initiator or msg.From
+	local result = primaryNames.getPrimaryNameRequest(initiator)
+	assert(result, "Primary name request not found for " .. initiator)
+	return Send(msg, {
+		Target = msg.From,
+		Action = ActionMap.PrimaryNameRequests .. "-Notice",
+		Data = json.encode({
+			name = result.name,
+			startTimestamp = result.startTimestamp,
+			endTimestamp = result.endTimestamp,
+			initiator = initiator,
+		}),
 	})
 end)
 
