@@ -2036,6 +2036,10 @@ describe("gar", function()
 			local gateways = gar.getPaginatedGateways(nil, 1, "startTimestamp", "asc")
 			gateway1.gatewayAddress = stubGatewayAddress
 			gateway2.gatewayAddress = stubRandomAddress
+			-- remove delegates and vaults to avoid sending unbounded arrays
+			local gateway2Copy = utils.deepCopy(gateway2)
+			gateway2Copy.delegates = nil
+			gateway2Copy.vaults = nil
 			assert.are.same({
 				limit = 1,
 				sortBy = "startTimestamp",
@@ -2044,11 +2048,14 @@ describe("gar", function()
 				nextCursor = stubRandomAddress,
 				totalItems = 2,
 				items = {
-					gateway2, -- should be first because it has a lower startTimestamp
+					gateway2Copy, -- should be first because it has a lower startTimestamp
 				},
 			}, gateways)
 			-- get the next page
 			local nextGateways = gar.getPaginatedGateways(gateways.nextCursor, 1, "startTimestamp", "asc")
+			local gateway1Copy = utils.deepCopy(gateway1)
+			gateway1Copy.delegates = nil
+			gateway1Copy.vaults = nil
 			assert.are.same({
 				limit = 1,
 				sortBy = "startTimestamp",
@@ -2057,7 +2064,7 @@ describe("gar", function()
 				nextCursor = nil,
 				totalItems = 2,
 				items = {
-					gateway1,
+					gateway1Copy,
 				},
 			}, nextGateways)
 		end)
@@ -2164,7 +2171,6 @@ describe("gar", function()
 							address = stubDelegate2Address,
 							delegatedStake = 2,
 							startTimestamp = 2000,
-							vaults = {},
 						}, -- should be first because it has a higher startTimestamp
 					},
 				}, delegates)
@@ -2183,7 +2189,6 @@ describe("gar", function()
 							address = stubRandomAddress,
 							delegatedStake = 1,
 							startTimestamp = 1000,
-							vaults = {},
 						},
 					},
 				}, nextDelegates)

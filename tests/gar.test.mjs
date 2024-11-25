@@ -7,6 +7,7 @@ import {
   getBalances,
   getDelegatesItems,
   getGatewayVaultsItems,
+  getDelegations,
 } from './helpers.mjs';
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
@@ -510,7 +511,6 @@ describe('GatewayRegistry', async () => {
           {
             startTimestamp: STUB_TIMESTAMP,
             delegatedStake: 500_000_000,
-            vaults: [],
             address: STUB_ADDRESS_9,
           },
         ],
@@ -893,13 +893,6 @@ describe('GatewayRegistry', async () => {
           {
             startTimestamp: STUB_TIMESTAMP,
             delegatedStake: 0,
-            vaults: {
-              mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm: {
-                balance: 500000000,
-                startTimestamp: STUB_TIMESTAMP,
-                endTimestamp: 2613600000,
-              },
-            },
             address: STUB_ADDRESS_8,
           },
         ],
@@ -1136,7 +1129,6 @@ describe('GatewayRegistry', async () => {
           {
             startTimestamp: delegationTimestamp,
             delegatedStake: delegatedQty,
-            vaults: [],
             address: delegatorAddress,
           },
         ],
@@ -1183,23 +1175,40 @@ describe('GatewayRegistry', async () => {
         memory: decreaseStakeMemory,
         gatewayAddress: STUB_ADDRESS,
       });
-      assert.deepEqual(
-        [
-          {
-            startTimestamp: STUB_TIMESTAMP,
-            delegatedStake: stakeQty - decreaseQty,
-            vaults: {
-              [decreaseStakeMsgId]: {
-                balance: decreaseQty,
-                startTimestamp: decreaseStakeTimestamp,
-                endTimestamp: decreaseStakeTimestamp + 1000 * 60 * 60 * 24 * 30,
-              },
-            },
-            address: delegatorAddress,
-          },
-        ],
-        delegateItems,
-      );
+
+      assert.deepStrictEqual(delegateItems, [
+        {
+          startTimestamp: STUB_TIMESTAMP,
+          delegatedStake: stakeQty - decreaseQty,
+          address: delegatorAddress,
+        },
+      ]);
+      const expectedDelegateId = `${STUB_ADDRESS}_${decreaseStakeTimestamp}`;
+      const expectedEndTimestamp =
+        decreaseStakeTimestamp + 1000 * 60 * 60 * 24 * 30;
+      // check the vault was created and delegation still exists
+      const delegationsForDelegator = await getDelegations({
+        memory: decreaseStakeMemory,
+        address: delegatorAddress,
+      });
+      assert.deepStrictEqual(delegationsForDelegator.items, [
+        {
+          balance: decreaseQty,
+          gatewayAddress: STUB_ADDRESS,
+          startTimestamp: decreaseStakeTimestamp,
+          endTimestamp: expectedEndTimestamp,
+          delegationId: expectedDelegateId,
+          type: 'vault',
+          vaultId: decreaseStakeMsgId,
+        },
+        {
+          balance: stakeQty - decreaseQty,
+          gatewayAddress: STUB_ADDRESS,
+          startTimestamp: STUB_TIMESTAMP,
+          delegationId: `${STUB_ADDRESS}_${STUB_TIMESTAMP}`,
+          type: 'stake',
+        },
+      ]);
     });
 
     it('should fail to withdraw a delegated stake if below the minimum withdrawal limitation', async () => {
@@ -1378,11 +1387,11 @@ describe('GatewayRegistry', async () => {
         ...gatewayBefore,
         totalDelegatedStake: 0, // the entire stake was withdrawn
       });
-      const getDelegatesResult = await getDelegatesItems({
+      const getVaultsResult = await getGatewayVaultsItems({
         memory: instantWithdrawalMemory,
         gatewayAddress: STUB_ADDRESS,
       });
-      assert.deepEqual(getDelegatesResult, []);
+      assert.deepEqual(getVaultsResult, []);
 
       // validate the withdrawal went to the delegate balance and the penalty went to the protocol
       const withdrawalAmount = stakeQty * 0.5; // half the penalty
@@ -1665,7 +1674,6 @@ describe('GatewayRegistry', async () => {
           {
             startTimestamp: STUB_TIMESTAMP,
             delegatedStake: stakeQty,
-            vaults: [],
             address: delegatorAddress,
           },
         ],
@@ -1696,7 +1704,6 @@ describe('GatewayRegistry', async () => {
           {
             delegatedStake: stakeQty,
             startTimestamp: STUB_TIMESTAMP,
-            vaults: [],
             address: delegatorAddress,
           },
         ],
@@ -1790,7 +1797,6 @@ describe('GatewayRegistry', async () => {
           {
             startTimestamp: STUB_TIMESTAMP,
             delegatedStake: stakeQty,
-            vaults: [],
             address: delegatorAddress,
           },
         ],
@@ -1833,7 +1839,6 @@ describe('GatewayRegistry', async () => {
             delegatedStake: stakeQty,
             startTimestamp: STUB_TIMESTAMP + 2,
             address: delegatorAddress,
-            vaults: [],
           },
         ],
       );
