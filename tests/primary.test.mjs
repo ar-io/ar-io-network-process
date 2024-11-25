@@ -57,7 +57,7 @@ describe('primary names', function () {
         Owner: caller,
         Timestamp: timestamp,
         Tags: [
-          { name: 'Action', value: 'Primary-Name-Request' },
+          { name: 'Action', value: 'Request-Primary-Name' },
           { name: 'Name', value: name },
           ...(fundFrom ? [{ name: 'Fund-From', value: fundFrom }] : []),
         ],
@@ -68,6 +68,23 @@ describe('primary names', function () {
     return {
       result: requestPrimaryNameResult,
       memory: requestPrimaryNameResult.Memory,
+    };
+  };
+
+  const getPrimaryNameRequest = async ({ initiator, memory }) => {
+    const getPrimaryNameRequestResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Primary-Name-Request' },
+          { name: 'Initiator', value: initiator },
+        ],
+      },
+      memory,
+    );
+    assertNoResultError(getPrimaryNameRequestResult);
+    return {
+      result: getPrimaryNameRequestResult,
+      memory: getPrimaryNameRequestResult.Memory,
     };
   };
 
@@ -179,7 +196,23 @@ describe('primary names', function () {
       memory: stakeResult.memory,
       fundFrom: 'stakes',
     });
-    assertNoResultError(requestPrimaryNameResult);
+
+    const { result: getPrimaryNameRequestResult } = await getPrimaryNameRequest(
+      {
+        initiator: recipient,
+        memory: requestPrimaryNameResult.Memory,
+      },
+    );
+
+    const requestData = JSON.parse(
+      getPrimaryNameRequestResult.Messages[0].Data,
+    );
+    assert.deepStrictEqual(requestData, {
+      name: 'test-name',
+      startTimestamp: 1234567890,
+      endTimestamp: 1839367890,
+      initiator: recipient,
+    });
 
     const approvedTimestamp = 1234567899;
     const { result: approvePrimaryNameRequestResult } =
