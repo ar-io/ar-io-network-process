@@ -1622,6 +1622,14 @@ function gar.getDelegations(address)
 	end, {})
 end
 
+--- If delegate is missing or stake is 0, then not eligible for distributions
+--- @param gateway table The gateway to check
+--- @param delegateAddress string The address of the delegate to check
+--- @return boolean isEligible - whether the delegate is eligible for distributions
+function gar.isDelegateEligibleForDistributions(gateway, delegateAddress)
+	return gateway.delegates[delegateAddress] and gateway.delegates[delegateAddress].delegatedStake > 0
+end
+
 ---@class Delegation
 ---@field type string # The type of the object. Either "stake" or "vault"
 ---@field gatewayAddress string # The address of the gateway the delegation is associated with

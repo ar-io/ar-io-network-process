@@ -667,9 +667,9 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 				-- distribute all the predetermined rewards to the delegates
 				for delegateAddress, eligibleDelegateReward in pairs(totalEligibleRewardsForGateway.delegateRewards) do
 					local actualDelegateReward = math.floor(eligibleDelegateReward * percentOfEligibleEarned)
-					-- distribute the rewards to the delegate if greater than 0 and the delegate still exists on the gateway
+					-- distribute the rewards to the delegate if greater than 0 and the delegate still exists on the gateway and has a stake greater than 0
 					if actualDelegateReward > 0 then
-						if gateway.delegates[delegateAddress] then
+						if gar.isDelegateEligibleForDistributions(gateway, delegateAddress) then
 							-- increase the stake and decrease the protocol balance, returns the updated gateway
 							gateway = gar.increaseExistingDelegateStake(
 								gatewayAddress,
