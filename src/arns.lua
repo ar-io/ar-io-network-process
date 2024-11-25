@@ -418,10 +418,11 @@ end
 
 ---Calculates the lease fee for a given base fee, years, and demand factor
 --- @param baseFee number The base fee for the name
---- @param years number The number of years
+--- @param years number|nil The number of years
 --- @param demandFactor number The demand factor
 --- @return number leaseFee - the lease fee
 function arns.calculateLeaseFee(baseFee, years, demandFactor)
+	assert(years, "Years is required for lease")
 	local annualRegistrationFee = arns.calculateAnnualRenewalFee(baseFee, years)
 	local totalLeaseCost = baseFee + annualRegistrationFee
 	return math.floor(demandFactor * totalLeaseCost)
