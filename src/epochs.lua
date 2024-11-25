@@ -17,7 +17,7 @@ local epochs = {}
 --- @field distributions Distribution The distributions of the epoch
 
 --- @class EpochSettings
---- @field pruneEpochsCount number The number of epochs to prune
+--- @field maxCachedEpochsCount number The number of epochs to prune
 --- @field prescribedNameCount number The number of prescribed names
 --- @field rewardPercentage number The reward percentage
 --- @field maxObservers number The maximum number of observers
@@ -61,7 +61,7 @@ local epochs = {}
 Epochs = Epochs or {}
 EpochSettings = EpochSettings
 	or {
-		pruneEpochsCount = 14, -- prune epochs older than 14 days
+		maxCachedEpochsCount = 14, -- prune epochs older than 14 days
 		prescribedNameCount = 2,
 		rewardPercentage = 0.0005, -- 0.05%
 		maxObservers = 50,
@@ -70,10 +70,16 @@ EpochSettings = EpochSettings
 		distributionDelayMs = 60 * 1000 * 40, -- 40 minutes (~ 20 arweave blocks)
 	}
 
---- Gets all the epochs
---- @return table<number, Epoch> The epochs indexed by their epoch index
+--- Gets a deep copy of all the epochs
+--- @return table<number, Epoch> # A deep copy of the epochs indexed by their epoch index
 function epochs.getEpochs()
 	return utils.deepCopy(Epochs) or {}
+end
+
+--- Gets all the epochs
+--- @return table<number, Epoch> # The epochs indexed by their epoch index
+function epochs.getEpochsUnsafe()
+	return Epochs or {}
 end
 
 --- Gets an epoch by index
@@ -725,16 +731,20 @@ end
 --- @param timestamp number The timestamp to prune epochs older than
 --- @return Epoch[] # The pruned epochs
 function epochs.pruneEpochs(timestamp)
-	local prunedEpochs = {}
+	local prunedEpochIndexes = {}
 	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	local cutoffEpochIndex = currentEpochIndex - epochs.getSettings().pruneEpochsCount
-	for epochIndex = 0, cutoffEpochIndex do
-		if Epochs[epochIndex] ~= nil then
-			table.insert(prunedEpochs, epochIndex)
+	local cutoffEpochIndex = currentEpochIndex - epochs.getSettings().maxCachedEpochsCount
+	local unsafeEpochs = epochs.getEpochsUnsafe()
+	local nextEpochIndex = next(unsafeEpochs)
+	while nextEpochIndex do
+		if nextEpochIndex <= cutoffEpochIndex then
+			table.insert(prunedEpochIndexes, nextEpochIndex)
+			-- Safe to assign to nil during next() iteration
+			Epochs[nextEpochIndex] = nil
 		end
-		Epochs[epochIndex] = nil
+		nextEpochIndex = next(unsafeEpochs, nextEpochIndex)
 	end
-	return prunedEpochs
+	return prunedEpochIndexes
 end
 
 return epochs
