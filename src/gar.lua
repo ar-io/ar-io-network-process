@@ -75,26 +75,46 @@ local gar = {}
 --- @type Gateways
 GatewayRegistry = GatewayRegistry or {}
 
-GatewayRegistrySettings = GatewayRegistrySettings
-	or {
-		observers = {
-			maxPerEpoch = 50,
-			tenureWeightDays = 180,
-			tenureWeightPeriod = 180 * 24 * 60 * 60 * 1000, -- aproximately 180 days
-			maxTenureWeight = 4,
-		},
-		operators = {
-			minStake = 50000 * 1000000, -- 50,000 IO
-			withdrawLengthMs = 30 * 24 * 60 * 60 * 1000, -- 30 days to lower operator stake
-			leaveLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days that balance will be vaulted
-			failedEpochCountMax = 30, -- number of epochs failed before marked as leaving
-			failedEpochSlashPercentage = 0.2, -- 20% of stake is returned to protocol balance
-		},
-		delegates = {
-			minStake = 500 * 1000000, -- 500 IO
-			withdrawLengthMs = 30 * 24 * 60 * 60 * 1000, -- 30 days
-		},
-	}
+--- @class ObserverSettings
+--- @field maxPerEpoch number
+--- @field tenureWeightDays number
+--- @field tenureWeightPeriod number
+--- @field maxTenureWeight number
+
+--- @class OperatorSettings
+--- @field minStake number
+--- @field withdrawLengthMs number
+--- @field leaveLengthMs number
+--- @field failedEpochCountMax number
+--- @field failedEpochSlashRate number
+
+--- @class DelegateSettings
+--- @field minStake number
+--- @field withdrawLengthMs number
+
+--- @class GatewayRegistrySettings
+--- @field observers ObserverSettings
+--- @field operators OperatorSettings
+--- @field delegates DelegateSettings
+GatewayRegistrySettings = {
+	observers = {
+		maxPerEpoch = 50,
+		tenureWeightDays = 180,
+		tenureWeightPeriod = 180 * 24 * 60 * 60 * 1000, -- approximately 180 days
+		maxTenureWeight = 4,
+	},
+	operators = {
+		minStake = 10000 * 1000000, -- 10,000 IO
+		withdrawLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days to lower operator stake
+		leaveLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days that balance will be vaulted
+		failedEpochCountMax = 30, -- number of epochs failed before marked as leaving
+		failedEpochSlashRate = 0.2, -- 20% of stake is returned to protocol balance
+	},
+	delegates = {
+		minStake = 10 * 1000000, -- 10 IO
+		withdrawLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days
+	},
+}
 
 --- @type Timestamp|nil
 NextGatewaysPruneTimestamp = NextGatewaysPruneTimestamp or 0
@@ -966,8 +986,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 			then
 				-- slash 20% of the minimum operator stake and return the rest to the protocol balance, then mark the gateway as leaving
 				local slashableOperatorStake = math.min(gateway.operatorStake, garSettings.operators.minStake)
-				local slashAmount =
-					math.floor(slashableOperatorStake * garSettings.operators.failedEpochSlashPercentage)
+				local slashAmount = math.floor(slashableOperatorStake * garSettings.operators.failedEpochSlashRate)
 				result.delegateStakeWithdrawing = result.delegateStakeWithdrawing + gateway.totalDelegatedStake
 				result.gatewayStakeWithdrawing = result.gatewayStakeWithdrawing + (gateway.operatorStake - slashAmount)
 				gar.slashOperatorStake(address, slashAmount, currentTimestamp)
