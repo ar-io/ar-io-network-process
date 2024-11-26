@@ -19,6 +19,7 @@ local testSettings = {
 	minDelegatedStake = minDelegatedStake,
 	autoStake = true,
 	label = "test",
+	note = "",
 	delegateRewardShareRatio = 0,
 	properties = stubGatewayAddress,
 	allowedDelegatesLookup = {
@@ -334,6 +335,7 @@ describe("gar", function()
 					fqdn = testSettings.fqdn,
 					protocol = testSettings.protocol,
 					port = testSettings.port,
+					note = testSettings.note,
 					properties = testSettings.properties,
 				},
 				services = testServices,
@@ -516,6 +518,35 @@ describe("gar", function()
 			)
 			assert.is_false(status)
 			assert.match("bundler.path is required and must be a string", error)
+		end)
+		it("should set defaults for non provided settings", function()
+			local minimalSettings = {
+				fqdn = "test.com",
+				label = "test",
+				properties = stubGatewayAddress,
+			}
+
+			local result = gar.joinNetwork(
+				stubGatewayAddress,
+				minOperatorStake,
+				minimalSettings,
+				nil,
+				stubGatewayAddress,
+				startTimestamp
+			)
+			assert.is_not_nil(result)
+			assert.are.same({
+				allowDelegatedStaking = false,
+				delegateRewardShareRatio = 0,
+				autoStake = true,
+				minDelegatedStake = gar.getSettings().delegates.minStake,
+				label = "test",
+				fqdn = "test.com",
+				protocol = "https",
+				note = "",
+				port = 443,
+				properties = stubGatewayAddress,
+			}, _G.GatewayRegistry[stubGatewayAddress].settings)
 		end)
 	end)
 
