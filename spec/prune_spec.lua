@@ -83,6 +83,7 @@ describe("prune", function()
 	)
 
 	it("should prune auctions at the time they expire", function()
+		_G.NextAuctionsPruneTimestamp = 0
 		local pruneTimestamp = 1000000
 		local result = tick.pruneState(pruneTimestamp, "msgId", 0)
 		assert.are.same({

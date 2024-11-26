@@ -10,6 +10,9 @@ local gar = require("gar")
 --- @type Timestamp|nil
 NextRecordsPruneTimestamp = NextRecordsPruneTimestamp or 0
 
+--- @type Timestamp|nil
+NextAuctionsPruneTimestamp = NextAuctionsPruneTimestamp or 0
+
 --- @class NameRegistry
 --- @field reserved table<string, ReservedName> The reserved names
 --- @field records table<string, Record> The records
@@ -828,6 +831,7 @@ function arns.createAuction(name, timestamp, initiator)
 	local demandFactor = demand.getDemandFactor()
 	local auction = Auction:new(name, timestamp, demandFactor, baseFee, initiator, arns.calculateRegistrationFee)
 	NameRegistry.auctions[name] = auction
+	arns.scheduleNextAuctionsPrune(auction.endTimestamp)
 	return auction
 end
 
@@ -1006,10 +1010,24 @@ end
 --- @return Auction[] prunedAuctions - the pruned auctions
 function arns.pruneAuctions(currentTimestamp)
 	local prunedAuctions = {}
+	if not NextAuctionsPruneTimestamp or currentTimestamp < NextAuctionsPruneTimestamp then
+		-- No known auctions to prune
+		return prunedAuctions
+	end
+
+	local minNextEndTimestamp
 	for name, auction in pairs(arns.getAuctions()) do
 		if auction.endTimestamp <= currentTimestamp then
 			prunedAuctions[name] = arns.removeAuction(name)
+		else
+			minNextEndTimestamp = math.min(minNextEndTimestamp or auction.endTimestamp, auction.endTimestamp)
 		end
+	end
+
+	-- Reset the next pruning timestamp now that pruning has completed
+	NextAuctionsPruneTimestamp = nil
+	if minNextEndTimestamp then
+		arns.scheduleNextAuctionsPrune(minNextEndTimestamp)
 	end
 	return prunedAuctions
 end
@@ -1066,6 +1084,11 @@ end
 --- @param timestamp Timestamp
 function arns.scheduleNextRecordsPrune(timestamp)
 	NextRecordsPruneTimestamp = math.min(NextRecordsPruneTimestamp or timestamp, timestamp)
+end
+
+--- @param timestamp Timestamp
+function arns.scheduleNextAuctionsPrune(timestamp)
+	NextAuctionsPruneTimestamp = math.min(NextAuctionsPruneTimestamp or timestamp, timestamp)
 end
 
 return arns
