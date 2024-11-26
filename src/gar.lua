@@ -170,7 +170,7 @@ function gar.joinNetwork(from, stake, settings, services, observerAddress, timeS
 				or nil,
 			delegateRewardShareRatio = settings.delegateRewardShareRatio or 0,
 			autoStake = settings.autoStake or false,
-			minDelegatedStake = settings.minDelegatedStake,
+			minDelegatedStake = settings.minDelegatedStake or gar.getSettings().delegates.minStake,
 			label = settings.label,
 			fqdn = settings.fqdn,
 			protocol = settings.protocol,
