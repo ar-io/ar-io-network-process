@@ -70,6 +70,30 @@ describe("Primary Names", function()
 			assert.match("Primary name is already owned", err)
 		end)
 
+		it("should fail if the caller already has a primary name request for the same name", function()
+			_G.PrimaryNames.requests = {
+				["user-requesting-primary-name"] = { name = "test", startTimestamp = 1234567890 },
+			}
+			local status, err = pcall(
+				primaryNames.createPrimaryNameRequest,
+				"test",
+				"user-requesting-primary-name",
+				1234567890,
+				"test-msg-id"
+			)
+			assert.is_false(status)
+			assert.match(
+				"Primary name request for '"
+					.. "user-requesting-primary-name"
+					.. "' for '"
+					.. "test"
+					.. "' already exists",
+				err,
+				nil,
+				true
+			)
+		end)
+
 		it(
 			"should create a primary name request and transfer the cost from the initiator to the protocol balance",
 			function()
@@ -351,6 +375,11 @@ describe("Primary Names", function()
 				{ name = "undername_test", owner = "primary-name-owner2" },
 				{ name = "undername2_test", owner = "primary-name-owner3" },
 			}, removedPrimaryNamesAndOwners)
+			assert.are.same({
+				owners = {},
+				names = {},
+				requests = {},
+			}, _G.PrimaryNames)
 		end)
 	end)
 

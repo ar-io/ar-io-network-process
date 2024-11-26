@@ -58,9 +58,13 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 	fundFrom = fundFrom or "balance"
 	local baseName = baseNameForName(name)
 
-	--- existing request for primary name from wallet?
-	local existingRequest = primaryNames.getPrimaryNameRequest(name)
-	assert(not existingRequest, "Primary name request for '" .. name .. "' already exists") -- TODO: should we error here or just let them create a new request and pay the fee again?
+	--- check the primary name request for the initiator does not already exist for the same name
+	--- this allows the caller to create a new request and pay the fee again, so long as it is for a different name
+	local existingRequest = primaryNames.getPrimaryNameRequest(initiator)
+	assert(
+		not existingRequest or existingRequest.name ~= name,
+		"Primary name request for '" .. initiator .. "' for '" .. name .. "' already exists"
+	)
 
 	--- check the primary name is not already owned
 	local primaryNameOwner = primaryNames.getAddressForPrimaryName(name)
