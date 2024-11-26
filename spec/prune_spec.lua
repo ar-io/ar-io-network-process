@@ -105,6 +105,7 @@ describe("prune", function()
 	end)
 
 	it("should prune primary names claims when they expire", function()
+		_G.NextPrimaryNamesPruneTimestamp = 0
 		local pruneTimestamp = 1000000
 		local result = tick.pruneState(pruneTimestamp, "msgId", 0)
 		assert.are.same({

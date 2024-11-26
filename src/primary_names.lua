@@ -22,6 +22,9 @@ PrimaryNames = PrimaryNames or {
 	owners = {},
 }
 
+--- @type Timestamp|nil
+NextPrimaryNamesPruneTimestamp = NextPrimaryNamesPruneTimestamp or 0
+
 --- @class PrimaryName
 --- @field name ArNSName
 --- @field startTimestamp number
@@ -94,6 +97,7 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 	else
 		-- otherwise store the request for asynchronous approval
 		PrimaryNames.requests[initiator] = request
+		primaryNames.scheduleNextPrimaryNamesPruning(request.endTimestamp)
 	end
 
 	return {
@@ -347,13 +351,33 @@ end
 --- @return table<string, PrimaryNameRequest> prunedNameClaims - the names of the requests that were pruned
 function primaryNames.prunePrimaryNameRequests(timestamp)
 	local prunedNameRequests = {}
+	if not NextPrimaryNamesPruneTimestamp or timestamp < NextPrimaryNamesPruneTimestamp then
+		-- No known requests to prune
+		return prunedNameRequests
+	end
+
+	local minNextEndTimestamp
 	for initiator, request in pairs(primaryNames.getUnsafePrimaryNameRequests()) do
 		if request.endTimestamp <= timestamp then
 			PrimaryNames.requests[initiator] = nil
 			prunedNameRequests[initiator] = request
+		else
+			minNextEndTimestamp = math.min(minNextEndTimestamp or request.endTimestamp, request.endTimestamp)
 		end
 	end
+
+	-- Reset the pruning timestamp
+	NextPrimaryNamesPruneTimestamp = nil
+	if minNextEndTimestamp then
+		primaryNames.scheduleNextPrimaryNamesPruning(minNextEndTimestamp)
+	end
+
 	return prunedNameRequests
+end
+
+--- @param timestamp Timestamp
+function primaryNames.scheduleNextPrimaryNamesPruning(timestamp)
+	NextPrimaryNamesPruneTimestamp = math.min(NextPrimaryNamesPruneTimestamp or timestamp, timestamp)
 end
 
 return primaryNames
