@@ -19,6 +19,7 @@ import {
   delegateStake,
   getGateway,
   joinNetwork,
+  buyRecord,
 } from './helpers.mjs';
 
 const genesisEpochStart = 1722837600000 + 1;
@@ -633,6 +634,7 @@ describe('Tick', async () => {
     assert.equal(zeroTickDemandFactorResult, 1);
 
     const fundedUser = 'funded-user-'.padEnd(43, '1');
+    const processId = 'process-id-'.padEnd(43, '1');
     const transferMemory = await transfer({
       recipient: fundedUser,
       quantity: 100_000_000_000_000,
@@ -642,17 +644,15 @@ describe('Tick', async () => {
     // Buy records in this epoch
     let buyRecordMemory = transferMemory;
     for (let i = 0; i < 10; i++) {
-      const { Memory } = await handle(
-        {
-          Tags: [
-            { name: 'Action', value: 'Buy-Record' },
-            { name: 'Name', value: 'test-name-' + i },
-            { name: 'Purchase-Type', value: 'permabuy' },
-          ],
-        },
-        buyRecordMemory,
-      );
-      buyRecordMemory = Memory;
+      const { result: buyRecordResult } = await buyRecord({
+        memory: buyRecordMemory,
+        from: fundedUser,
+        name: `test-name-${i}`,
+        purchaseType: 'lease',
+        processId: processId,
+        years: 1,
+      });
+      buyRecordMemory = buyRecordResult.Memory;
     }
 
     // Tick to the half way through the first epoch
