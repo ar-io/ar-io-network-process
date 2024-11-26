@@ -2006,4 +2006,12 @@ function gar.scheduleNextRedelegationsPruning(timestamp)
 	NextRedelegationsPruneTimestamp = math.min(NextRedelegationsPruneTimestamp or timestamp, timestamp)
 end
 
+function gar.nextGatewaysPruneTimestamp()
+	return NextGatewaysPruneTimestamp
+end
+
+function gar.nextRedelegationsPruneTimestamp()
+	return NextRedelegationsPruneTimestamp
+end
+
 return gar

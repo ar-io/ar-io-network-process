@@ -1091,4 +1091,12 @@ function arns.scheduleNextAuctionsPrune(timestamp)
 	NextAuctionsPruneTimestamp = math.min(NextAuctionsPruneTimestamp or timestamp, timestamp)
 end
 
+function arns.nextRecordsPruneTimestamp()
+	return NextRecordsPruneTimestamp
+end
+
+function arns.nextAuctionsPruneTimestamp()
+	return NextAuctionsPruneTimestamp
+end
+
 return arns

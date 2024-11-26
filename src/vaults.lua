@@ -232,4 +232,8 @@ function vaults.scheduleNextVaultsPruning(timestamp)
 	NextBalanceVaultsPruneTimestamp = math.min(NextBalanceVaultsPruneTimestamp or timestamp, timestamp)
 end
 
+function vaults.nextVaultsPruneTimestamp()
+	return NextBalanceVaultsPruneTimestamp
+end
+
 return vaults

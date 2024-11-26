@@ -15,6 +15,7 @@ local primaryNames = require("primary_names")
 ---@field prunedEpochs table<string, Epoch>
 ---@field prunedPrimaryNamesAndOwners table<string, RemovedPrimaryName[]>
 ---@field prunedPrimaryNameRequests table<WalletAddress, PrimaryNameRequest>
+---@field delegatorsWithFeeReset WalletAddress[]
 
 --- Prunes the state
 --- @param timestamp number The timestamp
