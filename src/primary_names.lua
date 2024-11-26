@@ -165,6 +165,11 @@ end
 --- @param startTimestamp number
 --- @return PrimaryNameWithOwner # the primary name with owner data
 function primaryNames.setPrimaryNameFromRequest(recipient, request, startTimestamp)
+	--- if the owner has an existing primary name, make sure we remove it from the maps before setting the new one
+	local existingPrimaryName = primaryNames.getPrimaryNameDataWithOwnerFromAddress(recipient)
+	if existingPrimaryName then
+		primaryNames.removePrimaryName(existingPrimaryName.name, recipient)
+	end
 	PrimaryNames.names[request.name] = recipient
 	PrimaryNames.owners[recipient] = {
 		name = request.name,
@@ -212,7 +217,9 @@ function primaryNames.removePrimaryName(name, from)
 
 	PrimaryNames.names[name] = nil
 	PrimaryNames.owners[primaryName.owner] = nil
-	PrimaryNames.requests[primaryName.owner] = nil -- should never happen, but cleanup anyway
+	if PrimaryNames.requests[primaryName.owner] and PrimaryNames.requests[primaryName.owner].name == name then
+		PrimaryNames.requests[primaryName.owner] = nil
+	end
 	return {
 		name = name,
 		owner = primaryName.owner,

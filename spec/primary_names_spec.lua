@@ -199,6 +199,43 @@ describe("Primary Names", function()
 				}, _G.PrimaryNames.names)
 			end
 		)
+
+		it("should remove the existing primary name if the recipient already has one and set the new one", function()
+			_G.NameRegistry.records = {
+				["test"] = {
+					processId = "owning-process-id",
+				},
+			}
+			_G.PrimaryNames = {
+				owners = {
+					["owner"] = { name = "test", startTimestamp = 1234567890 },
+				},
+				names = {
+					["test"] = "owner",
+				},
+				requests = {
+					["owner"] = {
+						name = "new_test",
+						startTimestamp = 1234567890,
+						endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
+					},
+				},
+			}
+			primaryNames.approvePrimaryNameRequest("owner", "new_test", "owning-process-id", 1234567890)
+			assert.are.same({
+				name = "new_test",
+				startTimestamp = 1234567890,
+			}, _G.PrimaryNames.owners["owner"])
+			assert.are.same(nil, _G.PrimaryNames.names["test"]) -- old name should be removed
+			assert.are.same({}, _G.PrimaryNames.requests) -- request should be removed
+			-- new primary name should be set
+			assert.are.same({
+				["owner"] = { name = "new_test", startTimestamp = 1234567890 },
+			}, _G.PrimaryNames.owners)
+			assert.are.same({
+				["new_test"] = "owner",
+			}, _G.PrimaryNames.names)
+		end)
 	end)
 
 	describe("getAddressForPrimaryName", function()
