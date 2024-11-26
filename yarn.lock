@@ -3,9 +3,9 @@
 
 
 "@ar.io/sdk@alpha":
-  version "2.5.1-alpha.2"
-  resolved "https://registry.yarnpkg.com/@ar.io/sdk/-/sdk-2.5.1-alpha.2.tgz#952d4cb4f6a05244c42a0beeb947f5394f8a4ab0"
-  integrity sha512-2GPAbq8tEW7X6GmpRtv2nq130X5OnTvf45/xnKzkFuE5YPG7lz631GSz7sXKqRaEMVr3X9GjGwmTeVE9Gece5Q==
+  version "2.5.3-alpha.1"
+  resolved "https://registry.yarnpkg.com/@ar.io/sdk/-/sdk-2.5.3-alpha.1.tgz#f8ecbfd592dbe73850ee3bcd04fb33a16c3cf156"
+  integrity sha512-xPSBYJ+N/qQCwyH3UmTiPmhuTFAJwp8os7qnLARdwy4X1b3SlstNp6YVORBQlQVBmFPYpGD98PCReuHbId5xjA==
   dependencies:
     "@dha-team/arbundles" "^1.0.1"
     "@permaweb/aoconnect" "^0.0.57"
