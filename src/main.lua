@@ -417,6 +417,15 @@ end, function(msg)
 		msg.Tags[tagName] = msg.Tags[tagName] and tonumber(msg.Tags[tagName]) or nil
 	end
 
+	if msg.Tags["Force-Prune"] == "true" then
+		gar.scheduleNextGatewaysPruning(0)
+		gar.scheduleNextRedelegationsPruning(0)
+		arns.scheduleNextAuctionsPrune(0)
+		arns.scheduleNextRecordsPrune(0)
+		primaryNames.scheduleNextPrimaryNamesPruning(0)
+		vaults.scheduleNextVaultsPruning(0)
+	end
+
 	local msgId = msg.Id
 	print("Pruning state at timestamp: " .. msgTimestamp)
 	local prunedStateResult = prune.pruneState(msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
