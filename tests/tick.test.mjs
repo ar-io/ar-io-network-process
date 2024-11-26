@@ -9,11 +9,16 @@ import {
   PROCESS_OWNER,
   PROCESS_ID,
   STUB_TIMESTAMP,
+  INITIAL_OPERATOR_STAKE,
+  INITIAL_DELEGATE_STAKE,
 } from '../tools/constants.mjs';
 import {
   getBaseRegistrationFeeForName,
   getDemandFactor,
   getDelegatesItems,
+  delegateStake,
+  getGateway,
+  joinNetwork,
 } from './helpers.mjs';
 
 const genesisEpochStart = 1722837600000 + 1;
@@ -176,23 +181,14 @@ describe('Tick', async () => {
     );
 
     // assert no error tag
-    const errorTag = joinNetworkResult.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(errorTag, undefined);
+    assertNoResultError(joinNetworkResult);
 
     // check the gateway record from contract
-    const gateway = await handle(
-      {
-        Tags: [
-          { name: 'Action', value: 'Gateway' },
-          { name: 'Address', value: STUB_ADDRESS },
-        ],
-      },
-      joinNetworkResult.Memory,
-    );
-    const gatewayData = JSON.parse(gateway.Messages[0].Data);
-    assert.deepEqual(gatewayData.status, 'joined');
+    const gateway = await getGateway({
+      memory: joinNetworkResult.Memory,
+      address: STUB_ADDRESS,
+    });
+    assert.deepEqual(gateway.status, 'joined');
 
     // leave the network
     const leaveNetworkResult = await handle(
@@ -205,22 +201,15 @@ describe('Tick', async () => {
     );
 
     // check the gateways status is leaving
-    const leavingGateway = await handle(
-      {
-        Tags: [
-          { name: 'Action', value: 'Gateway' },
-          { name: 'Address', value: STUB_ADDRESS },
-        ],
-      },
-      leaveNetworkResult.Memory,
-    );
-
-    const leavingGatewayData = JSON.parse(leavingGateway.Messages[0].Data);
-    assert.deepEqual(leavingGatewayData.status, 'leaving');
+    const leavingGateway = await getGateway({
+      memory: leaveNetworkResult.Memory,
+      address: STUB_ADDRESS,
+    });
+    assert.deepEqual(leavingGateway.status, 'leaving');
     // TODO: check delegates and operator stake are vaulted
 
     // expedite the timestamp to the future
-    const futureTimestamp = leavingGatewayData.endTimestamp + 1;
+    const futureTimestamp = leavingGateway.endTimestamp + 1;
     const futureTick = await handle(
       {
         Tags: [
@@ -232,18 +221,12 @@ describe('Tick', async () => {
     );
 
     // check the gateway is pruned
-    const prunedGateway = await handle(
-      {
-        Tags: [
-          { name: 'Action', value: 'Gateway' },
-          { name: 'Address', value: STUB_ADDRESS },
-        ],
-      },
-      futureTick.Memory,
-    );
+    const prunedGateway = await getGateway({
+      memory: futureTick.Memory,
+      address: STUB_ADDRESS,
+    });
 
-    const prunedGatewayData = JSON.parse(prunedGateway.Messages[0].Data);
-    assert.deepEqual(undefined, prunedGatewayData);
+    assert.deepEqual(undefined, prunedGateway);
   });
 
   // vaulting is not working as expected, need to fix before enabling this test
@@ -380,58 +363,34 @@ describe('Tick', async () => {
     });
 
     const delegateAddress = 'delegate-address-'.padEnd(43, '1');
-    // add a gateway
-    const newGateway = await handle(
-      {
-        Tags: validGatewayTags,
-        From: STUB_ADDRESS,
-        Owner: STUB_ADDRESS,
-      },
-      initialMemory,
-    );
+    // add the gateway
+    const { result: newGateway } = await joinNetwork({
+      memory: initialMemory,
+      address: STUB_ADDRESS,
+      timestamp: STUB_TIMESTAMP,
+    });
 
     // assert no error tag
-    const errorTag = newGateway.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(errorTag, undefined);
+    assertNoResultError(newGateway);
 
-    // give balance to delegate
-    const delegateQuantity = 50_000_000_000;
+    // give balance to delegate and stake - making the gateway weight 3 * the minimum
+    const delegateQuantity = INITIAL_OPERATOR_STAKE * 2;
     const delegateTimestamp = STUB_TIMESTAMP + 1;
     const transferMemory = await transfer({
       recipient: delegateAddress,
       quantity: delegateQuantity,
       memory: newGateway.Memory,
     });
-    const newDelegate = await handle(
-      {
-        Tags: [
-          {
-            name: 'Action',
-            value: 'Delegate-Stake',
-          },
-          {
-            name: 'Quantity',
-            value: delegateQuantity.toString(),
-          },
-          {
-            name: 'Address',
-            value: STUB_ADDRESS,
-          },
-        ],
-        From: delegateAddress,
-        Owner: delegateAddress,
-        Timestamp: delegateTimestamp,
-      },
-      transferMemory,
-    );
+    const { result: newDelegateResult } = await delegateStake({
+      gatewayAddress: STUB_ADDRESS,
+      delegatorAddress: delegateAddress,
+      quantity: delegateQuantity,
+      timestamp: delegateTimestamp,
+      memory: transferMemory,
+    });
 
     // assert no error tag
-    const delegateErrorTag = newDelegate.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(delegateErrorTag, undefined);
+    assertNoResultError(newDelegateResult);
 
     // fast forward to the start of the first epoch
     const epochSettings = await handle({
@@ -446,7 +405,7 @@ describe('Tick', async () => {
         Timestamp: createEpochTimestamp, // one millisecond after the epoch start timestamp, should create the epoch and set the prescribed observers and names
         Tags: [{ name: 'Action', value: 'Tick' }],
       },
-      newDelegate.Memory,
+      newDelegateResult.Memory,
     );
 
     // assert no error tag
@@ -490,7 +449,7 @@ describe('Tick', async () => {
           normalizedCompositeWeight: 1,
           gatewayRewardRatioWeight: 1,
           gatewayAddress: STUB_ADDRESS,
-          stake: 150000000000,
+          stake: INITIAL_OPERATOR_STAKE * 3,
           tenureWeight: 4,
           compositeWeight: 12,
           startTimestamp: 21600000,
@@ -549,10 +508,7 @@ describe('Tick', async () => {
     );
 
     // assert no error tag
-    const distributionTickErrorTag = distributionTick.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(distributionTickErrorTag, undefined);
+    assertNoResultError(distributionTick);
 
     // check the rewards were distributed correctly
     const rewards = await handle(
@@ -602,28 +558,21 @@ describe('Tick', async () => {
     const newEpochData = JSON.parse(newEpoch.Messages[0].Data);
     assert.equal(newEpochData.epochIndex, 1);
     // assert the gateway stakes were updated and match the distributed rewards
-    const gateway = await handle(
-      {
-        Tags: [
-          { name: 'Action', value: 'Gateway' },
-          { name: 'Address', value: STUB_ADDRESS },
-        ],
-        Timestamp: distributionTimestamp,
-      },
-      distributionTick.Memory,
-    );
-    const gatewayData = JSON.parse(gateway.Messages[0].Data);
-    assert.deepStrictEqual(gatewayData, {
+    const gateway = await getGateway({
+      memory: distributionTick.Memory,
+      address: STUB_ADDRESS,
+    });
+    assert.deepStrictEqual(gateway, {
       status: 'joined',
       startTimestamp: STUB_TIMESTAMP,
       observerAddress: STUB_ADDRESS,
-      operatorStake: 100_000_000_000 + expectedGatewayOperatorReward,
-      totalDelegatedStake: 50_000_000_000 + expectedGatewayDelegateReward,
+      operatorStake: INITIAL_OPERATOR_STAKE + expectedGatewayOperatorReward,
+      totalDelegatedStake: delegateQuantity + expectedGatewayDelegateReward,
       settings: {
         allowDelegatedStaking: true,
         autoStake: true,
         delegateRewardShareRatio: 25,
-        minDelegatedStake: 500_000_000,
+        minDelegatedStake: INITIAL_DELEGATE_STAKE,
         fqdn: 'test-fqdn',
         label: 'test-gateway',
         note: 'test-note',
@@ -641,11 +590,11 @@ describe('Tick', async () => {
         totalEpochCount: 1,
       },
       weights: {
-        compositeWeight: 14,
+        compositeWeight: 22,
         gatewayRewardRatioWeight: 1,
         normalizedCompositeWeight: 1,
         observerRewardRatioWeight: 1,
-        stakeWeight: 3.5,
+        stakeWeight: 5.5,
         tenureWeight: 4,
       },
     });
@@ -656,7 +605,7 @@ describe('Tick', async () => {
     });
     assert.deepEqual(delegateItems, [
       {
-        delegatedStake: 50_000_000_000 + expectedGatewayDelegateReward,
+        delegatedStake: delegateQuantity + expectedGatewayDelegateReward,
         startTimestamp: delegateTimestamp,
         address: delegateAddress,
       },
