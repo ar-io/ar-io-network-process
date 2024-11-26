@@ -459,7 +459,7 @@ end
 
 --- Splits a string by a delimiter
 --- @param input string The string to split
---- @param delimiter string The delimiter to split by
+--- @param delimiter string|nil The delimiter to split by
 --- @return table The split string
 function utils.splitString(input, delimiter)
 	delimiter = delimiter or ","

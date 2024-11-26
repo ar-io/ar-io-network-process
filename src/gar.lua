@@ -169,14 +169,14 @@ function gar.joinNetwork(from, stake, settings, services, observerAddress, timeS
 			allowedDelegatesLookup = settings.allowedDelegates and utils.createLookupTable(settings.allowedDelegates)
 				or nil,
 			delegateRewardShareRatio = settings.delegateRewardShareRatio or 0,
-			autoStake = settings.autoStake or false,
-			minDelegatedStake = settings.minDelegatedStake,
+			autoStake = settings.autoStake or true,
+			minDelegatedStake = settings.minDelegatedStake or gar.getSettings().delegates.minStake,
 			label = settings.label,
 			fqdn = settings.fqdn,
-			protocol = settings.protocol,
-			port = settings.port,
+			protocol = settings.protocol or "https",
+			port = settings.port or 443,
 			properties = settings.properties,
-			note = settings.note,
+			note = settings.note or "",
 		},
 		services = services or nil,
 		status = "joined",
@@ -763,7 +763,9 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 		type(observerAddress) == "string" and utils.isValidAddress(observerAddress, true),
 		"Observer-Address is required and must be a a valid arweave address"
 	)
-	assert(type(settings.allowDelegatedStaking) == "boolean", "allowDelegatedStaking must be a boolean")
+	if settings.allowDelegatedStaking ~= nil then
+		assert(type(settings.allowDelegatedStaking) == "boolean", "allowDelegatedStaking must be a boolean")
+	end
 	if type(settings.allowedDelegates) == "table" then
 		for _, delegate in ipairs(settings.allowedDelegates) do
 			assert(utils.isValidAddress(delegate, true), "delegates in allowedDelegates must be valid AO addresses")
@@ -777,17 +779,21 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 
 	assert(type(settings.label) == "string", "label is required and must be a string")
 	assert(type(settings.fqdn) == "string", "fqdn is required and must be a string")
-	assert(
-		type(settings.protocol) == "string" and settings.protocol == "https",
-		"protocol is required and must be https"
-	)
-	assert(
-		type(settings.port) == "number"
-			and utils.isInteger(settings.port)
-			and settings.port >= 0
-			and settings.port <= 65535,
-		"port is required and must be an integer between 0 and 65535"
-	)
+	if settings.protocol ~= nil then
+		assert(
+			type(settings.protocol) == "string" and settings.protocol == "https",
+			"protocol is required and must be https"
+		)
+	end
+	if settings.port ~= nil then
+		assert(
+			type(settings.port) == "number"
+				and utils.isInteger(settings.port)
+				and settings.port >= 0
+				and settings.port <= 65535,
+			"port is required and must be an integer between 0 and 65535"
+		)
+	end
 	assert(
 		type(settings.properties) == "string" and utils.isValidAddress(settings.properties, true),
 		"properties is required and must be a string"

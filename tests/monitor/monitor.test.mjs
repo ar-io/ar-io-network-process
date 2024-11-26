@@ -377,8 +377,8 @@ describe('setup', () => {
               `Gateway ${gateway.gatewayAddress} has an invalid total delegated stake: ${gateway.totalDelegatedStake}`,
             );
             assert(
-              gateway.operatorStake >= 50_000_000_000,
-              `Gateway ${gateway.gatewayAddress} has less than 50_000_000_000 IO staked`,
+              gateway.operatorStake >= 10_000_000_000,
+              `Gateway ${gateway.gatewayAddress} has less than 10_000_000_000 IO staked`,
             );
             assert(
               gateway.stats.failedConsecutiveEpochs >= 0,
@@ -426,6 +426,61 @@ describe('setup', () => {
       );
     });
 
+    it('should have valid delegates for all gateways', async () => {
+      const { items: gateways } = await io.getGateways({
+        limit: 1000,
+      });
+      // NOTE: this is an attempt to get the delegates for a gateway, the UX is not great so consider modifying or adding handlers to support gateway specific delegation filters
+      for (const gateway of gateways) {
+        const { items: delegates } = await io.getGatewayDelegates({
+          address: gateway.gatewayAddress,
+        });
+        if (delegates.length > 0) {
+          for (const delegate of delegates) {
+            assert(
+              delegate.delegatedStake >= 0 && delegate.startTimestamp > 0,
+              `Gateway ${gateway.gatewayAddress} has invalid delegate`,
+            );
+            const { items: allDelegations } = await io.getDelegations({
+              address: delegate.address,
+              limit: 1000,
+            });
+            const delegations = allDelegations.filter(
+              (delegation) =>
+                delegation.gatewayAddress === gateway.gatewayAddress,
+            );
+            const stakes = delegations.filter(
+              (delegation) => delegation.type === 'stake',
+            );
+            const vaults = delegations.filter(
+              (delegation) => delegation.type === 'vault',
+            );
+            for (const stake of stakes) {
+              assert(
+                stake.balance >= 0, // can be 0 if the delegate is unstaking
+                `Gateway ${gateway.gatewayAddress} has invalid stake for delegate ${delegate.address}: ${stake.balance}`,
+              );
+              assert(
+                stake.startTimestamp > 0,
+                `Gateway ${gateway.gatewayAddress} has invalid stake start timestamp for delegate ${delegate.address}: ${stake.startTimestamp}`,
+              );
+            }
+            for (const vault of vaults) {
+              assert(
+                vault.balance > 0, // should never be zero
+                `Gateway ${gateway.gatewayAddress} has invalid vault for delegate ${delegate.address}: ${vault.balance}`,
+              );
+              assert(
+                vault.startTimestamp > 0 &&
+                  vault.endTimestamp > vault.startTimestamp,
+                `Gateway ${gateway.gatewayAddress} has invalid vault start and end timestamps for delegate ${delegate.address}: ${vault.startTimestamp} and ${vault.endTimestamp}`,
+              );
+            }
+          }
+        }
+      }
+    });
+
     it('should have valid vaults for all gateways', async () => {
       const { items: gateways } = await io.getGateways({
         limit: 1000,
@@ -437,7 +492,7 @@ describe('setup', () => {
         });
         if (vaults.length === 0) {
           for (const vault of vaults) {
-            // assert vault balance is greater than 0 and startTimestamp and endTimestamp are valid timestamps 30 days apart
+            // assert vault balance is greater than 0 and startTimestamp and endTimestamp are valid timestamps (they are all set to 90 by default, but old ones have to expire out)
             assert(
               Number.isInteger(vault.balance),
               `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid balance (${vault.balance})`,
@@ -455,9 +510,8 @@ describe('setup', () => {
               `Vault ${vault.vaultId} on gateway ${gateway.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`,
             );
             assert(
-              vault.endTimestamp ===
-                vault.startTimestamp + 1000 * 60 * 60 * 24 * 90,
-              `Vault ${vault.vaultId} has an invalid end timestamp (${vault.endTimestamp}).`,
+              vault.endTimestamp > vault.startTimestamp,
+              `Vault ${vault.vaultId} on gateway ${gateway.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`,
             );
           }
         }

@@ -651,3 +651,32 @@ export const updateGatewaySettings = async ({
     result,
   };
 };
+
+export const buyRecord = async ({
+  memory,
+  from,
+  name,
+  processId,
+  type = 'lease',
+  years = 1,
+}) => {
+  const buyRecordResult = await handle(
+    {
+      From: from,
+      Owner: from,
+      Tags: [
+        { name: 'Action', value: 'Buy-Record' },
+        { name: 'Name', value: name },
+        { name: 'Purchase-Type', value: type },
+        { name: 'Process-Id', value: processId },
+        { name: 'Years', value: `${years}` },
+      ],
+    },
+    memory,
+  );
+  assertNoResultError(buyRecordResult);
+  return {
+    result: buyRecordResult,
+    memory: buyRecordResult.Memory,
+  };
+};
