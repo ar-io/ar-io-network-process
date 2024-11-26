@@ -281,3 +281,289 @@ export const getGatewayVaultsItems = async ({ memory, gatewayAddress }) => {
   assertNoResultError(gatewayVaultsResult);
   return JSON.parse(gatewayVaultsResult.Messages?.[0]?.Data).items;
 };
+
+export const delegateStake = async ({
+  memory,
+  timestamp,
+  delegatorAddress,
+  quantity,
+  gatewayAddress,
+  assert = true,
+}) => {
+  // give the wallet the delegate tokens
+  const transferMemory = await transfer({
+    recipient: delegatorAddress,
+    quantity,
+    memory,
+  });
+
+  const delegateResult = await handle(
+    {
+      From: delegatorAddress,
+      Owner: delegatorAddress,
+      Tags: [
+        { name: 'Action', value: 'Delegate-Stake' },
+        { name: 'Quantity', value: `${quantity}` }, // 2K IO
+        { name: 'Address', value: gatewayAddress }, // our gateway address
+      ],
+      Timestamp: timestamp,
+    },
+    transferMemory,
+  );
+  if (assert) {
+    assertNoResultError(delegateResult);
+  }
+  return {
+    result: delegateResult,
+    memory: delegateResult.Memory,
+  };
+};
+
+export const getGateway = async ({
+  memory,
+  timestamp = STUB_TIMESTAMP,
+  address,
+}) => {
+  const gatewayResult = await handle(
+    {
+      Tags: [
+        { name: 'Action', value: 'Gateway' },
+        { name: 'Address', value: address },
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  );
+  const gateway = JSON.parse(gatewayResult.Messages?.[0]?.Data);
+  return gateway;
+};
+
+export const getAllowedDelegates = async ({
+  memory,
+  from,
+  timestamp,
+  gatewayAddress,
+}) => {
+  const delegatesResult = await handle(
+    {
+      From: from,
+      Owner: from,
+      Tags: [
+        { name: 'Action', value: 'Paginated-Allowed-Delegates' },
+        { name: 'Address', value: gatewayAddress },
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  );
+  assertNoResultError(delegatesResult);
+
+  return {
+    result: delegatesResult,
+    memory: delegatesResult.Memory,
+  };
+};
+
+export const getAllowedDelegatesItems = async ({ memory, gatewayAddress }) => {
+  const { result } = await getAllowedDelegates({
+    memory,
+    from: STUB_ADDRESS,
+    timestamp: STUB_TIMESTAMP,
+    gatewayAddress,
+  });
+  return JSON.parse(result.Messages?.[0]?.Data)?.items;
+};
+
+export const decreaseOperatorStake = async ({
+  memory,
+  decreaseQty,
+  address,
+  instant = false,
+  messageId = STUB_MESSAGE_ID,
+  timestamp = STUB_TIMESTAMP,
+  assert = true,
+}) => {
+  const result = await handle(
+    {
+      From: address,
+      Owner: address,
+      Timestamp: timestamp,
+      Id: messageId,
+      Tags: [
+        { name: 'Action', value: 'Decrease-Operator-Stake' },
+        { name: 'Quantity', value: `${decreaseQty}` },
+        { name: 'Instant', value: `${instant}` },
+      ],
+    },
+    memory,
+  );
+  if (assert) {
+    assertNoResultError(result);
+  }
+  return {
+    memory: result.Memory,
+    result,
+  };
+};
+
+export const decreaseDelegateStake = async ({
+  memory,
+  gatewayAddress,
+  delegatorAddress,
+  decreaseQty,
+  instant = false,
+  messageId,
+  timestamp = STUB_TIMESTAMP,
+  assert = true,
+}) => {
+  const result = await handle(
+    {
+      From: delegatorAddress,
+      Owner: delegatorAddress,
+      Timestamp: timestamp,
+      Id: messageId,
+      Tags: [
+        { name: 'Action', value: 'Decrease-Delegate-Stake' },
+        { name: 'Address', value: gatewayAddress },
+        { name: 'Quantity', value: `${decreaseQty}` }, // 500 IO
+        { name: 'Instant', value: `${instant}` },
+      ],
+    },
+    memory,
+  );
+  if (assert) {
+    assertNoResultError(result);
+  }
+  return {
+    memory: result.Memory,
+    result,
+  };
+};
+
+export const cancelWithdrawal = async ({
+  memory,
+  vaultOwner,
+  gatewayAddress,
+  timestamp = STUB_TIMESTAMP,
+  vaultId,
+}) => {
+  const result = await handle(
+    {
+      From: vaultOwner,
+      Owner: vaultOwner,
+      Tags: [
+        { name: 'Action', value: 'Cancel-Withdrawal' },
+        { name: 'Vault-Id', value: vaultId },
+        { name: 'Address', value: gatewayAddress },
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  );
+  assertNoResultError(result);
+  return {
+    memory: result.Memory,
+    result,
+  };
+};
+
+export const instantWithdrawal = async ({
+  memory,
+  address,
+  timestamp = STUB_TIMESTAMP,
+  gatewayAddress,
+  vaultId,
+}) => {
+  const result = await handle(
+    {
+      From: address,
+      Owner: address,
+      Tags: [
+        { name: 'Action', value: 'Instant-Withdrawal' },
+        { name: 'Address', value: gatewayAddress },
+        { name: 'Vault-Id', value: vaultId },
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  );
+  assertNoResultError(result);
+  return {
+    memory: result.Memory,
+    result,
+  };
+};
+
+export const increaseOperatorStake = async ({
+  address,
+  increaseQty,
+  timestamp = STUB_TIMESTAMP,
+  memory,
+}) => {
+  // give them the stake they are increasing by
+  const transferMemory = await transfer({
+    memory,
+    quantity: increaseQty,
+    recipient: address,
+  });
+  const result = await handle(
+    {
+      From: address,
+      Owner: address,
+      Tags: [
+        { name: 'Action', value: 'Increase-Operator-Stake' },
+        { name: 'Quantity', value: `${increaseQty}` },
+      ],
+      Timestamp: timestamp,
+    },
+    transferMemory,
+  );
+  assertNoResultError(result);
+  return {
+    memory: result.Memory,
+    result,
+  };
+};
+
+export const leaveNetwork = async ({
+  address,
+  timestamp = STUB_TIMESTAMP,
+  memory,
+}) => {
+  const result = await handle(
+    {
+      From: address,
+      Owner: address,
+      Tags: [{ name: 'Action', value: 'Leave-Network' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  );
+  assertNoResultError(result);
+  return {
+    memory: result.Memory,
+    result,
+  };
+};
+
+export const updateGatewaySettings = async ({
+  address,
+  settingsTags,
+  timestamp = STUB_TIMESTAMP,
+  memory,
+}) => {
+  const result = await handle(
+    {
+      From: address,
+      Owner: address,
+      Tags: settingsTags,
+      Timestamp: timestamp,
+    },
+    memory,
+  );
+  assertNoResultError(result);
+  return {
+    memory: result.Memory,
+    result,
+  };
+};
