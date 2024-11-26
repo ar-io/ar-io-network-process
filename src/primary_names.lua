@@ -48,7 +48,7 @@ local function baseNameForName(name)
 end
 
 --- Creates a transient request for a primary name. This is done by a user and must be approved by the name owner of the base name.
---- @param name string -- the name being requested, this could be an undername provided by the ant
+--- @param name string -- the name being requested, this could be an undername and should always be lower case
 --- @param initiator WalletAddress -- the address that is creating the primary name request, e.g. the ANT process id
 --- @param timestamp number -- the timestamp of the request
 --- @param msgId string -- the message id of the request
@@ -56,6 +56,7 @@ end
 --- @return CreatePrimaryNameResult # the request created, or the primary name with owner data if the request is approved
 function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
+	name = string.lower(name)
 	local baseName = baseNameForName(name)
 
 	--- check the primary name request for the initiator does not already exist for the same name
@@ -63,7 +64,7 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 	local existingRequest = primaryNames.getPrimaryNameRequest(initiator)
 	assert(
 		not existingRequest or existingRequest.name ~= name,
-		"Primary name request for '" .. initiator .. "' for '" .. name .. "' already exists"
+		"Primary name request by '" .. initiator .. "' for '" .. name .. "' already exists"
 	)
 
 	--- check the primary name is not already owned

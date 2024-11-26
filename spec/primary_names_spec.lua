@@ -83,11 +83,7 @@ describe("Primary Names", function()
 			)
 			assert.is_false(status)
 			assert.match(
-				"Primary name request for '"
-					.. "user-requesting-primary-name"
-					.. "' for '"
-					.. "test"
-					.. "' already exists",
+				[[Primary name request by 'user-requesting-primary-name' for 'test' already exists]],
 				err,
 				nil,
 				true
