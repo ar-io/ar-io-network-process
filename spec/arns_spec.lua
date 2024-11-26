@@ -1102,8 +1102,23 @@ describe("arns", function()
 	end)
 
 	describe("pruneAuctions", function()
+		local currentTimestamp = 1000000
+		local expiredAuction = Auction:new(
+			"expired-auction",
+			currentTimestamp,
+			1,
+			500000000,
+			"test-initiator",
+			arns.calculateRegistrationFee
+		)
+		-- manually set the end timestamp to the current timestamp
+		expiredAuction.endTimestamp = currentTimestamp
+
+		after_each(function()
+			_G.NextAuctionsPruneTimestamp = 0
+		end)
+
 		it("should remove expired auctions", function()
-			local currentTimestamp = 1000000
 			local existingAuction = Auction:new(
 				"active-auction",
 				currentTimestamp,
@@ -1112,16 +1127,6 @@ describe("arns", function()
 				"test-initiator",
 				arns.calculateRegistrationFee
 			)
-			local expiredAuction = Auction:new(
-				"expired-auction",
-				currentTimestamp,
-				1,
-				500000000,
-				"test-initiator",
-				arns.calculateRegistrationFee
-			)
-			-- manually set the end timestamp to the current timestamp
-			expiredAuction.endTimestamp = currentTimestamp
 			_G.NameRegistry.auctions = {
 				["active-auction"] = existingAuction,
 				["expired-auction"] = expiredAuction,
@@ -1133,6 +1138,19 @@ describe("arns", function()
 			assert.are.same({
 				["active-auction"] = existingAuction,
 			}, _G.NameRegistry.auctions)
+		end)
+
+		it("should skip pruning auctions when possible", function()
+			_G.NextAuctionsPruneTimestamp = currentTimestamp + 1 -- force invariant case for test
+			_G.NameRegistry.auctions = {
+				["expired-auction"] = expiredAuction,
+			}
+			local prunedAuctions = arns.pruneAuctions(currentTimestamp)
+			assert.are.same({}, prunedAuctions)
+			assert.are.same({
+				["expired-auction"] = expiredAuction,
+			}, _G.NameRegistry.auctions)
+			assert.are.equal(currentTimestamp + 1, _G.NextAuctionsPruneTimestamp)
 		end)
 	end)
 
