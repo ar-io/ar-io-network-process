@@ -48,7 +48,7 @@ local function baseNameForName(name)
 end
 
 --- Creates a transient request for a primary name. This is done by a user and must be approved by the name owner of the base name.
---- @param name string -- the name being requested, this could be an undername provided by the ant
+--- @param name string -- the name being requested, this could be an undername and should always be lower case
 --- @param initiator WalletAddress -- the address that is creating the primary name request, e.g. the ANT process id
 --- @param timestamp number -- the timestamp of the request
 --- @param msgId string -- the message id of the request
@@ -56,11 +56,16 @@ end
 --- @return CreatePrimaryNameResult # the request created, or the primary name with owner data if the request is approved
 function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
+	name = string.lower(name)
 	local baseName = baseNameForName(name)
 
-	--- existing request for primary name from wallet?
-	local existingRequest = primaryNames.getPrimaryNameRequest(name)
-	assert(not existingRequest, "Primary name request for '" .. name .. "' already exists") -- TODO: should we error here or just let them create a new request and pay the fee again?
+	--- check the primary name request for the initiator does not already exist for the same name
+	--- this allows the caller to create a new request and pay the fee again, so long as it is for a different name
+	local existingRequest = primaryNames.getPrimaryNameRequest(initiator)
+	assert(
+		not existingRequest or existingRequest.name ~= name,
+		"Primary name request by '" .. initiator .. "' for '" .. name .. "' already exists"
+	)
 
 	--- check the primary name is not already owned
 	local primaryNameOwner = primaryNames.getAddressForPrimaryName(name)
@@ -161,6 +166,11 @@ end
 --- @param startTimestamp number
 --- @return PrimaryNameWithOwner # the primary name with owner data
 function primaryNames.setPrimaryNameFromRequest(recipient, request, startTimestamp)
+	--- if the owner has an existing primary name, make sure we remove it from the maps before setting the new one
+	local existingPrimaryName = primaryNames.getPrimaryNameDataWithOwnerFromAddress(recipient)
+	if existingPrimaryName then
+		primaryNames.removePrimaryName(existingPrimaryName.name, recipient)
+	end
 	PrimaryNames.names[request.name] = recipient
 	PrimaryNames.owners[recipient] = {
 		name = request.name,
@@ -208,7 +218,9 @@ function primaryNames.removePrimaryName(name, from)
 
 	PrimaryNames.names[name] = nil
 	PrimaryNames.owners[primaryName.owner] = nil
-	PrimaryNames.requests[primaryName.owner] = nil -- should never happen, but cleanup anyway
+	if PrimaryNames.requests[primaryName.owner] and PrimaryNames.requests[primaryName.owner].name == name then
+		PrimaryNames.requests[primaryName.owner] = nil
+	end
 	return {
 		name = name,
 		owner = primaryName.owner,
