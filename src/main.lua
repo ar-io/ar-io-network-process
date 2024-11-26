@@ -705,10 +705,10 @@ addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", Actio
 end)
 
 addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRecord), function(msg)
-	local name = string.lower(msg.Tags.Name)
+	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
 	local purchaseType = msg.Tags["Purchase-Type"] and string.lower(msg.Tags["Purchase-Type"]) or "lease"
 	local years = msg.Tags.Years or nil
-	local processId = msg.Tags["Process-Id"] or msg.From
+	local processId = msg.Tags["Process-Id"]
 	local timestamp = msg.Timestamp
 	local fundFrom = msg.Tags["Fund-From"]
 
@@ -725,7 +725,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	end
 	assertValidFundFrom(fundFrom)
 
-	msg.ioEvent:addField("nameLength", #msg.Tags.Name)
+	msg.ioEvent:addField("Name-Length", #name)
 
 	local result = arns.buyRecord(name, purchaseType, years, msg.From, timestamp, processId, msg.Id, fundFrom)
 	local record = {}
