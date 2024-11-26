@@ -648,9 +648,8 @@ describe('Tick', async () => {
         memory: buyRecordMemory,
         from: fundedUser,
         name: `test-name-${i}`,
-        purchaseType: 'lease',
+        purchaseType: 'permabuy',
         processId: processId,
-        years: 1,
       });
       buyRecordMemory = buyRecordResult.Memory;
     }
