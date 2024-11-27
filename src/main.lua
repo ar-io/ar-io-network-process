@@ -109,6 +109,7 @@ local ActionMap = {
 	Delegations = "Delegations",
 	-- PRIMARY NAMES
 	RemovePrimaryNames = "Remove-Primary-Names",
+	RequestPrimaryName = "Request-Primary-Name",
 	PrimaryNameRequest = "Primary-Name-Request",
 	PrimaryNameRequests = "Primary-Name-Requests",
 	ApprovePrimaryNameRequest = "Approve-Primary-Name-Request",
@@ -319,6 +320,37 @@ local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
 	end
 end
 
+--- @param ioEvent table
+--- @param prunedStateResult PruneStateResult
+local function addNextPruneTimestampsResults(ioEvent, prunedStateResult)
+	--- @type PrunedGatewaysResult
+	local pruneGatewaysResult = prunedStateResult.pruneGatewaysResult
+
+	-- If anything meaningful was pruned, collect the next prune timestamps
+	if
+		next(prunedStateResult.prunedAuctions)
+		or next(prunedStateResult.prunedEpochs)
+		or next(prunedStateResult.prunedPrimaryNameRequests)
+		or next(prunedStateResult.prunedEpochs)
+		or next(prunedStateResult.prunedRecords)
+		or next(pruneGatewaysResult.prunedGateways)
+		or next(prunedStateResult.delegatorsWithFeeReset)
+		or next(pruneGatewaysResult.slashedGateways)
+		or pruneGatewaysResult.delegateStakeReturned > 0
+		or pruneGatewaysResult.gatewayStakeReturned > 0
+		or pruneGatewaysResult.delegateStakeWithdrawing > 0
+		or pruneGatewaysResult.gatewayStakeWithdrawing > 0
+		or pruneGatewaysResult.stakeSlashed > 0
+	then
+		ioEvent:addField("Next-Auctions-Prune-Timestamp", arns.nextAuctionsPruneTimestamp())
+		ioEvent:addField("Next-Records-Prune-Timestamp", arns.nextRecordsPruneTimestamp())
+		ioEvent:addField("Next-Vaults-Prune-Timestamp", vaults.nextVaultsPruneTimestamp())
+		ioEvent:addField("Next-Gateways-Prune-Timestamp", gar.nextGatewaysPruneTimestamp())
+		ioEvent:addField("Next-Redelegations-Prune-Timestamp", gar.nextRedelegationsPruneTimestamp())
+		ioEvent:addField("Next-Primary-Names-Prune-Timestamp", primaryNames.nextPrimaryNamesPruneTimestamp())
+	end
+end
+
 local function assertValidFundFrom(fundFrom)
 	if fundFrom == nil then
 		return
@@ -416,6 +448,15 @@ end, function(msg)
 		msg.Tags[tagName] = msg.Tags[tagName] and tonumber(msg.Tags[tagName]) or nil
 	end
 
+	if msg.Tags["Force-Prune"] == "true" then
+		gar.scheduleNextGatewaysPruning(0)
+		gar.scheduleNextRedelegationsPruning(0)
+		arns.scheduleNextAuctionsPrune(0)
+		arns.scheduleNextRecordsPrune(0)
+		primaryNames.scheduleNextPrimaryNamesPruning(0)
+		vaults.scheduleNextVaultsPruning(0)
+	end
+
 	local msgId = msg.Id
 	print("Pruning state at timestamp: " .. msgTimestamp)
 	local prunedStateResult = prune.pruneState(msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
@@ -479,6 +520,8 @@ end, function(msg)
 		if prunedRequestsCount then
 			msg.ioEvent:addField("Pruned-Requests-Count", prunedRequestsCount)
 		end
+
+		addNextPruneTimestampsResults(msg.ioEvent, prunedStateResult)
 	end
 
 	-- add supply data if it has changed since the last state
@@ -704,10 +747,10 @@ addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", Actio
 end)
 
 addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRecord), function(msg)
-	local name = string.lower(msg.Tags.Name)
+	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
 	local purchaseType = msg.Tags["Purchase-Type"] and string.lower(msg.Tags["Purchase-Type"]) or "lease"
 	local years = msg.Tags.Years or nil
-	local processId = msg.Tags["Process-Id"] or msg.From
+	local processId = msg.Tags["Process-Id"]
 	local timestamp = msg.Timestamp
 	local fundFrom = msg.Tags["Fund-From"]
 
@@ -724,7 +767,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	end
 	assertValidFundFrom(fundFrom)
 
-	msg.ioEvent:addField("nameLength", #msg.Tags.Name)
+	msg.ioEvent:addField("Name-Length", #name)
 
 	local result = arns.buyRecord(name, purchaseType, years, msg.From, timestamp, processId, msg.Id, fundFrom)
 	local record = {}
@@ -2380,10 +2423,10 @@ addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap
 	end
 end)
 
-addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMap.PrimaryNameRequest), function(msg)
+addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMap.RequestPrimaryName), function(msg)
 	local fundFrom = msg.Tags["Fund-From"]
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
-	local initiator = msg.From -- the process that is creating the claim
+	local initiator = msg.From
 	local timestamp = msg.Timestamp
 	assert(name, "Name is required")
 	assert(initiator, "Initiator is required")
@@ -2460,6 +2503,22 @@ addEventingHandler("getPrimaryNameData", utils.hasMatchingTag("Action", ActionMa
 		Action = ActionMap.PrimaryName .. "-Notice",
 		Tags = { Owner = primaryNameData.owner, Name = primaryNameData.name },
 		Data = json.encode(primaryNameData),
+	})
+end)
+
+addEventingHandler("getPrimaryNameRequest", utils.hasMatchingTag("Action", ActionMap.PrimaryNameRequest), function(msg)
+	local initiator = msg.Tags.Initiator or msg.From
+	local result = primaryNames.getPrimaryNameRequest(initiator)
+	assert(result, "Primary name request not found for " .. initiator)
+	return Send(msg, {
+		Target = msg.From,
+		Action = ActionMap.PrimaryNameRequests .. "-Notice",
+		Data = json.encode({
+			name = result.name,
+			startTimestamp = result.startTimestamp,
+			endTimestamp = result.endTimestamp,
+			initiator = initiator,
+		}),
 	})
 end)
 

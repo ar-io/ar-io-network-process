@@ -880,7 +880,9 @@ describe("epochs", function()
 
 	-- prune epochs
 	describe("pruneEpochs", function()
-		it("should prune epochs older than 14 days", function()
+		local startingEpochs
+		before_each(function()
+			_G.Epochs = {}
 			-- add 20 epochs
 			for i = 0, 20 do
 				_G.Epochs[i] = {
@@ -890,6 +892,10 @@ describe("epochs", function()
 					distributionTimestamp = 1704092400115,
 				}
 			end
+			startingEpochs = utils.deepCopy(_G.Epochs)
+		end)
+
+		it("should prune epochs older than 14 days", function()
 			local currentTimestamp = epochs.getSettings().epochZeroStartTimestamp
 				+ epochs.getSettings().durationMs * 20
 				+ 1
@@ -913,6 +919,18 @@ describe("epochs", function()
 				[19] = _G.Epochs[19],
 				[20] = _G.Epochs[20],
 			}, _G.Epochs)
+		end)
+
+		it("should skip pruning when unnecessary", function()
+			local currentTimestamp = epochs.getSettings().epochZeroStartTimestamp
+				+ epochs.getSettings().durationMs * 20
+				+ 1
+			_G.NextEpochsPruneTimestamp = currentTimestamp + 1
+			-- prune epochs
+			local result = epochs.pruneEpochs(currentTimestamp)
+			assert.are.same({}, result)
+			assert.are.same(startingEpochs, _G.Epochs)
+			assert.are.equal(currentTimestamp + 1, _G.NextEpochsPruneTimestamp)
 		end)
 	end)
 end)

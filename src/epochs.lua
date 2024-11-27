@@ -70,10 +70,19 @@ EpochSettings = EpochSettings
 		distributionDelayMs = 60 * 1000 * 40, -- 40 minutes (~ 20 arweave blocks)
 	}
 
---- Gets all the epochs
---- @return table<number, Epoch> The epochs indexed by their epoch index
+--- @type Timestamp|nil
+NextEpochsPruneTimestamp = NextEpochsPruneTimestamp or 0
+
+--- Gets a deep copy of all the epochs
+--- @return table<number, Epoch> # A deep copy of the epochs indexed by their epoch index
 function epochs.getEpochs()
 	return utils.deepCopy(Epochs) or {}
+end
+
+--- Gets all the epochs
+--- @return table<number, Epoch> # The epochs indexed by their epoch index
+function epochs.getEpochsUnsafe()
+	return Epochs or {}
 end
 
 --- Gets an epoch by index
@@ -394,6 +403,10 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 			gar.updateGatewayWeights(weightedGateway)
 		end
 	end
+
+	-- Force schedule a pruning JIC
+	NextEpochsPruneTimestamp = NextEpochsPruneTimestamp or 0
+
 	return epoch
 end
 
@@ -667,9 +680,9 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 				-- distribute all the predetermined rewards to the delegates
 				for delegateAddress, eligibleDelegateReward in pairs(totalEligibleRewardsForGateway.delegateRewards) do
 					local actualDelegateReward = math.floor(eligibleDelegateReward * percentOfEligibleEarned)
-					-- distribute the rewards to the delegate if greater than 0 and the delegate still exists on the gateway
+					-- distribute the rewards to the delegate if greater than 0 and the delegate still exists on the gateway and has a stake greater than 0
 					if actualDelegateReward > 0 then
-						if gateway.delegates[delegateAddress] then
+						if gar.isDelegateEligibleForDistributions(gateway, delegateAddress) then
 							-- increase the stake and decrease the protocol balance, returns the updated gateway
 							gateway = gar.increaseExistingDelegateStake(
 								gatewayAddress,
@@ -725,16 +738,30 @@ end
 --- @param timestamp number The timestamp to prune epochs older than
 --- @return Epoch[] # The pruned epochs
 function epochs.pruneEpochs(timestamp)
-	local prunedEpochs = {}
+	local prunedEpochIndexes = {}
+	if not NextEpochsPruneTimestamp or timestamp < NextEpochsPruneTimestamp then
+		-- No known pruning work to do
+		return prunedEpochIndexes
+	end
+
+	--- Reset the next pruning timestamp
+	NextEpochsPruneTimestamp = nil
 	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)
 	local cutoffEpochIndex = currentEpochIndex - epochs.getSettings().pruneEpochsCount
-	for epochIndex = 0, cutoffEpochIndex do
-		if Epochs[epochIndex] ~= nil then
-			table.insert(prunedEpochs, epochIndex)
+	local unsafeEpochs = epochs.getEpochsUnsafe()
+	local nextEpochIndex = next(unsafeEpochs)
+	while nextEpochIndex do
+		if nextEpochIndex <= cutoffEpochIndex then
+			table.insert(prunedEpochIndexes, nextEpochIndex)
+			-- Safe to assign to nil during next() iteration
+			Epochs[nextEpochIndex] = nil
+		else
+			local _, endTimestamp = epochs.getEpochTimestampsForIndex(nextEpochIndex)
+			NextEpochsPruneTimestamp = math.min(NextEpochsPruneTimestamp or endTimestamp, endTimestamp)
 		end
-		Epochs[epochIndex] = nil
+		nextEpochIndex = next(unsafeEpochs, nextEpochIndex)
 	end
-	return prunedEpochs
+	return prunedEpochIndexes
 end
 
 return epochs
