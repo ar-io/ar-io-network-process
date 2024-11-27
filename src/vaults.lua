@@ -40,10 +40,7 @@ function vaults.createVault(from, qty, lockLengthMs, currentTimestamp, vaultId)
 		startTimestamp = currentTimestamp,
 		endTimestamp = currentTimestamp + lockLengthMs,
 	})
-	-- A nil NextPruneTimestamp means we're not expecting anything to prune, so set it if necessary
-	-- Otherwise, this new endTimestamp might be earlier than the next known for pruning. If so, set it.
-	NextBalanceVaultsPruneTimestamp =
-		math.min(NextBalanceVaultsPruneTimestamp or newVault.endTimestamp, newVault.endTimestamp)
+	vaults.scheduleNextVaultsPruning(newVault.endTimestamp)
 	return newVault
 end
 
@@ -218,11 +215,26 @@ function vaults.pruneVaults(currentTimestamp)
 		end
 	end
 
-	NextBalanceVaultsPruneTimestamp = minNextEndTimestamp
+	-- Reset the pruning timestamp
+	NextBalanceVaultsPruneTimestamp = nil
+	if minNextEndTimestamp then
+		vaults.scheduleNextVaultsPruning(minNextEndTimestamp)
+	end
 
 	-- set the vaults to the updated vaults
 	Vaults = allVaults
 	return prunedVaults
+end
+
+--- @param timestamp Timestamp
+function vaults.scheduleNextVaultsPruning(timestamp)
+	-- A nil NextPruneTimestamp means we're not expecting anything to prune, so set it if necessary
+	-- Otherwise, this new endTimestamp might be earlier than the next known for pruning. If so, set it.
+	NextBalanceVaultsPruneTimestamp = math.min(NextBalanceVaultsPruneTimestamp or timestamp, timestamp)
+end
+
+function vaults.nextVaultsPruneTimestamp()
+	return NextBalanceVaultsPruneTimestamp
 end
 
 return vaults

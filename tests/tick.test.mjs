@@ -404,7 +404,10 @@ describe('Tick', async () => {
     const newEpochTick = await handle(
       {
         Timestamp: createEpochTimestamp, // one millisecond after the epoch start timestamp, should create the epoch and set the prescribed observers and names
-        Tags: [{ name: 'Action', value: 'Tick' }],
+        Tags: [
+          { name: 'Action', value: 'Tick' },
+          { name: 'Force-Prune', value: 'true' }, // simply exercise this though it's not critical to the test
+        ],
       },
       newDelegateResult.Memory,
     );

@@ -320,6 +320,37 @@ local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
 	end
 end
 
+--- @param ioEvent table
+--- @param prunedStateResult PruneStateResult
+local function addNextPruneTimestampsResults(ioEvent, prunedStateResult)
+	--- @type PrunedGatewaysResult
+	local pruneGatewaysResult = prunedStateResult.pruneGatewaysResult
+
+	-- If anything meaningful was pruned, collect the next prune timestamps
+	if
+		next(prunedStateResult.prunedAuctions)
+		or next(prunedStateResult.prunedEpochs)
+		or next(prunedStateResult.prunedPrimaryNameRequests)
+		or next(prunedStateResult.prunedEpochs)
+		or next(prunedStateResult.prunedRecords)
+		or next(pruneGatewaysResult.prunedGateways)
+		or next(prunedStateResult.delegatorsWithFeeReset)
+		or next(pruneGatewaysResult.slashedGateways)
+		or pruneGatewaysResult.delegateStakeReturned > 0
+		or pruneGatewaysResult.gatewayStakeReturned > 0
+		or pruneGatewaysResult.delegateStakeWithdrawing > 0
+		or pruneGatewaysResult.gatewayStakeWithdrawing > 0
+		or pruneGatewaysResult.stakeSlashed > 0
+	then
+		ioEvent:addField("Next-Auctions-Prune-Timestamp", arns.nextAuctionsPruneTimestamp())
+		ioEvent:addField("Next-Records-Prune-Timestamp", arns.nextRecordsPruneTimestamp())
+		ioEvent:addField("Next-Vaults-Prune-Timestamp", vaults.nextVaultsPruneTimestamp())
+		ioEvent:addField("Next-Gateways-Prune-Timestamp", gar.nextGatewaysPruneTimestamp())
+		ioEvent:addField("Next-Redelegations-Prune-Timestamp", gar.nextRedelegationsPruneTimestamp())
+		ioEvent:addField("Next-Primary-Names-Prune-Timestamp", primaryNames.nextPrimaryNamesPruneTimestamp())
+	end
+end
+
 local function assertValidFundFrom(fundFrom)
 	if fundFrom == nil then
 		return
@@ -419,9 +450,19 @@ end, function(msg)
 
 	local knownBooleanTags = {
 		"Allow-Unsafe-Addresses",
+		"Force-Prune",
 	}
 	for _, tagName in ipairs(knownBooleanTags) do
 		msg.Tags[tagName] = msg.Tags[tagName] and msg.Tags[tagName] == "true" or false
+	end
+
+	if msg.Tags["Force-Prune"] then
+		gar.scheduleNextGatewaysPruning(0)
+		gar.scheduleNextRedelegationsPruning(0)
+		arns.scheduleNextAuctionsPrune(0)
+		arns.scheduleNextRecordsPrune(0)
+		primaryNames.scheduleNextPrimaryNamesPruning(0)
+		vaults.scheduleNextVaultsPruning(0)
 	end
 
 	local msgId = msg.Id
@@ -487,6 +528,8 @@ end, function(msg)
 		if prunedRequestsCount then
 			msg.ioEvent:addField("Pruned-Requests-Count", prunedRequestsCount)
 		end
+
+		addNextPruneTimestampsResults(msg.ioEvent, prunedStateResult)
 	end
 
 	-- add supply data if it has changed since the last state

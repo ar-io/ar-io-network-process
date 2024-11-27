@@ -380,4 +380,8 @@ function primaryNames.scheduleNextPrimaryNamesPruning(timestamp)
 	NextPrimaryNamesPruneTimestamp = math.min(NextPrimaryNamesPruneTimestamp or timestamp, timestamp)
 end
 
+function primaryNames.nextPrimaryNamesPruneTimestamp()
+	return NextPrimaryNamesPruneTimestamp
+end
+
 return primaryNames
