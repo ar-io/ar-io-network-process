@@ -384,7 +384,10 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical)
 			local errorWithEvent = tostring(resultOrError) .. "\n" .. errorEvent:toJSON()
 			error(errorWithEvent, 0) -- 0 ensures not to include this line number in the error message
 		end
-		msg.ioEvent:printEvent()
+		-- isolate out prune handler here when printing
+		if handlerName ~= "prune" then
+			msg.ioEvent:printEvent()
+		end
 	end)
 end
 
