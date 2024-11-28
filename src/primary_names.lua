@@ -5,7 +5,6 @@ local gar = require("gar")
 local primaryNames = {}
 
 -- TODO: Figure out how to modulate this according to market conditions since it's actual spending
-local PRIMARY_NAME_COST = 100000000 -- 100 IO
 local ONE_WEEK_IN_MS = 604800000
 
 --- @alias WalletAddress string
@@ -77,12 +76,18 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 	local record = arns.getRecord(baseName)
 	assert(record, "ArNS record '" .. baseName .. "' does not exist")
 
-	local fundingPlan = gar.getFundingPlan(initiator, PRIMARY_NAME_COST, fundFrom)
+	local requestCost = arns.getTokenCost({
+		intent = "Primary-Name-Request",
+		name = name,
+		currentTimestamp = timestamp,
+	})
+
+	local fundingPlan = gar.getFundingPlan(initiator, requestCost.tokenCost, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0, "Insufficient balances")
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, timestamp)
 
 	--- transfer the primary name cost from the initiator to the protocol balance
-	balances.increaseBalance(ao.id, PRIMARY_NAME_COST)
+	balances.increaseBalance(ao.id, requestCost.tokenCost)
 
 	local request = {
 		name = name,

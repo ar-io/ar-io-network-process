@@ -901,10 +901,11 @@ function assertTokenCostTags(msg)
 		ActionMap.ExtendLease,
 		ActionMap.IncreaseUndernameLimit,
 		ActionMap.UpgradeName,
+		ActionMap.PrimaryNameRequest,
 	})
 	assert(
 		intentType and type(intentType) == "string" and validIntents[intentType],
-		"Intent must be valid registry interaction (e.g. BuyRecord, ExtendLease, IncreaseUndernameLimit, UpgradeName). Provided intent: "
+		"Intent must be valid registry interaction (e.g. Buy-Record, Extend-Lease, Increase-Undername-Limit, Upgrade-Name, Primary-Name-Request). Provided intent: "
 			.. (intentType or "nil")
 	)
 	assert(msg.Tags.Name, "Name is required")
