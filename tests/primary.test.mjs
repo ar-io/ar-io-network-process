@@ -315,13 +315,13 @@ describe('primary names', function () {
       baseNameOwner: processId,
       fundingPlan: {
         address: processId,
-        balance: 100000000,
+        balance: 10000000,
         shortfall: 0,
         stakes: [],
       },
       fundingResult: {
         newWithdrawVaults: [],
-        totalFunded: 100000000,
+        totalFunded: 10000000,
       },
       newPrimaryName: expectedNewPrimaryName,
       request: {

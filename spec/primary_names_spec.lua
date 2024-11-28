@@ -116,7 +116,7 @@ describe("Primary Names", function()
 					baseNameOwner = "processId",
 					fundingPlan = {
 						address = "user-requesting-primary-name",
-						balance = 100000000,
+						balance = 10000000,
 						shortfall = 0,
 						stakes = {},
 					},

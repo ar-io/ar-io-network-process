@@ -541,6 +541,19 @@ describe('ArNS', async () => {
       const tokenCost = JSON.parse(upgradeNameResult.Messages[0].Data);
       assert.equal(tokenCost, basePermabuyPrice);
     });
+
+    it('should return the correct cost of creating a primary name request', async () => {
+      const result = await handle({
+        Tags: [
+          { name: 'Action', value: 'Token-Cost' },
+          { name: 'Intent', value: 'Primary-Name-Request' },
+          { name: 'Name', value: 'test-name' },
+        ],
+      });
+      assertNoResultError(result);
+      const tokenCost = JSON.parse(result.Messages[0].Data);
+      assert.equal(tokenCost, 10000000);
+    });
   });
 
   describe('Extend-Lease', () => {
