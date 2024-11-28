@@ -384,7 +384,10 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical)
 			local errorWithEvent = tostring(resultOrError) .. "\n" .. errorEvent:toJSON()
 			error(errorWithEvent, 0) -- 0 ensures not to include this line number in the error message
 		end
-		msg.ioEvent:printEvent()
+		-- isolate out prune handler here when printing
+		if handlerName ~= "prune" then
+			msg.ioEvent:printEvent()
+		end
 	end)
 end
 
@@ -909,10 +912,11 @@ function assertTokenCostTags(msg)
 		ActionMap.ExtendLease,
 		ActionMap.IncreaseUndernameLimit,
 		ActionMap.UpgradeName,
+		ActionMap.PrimaryNameRequest,
 	})
 	assert(
 		intentType and type(intentType) == "string" and validIntents[intentType],
-		"Intent must be valid registry interaction (e.g. BuyRecord, ExtendLease, IncreaseUndernameLimit, UpgradeName). Provided intent: "
+		"Intent must be valid registry interaction (e.g. Buy-Record, Extend-Lease, Increase-Undername-Limit, Upgrade-Name, Primary-Name-Request). Provided intent: "
 			.. (intentType or "nil")
 	)
 	arns.assertValidArNSName(msg.Tags.Name)

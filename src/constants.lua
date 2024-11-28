@@ -29,6 +29,7 @@ constants.ANNUAL_PERCENTAGE_FEE = 0.2 -- 20%
 constants.ARNS_NAME_DOES_NOT_EXIST_MESSAGE = "Name not found in the ArNS Registry!"
 constants.UNDERNAME_LEASE_FEE_PERCENTAGE = 0.001
 constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE = 0.005
+constants.PRIMARY_NAME_REQUEST_COST = 10000000 -- 10 IO
 constants.oneYearMs = 31536000 * 1000
 constants.gracePeriodMs = 14 * 24 * 60 * 60 * 1000 -- 2 weeks
 constants.maxLeaseLengthYears = 5
