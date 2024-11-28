@@ -593,7 +593,7 @@ end
 --- @field years number|nil The number of years for lease
 --- @field quantity number|nil The quantity for increasing undername limit
 --- @field name string The name of the record
---- @field intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name)
+--- @field intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name/Primary-Name-Request)
 --- @field currentTimestamp number The current timestamp
 --- @field from string|nil The target address of the intended action
 
@@ -638,6 +638,11 @@ function arns.getTokenCost(intendedAction)
 		assert(currentTimestamp, "Timestamp is required")
 		arns.assertValidUpgradeName(record, currentTimestamp)
 		tokenCost = arns.calculatePermabuyFee(baseFee, demand.getDemandFactor())
+	elseif intent == "Primary-Name-Request" then
+		-- TODO: this may change to the cost of a single undername
+		tokenCost = constants.PRIMARY_NAME_REQUEST_COST
+	else
+		error("Invalid intent: " .. intent)
 	end
 
 	local discounts = {}
