@@ -3,7 +3,7 @@ import { getBalances, getVaults } from './helpers.mjs';
 
 function assertValidBalance(balance) {
   assert(
-    balance >= 0 && balance <= 1_000_000_000_000_000,
+    balance > 0 && balance <= 1_000_000_000_000_000,
     `Invariant violated: balance ${balance} is invalid`,
   );
 }
@@ -22,7 +22,7 @@ function assertValidTimestampsAtTimestamp({
     `Invariant violated: startTimestamp ${startTimestamp} is in the future`,
   );
   assert(
-    endTimestamp === null || endTimestamp >= startTimestamp,
+    endTimestamp === null || endTimestamp > startTimestamp,
     `Invariant violated: endTimestamp of ${endTimestamp} for vault ${address}`,
   );
 }
