@@ -1004,11 +1004,10 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 		if arns.recordExpired(record, currentTimestamp) then
 			prunedRecords[name] = record
 			NameRegistry.records[name] = nil
-		elseif
-			arns.recordInGracePeriod(record, currentTimestamp)
-			and record.endTimestamp > lastGracePeriodEntryEndTimestamp
-		then
-			newGracePeriodRecords[name] = record
+		elseif arns.recordInGracePeriod(record, currentTimestamp) then
+			if record.endTimestamp > lastGracePeriodEntryEndTimestamp then
+				newGracePeriodRecords[name] = record
+			end
 			-- Make sure we prune when the grace period is over
 			arns.scheduleNextRecordsPrune(record.endTimestamp + constants.gracePeriodMs)
 		elseif record.endTimestamp then
