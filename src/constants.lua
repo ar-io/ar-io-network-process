@@ -111,4 +111,8 @@ constants.genesisFees = {
 	[51] = 400000000,
 }
 
+-- General
+constants.MIN_UNSAFE_ADDRESS_LENGTH = 1
+constants.MAX_UNSAFE_ADDRESS_LENGTH = 128
+
 return constants

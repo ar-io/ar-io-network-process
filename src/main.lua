@@ -2037,13 +2037,13 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	-- validate the name and process id exist, then create the auction using the auction function
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name)
 	local processId = msg.From
-	local record = arns.getRecord(name)
 	local initiator = msg.Tags.Initiator or msg.From
 	local timestamp = msg.Timestamp
 
-	assert(name and #name > 0, "Name is required") --- this could be an undername, so we don't want to assertValidArNSName
+	assert(name and #name > 0, "Name is required") -- this could be an undername, so we don't want to assertValidArNSName
 	assert(processId and utils.isValidAddress(processId, true), "Process-Id must be a valid address")
 	assert(initiator and utils.isValidAddress(initiator, true), "Initiator is required")
+	local record = arns.getRecord(name)
 	assert(record, "Record not found")
 	assert(record.type == "permabuy", "Only permabuy names can be released")
 	assert(record.processId == processId, "Process-Id mismatch")
@@ -2216,11 +2216,12 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 	local timestamp = msg.Timestamp
 	local type = msg.Tags["Purchase-Type"] or "permabuy"
 	local years = msg.Tags.Years or nil
+	local allowUnsafeProcessId = msg.Tags["Allow-Unsafe-Addresses"]
 
 	-- assert name, bidder, processId are provided
 	assert(name and #name > 0, "Name is required")
 	assert(bidder and utils.isValidAddress(bidder, true), "Bidder is required")
-	assert(processId and utils.isValidAddress(processId, true), "Process-Id must be a valid Arweave address")
+	assert(processId and utils.isValidAddress(processId, allowUnsafeProcessId), "Process-Id must be a valid address")
 	assert(timestamp and timestamp > 0, "Timestamp is required")
 	-- if bidAmount is not nil assert that it is a number
 	if bidAmount then

@@ -1,6 +1,7 @@
 local base64 = require("base64")
 local crypto = require("crypto.init")
 local json = require("json")
+local constants = require("constants")
 local utils = {}
 
 function utils.hasMatchingTag(tag, value)
@@ -246,7 +247,7 @@ end
 
 --- Checks if an address is a valid Arweave address
 --- @param address string The address to check
---- @return boolean isValidAddress - whether the address is a valid Arweave address
+--- @return boolean # whether the address is a valid Arweave address
 function utils.isValidArweaveAddress(address)
 	return type(address) == "string" and #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
 end
@@ -263,13 +264,15 @@ function utils.isValidUnsafeAddress(address)
 		return false
 	end
 	local match = string.match(address, "^[%w_-]+$")
-	return match ~= nil and #address >= 1 and #address <= 128
+	return match ~= nil
+		and #address >= constants.MIN_UNSAFE_ADDRESS_LENGTH
+		and #address <= constants.MAX_UNSAFE_ADDRESS_LENGTH
 end
 
 --- Checks if an address is a valid AO address
 --- @param address string|nil The address to check
 --- @param allowUnsafe boolean Whether to allow unsafe addresses, defaults to false
---- @return boolean isValidAddress - whether the address is valid, depending on the allowUnsafe flag
+--- @return boolean # whether the address is valid, depending on the allowUnsafe flag
 function utils.isValidAddress(address, allowUnsafe)
 	allowUnsafe = allowUnsafe or false -- default to false, only allow unsafe addresses if explicitly set
 	if not address then
