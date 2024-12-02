@@ -1071,10 +1071,12 @@ end
 --- @param currentTimestamp number The current timestamp
 --- @param from string The address of the sender
 --- @param newProcessId string The new process id
-function arns.assertValidReassignName(record, currentTimestamp, from, newProcessId)
+--- @param allowUnsafeProcessId boolean|nil Whether to allow unsafe processIds. Default false.
+function arns.assertValidReassignName(record, currentTimestamp, from, newProcessId, allowUnsafeProcessId)
+	allowUnsafeProcessId = allowUnsafeProcessId or false
 	assert(record, "Name is not registered")
 	assert(currentTimestamp, "Timestamp is required")
-	assert(utils.isValidAddress(newProcessId, true), "Invalid Process-Id") -- allow unsafe addresses for processId
+	assert(utils.isValidAddress(newProcessId, allowUnsafeProcessId), "Invalid Process-Id")
 	assert(record.processId == from, "Not authorized to reassign this name")
 
 	if record.endTimestamp then
@@ -1093,11 +1095,13 @@ end
 --- @param from string The address of the sender
 --- @param currentTimestamp number The current timestamp
 --- @param newProcessId string The new process id
+--- @param allowUnsafeProcessId boolean|nil Whether to allow unsafe processIds. Default false.
 --- @return StoredRecord|nil updatedRecord - the updated record
-function arns.reassignName(name, from, currentTimestamp, newProcessId)
+function arns.reassignName(name, from, currentTimestamp, newProcessId, allowUnsafeProcessId)
+	allowUnsafeProcessId = allowUnsafeProcessId or false
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
-	arns.assertValidReassignName(record, currentTimestamp, from, newProcessId)
+	arns.assertValidReassignName(record, currentTimestamp, from, newProcessId, allowUnsafeProcessId)
 	local updatedRecord = arns.modifyProcessId(name, newProcessId)
 	return updatedRecord
 end

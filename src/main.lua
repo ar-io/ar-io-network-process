@@ -769,6 +769,7 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	local processId = msg.Tags["Process-Id"]
 	local timestamp = msg.Timestamp
 	local fundFrom = msg.Tags["Fund-From"]
+	local allowUnsafeProcessId = msg.Tags["Allow-Unsafe-Addresses"]
 	assert(
 		type(purchaseType) == "string" and purchaseType == "lease" or purchaseType == "permabuy",
 		"Invalid purchase type"
@@ -783,7 +784,17 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 
 	msg.ioEvent:addField("Name-Length", #name)
 
-	local result = arns.buyRecord(name, purchaseType, years, msg.From, timestamp, processId, msg.Id, fundFrom)
+	local result = arns.buyRecord(
+		name,
+		purchaseType,
+		years,
+		msg.From,
+		timestamp,
+		processId,
+		msg.Id,
+		fundFrom,
+		allowUnsafeProcessId
+	)
 	local record = {}
 	if result ~= nil then
 		record = result.record
@@ -1469,6 +1480,7 @@ addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", Action
 	local name = string.lower(msg.Tags.Name)
 	local initiator = msg.Tags.Initiator
 	local timestamp = msg.Timestamp
+	local allowUnsafeProcessId = msg.Tags["Allow-Unsafe-Addresses"]
 	assert(name and #name > 0, "Name is required")
 	assert(utils.isValidAddress(newProcessId, true), "Process Id must be a valid address.")
 	assert(timestamp, "Timestamp is required")
@@ -1476,7 +1488,7 @@ addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", Action
 		assert(utils.isValidAddress(initiator, true), "Invalid initiator address.")
 	end
 
-	local reassignment = arns.reassignName(name, msg.From, timestamp, newProcessId)
+	local reassignment = arns.reassignName(name, msg.From, timestamp, newProcessId, allowUnsafeProcessId)
 
 	Send(msg, {
 		Target = msg.From,
