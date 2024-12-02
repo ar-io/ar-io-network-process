@@ -51,7 +51,7 @@ end
 --- @param lockLengthMs number The lock length in milliseconds
 --- @param currentTimestamp number The current timestamp
 --- @param vaultId string The vault id
---- @param allowUnsafeAddresses boolean Whether to allow unsafe addresses, since this results in funds eventually being sent to an invalid address
+--- @param allowUnsafeAddresses boolean|nil Whether to allow unsafe addresses, since this results in funds eventually being sent to an invalid address
 --- @return Vault The created vault
 function vaults.vaultedTransfer(from, recipient, qty, lockLengthMs, currentTimestamp, vaultId, allowUnsafeAddresses)
 	assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
