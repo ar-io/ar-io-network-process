@@ -271,7 +271,7 @@ end
 
 --- Checks if an address is a valid AO address
 --- @param address string|nil The address to check
---- @param allowUnsafe boolean Whether to allow unsafe addresses, defaults to false
+--- @param allowUnsafe boolean|nil Whether to allow unsafe addresses, defaults to false
 --- @return boolean # whether the address is valid, depending on the allowUnsafe flag
 function utils.isValidAddress(address, allowUnsafe)
 	allowUnsafe = allowUnsafe or false -- default to false, only allow unsafe addresses if explicitly set
