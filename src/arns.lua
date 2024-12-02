@@ -59,10 +59,12 @@ NameRegistry = NameRegistry or {
 --- @param processId string The process id
 --- @param msgId string The current message id
 --- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
+--- @param allowUnsafeProcessId boolean|nil Whether to allow unsafe processIds. Default false.
 --- @return BuyRecordResponse buyRecordResponse - The response including relevant metadata about the purchase
-function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, msgId, fundFrom)
+function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, msgId, fundFrom, allowUnsafeProcessId)
 	fundFrom = fundFrom or "balance"
-	arns.assertValidBuyRecord(name, years, purchaseType, processId)
+	allowUnsafeProcessId = allowUnsafeProcessId or false
+	arns.assertValidBuyRecord(name, years, purchaseType, processId, allowUnsafeProcessId)
 	if purchaseType == nil then
 		purchaseType = "lease" -- set to lease by default
 	end
@@ -507,7 +509,9 @@ end
 --- @param years number|nil The number of years to check
 --- @param purchaseType string|nil The purchase type to check
 --- @param processId string|nil The processId of the record
-function arns.assertValidBuyRecord(name, years, purchaseType, processId)
+--- @param allowUnsafeProcessId boolean|nil Whether to allow unsafe processIds. Default false.
+function arns.assertValidBuyRecord(name, years, purchaseType, processId, allowUnsafeProcessId)
+	allowUnsafeProcessId = allowUnsafeProcessId or false
 	arns.assertValidArNSName(name)
 
 	-- assert purchase type if present is lease or permabuy
@@ -524,7 +528,7 @@ function arns.assertValidBuyRecord(name, years, purchaseType, processId)
 
 	-- assert processId is valid pattern
 	assert(type(processId) == "string", "Process id is required and must be a string.")
-	assert(utils.isValidAddress(processId, true), "Process Id must be a valid address.")
+	assert(utils.isValidAddress(processId, allowUnsafeProcessId), "Process Id must be a valid address.")
 end
 
 --- Asserts that a record is valid for extending the lease
@@ -627,7 +631,7 @@ function arns.getTokenCost(intendedAction)
 	if intent == "Buy-Record" then
 		-- stub the process id as it is not required for this intent
 		local processId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-		arns.assertValidBuyRecord(name, years, purchaseType, processId)
+		arns.assertValidBuyRecord(name, years, purchaseType, processId, false)
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
 	elseif intent == "Extend-Lease" then
 		assert(record, "Name is not registered")
