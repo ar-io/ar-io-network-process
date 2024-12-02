@@ -417,14 +417,12 @@ end
 --- @param timestamp number The timestamp
 --- @return Observations # The updated observations for the epoch
 function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddresses, timestamp)
-	-- assert report tx id is valid arweave address
-	assert(utils.isValidArweaveAddress(reportTxId), "Report transaction ID is not a valid Arweave address")
-	-- assert observer address is valid arweave address
-	assert(utils.isValidArweaveAddress(observerAddress), "Observer address is not a valid Arweave address")
+	-- Note: one of the only places we use arweave addresses, as the protocol requires the report to be stored on arweave. This would be a significant change to OIP if changed.
+	assert(utils.isValidArweaveAddress(reportTxId), "Report transaction ID is not a valid address")
+	assert(utils.isValidAddress(observerAddress, true), "Observer address is not a valid address") -- allow unsafe addresses for observer address
 	assert(type(failedGatewayAddresses) == "table", "Failed gateway addresses is required")
-	-- assert each address in failedGatewayAddresses is a valid arweave address
 	for _, address in ipairs(failedGatewayAddresses) do
-		assert(utils.isValidArweaveAddress(address), "Failed gateway address is not a valid Arweave address")
+		assert(utils.isValidAddress(address, true), "Failed gateway address is not a valid address") -- allow unsafe addresses for failed gateway addresses
 	end
 	assert(type(timestamp) == "number", "Timestamp is required")
 

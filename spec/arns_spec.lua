@@ -65,6 +65,66 @@ describe("arns", function()
 		_G.GatewayRegistry = {}
 	end)
 
+	describe("assertValidArNSName", function()
+		it("should return false for invalid ArNS names", function()
+			local invalidNames = {
+				"", -- empty string
+				nil, -- nil value
+				{}, -- table
+				123, -- number
+				true, -- boolean
+				"test ar", -- space
+				"test!.ar", -- !
+				"test@.ar", -- @
+				"test#.ar", -- #
+				"test$.ar", -- $
+				"test%.ar", -- %
+				"test^.ar", -- ^
+				"test&.ar", -- &
+				"test*.ar", -- *
+				"test(.ar", -- (
+				"test).ar", -- )
+				"test+.ar", -- +
+				"test=.ar", -- =
+				"test{.ar", -- {
+				"test}.ar", -- }
+				string.rep("a", 52), -- too long
+			}
+
+			for _, name in ipairs(invalidNames) do
+				local status, err = pcall(arns.assertValidArNSName, name)
+				assert.is_false(status, "Expected " .. name .. " to be invalid")
+				assert.not_nil(err)
+			end
+		end)
+
+		it("should return true for valid ArNS names", function()
+			local validNames = {
+				"a", -- single character
+				"z", -- single character
+				"0", -- single numeric
+				"9", -- single numeric
+				"test123", -- alphanumeric
+				"123test", -- starts with number
+				"test-123", -- with hyphen
+				"a123456789", -- multiple numbers
+				string.rep("a", 51), -- max length
+				"abcdefghijklmnopqrstuvwxyz0123456789", -- all valid chars
+				"UPPERCASE", -- uppercase allowed
+				"MixedCase123", -- mixed case
+				"with-hyphens-123", -- multiple hyphens
+				"1-2-3", -- numbers and hyphens
+				"a-b-c", -- letters and hyphens
+			}
+
+			for _, name in ipairs(validNames) do
+				local status, err = pcall(arns.assertValidArNSName, name)
+				assert.is_true(status, "Expected " .. name .. " to be valid")
+				assert.is_nil(err)
+			end
+		end)
+	end)
+
 	for addressType, testAddress in pairs(testAddresses) do
 		-- stub out the global state for these tests
 
@@ -281,14 +341,6 @@ describe("arns", function()
 					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
 				assert.is_false(status)
 				assert.match("Name is in auction", result)
-				assert.are.same({}, _G.NameRegistry.records)
-			end)
-
-			it("should throw an error if the name looks like a wallet address [" .. addressType .. "]", function()
-				local status, result =
-					pcall(arns.buyRecord, testAddress, "lease", 1, testAddress, timestamp, testProcessId)
-				assert.is_false(status)
-				assert.match("Name cannot be a wallet address", result)
 				assert.are.same({}, _G.NameRegistry.records)
 			end)
 		end)

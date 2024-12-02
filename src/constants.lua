@@ -14,8 +14,16 @@ constants.minimumWithdrawalAmount = constants.mIOPerIO -- the minimum amount tha
 constants.redelegationFeeResetIntervalMs = 1000 * 60 * 60 * 24 * 7 -- 7 epochs
 
 -- ARNS
+constants.MAX_NAME_LENGTH = 51
+constants.MIN_NAME_LENGTH = 1
+-- Regex pattern to validate ARNS names:
+-- - Starts with an alphanumeric character (%w)
+-- - Can contain alphanumeric characters and hyphens (%w-)
+-- - Ends with an alphanumeric character (%w)
+-- - Does not allow names to start or end with a hyphen
+constants.ARNS_NAME_REGEX = "^%w[%w-]*%w?$"
 constants.DEFAULT_UNDERNAME_COUNT = 10
-constants.DEADLINE_DURATION_MS = 60 * 60 * 1000 -- One hour of miliseconds
+constants.DEADLINE_DURATION_MS = 60 * 60 * 1000 -- One hour of milliseconds
 constants.PERMABUY_LEASE_FEE_LENGTH = 20 -- 20 years
 constants.ANNUAL_PERCENTAGE_FEE = 0.2 -- 20%
 constants.ARNS_NAME_DOES_NOT_EXIST_MESSAGE = "Name not found in the ArNS Registry!"
@@ -102,5 +110,9 @@ constants.genesisFees = {
 	[50] = 400000000,
 	[51] = 400000000,
 }
+
+-- General
+constants.MIN_UNSAFE_ADDRESS_LENGTH = 1
+constants.MAX_UNSAFE_ADDRESS_LENGTH = 128
 
 return constants

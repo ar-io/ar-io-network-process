@@ -451,7 +451,15 @@ end, function(msg)
 		msg.Tags[tagName] = msg.Tags[tagName] and tonumber(msg.Tags[tagName]) or nil
 	end
 
-	if msg.Tags["Force-Prune"] == "true" then
+	local knownBooleanTags = {
+		"Allow-Unsafe-Addresses",
+		"Force-Prune",
+	}
+	for _, tagName in ipairs(knownBooleanTags) do
+		msg.Tags[tagName] = msg.Tags[tagName] and msg.Tags[tagName] == "true" or false
+	end
+
+	if msg.Tags["Force-Prune"] then
 		gar.scheduleNextGatewaysPruning(0)
 		gar.scheduleNextRedelegationsPruning(0)
 		arns.scheduleNextAuctionsPrune(0)
@@ -548,13 +556,14 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 	-- assert recipient is a valid arweave address
 	local recipient = msg.Tags.Recipient
 	local quantity = msg.Tags.Quantity
-	assert(utils.isValidAOAddress(recipient), "Invalid recipient")
+	local allowUnsafeAddresses = msg.Tags["Allow-Unsafe-Addresses"] or false
+	assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
 	assert(quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
 	assert(recipient ~= msg.From, "Cannot transfer to self")
 
 	msg.ioEvent:addField("RecipientFormatted", recipient)
 
-	local result = balances.transfer(recipient, msg.From, quantity)
+	local result = balances.transfer(recipient, msg.From, quantity, allowUnsafeAddresses)
 	if result ~= nil then
 		local senderNewBalance = result[msg.From]
 		local recipientNewBalance = result[recipient]
@@ -572,7 +581,8 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 			Action = "Debit-Notice",
 			Recipient = recipient,
 			Quantity = tostring(quantity),
-			Data = "You transferred " .. tostring(quantity) .. " to " .. recipient,
+			["Allow-Unsafe-Addresses"] = tostring(allowUnsafeAddresses),
+			Data = "You transferred " .. msg.Tags.Quantity .. " to " .. recipient,
 		}
 		-- Credit-Notice message template, that is sent to the Recipient of the transfer
 		local creditNotice = {
@@ -580,7 +590,8 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 			Action = "Credit-Notice",
 			Sender = msg.From,
 			Quantity = tostring(quantity),
-			Data = "You received " .. tostring(quantity) .. " from " .. msg.From,
+			["Allow-Unsafe-Addresses"] = tostring(allowUnsafeAddresses),
+			Data = "You received " .. msg.Tags.Quantity .. " from " .. msg.From,
 		}
 
 		-- Add forwarded tags to the credit and debit notice messages
@@ -647,8 +658,8 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 	local lockLengthMs = msg.Tags["Lock-Length"]
 	local timestamp = msg.Timestamp
 	local msgId = msg.Id
-
-	assert(utils.isValidAOAddress(recipient), "Invalid recipient")
+	local allowUnsafeAddresses = msg.Tags["Allow-Unsafe-Addresses"] or false
+	assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
 	assert(
 		lockLengthMs and lockLengthMs > 0 and utils.isInteger(lockLengthMs),
 		"Invalid lock length. Must be integer greater than 0"
@@ -660,7 +671,8 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 	assert(timestamp, "Timestamp is required for a tick interaction")
 	assert(recipient ~= msg.From, "Cannot transfer to self")
 
-	local vault = vaults.vaultedTransfer(msg.From, recipient, quantity, lockLengthMs, timestamp, msgId)
+	local vault =
+		vaults.vaultedTransfer(msg.From, recipient, quantity, lockLengthMs, timestamp, msgId, allowUnsafeAddresses)
 
 	if vault ~= nil then
 		msg.ioEvent:addField("Vault-Id", msgId)
@@ -678,7 +690,11 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 		Target = msg.From,
 		Recipient = recipient,
 		Quantity = quantity,
-		Tags = { Action = "Debit-Notice", ["Vault-Id"] = msgId },
+		Tags = {
+			Action = "Debit-Notice",
+			["Vault-Id"] = msgId,
+			["Allow-Unsafe-Addresses"] = tostring(allowUnsafeAddresses),
+		},
 		Data = json.encode(vault),
 	})
 	-- to the receiver, they get a vault notice
@@ -689,6 +705,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 		Tags = {
 			Action = ActionMap.CreateVault .. "-Notice",
 			["Vault-Id"] = msgId,
+			["Allow-Unsafe-Addresses"] = tostring(allowUnsafeAddresses),
 		},
 		Data = json.encode(vault),
 	})
@@ -698,7 +715,7 @@ addEventingHandler(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionM
 	local vaultId = msg.Tags["Vault-Id"]
 	local timestamp = msg.Timestamp
 	local extendLengthMs = msg.Tags["Extend-Length"]
-	assert(utils.isValidAOAddress(vaultId), "Invalid vault id")
+	assert(utils.isValidAddress(vaultId, true), "Invalid vault id")
 	assert(
 		extendLengthMs and extendLengthMs > 0 and utils.isInteger(extendLengthMs),
 		"Invalid extension length. Must be integer greater than 0"
@@ -725,7 +742,7 @@ end)
 addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", ActionMap.IncreaseVault), function(msg)
 	local vaultId = msg.Tags["Vault-Id"]
 	local quantity = msg.Tags.Quantity
-	assert(utils.isValidAOAddress(vaultId), "Invalid vault id")
+	assert(utils.isValidAddress(vaultId, true), "Invalid vault id")
 	assert(quantity and quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
 
 	local vault = vaults.increaseVault(msg.From, quantity, vaultId, msg.Timestamp)
@@ -756,15 +773,14 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	local processId = msg.Tags["Process-Id"]
 	local timestamp = msg.Timestamp
 	local fundFrom = msg.Tags["Fund-From"]
-
+	local allowUnsafeProcessId = msg.Tags["Allow-Unsafe-Addresses"]
 	assert(
 		type(purchaseType) == "string" and purchaseType == "lease" or purchaseType == "permabuy",
 		"Invalid purchase type"
 	)
 	assert(timestamp, "Timestamp is required for a tick interaction")
-	assert(type(name) == "string" and #name > 0 and #name <= 51 and not utils.isValidAOAddress(name), "Invalid name")
-	assert(type(processId) == "string", "Process id is required and must be a string.")
-	assert(utils.isValidAOAddress(processId), "Process Id must be a valid AO signer address..")
+	arns.assertValidArNSName(name)
+	assert(utils.isValidAddress(processId, true), "Process Id must be a valid address.")
 	if years then
 		assert(years >= 1 and years <= 5 and utils.isInteger(years), "Invalid years. Must be integer between 1 and 5")
 	end
@@ -772,7 +788,17 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 
 	msg.ioEvent:addField("Name-Length", #name)
 
-	local result = arns.buyRecord(name, purchaseType, years, msg.From, timestamp, processId, msg.Id, fundFrom)
+	local result = arns.buyRecord(
+		name,
+		purchaseType,
+		years,
+		msg.From,
+		timestamp,
+		processId,
+		msg.Id,
+		fundFrom,
+		allowUnsafeProcessId
+	)
 	local record = {}
 	if result ~= nil then
 		record = result.record
@@ -908,7 +934,7 @@ function assertTokenCostTags(msg)
 		"Intent must be valid registry interaction (e.g. Buy-Record, Extend-Lease, Increase-Undername-Limit, Upgrade-Name, Primary-Name-Request). Provided intent: "
 			.. (intentType or "nil")
 	)
-	assert(msg.Tags.Name, "Name is required")
+	arns.assertValidArNSName(msg.Tags.Name)
 	-- if years is provided, assert it is a number and integer between 1 and 5
 	if msg.Tags.Years then
 		assert(utils.isInteger(msg.Tags.Years), "Invalid years. Must be integer between 1 and 5")
@@ -1207,7 +1233,7 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 	local gatewayTarget = msg.Tags.Target or msg.Tags.Address
 	local quantity = msg.Tags.Quantity
 	local timestamp = msg.Timestamp
-	assert(utils.isValidAOAddress(gatewayTarget), "Invalid gateway address")
+	assert(utils.isValidAddress(gatewayTarget, true), "Invalid gateway address")
 	assert(
 		msg.Tags.Quantity and msg.Tags.Quantity > 0 and utils.isInteger(msg.Tags.Quantity),
 		"Invalid quantity. Must be integer greater than 0"
@@ -1239,8 +1265,8 @@ end)
 addEventingHandler(ActionMap.CancelWithdrawal, utils.hasMatchingTag("Action", ActionMap.CancelWithdrawal), function(msg)
 	local gatewayAddress = msg.Tags.Target or msg.Tags.Address or msg.From
 	local vaultId = msg.Tags["Vault-Id"]
-	assert(utils.isValidAOAddress(gatewayAddress), "Invalid gateway address")
-	assert(utils.isValidAOAddress(vaultId), "Invalid vault id")
+	assert(utils.isValidAddress(gatewayAddress, true), "Invalid gateway address")
+	assert(utils.isValidAddress(vaultId, true), "Invalid vault id")
 
 	msg.ioEvent:addField("Target-Formatted", gatewayAddress)
 
@@ -1285,9 +1311,8 @@ addEventingHandler(
 		local vaultId = msg.Tags["Vault-Id"]
 		local timestamp = msg.Timestamp
 		msg.ioEvent:addField("Target-Formatted", target)
-
-		assert(utils.isValidAOAddress(target), "Invalid gateway address")
-		assert(utils.isValidAOAddress(vaultId), "Invalid vault id")
+		assert(utils.isValidAddress(target, true), "Invalid gateway address")
+		assert(utils.isValidAddress(vaultId, true), "Invalid vault id")
 		assert(timestamp, "Timestamp is required")
 
 		local result = gar.instantGatewayWithdrawal(msg.From, target, vaultId, timestamp)
@@ -1459,14 +1484,15 @@ addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", Action
 	local name = string.lower(msg.Tags.Name)
 	local initiator = msg.Tags.Initiator
 	local timestamp = msg.Timestamp
+	local allowUnsafeProcessId = msg.Tags["Allow-Unsafe-Addresses"]
 	assert(name and #name > 0, "Name is required")
-	assert(utils.isValidAOAddress(newProcessId), "Process Id must be a valid AO signer address..")
+	assert(utils.isValidAddress(newProcessId, true), "Process Id must be a valid address.")
 	assert(timestamp, "Timestamp is required")
 	if initiator ~= nil then
-		assert(utils.isValidAOAddress(initiator), "Invalid initiator address.")
+		assert(utils.isValidAddress(initiator, true), "Invalid initiator address.")
 	end
 
-	local reassignment = arns.reassignName(name, msg.From, timestamp, newProcessId)
+	local reassignment = arns.reassignName(name, msg.From, timestamp, newProcessId, allowUnsafeProcessId)
 
 	Send(msg, {
 		Target = msg.From,
@@ -1490,9 +1516,9 @@ addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", Ac
 	local reportTxId = msg.Tags["Report-Tx-Id"]
 	local failedGateways = utils.splitAndTrimString(msg.Tags["Failed-Gateways"], ",")
 	local timestamp = msg.Timestamp
-	assert(utils.isValidAOAddress(reportTxId), "Invalid report tx id")
+	assert(utils.isValidArweaveAddress(reportTxId), "Invalid report tx id. Must be a valid Arweave address.")
 	for _, gateway in ipairs(failedGateways) do
-		assert(utils.isValidAOAddress(gateway), "Invalid failed gateway address: " .. gateway)
+		assert(utils.isValidAddress(gateway, true), "Invalid failed gateway address: " .. gateway)
 	end
 
 	local observations = epochs.saveObservations(msg.From, reportTxId, failedGateways, timestamp)
@@ -2015,13 +2041,13 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	-- validate the name and process id exist, then create the auction using the auction function
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name)
 	local processId = msg.From
-	local record = arns.getRecord(name)
 	local initiator = msg.Tags.Initiator or msg.From
 	local timestamp = msg.Timestamp
 
-	assert(name and #name > 0, "Name is required")
-	assert(processId and utils.isValidAOAddress(processId), "Process-Id is required")
-	assert(initiator and utils.isValidAOAddress(initiator), "Initiator is required")
+	assert(name and #name > 0, "Name is required") -- this could be an undername, so we don't want to assertValidArNSName
+	assert(processId and utils.isValidAddress(processId, true), "Process-Id must be a valid address")
+	assert(initiator and utils.isValidAddress(initiator, true), "Initiator is required")
+	local record = arns.getRecord(name)
 	assert(record, "Record not found")
 	assert(record.type == "permabuy", "Only permabuy names can be released")
 	assert(record.processId == processId, "Process-Id mismatch")
@@ -2194,11 +2220,12 @@ addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.Auctio
 	local timestamp = msg.Timestamp
 	local type = msg.Tags["Purchase-Type"] or "permabuy"
 	local years = msg.Tags.Years or nil
+	local allowUnsafeProcessId = msg.Tags["Allow-Unsafe-Addresses"]
 
 	-- assert name, bidder, processId are provided
 	assert(name and #name > 0, "Name is required")
-	assert(bidder and utils.isValidAOAddress(bidder), "Bidder is required")
-	assert(processId and utils.isValidAOAddress(processId), "Process-Id is required")
+	assert(bidder and utils.isValidAddress(bidder, true), "Bidder is required")
+	assert(processId and utils.isValidAddress(processId, allowUnsafeProcessId), "Process-Id must be a valid address")
 	assert(timestamp and timestamp > 0, "Timestamp is required")
 	-- if bidAmount is not nil assert that it is a number
 	if bidAmount then
@@ -2319,7 +2346,7 @@ addEventingHandler("paginatedDelegations", utils.hasMatchingTag("Action", "Pagin
 	local address = msg.Tags.Address or msg.From
 	local page = utils.parsePaginationTags(msg)
 
-	assert(utils.isValidAOAddress(address), "Invalid address.")
+	assert(utils.isValidAddress(address, true), "Invalid address.")
 
 	local result = gar.getPaginatedDelegations(address, page.cursor, page.limit, page.sortBy, page.sortOrder)
 	Send(msg, {
@@ -2337,12 +2364,12 @@ addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", Act
 	local vaultId = msg.Tags["Vault-Id"]
 	local timestamp = msg.Timestamp
 
-	assert(utils.isValidAOAddress(sourceAddress), "Invalid source gateway address")
-	assert(utils.isValidAOAddress(targetAddress), "Invalid target gateway address")
-	assert(utils.isValidAOAddress(delegateAddress), "Invalid delegator address")
+	assert(utils.isValidAddress(sourceAddress, true), "Invalid source gateway address")
+	assert(utils.isValidAddress(targetAddress, true), "Invalid target gateway address")
+	assert(utils.isValidAddress(delegateAddress, true), "Invalid delegator address")
 	assert(timestamp, "Timestamp is required")
 	if vaultId then
-		assert(utils.isValidAOAddress(vaultId), "Invalid vault id")
+		assert(utils.isValidAddress(vaultId, true), "Invalid vault id")
 	end
 
 	assert(quantity and quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
@@ -2392,7 +2419,7 @@ end)
 
 addEventingHandler(ActionMap.RedelegationFee, utils.hasMatchingTag("Action", ActionMap.RedelegationFee), function(msg)
 	local delegateAddress = msg.Tags.Address or msg.From
-	assert(utils.isValidAOAddress(delegateAddress), "Invalid delegator address")
+	assert(utils.isValidAddress(delegateAddress, true), "Invalid delegator address")
 	local feeResult = gar.getRedelegationFee(delegateAddress)
 	Send(msg, {
 		Target = msg.From,
@@ -2563,7 +2590,7 @@ addEventingHandler(
 	function(msg)
 		local page = utils.parsePaginationTags(msg)
 		local gatewayAddress = utils.formatAddress(msg.Tags.Address or msg.From)
-		assert(utils.isValidAOAddress(gatewayAddress), "Invalid gateway address")
+		assert(utils.isValidAddress(gatewayAddress, true), "Invalid gateway address")
 		local result = gar.getPaginatedVaultsForGateway(
 			gatewayAddress,
 			page.cursor,

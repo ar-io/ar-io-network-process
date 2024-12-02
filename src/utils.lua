@@ -1,6 +1,7 @@
 local base64 = require("base64")
 local crypto = require("crypto.init")
 local json = require("json")
+local constants = require("constants")
 local utils = {}
 
 function utils.hasMatchingTag(tag, value)
@@ -246,7 +247,7 @@ end
 
 --- Checks if an address is a valid Arweave address
 --- @param address string The address to check
---- @return boolean isValidArweaveAddress - whether the address is a valid Arweave address
+--- @return boolean # whether the address is a valid Arweave address
 function utils.isValidArweaveAddress(address)
 	return type(address) == "string" and #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
 end
@@ -258,11 +259,29 @@ function utils.isValidEthAddress(address)
 	return type(address) == "string" and #address == 42 and string.match(address, "^0x[%x]+$") ~= nil
 end
 
+function utils.isValidUnsafeAddress(address)
+	if not address then
+		return false
+	end
+	local match = string.match(address, "^[%w_-]+$")
+	return match ~= nil
+		and #address >= constants.MIN_UNSAFE_ADDRESS_LENGTH
+		and #address <= constants.MAX_UNSAFE_ADDRESS_LENGTH
+end
+
 --- Checks if an address is a valid AO address
---- @param url string|nil The address to check
---- @return boolean isValidAOAddress - whether the address is a valid AO address
-function utils.isValidAOAddress(url)
-	return url and (utils.isValidArweaveAddress(url) or utils.isValidEthAddress(url)) or false
+--- @param address string|nil The address to check
+--- @param allowUnsafe boolean|nil Whether to allow unsafe addresses, defaults to false
+--- @return boolean # whether the address is valid, depending on the allowUnsafe flag
+function utils.isValidAddress(address, allowUnsafe)
+	allowUnsafe = allowUnsafe or false -- default to false, only allow unsafe addresses if explicitly set
+	if not address then
+		return false
+	end
+	if allowUnsafe then
+		return utils.isValidUnsafeAddress(address)
+	end
+	return utils.isValidArweaveAddress(address) or utils.isValidEthAddress(address)
 end
 
 --- Converts an address to EIP-55 checksum format
