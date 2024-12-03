@@ -20,6 +20,7 @@ function balances.transfer(recipient, from, qty, allowUnsafeAddresses)
 	assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
 	assert(type(qty) == "number", "Quantity is required and must be a number!")
 	assert(utils.isInteger(qty), "Quantity must be an integer: " .. qty)
+	assert(qty > 0, "Quantity must be greater than 0")
 
 	balances.reduceBalance(from, qty)
 	balances.increaseBalance(recipient, qty)
