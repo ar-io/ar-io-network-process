@@ -3,7 +3,6 @@ local constants = require("constants")
 local arns = require("arns")
 local demand = require("demand")
 local utils = require("utils")
-local Auction = require("auctions")
 local gar = require("gar")
 
 local stubGatewayAddress = "test-this-is-valid-arweave-wallet-address-1"
@@ -55,7 +54,7 @@ describe("arns", function()
 		_G.NameRegistry = {
 			records = {},
 			reserved = {},
-			auctions = {},
+			returned = {},
 		}
 		_G.Balances = {
 			[testAddressArweave] = startBalance,
@@ -324,23 +323,34 @@ describe("arns", function()
 				assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 			end)
 
+			it(
+				"should allow purchasing returned names with the returned name premium applied [" .. addressType .. "]",
+				function()
+					_G.NameRegistry.returned["test-name"] = {
+						startTimestamp = timestamp,
+						name = "test-name",
+						initiator = "test-initiator",
+					}
+					local result =
+						arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId, "msd-id")
+					local expectation = {
+						endTimestamp = timestamp + constants.oneYearMs,
+						processId = testProcessId,
+						purchasePrice = 600000000 * constants.returnedNameMaxMultiplier,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 10,
+					}
+					assert.are.same(expectation, result.record)
+				end
+			)
+
 			it("should throw an error if the user does not have enough balance [" .. addressType .. "]", function()
 				_G.Balances[testAddress] = 0
 				local status, result =
 					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
 				assert.is_false(status)
 				assert.match("Insufficient balance", result)
-				assert.are.same({}, _G.NameRegistry.records)
-			end)
-
-			it("should throw an error if the name is in auction [" .. addressType .. "]", function()
-				_G.NameRegistry.auctions["test-name"] = {
-					endTimestamp = timestamp + constants.oneYearMs,
-				}
-				local status, result =
-					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
-				assert.is_false(status)
-				assert.match("Name is in auction", result)
 				assert.are.same({}, _G.NameRegistry.records)
 			end)
 		end)
@@ -964,7 +974,7 @@ describe("arns", function()
 			local currentTimestamp = 2000000000
 
 			_G.NameRegistry = {
-				auctions = {},
+				returned = {},
 				reserved = {},
 				records = {
 					["active-record"] = {
@@ -1096,10 +1106,10 @@ describe("arns", function()
 
 		it("should skip pruning when possible", function()
 			local currentTimestamp = 2000000000
-			--- force an invariant case (next prune timestamp after next prunable end timestmap) to prove the point
+			--- force an invariant case (next prune timestamp after next prunable end timestamp) to prove the point
 			_G.NextRecordsPruneTimestamp = currentTimestamp + 1
 			_G.NameRegistry = {
-				auctions = {},
+				returned = {},
 				reserved = {},
 				records = {
 					["expired-record"] = {
@@ -1153,56 +1163,48 @@ describe("arns", function()
 		end)
 	end)
 
-	describe("pruneAuctions", function()
+	describe("pruneReturnedNames", function()
 		local currentTimestamp = 1000000
-		local expiredAuction = Auction:new(
-			"expired-auction",
-			currentTimestamp,
-			1,
-			500000000,
-			"test-initiator",
-			arns.calculateRegistrationFee
-		)
-		-- manually set the end timestamp to the current timestamp
-		expiredAuction.endTimestamp = currentTimestamp
+		local expiredReturnedName = {
+			name = "expired--returned-name",
+			startTimestamp = currentTimestamp - constants.returnedNamePeriod - 1,
+			initiator = "test-initiator",
+		}
+		local activeReturnedName = {
+			name = "active-returned-name",
+			startTimestamp = currentTimestamp - constants.returnedNamePeriod + 1,
+			initiator = "test-initiator",
+		}
 
 		after_each(function()
-			_G.NextAuctionsPruneTimestamp = 0
+			_G.NextReturnedNamesPruneTimestamp = 0
 		end)
 
-		it("should remove expired auctions", function()
-			local existingAuction = Auction:new(
-				"active-auction",
-				currentTimestamp,
-				1,
-				500000000,
-				"test-initiator",
-				arns.calculateRegistrationFee
-			)
-			_G.NameRegistry.auctions = {
-				["active-auction"] = existingAuction,
-				["expired-auction"] = expiredAuction,
+		it("should remove returned names after the returned name period", function()
+			_G.NameRegistry.returned = {
+				["active-returned-name"] = activeReturnedName,
+				["expired-returned-name"] = expiredReturnedName,
 			}
-			local prunedAuctions = arns.pruneAuctions(currentTimestamp)
+			local prunedReturnedNames = arns.pruneReturnedNames(currentTimestamp)
 			assert.are.same({
-				["expired-auction"] = expiredAuction,
-			}, prunedAuctions)
+				["expired-returned-name"] = expiredReturnedName,
+			}, prunedReturnedNames)
 			assert.are.same({
-				["active-auction"] = existingAuction,
-			}, _G.NameRegistry.auctions)
+				["active-returned-name"] = activeReturnedName,
+			}, _G.NameRegistry.returned)
 		end)
 
-		it("should skip pruning auctions when possible", function()
-			_G.NextAuctionsPruneTimestamp = currentTimestamp + 1 -- force invariant case for test
-			_G.NameRegistry.auctions = {
-				["expired-auction"] = expiredAuction,
+		it("should skip pruning returned names when possible", function()
+			_G.NextReturnedNamesPruneTimestamp = currentTimestamp + 1 -- force invariant case for test
+			_G.NameRegistry.returned = {
+				["expired-returned-name"] = expiredReturnedName,
 			}
-			local prunedAuctions = arns.pruneAuctions(currentTimestamp)
-			assert.are.same({}, prunedAuctions)
+			local prunedReturnedNames = arns.pruneReturnedNames(currentTimestamp)
+			assert.are.same({}, prunedReturnedNames)
 			assert.are.same({
-				["expired-auction"] = expiredAuction,
-			}, _G.NameRegistry.auctions)
-			assert.are.equal(currentTimestamp + 1, _G.NextAuctionsPruneTimestamp)
+				["expired-returned-name"] = expiredReturnedName,
+			}, _G.NameRegistry.returned)
+			assert.are.equal(currentTimestamp + 1, _G.NextReturnedNamesPruneTimestamp)
 		end)
 	end)
 
@@ -1220,43 +1222,36 @@ describe("arns", function()
 		end)
 	end)
 
-	describe("auctions", function()
-		describe("createAuction", function()
-			it("should create an auction and remove any existing record", function()
-				local auction = arns.createAuction("test-name", 1000000, "test-initiator")
-				local twoWeeksMs = 1000 * 60 * 60 * 24 * 14
-				assert(auction, "Auction should be created")
-				assert.are.equal(auction.name, "test-name")
-				assert.are.equal(auction.startTimestamp, 1000000)
-				assert.are.equal(auction.endTimestamp, twoWeeksMs + 1000000) -- 14 days late
-				assert.are.equal(auction.initiator, "test-initiator")
-				assert.are.equal(auction.baseFee, 500000000)
-				assert.are.equal(auction.demandFactor, 1)
-				assert.are.equal(auction.settings.decayRate, 0.02037911 / (1000 * 60 * 60 * 24 * 14))
-				assert.are.equal(auction.settings.scalingExponent, 190)
-				assert.are.equal(auction.settings.startPriceMultiplier, 50)
-				assert.are.equal(auction.settings.durationMs, twoWeeksMs)
+	describe("returnedNames", function()
+		describe("createReturnedName", function()
+			it("should create a returned name", function()
+				local returnedName = arns.createReturnedName("test-name", 1000000)
+				assert(returnedName, "Name should be returned")
+				assert.are.equal(returnedName.name, "test-name")
+				assert.are.equal(returnedName.startTimestamp, 1000000)
 				assert.are.equal(_G.NameRegistry.records["test-name"], nil)
+				assert.are.equal(_G.NameRegistry.returned["test-name"], returnedName)
 			end)
 
-			it("should throw an error if the name is already in the auction map", function()
-				local existingAuction =
-					Auction:new("test-name", 1000000, 1, 500000000, "test-initiator", arns.calculateRegistrationFee)
-				_G.NameRegistry.auctions = {
-					["test-name"] = existingAuction,
+			it("should throw an error if the name is already in the returned map", function()
+				_G.NameRegistry.returned = {
+					["test-name"] = {
+						name = "test-name",
+						startTimestamp = 1000000,
+					},
 				}
-				local status, error = pcall(arns.createAuction, "test-name", 1000000, "test-initiator")
+				local status, error = pcall(arns.createReturnedName, "test-name", 1000000)
 				assert.is_false(status)
-				assert.match("Auction already exists", error)
+				assert.match("Returned name already exists", error)
 			end)
 
 			it("should throw an error if the name is reserved", function()
 				_G.NameRegistry.reserved["test-name"] = {
 					endTimestamp = 1000000,
 				}
-				local status, error = pcall(arns.createAuction, "test-name", 1000000, "test-initiator")
+				local status, error = pcall(arns.createReturnedName, "test-name", 1000000)
 				assert.is_false(status)
-				assert.match("Name is reserved. Auctions can only be created for unregistered names.", error)
+				assert.match("Name is reserved. Returned names can only be created for unregistered names.", error)
 			end)
 
 			it("should throw an error if the name is registered", function()
@@ -1268,85 +1263,39 @@ describe("arns", function()
 					type = "permabuy",
 					undernameLimit = 10,
 				}
-				local status, error = pcall(arns.createAuction, "test-name", 1000000, "test-initiator")
+				local status, error = pcall(arns.createReturnedName, "test-name", 1000000)
 				assert.is_false(status)
-				assert.match("Name is registered. Auctions can only be created for unregistered names.", error)
+				assert.match("Name is registered. Returned names can only be created for unregistered names.", error)
 			end)
 		end)
 
-		describe("getAuction", function()
-			it("should return the auction", function()
-				local auction = arns.createAuction("test-name", 1000000, "test-initiator")
-				local retrievedAuction = arns.getAuction("test-name")
-				assert.are.same(retrievedAuction, auction)
+		describe("getReturnedName", function()
+			it("should return the returnedName", function()
+				local returnedName = arns.createReturnedName("test-name", 1000000, "test-initiator")
+				local retrievedReturnedName = arns.getReturnedName("test-name")
+				assert.are.same(retrievedReturnedName, returnedName)
 			end)
 
-			it("should throw an error if the auction is not found", function()
-				local nonexistentAuction = arns.getAuction("nonexistent-auction")
-				assert.is_nil(nonexistentAuction)
+			it("should throw an error if the returnedName is not found", function()
+				local nonexistentReturnedName = arns.getReturnedName("nonexistent-returnedName")
+				assert.is_nil(nonexistentReturnedName)
 			end)
 		end)
 
-		describe("getPriceForAuctionAtTimestamp", function()
-			it("should return the correct price for an auction at a given timestamp permanently", function()
+		describe("getReturnedNamePremiumMultiplier", function()
+			it("should return the correct multiplier for a returned name", function()
 				local startTimestamp = 1000000
-				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
-				assert(auction, "Auction should be created")
-				local currentTimestamp = startTimestamp + 1000 * 60 * 60 * 24 * 7 -- 1 week into the auction
-				local decayRate = 0.02037911 / (1000 * 60 * 60 * 24 * 14)
-				local scalingExponent = 190
-				local expectedStartPrice = auction.registrationFeeCalculator(
-					"permabuy",
-					auction.baseFee,
-					nil,
-					auction.demandFactor
-				) * 50
-				local timeSinceStart = currentTimestamp - auction.startTimestamp
-				local totalDecaySinceStart = decayRate * timeSinceStart
-				local expectedPriceAtTimestamp =
-					math.floor(expectedStartPrice * ((1 - totalDecaySinceStart) ^ scalingExponent))
-				local priceAtTimestamp = auction:getPriceForAuctionAtTimestamp(currentTimestamp, "permabuy", nil)
-				assert.are.equal(expectedPriceAtTimestamp, priceAtTimestamp)
+				local currentTimestamp = 1000000 + constants.returnedNamePeriod / 2
+				local multiplier = arns.getReturnedNamePremiumMultiplier(startTimestamp, currentTimestamp)
+				assert.are.equal(constants.returnedNameMaxMultiplier / 2, multiplier)
 			end)
-		end)
 
-		describe("computePricesForAuction", function()
-			it("should return the correct prices for an auction with for a lease", function()
-				local startTimestamp = 1729524023521
-				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
-				assert(auction, "Auction should be created")
-				local intervalMs = 1000 * 60 * 15 -- 15 min (how granular we want to compute the prices)
-				local prices = auction:computePricesForAuction("lease", 1, intervalMs)
-				local baseFee = 500000000
-				local oneYearLeaseFee = baseFee * constants.ANNUAL_PERCENTAGE_FEE * 1
-				local floorPrice = baseFee + oneYearLeaseFee
-				local startPriceForLease = floorPrice * 50
-				-- create the curve of prices using the parameters of the auction
-				local decayRate = auction.settings.decayRate
-				local scalingExponent = auction.settings.scalingExponent
-				-- all the prices before the last one should match
-				for i = startTimestamp, auction.endTimestamp - intervalMs, intervalMs do
-					local timeSinceStart = i - auction.startTimestamp
-					local totalDecaySinceStart = decayRate * timeSinceStart
-					local expectedPriceAtTimestamp =
-						math.floor(startPriceForLease * ((1 - totalDecaySinceStart) ^ scalingExponent))
-					assert.are.equal(
-						expectedPriceAtTimestamp,
-						prices[i],
-						"Price at timestamp" .. i .. " should be " .. expectedPriceAtTimestamp
-					)
-				end
-				-- make sure the last price at the end of the auction is the floor price
-				local lastProvidedPrice = prices[auction.endTimestamp]
-				local lastComputedPrice = auction:getPriceForAuctionAtTimestamp(auction.endTimestamp, "lease", 1)
-				local listPricePercentDifference = (lastComputedPrice - lastProvidedPrice) / lastProvidedPrice
-				assert.is_true(
-					listPricePercentDifference <= 0.0001,
-					"Last price should be within 0.01% of the final price in the interval. Last computed: "
-						.. lastComputedPrice
-						.. " Last provided: "
-						.. lastProvidedPrice
-				)
+			it("should throw an error if provided timestamps fall outside the returned name period", function()
+				local startTimestamp = 1000000
+				local currentTimestamp = 1000000 + constants.returnedNamePeriod + 1
+				local status, error = pcall(arns.getReturnedNamePremiumMultiplier, startTimestamp, currentTimestamp)
+				assert.is_false(status)
+				assert.match("Timestamp is outside of the returned name period", error)
 			end)
 		end)
 
@@ -1484,169 +1433,6 @@ describe("arns", function()
 				}
 				_G.Balances[testAddressArweave] = 2500000000 - 1 -- 1 less than the upgrade cost
 				local status, error = pcall(arns.upgradeRecord, testAddressArweave, "upgrade-name", 1000000)
-				assert.is_false(status)
-				assert.match("Insufficient balance", error)
-			end)
-		end)
-
-		describe("submitAuctionBid", function()
-			it(
-				"should accept bid on an existing auction and transfer tokens to the auction initiator and protocol balance, and create the record",
-				function()
-					local startTimestamp = 1000000
-					local bidTimestamp = startTimestamp + 1000 * 60 * 2 -- 2 min into the auction
-					local demandBefore = demand.getCurrentPeriodPurchases()
-					local revenueBefore = demand.getCurrentPeriodRevenue()
-					local baseFee = 500000000
-					local permabuyAnnualFee = baseFee * constants.ANNUAL_PERCENTAGE_FEE * 20
-					local floorPrice = baseFee + permabuyAnnualFee
-					local startPrice = floorPrice * 50
-					local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
-					assert(auction, "Auction should be created")
-					local result = arns.submitAuctionBid(
-						"test-name",
-						startPrice,
-						testAddressArweave,
-						bidTimestamp,
-						"test-process-id",
-						"permabuy",
-						0,
-						"test-msg-id"
-					)
-					local totalDecay = auction.settings.decayRate * (bidTimestamp - startTimestamp)
-					local expectedPrice = math.floor(startPrice * ((1 - totalDecay) ^ auction.settings.scalingExponent))
-					local expectedRecord = {
-						endTimestamp = nil,
-						processId = "test-process-id",
-						purchasePrice = expectedPrice,
-						startTimestamp = bidTimestamp,
-						type = "permabuy",
-						undernameLimit = 10,
-					}
-					local expectedInitiatorReward = math.floor(expectedPrice * 0.5)
-					local expectedProtocolReward = expectedPrice - expectedInitiatorReward
-					assert.are.equal(expectedInitiatorReward, _G.Balances["test-initiator"])
-					assert.are.equal(expectedProtocolReward, _G.Balances[_G.ao.id])
-					assert.are.equal(nil, _G.NameRegistry.auctions["test-name"])
-					assert.are.same(expectedRecord, _G.NameRegistry.records["test-name"])
-					assert.are.same(expectedRecord, result.record)
-					assert.are.equal(
-						demandBefore + 1,
-						demand.getCurrentPeriodPurchases(),
-						"Purchases should increase by 1"
-					)
-					assert.are.equal(
-						revenueBefore + expectedPrice,
-						demand.getCurrentPeriodRevenue(),
-						"Revenue should increase by the bid amount"
-					)
-				end
-			)
-
-			it("should apply ArNS discount on auction bids for eligible gateways", function()
-				_G.GatewayRegistry[testAddressArweave] = testGateway
-				_G.GatewayRegistry[testAddressArweave].weights = {
-					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
-					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
-				}
-				assert(gar.isEligibleForArNSDiscount(testAddressArweave))
-				local startTimestamp = 1000000
-				local bidTimestamp = startTimestamp + 1000 * 60 * 2 -- 2 min into the auction
-				local demandBefore = demand.getCurrentPeriodPurchases()
-				local revenueBefore = demand.getCurrentPeriodRevenue()
-				local baseFee = 500000000
-				local permabuyAnnualFee = baseFee * constants.ANNUAL_PERCENTAGE_FEE * 20
-				local floorPrice = baseFee + permabuyAnnualFee
-				local startPrice = floorPrice * 50
-				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
-				assert(auction, "Auction should be created")
-				local result = arns.submitAuctionBid(
-					"test-name",
-					startPrice,
-					testAddressArweave,
-					bidTimestamp,
-					"test-process-id",
-					"permabuy",
-					0,
-					"test-msg-id"
-				)
-				local totalDecay = auction.settings.decayRate * (bidTimestamp - startTimestamp)
-				local expectedPrice = math.floor(startPrice * ((1 - totalDecay) ^ auction.settings.scalingExponent))
-				local discountedPrice = expectedPrice - (math.floor(expectedPrice * constants.ARNS_DISCOUNT_PERCENTAGE))
-				local expectedRecord = {
-					endTimestamp = nil,
-					processId = "test-process-id",
-					purchasePrice = discountedPrice,
-					startTimestamp = bidTimestamp,
-					type = "permabuy",
-					undernameLimit = 10,
-				}
-				local expectedInitiatorReward = math.floor(discountedPrice * 0.5)
-				local expectedProtocolReward = discountedPrice - expectedInitiatorReward
-				assert.are.equal(expectedInitiatorReward, _G.Balances["test-initiator"])
-				assert.are.equal(expectedProtocolReward, _G.Balances[_G.ao.id])
-				assert.are.equal(nil, _G.NameRegistry.auctions["test-name"])
-				assert.are.same(expectedRecord, _G.NameRegistry.records["test-name"])
-				assert.are.same(expectedRecord, result.record)
-				assert.are.equal(demandBefore + 1, demand.getCurrentPeriodPurchases(), "Purchases should increase by 1")
-				assert.are.equal(
-					revenueBefore + discountedPrice,
-					demand.getCurrentPeriodRevenue(),
-					"Revenue should increase by the bid amount"
-				)
-			end)
-
-			it("should throw an error if the auction is not found", function()
-				local status, error = pcall(
-					arns.submitAuctionBid,
-					"test-name-2",
-					1000000000,
-					"test-bidder",
-					1000000,
-					"test-process-id",
-					"test-msg-id"
-				)
-				assert.is_false(status)
-				assert.match("Auction not found", error)
-			end)
-
-			it("should throw an error if the bid is not high enough", function()
-				local startTimestamp = 1000000
-				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
-				assert(auction, "Auction should be created")
-				local startPrice = auction:getPriceForAuctionAtTimestamp(startTimestamp, "permabuy", nil)
-				local status, error = pcall(
-					arns.submitAuctionBid,
-					"test-name",
-					startPrice - 1,
-					testAddressArweave,
-					startTimestamp,
-					"test-process-id",
-					"permabuy",
-					nil,
-					"test-msg-id"
-				)
-				assert.is_false(status)
-				assert.match("Bid amount is less than the required bid of " .. startPrice, error)
-			end)
-
-			it("should throw an error if the bidder does not have enough balance", function()
-				local startTimestamp = 1000000
-				local auction = arns.createAuction("test-name", startTimestamp, "test-initiator")
-				assert(auction, "Auction should be created")
-				local requiredBid = auction:getPriceForAuctionAtTimestamp(startTimestamp, "permabuy", nil)
-				_G.Balances[testAddressArweave] = requiredBid - 1
-				local status, error = pcall(
-					arns.submitAuctionBid,
-					"test-name",
-					requiredBid,
-					testAddressArweave,
-					startTimestamp,
-					"test-process-id",
-					"permabuy",
-					nil,
-					"test-msg-id"
-				)
 				assert.is_false(status)
 				assert.match("Insufficient balance", error)
 			end)

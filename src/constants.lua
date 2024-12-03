@@ -1,17 +1,23 @@
 local constants = {}
 
--- GAR
-constants.DEFAULT_UNDERNAME_COUNT = 10
-constants.DEADLINE_DURATION_MS = 60 * 60 * 1000 -- One hour of miliseconds
 constants.oneYearSeconds = 60 * 60 * 24 * 365
 constants.thirtyDaysSeconds = 60 * 60 * 24 * 30
-constants.defaultundernameLimit = 10
+
+constants.oneHourMs = 1000 * 60 * 60
+constants.oneDayMs = constants.oneHourMs * 24
+constants.oneWeekMs = constants.oneDayMs * 7
+constants.twoWeeksMs = constants.oneWeekMs * 2
+constants.oneYearMs = 31536000 * 1000
+
+-- GAR
+constants.DEFAULT_UNDERNAME_COUNT = 10
+constants.DEADLINE_DURATION_MS = constants.oneHourMs
 constants.totalTokenSupply = 1000000000 * 1000000 -- 1 billion tokens
 constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.10 -- the minimum penalty rate for an expedited withdrawal (10% of the amount being withdrawn)
 constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.50 -- the maximum penalty rate for an expedited withdrawal (50% of the amount being withdrawn)
 constants.mIOPerIO = 1000000
 constants.minimumWithdrawalAmount = constants.mIOPerIO -- the minimum amount that can be withdrawn from the GAR
-constants.redelegationFeeResetIntervalMs = 1000 * 60 * 60 * 24 * 7 -- 7 epochs
+constants.redelegationFeeResetIntervalMs = constants.oneWeekMs -- 7 epochs
 
 -- ARNS
 constants.MAX_NAME_LENGTH = 51
@@ -23,16 +29,17 @@ constants.MIN_NAME_LENGTH = 1
 -- - Does not allow names to start or end with a hyphen
 constants.ARNS_NAME_REGEX = "^%w[%w-]*%w?$"
 constants.DEFAULT_UNDERNAME_COUNT = 10
-constants.DEADLINE_DURATION_MS = 60 * 60 * 1000 -- One hour of milliseconds
+constants.DEADLINE_DURATION_MS = constants.oneHourMs
 constants.PERMABUY_LEASE_FEE_LENGTH = 20 -- 20 years
 constants.ANNUAL_PERCENTAGE_FEE = 0.2 -- 20%
 constants.ARNS_NAME_DOES_NOT_EXIST_MESSAGE = "Name not found in the ArNS Registry!"
 constants.UNDERNAME_LEASE_FEE_PERCENTAGE = 0.001
 constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE = 0.005
 constants.PRIMARY_NAME_REQUEST_COST = 10000000 -- 10 IO
-constants.oneYearMs = 31536000 * 1000
-constants.gracePeriodMs = 14 * 24 * 60 * 60 * 1000 -- 2 weeks
+constants.gracePeriodMs = constants.twoWeeksMs
 constants.maxLeaseLengthYears = 5
+constants.returnedNamePeriod = constants.twoWeeksMs
+constants.returnedNameMaxMultiplier = 50 -- Freshly returned names will have a multiplier of 50x
 
 constants.ARNS_DISCOUNT_PERCENTAGE = 0.2
 constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD = 1
