@@ -50,6 +50,7 @@ end
 --- @param vaultId string The vault id
 --- @return Vault The created vault
 function vaults.vaultedTransfer(from, recipient, qty, lockLengthMs, currentTimestamp, vaultId)
+	assert(qty > 0, "Quantity must be greater than 0")
 	assert(balances.walletHasSufficientBalance(from, qty), "Insufficient balance")
 	assert(not vaults.getVault(recipient, vaultId), "Vault with id " .. vaultId .. " already exists")
 	assert(
