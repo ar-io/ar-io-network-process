@@ -57,6 +57,7 @@ end
 --- @param nameLength number The length of the name
 --- @return number #The base fee for the name length
 function demand.baseFeeForNameLength(nameLength)
+	assert(utils.isInteger(nameLength) and nameLength > 0, "nameLength must be a positive integer")
 	return demand.getFees()[nameLength]
 end
 
