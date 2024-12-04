@@ -127,7 +127,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 	local rewardForProtocol = totalRegistrationFee
 	local rewardForInitiator = 0
 	local returnedName = arns.getReturnedName(name)
-	if returnedName then -- TODO: unit test this
+	if returnedName then
 		arns.removeReturnedName(name)
 		rewardForInitiator = returnedName.initiator ~= ao.id and math.floor(totalRegistrationFee * 0.5) or 0
 		rewardForProtocol = totalRegistrationFee - rewardForInitiator
@@ -150,7 +150,6 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 		df = demand.getDemandFactorInfo(),
 		fundingPlan = fundingPlan,
 		fundingResult = fundingResult,
-		-- TODO: unit test coverage for this
 		returnedName = returnedName and {
 			initiator = returnedName.initiator,
 			rewardForProtocol = rewardForProtocol,

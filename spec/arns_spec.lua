@@ -333,15 +333,22 @@ describe("arns", function()
 					}
 					local result =
 						arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId, "msd-id")
+					local expectedPrice = math.floor(600000000 * constants.returnedNameMaxMultiplier)
 					local expectation = {
 						endTimestamp = timestamp + constants.oneYearMs,
 						processId = testProcessId,
-						purchasePrice = 600000000 * constants.returnedNameMaxMultiplier,
+						purchasePrice = expectedPrice,
 						startTimestamp = 0,
 						type = "lease",
 						undernameLimit = 10,
 					}
 					assert.are.same(expectation, result.record)
+					assert.are.same({
+						initiator = "test-initiator",
+						rewardForProtocol = math.floor(expectedPrice / 2),
+						rewardForInitiator = math.floor(expectedPrice / 2),
+					}, result.returnedName)
+					assert.are.same(nil, _G.NameRegistry.returned["test-name"])
 				end
 			)
 
