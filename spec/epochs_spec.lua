@@ -160,23 +160,26 @@ describe("epochs", function()
 	end)
 
 	describe("computePrescribedNamesForEpoch", function()
+		-- NOTE: Record names in the tests below use spelled out numbers because without that
+		-- there's insufficient base64url information encoded in the final encoded block to
+		-- disambiguate the decoded vallues.
 		it("should return all eligible names if fewer than the maximum in name registry", function()
 			_G.NameRegistry.records = {
-				["arns-name-1"] = {
+				["arns-name-one"] = {
 					startTimestamp = startTimestamp,
 					endTimestamp = startTimestamp + 60 * 1000 * 60 * 24 * 365, -- add a year
 					type = "lease",
 					purchasePrice = 0,
 					undernameLimit = 10,
 				},
-				["arns-name-2"] = {
+				["arns-name-two"] = {
 					startTimestamp = startTimestamp,
 					type = "permabuy",
 					purchasePrice = 0,
 					undernameLimit = 10,
 				},
 			}
-			local expectation = { "arns-name-1", "arns-name-2" }
+			local expectation = { "arns-name-two", "arns-name-one" }
 			local status, result = pcall(epochs.computePrescribedNamesForEpoch, 0, hashchain)
 			assert.is_true(status)
 			assert.are.equal(2, #result)
@@ -185,39 +188,39 @@ describe("epochs", function()
 
 		it("should return a subset of eligible names if more than the maximum in the name registry", function()
 			_G.NameRegistry.records = {
-				["arns-name-1"] = {
+				["arns-name-one"] = {
 					startTimestamp = startTimestamp,
 					endTimestamp = startTimestamp + 60 * 1000 * 60 * 24 * 365, -- add a year
 					type = "lease",
 					purchasePrice = 0,
 					undernameLimit = 10,
 				},
-				["arns-name-2"] = {
+				["arns-name-two"] = {
 					startTimestamp = startTimestamp,
 					type = "permabuy",
 					purchasePrice = 0,
 					undernameLimit = 10,
 				},
-				["arns-name-3"] = {
+				["arns-name-three"] = {
 					startTimestamp = startTimestamp,
 					endTimestamp = startTimestamp + 60 * 1000 * 60 * 24 * 365, -- add a year
 					type = "lease",
 					purchasePrice = 0,
 					undernameLimit = 10,
 				},
-				["arns-name-4"] = {
+				["arns-name-four"] = {
 					startTimestamp = startTimestamp,
 					type = "permabuy",
 					purchasePrice = 0,
 					undernameLimit = 10,
 				},
-				["arns-name-5"] = {
+				["arns-name-five"] = {
 					startTimestamp = startTimestamp,
 					type = "permabuy",
 					purchasePrice = 0,
 					undernameLimit = 10,
 				},
-				["arns-name-6"] = {
+				["arns-name-six"] = {
 					startTimestamp = startTimestamp,
 					endTimestamp = startTimestamp + 60 * 1000 * 60 * 24 * 365, -- add a year
 					type = "lease",
@@ -225,7 +228,8 @@ describe("epochs", function()
 					undernameLimit = 10,
 				},
 			}
-			local expectation = { "arns-name-1", "arns-name-3", "arns-name-4", "arns-name-5", "arns-name-6" }
+			local expectation =
+				{ "arns-name-five", "arns-name-four", "arns-name-one", "arns-name-three", "arns-name-two" }
 			local status, result = pcall(epochs.computePrescribedNamesForEpoch, 0, hashchain)
 			assert.is_true(status)
 			assert.are.equal(5, #result)
