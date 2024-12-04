@@ -806,15 +806,33 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.BuyRecord .. "-Notice", Name = name },
-		Data = json.encode(fundFrom and result or {
+		Data = json.encode({
 			name = name,
 			startTimestamp = record.startTimestamp,
 			endTimestamp = record.endTimestamp,
 			undernameLimit = record.undernameLimit,
 			purchasePrice = record.purchasePrice,
 			processId = record.processId,
+			fundingResult = fundFrom and result and result.fundingResult or nil,
+			fundingPlan = fundFrom and result and result.fundingPlan or nil,
 		}),
 	})
+
+	--  If was returned name, send a notice to the initiator
+	if result ~= nil and result.returnedName ~= nil then
+		Send(msg, {
+			Target = result.returnedName.initiator,
+			Action = "Debit-Notice",
+			Quantity = tostring(result.returnedName.rewardForInitiator),
+			Data = json.encode({
+				name = name,
+				buyer = msg.From,
+				rewardForInitiator = result.returnedName.rewardForInitiator,
+				rewardForProtocol = result.returnedName.rewardForProtocol,
+				record = result.record,
+			}),
+		})
+	end
 end)
 
 addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.UpgradeName), function(msg)

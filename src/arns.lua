@@ -39,10 +39,17 @@ NameRegistry = NameRegistry or {
 --- @field target string|nil The address of the target of the reserved record
 --- @field endTimestamp number|nil The time at which the record is no longer reserved
 
+--- @alias ReturnedNameInitiator string -- The address of the initiator of the returned name
+
 --- @class ReturnedName
 --- @field name string The name of the returned record
---- @field initiator string The address of the initiator of the returned name
+--- @field initiator ReturnedNameInitiator
 --- @field startTimestamp number The timestamp of when the record was returned
+
+--- @class ReturnedNameBuyRecordResult -- extends above
+--- @field initiator ReturnedNameInitiator
+--- @field rewardForProtocol number -- The reward for the protocol from the returned name purchase
+--- @field rewardForInitiator number -- The reward for the protocol from the returned name purchase
 
 --- @class BuyRecordResponse
 --- @field record Record The updated record
@@ -53,6 +60,7 @@ NameRegistry = NameRegistry or {
 --- @field df table The demand factor info
 --- @field fundingPlan table The funding plan
 --- @field fundingResult table The funding result
+--- @field returnedName nil|ReturnedNameBuyRecordResult -- The initiator and reward details if returned name was purchased
 
 --- Buys a record
 --- @param name string The name of the record
@@ -117,10 +125,11 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 	assert(fundingResult.totalFunded == totalRegistrationFee, "Funding plan application failed")
 
 	local rewardForProtocol = totalRegistrationFee
+	local rewardForInitiator = 0
 	local returnedName = arns.getReturnedName(name)
 	if returnedName then -- TODO: unit test this
 		arns.removeReturnedName(name)
-		local rewardForInitiator = returnedName.initiator ~= ao.id and math.floor(totalRegistrationFee * 0.5) or 0
+		rewardForInitiator = returnedName.initiator ~= ao.id and math.floor(totalRegistrationFee * 0.5) or 0
 		rewardForProtocol = totalRegistrationFee - rewardForInitiator
 		balances.increaseBalance(returnedName.initiator, rewardForInitiator)
 	end
@@ -141,6 +150,12 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 		df = demand.getDemandFactorInfo(),
 		fundingPlan = fundingPlan,
 		fundingResult = fundingResult,
+		-- TODO: unit test coverage for this
+		returnedName = returnedName and {
+			initiator = returnedName.initiator,
+			rewardForProtocol = rewardForProtocol,
+			rewardForInitiator = rewardForInitiator,
+		} or nil,
 	}
 end
 
