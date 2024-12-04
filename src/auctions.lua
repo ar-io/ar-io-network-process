@@ -1,4 +1,5 @@
 local Auction = {}
+local utils = require("utils")
 
 -- Default Auction Settings
 AuctionSettings = {
@@ -32,6 +33,13 @@ AuctionSettings = {
 --- @param registrationFeeCalculator function Function to calculate registration fee that supports type, baseFee, years, demandFactor
 --- @return Auction The new Auction instance
 function Auction:new(name, startTimestamp, demandFactor, baseFee, initiator, registrationFeeCalculator)
+	assert(type(name) == "string" and #name > 0, "name must be a string with length > 0")
+	-- TODO: Use new assertions for valid addresses from latest codebase on initiator
+	assert(utils.isInteger(startTimestamp) and startTimestamp > 0, "startTimestamp must be a positive integer")
+	assert(demandFactor > 0, "demandFactor must be a positive number")
+	assert(utils.isInteger(baseFee) and baseFee > 0, "baseFee must be a positive integer")
+	assert(type(registrationFeeCalculator) == "function", "registrationFeeCalculator must be a function")
+
 	local auction = {
 		name = name,
 		initiator = initiator,
