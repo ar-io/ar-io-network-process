@@ -137,7 +137,7 @@ describe("epochs", function()
 					normalizedCompositeWeight = 1 / 3,
 				},
 				{
-					gatewayAddress = "observer2",
+					gatewayAddress = "observer3",
 					observerAddress = "observerAddress",
 					stake = gar.getSettings().operators.minStake,
 					startTimestamp = startTimestamp,
@@ -159,7 +159,7 @@ describe("epochs", function()
 		end)
 	end)
 
-	describe("computePrescrbiedNamesForEpoch", function()
+	describe("computePrescribedNamesForEpoch", function()
 		it("should return all eligible names if fewer than the maximum in name registry", function()
 			_G.NameRegistry.records = {
 				["arns-name-1"] = {
@@ -225,7 +225,7 @@ describe("epochs", function()
 					undernameLimit = 10,
 				},
 			}
-			local expectation = { "arns-name-1", "arns-name-2", "arns-name-3", "arns-name-4", "arns-name-5" }
+			local expectation = { "arns-name-1", "arns-name-3", "arns-name-4", "arns-name-5", "arns-name-6" }
 			local status, result = pcall(epochs.computePrescribedNamesForEpoch, 0, hashchain)
 			assert.is_true(status)
 			assert.are.equal(5, #result)
