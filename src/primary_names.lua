@@ -158,9 +158,6 @@ function primaryNames.approvePrimaryNameRequest(recipient, name, from, timestamp
 	assert(record, "ArNS record '" .. baseName .. "' does not exist")
 	assert(record.processId == from, "Primary name request must be approved by the owner of the base name")
 
-	-- assert the name matches the request
-	assert(request.name == name, "Provided name does not match the primary name request")
-
 	-- set the primary name
 	local newPrimaryName = primaryNames.setPrimaryNameFromRequest(recipient, request, timestamp)
 	return {
