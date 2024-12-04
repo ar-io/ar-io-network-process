@@ -3,6 +3,7 @@ local Queue = require(".crypto.util.queue")
 local Stream = {}
 
 Stream.fromString = function(string)
+	assert(type(string) == "string", "expected string, got " .. type(string))
 	local i = 0
 	return function()
 		i = i + 1
@@ -25,6 +26,7 @@ Stream.toString = function(stream)
 end
 
 Stream.fromArray = function(array)
+	assert(type(array) == "table", "expected table, got " .. type(array))
 	local queue = Queue()
 	local i = 1
 
