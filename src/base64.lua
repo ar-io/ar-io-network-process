@@ -200,45 +200,92 @@ function base64.decode(b64, decoder, usecaching)
 		end
 		pattern = ("[^%%w%%%s%%%s%%=]"):format(char(s62), char(s63))
 	end
-	b64 = b64:gsub(pattern, "")
-	local cache = usecaching and {}
-	local t, k = {}, 1
+
+	-- Remove whitespace and invalid characters
+	b64 = b64:gsub("[\n\r%s]", ""):gsub(pattern, "")
+
+	-- Handle excessive padding
+	while #b64 % 4 ~= 0 do
+		if b64:sub(-1) == "=" then
+			b64 = b64:sub(1, -2) -- Remove the last character if it's '='
+		else
+			break -- Stop if the last character is not '='
+		end
+	end
+
+	-- Truncate at invalid '=' characters
+	local eqPos = b64:find("=")
+	if eqPos and eqPos < #b64 then
+		-- Trim excessive '=' characters within the string
+		b64 = b64:sub(1, eqPos - 1)
+	end
+
+	-- Ensure the length is a multiple of 4
 	local n = #b64
 	local padding = b64:sub(-2) == "==" and 2 or b64:sub(-1) == "=" and 1 or 0
-
-	-- Adjust length to be a multiple of 4
 	if n % 4 ~= 0 then
 		b64 = b64 .. string.rep("=", 4 - (n % 4))
+		padding = (4 - (n % 4)) % 4 -- Recalculate padding after adjustment
 		n = #b64
 	end
 
-	for i = 1, padding > 0 and n - 4 or n, 4 do
+	local cache = usecaching and {}
+	local t, k = {}, 1
+
+	for i = 1, n - 4, 4 do
 		local a, b, c, d = b64:byte(i, i + 3)
 		local s
-		if usecaching then
-			local v0 = a * 0x1000000 + b * 0x10000 + c * 0x100 + d
-			s = cache[v0]
-			if not s then
+
+		if a and b and c and d and decoder[a] and decoder[b] and decoder[c] and decoder[d] then
+			if usecaching then
+				local v0 = a * 0x1000000 + b * 0x10000 + c * 0x100 + d
+				s = cache[v0]
+				if not s then
+					local v = decoder[a] * 0x40000 + decoder[b] * 0x1000 + decoder[c] * 0x40 + decoder[d]
+					s = char(extract(v, 16, 8), extract(v, 8, 8), extract(v, 0, 8))
+					cache[v0] = s
+				end
+			else
 				local v = decoder[a] * 0x40000 + decoder[b] * 0x1000 + decoder[c] * 0x40 + decoder[d]
 				s = char(extract(v, 16, 8), extract(v, 8, 8), extract(v, 0, 8))
-				cache[v0] = s
 			end
-		else
-			local v = decoder[a] * 0x40000 + decoder[b] * 0x1000 + decoder[c] * 0x40 + decoder[d]
-			s = char(extract(v, 16, 8), extract(v, 8, 8), extract(v, 0, 8))
+			t[k] = s
+			k = k + 1
 		end
-		t[k] = s
-		k = k + 1
 	end
-	if padding == 1 then
-		local a, b, c = b64:byte(n - 3, n - 1)
-		local v = decoder[a] * 0x40000 + decoder[b] * 0x1000 + decoder[c] * 0x40
-		t[k] = char(extract(v, 16, 8), extract(v, 8, 8))
-	elseif padding == 2 then
-		local a, b = b64:byte(n - 3, n - 2)
-		local v = decoder[a] * 0x40000 + decoder[b] * 0x1000
-		t[k] = char(extract(v, 16, 8))
+
+	-- Handle the final block (based on padding)
+	if padding > 0 then
+		local a, b, c = b64:byte(n - 3, n)
+		local v
+		if padding == 1 then
+			if a == 61 and b == 61 and c == 61 then
+				-- Invalid case: final block is entirely padding
+				return concat(t)
+			elseif decoder[a] and decoder[b] and decoder[c] then
+				v = decoder[a] * 0x40000 + decoder[b] * 0x1000 + decoder[c] * 0x40
+				t[k] = char(extract(v, 16, 8), extract(v, 8, 8))
+			end
+		elseif padding == 2 then
+			if a == 61 and b == 61 then
+				-- Invalid case: final block is entirely padding
+				return concat(t)
+			elseif decoder[a] and decoder[b] then
+				v = decoder[a] * 0x40000 + decoder[b] * 0x1000
+				t[k] = char(extract(v, 16, 8))
+			end
+		end
+	else
+		local a, b, c, d = b64:byte(n - 3, n)
+		if decoder[a] and decoder[b] and decoder[c] and decoder[d] then
+			local v = decoder[a] * 0x40000 + decoder[b] * 0x1000 + decoder[c] * 0x40 + decoder[d]
+			t[k] = char(extract(v, 16, 8), extract(v, 8, 8), extract(v, 0, 8))
+		elseif decoder[a] and decoder[b] and decoder[c] then
+			local v = decoder[a] * 0x40000 + decoder[b] * 0x1000 + decoder[c] * 0x40
+			t[k] = char(extract(v, 16, 8), extract(v, 8, 8))
+		end
 	end
+
 	return concat(t)
 end
 
