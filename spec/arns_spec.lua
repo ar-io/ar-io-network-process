@@ -847,6 +847,28 @@ describe("arns", function()
 			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
 		end)
 
+		it("should return the token cost for a fresh returned name", function()
+			_G.NameRegistry.returned["test-name"] = {
+				startTimestamp = timestamp,
+				name = "test-name",
+				initiator = "test-initiator",
+			}
+			local baseFee = 500000000
+			local years = 2
+			local demandFactor = 0.974
+			local expectedCost =
+				math.floor((((years * baseFee * 0.20) + baseFee) * demandFactor) * constants.returnedNameMaxMultiplier)
+			local intendedAction = {
+				intent = "Buy-Record",
+				purchaseType = "lease",
+				years = years,
+				name = "test-name",
+				currentTimestamp = timestamp,
+			}
+			_G.DemandFactor.currentDemandFactor = demandFactor
+			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
+		end)
+
 		it("should return the correct token cost for an ArNS discount eligible address", function()
 			_G.GatewayRegistry[stubRandomAddress] = testGateway
 			_G.GatewayRegistry[stubRandomAddress].weights = {

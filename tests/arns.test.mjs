@@ -1,5 +1,5 @@
 import { assertNoResultError } from './utils.mjs';
-import { describe, it, before, run } from 'node:test';
+import { describe, it, before } from 'node:test';
 import {
   handle,
   startMemory,
@@ -23,7 +23,6 @@ import {
   STUB_OPERATOR_ADDRESS,
   STUB_TIMESTAMP,
 } from '../tools/constants.mjs';
-import { type } from 'node:os';
 
 // EIP55-formatted test address
 const testEthAddress = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa';
@@ -867,17 +866,6 @@ describe('ArNS', async () => {
 
       const timePassed = 60 * 1000; // 1 minute
       const newBuyTimestamp = returnedName.startTimestamp + timePassed; // same as the original interval but 1 minute after the returnedName has started
-
-      // function arns.getReturnedNamePremiumMultiplier(startTimestamp, currentTimestamp)
-      // local timestampDiff = currentTimestamp - startTimestamp
-      // assert(timestampDiff < constants.returnedNamePeriod, "Timestamp is outside of the returned name period")
-      // -- The percentage of the period that has passed e.g: 0.5 if half the period has passed
-      // local percentageOfReturnedNamePeriodPassed = timestampDiff / constants.returnedNamePeriod
-      // -- Take the inverse so that a fresh returned name has the full multiplier, and a name almost expired has a multiplier close to base price
-      // local inversePercentage = 1 - percentageOfReturnedNamePeriodPassed
-
-      // return constants.returnedNameMaxMultiplier * inversePercentage
-      // end
 
       const expectedPremiumMultiplier =
         50 * (1 - timePassed / returnedNamesPeriod);

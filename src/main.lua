@@ -137,7 +137,7 @@ local function eventingPcall(ioEvent, onError, fnToCall, ...)
 end
 
 --- @param fundingPlan FundingPlan|nil
---- @param rewardForInitiator number|nil only applies in buy record for returned names that were released by the buyer
+--- @param rewardForInitiator number|nil only applies in buy record for returned names
 local function adjustSuppliesForFundingPlan(fundingPlan, rewardForInitiator)
 	if not fundingPlan then
 		return
