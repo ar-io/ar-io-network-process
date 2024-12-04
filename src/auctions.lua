@@ -1,5 +1,6 @@
 local Auction = {}
 local utils = require("utils")
+local constants = require("constants")
 
 -- Default Auction Settings
 AuctionSettings = {
@@ -66,6 +67,10 @@ end
 --- @param intervalMs number The interval in milliseconds, must be at least 15 minutes
 --- @return table A table of prices indexed by timestamp
 function Auction:computePricesForAuction(type, years, intervalMs)
+	assert(
+		utils.isInteger(intervalMs) and intervalMs >= constants.MIN_PRICE_INTERVAL_MS,
+		"intervalMs must be an integer >= " .. constants.MIN_PRICE_INTERVAL_MS .. "ms (15 minutes)"
+	)
 	local prices = {}
 	for i = self.startTimestamp, self.endTimestamp, intervalMs do
 		local priceAtTimestamp = self:getPriceForAuctionAtTimestamp(i, type, years)
