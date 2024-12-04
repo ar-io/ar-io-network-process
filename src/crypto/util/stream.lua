@@ -61,6 +61,8 @@ for i = 0, 255 do
 end
 
 Stream.fromHex = function(hex)
+	assert(type(hex) == "string", "expected string, got " .. type(hex))
+	assert(string.len(hex) % 2 == 0, "expected even-length string")
 	local queue = Queue()
 
 	for i = 1, string.len(hex) / 2 do
