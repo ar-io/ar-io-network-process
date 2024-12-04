@@ -140,7 +140,7 @@ function demand.updateDemandFactor(timestamp)
 	local settings = demand.getSettings()
 
 	-- check that we have settings
-	if not demand.shouldUpdateDemandFactor(timestamp) or not settings then
+	if not settings then
 		print("No settings found")
 		return demand.getDemandFactor()
 	end
