@@ -189,6 +189,23 @@ describe("gar", function()
 			assert.is_false(status)
 			assert.match("bundler contains an invalid key", error)
 		end)
+
+		it("should fail to join the network if delegateRewardShareRatio is over the maximum", function()
+			local settings = utils.deepCopy(testSettings)
+			settings.delegateRewardShareRatio = 96
+			local status, error = pcall(
+				gar.joinNetwork,
+				stubGatewayAddress,
+				minOperatorStake,
+				settings,
+				nil,
+				stubObserverAddress,
+				startTimestamp
+			)
+			assert.is_false(status)
+			assert.match("delegateRewardShareRatio must be an integer between 0 and 95", error)
+		end)
+
 		it("should fail to join the network with too many bundlers", function()
 			local servicesWithTooManyBundlers = {
 				bundlers = {},
@@ -1013,6 +1030,51 @@ describe("gar", function()
 			assert.is_not_nil(err)
 			assert.matches("Gateway is leaving the network and cannot be updated", err)
 		end)
+
+		it(
+			"should not allow editing gateway settings for a gateway that has a delegate share ratio above the maximum allowed",
+			function()
+				local settings = utils.deepCopy(testGateway.settings)
+				settings.delegateRewardShareRatio = 100
+
+				_G.GatewayRegistry[stubGatewayAddress] = {
+					operatorStake = minOperatorStake,
+					totalDelegatedStake = 0,
+					vaults = {},
+					delegates = {},
+					startTimestamp = testGateway.startTimestamp,
+					stats = testGateway.stats,
+					settings = settings,
+					status = testGateway.status,
+					observerAddress = testGateway.observerAddress,
+				}
+
+				local updatedSettings = {
+					fqdn = "example.com",
+					port = 80,
+					protocol = "https",
+					properties = "NdZ3YRwMB2AMwwFYjKn1g88Y9nRybTo0qhS1ORq_E7g",
+					note = "This is a test update.",
+					label = "Test Label Update",
+					autoStake = true,
+					allowDelegatedStaking = false,
+					delegateRewardShareRatio = 100,
+					minDelegatedStake = minDelegatedStake + 5,
+				}
+				local status, err = pcall(
+					gar.updateGatewaySettings,
+					stubGatewayAddress,
+					updatedSettings,
+					nil,
+					stubObserverAddress,
+					startTimestamp,
+					stubMessageId
+				)
+				assert.is_false(status)
+				assert.is_not_nil(err)
+				assert.matches("delegateRewardShareRatio must be an integer between 0 and 95", err)
+			end
+		)
 
 		it("should not update gateway settings if the Gateway not found", function()
 			local updatedSettings = {
