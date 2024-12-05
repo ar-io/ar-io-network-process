@@ -377,6 +377,12 @@ describe("utils", function()
 			local result = utils.splitAndTrimString(input)
 			assert.are.same({ "apple", "banana", "cherry" }, result)
 		end)
+
+		it("should handle regex characters as delimiters", function()
+			local input = "apple|banana.cherry[date]eggplant"
+			local result = utils.splitAndTrimString(input, "[|.]")
+			assert.are.same({ "apple", "banana", "cherry", "date", "eggplant" }, result)
+		end)
 	end)
 
 	describe("createLookupTable", function()
