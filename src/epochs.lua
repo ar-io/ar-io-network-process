@@ -293,9 +293,6 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	end, {})
 	for address, _ in pairs(prescribedObserversAddressesLookup) do
 		table.insert(prescribedObservers, filteredObserversAddressMap[address])
-		table.sort(prescribedObservers, function(a, b)
-			return a.normalizedCompositeWeight > b.normalizedCompositeWeight
-		end)
 	end
 
 	-- sort them in place
