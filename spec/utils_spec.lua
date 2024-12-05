@@ -819,6 +819,14 @@ describe("utils", function()
 			assert.is_false(utils.booleanOrBooleanStringToBoolean("y"))
 			assert.is_false(utils.booleanOrBooleanStringToBoolean("Y"))
 			assert.is_false(utils.booleanOrBooleanStringToBoolean("t"))
+			---@ diagnostic disable-next-line: param-type-mismatch
+			assert.is_false(utils.booleanOrBooleanStringToBoolean({
+				True = true,
+			}))
+			---@ diagnostic disable-next-line: param-type-mismatch
+			assert.is_false(utils.booleanOrBooleanStringToBoolean(nil))
+			---@ diagnostic disable-next-line: param-type-mismatch
+			assert.is_false(utils.booleanOrBooleanStringToBoolean(1))
 		end)
 	end)
 end)
