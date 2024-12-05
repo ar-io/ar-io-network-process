@@ -72,6 +72,7 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 	local fundingPlan = gar.getFundingPlan(initiator, PRIMARY_NAME_COST, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0, "Insufficient balances")
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, timestamp)
+	assert(fundingResult.totalFunded == PRIMARY_NAME_COST, "Funding plan application failed")
 
 	--- transfer the primary name cost from the initiator to the protocol balance
 	balances.increaseBalance(ao.id, PRIMARY_NAME_COST)
