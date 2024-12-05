@@ -181,7 +181,7 @@ function epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
 		return nameAString < nameBString
 	end)
 
-	if #activeArNSNames < epochs.getSettings().prescribedNameCount then
+	if #activeArNSNames <= epochs.getSettings().prescribedNameCount then
 		return activeArNSNames
 	end
 
