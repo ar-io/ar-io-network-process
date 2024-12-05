@@ -14,7 +14,7 @@ function utils.isInteger(value)
 	if type(value) == "string" then
 		value = tonumber(value)
 	end
-	return value % 1 == 0
+	return type(value) == "number" and value % 1 == 0
 end
 
 --- Rounds a number to a given precision
