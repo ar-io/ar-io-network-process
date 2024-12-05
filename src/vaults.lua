@@ -24,6 +24,7 @@ NextBalanceVaultsPruneTimestamp = NextBalanceVaultsPruneTimestamp or 0
 --- @param vaultId string The vault id
 --- @return Vault The created vault
 function vaults.createVault(from, qty, lockLengthMs, currentTimestamp, vaultId)
+	assert(qty > 0, "Quantity must be greater than 0")
 	assert(not vaults.getVault(from, vaultId), "Vault with id " .. vaultId .. " already exists")
 	assert(balances.walletHasSufficientBalance(from, qty), "Insufficient balance")
 	assert(
@@ -111,6 +112,7 @@ end
 --- @param currentTimestamp number The current timestamp
 --- @return Vault The increased vault
 function vaults.increaseVault(from, qty, vaultId, currentTimestamp)
+	assert(qty > 0, "Quantity must be greater than 0")
 	assert(balances.walletHasSufficientBalance(from, qty), "Insufficient balance")
 
 	local vault = vaults.getVault(from, vaultId)
