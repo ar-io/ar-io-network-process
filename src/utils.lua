@@ -32,6 +32,7 @@ end
 function utils.sumTableValues(tbl)
 	local sum = 0
 	for _, value in pairs(tbl) do
+		assert(type(value) == "number", "Table values must be numbers. Found: " .. type(value))
 		sum = sum + value
 	end
 	return sum
