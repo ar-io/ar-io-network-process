@@ -450,7 +450,7 @@ end, function(msg)
 		"Force-Prune",
 	}
 	for _, tagName in ipairs(knownBooleanTags) do
-		msg.Tags[tagName] = msg.Tags[tagName] and msg.Tags[tagName] == "true" or false
+		msg.Tags[tagName] = utils.booleanOrBooleanStringToBoolean(msg.Tags[tagName])
 	end
 
 	if msg.Tags["Force-Prune"] then

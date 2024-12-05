@@ -18,6 +18,7 @@ constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.50 -- the maximum penalty ra
 constants.mIOPerIO = 1000000
 constants.minimumWithdrawalAmount = constants.mIOPerIO -- the minimum amount that can be withdrawn from the GAR
 constants.redelegationFeeResetIntervalMs = constants.oneWeekMs -- 7 epochs
+constants.maxDelegateRewardShareRatio = 95 -- 95% of rewards can be shared with delegates
 
 -- ARNS
 constants.MAX_NAME_LENGTH = 51
