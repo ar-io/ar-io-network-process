@@ -807,8 +807,8 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 			type(settings.delegateRewardShareRatio) == "number"
 				and utils.isInteger(settings.delegateRewardShareRatio)
 				and settings.delegateRewardShareRatio >= 0
-				and settings.delegateRewardShareRatio <= 100,
-			"delegateRewardShareRatio must be an integer between 0 and 100"
+				and settings.delegateRewardShareRatio <= constants.maxDelegateRewardShareRatio,
+			"delegateRewardShareRatio must be an integer between 0 and " .. constants.maxDelegateRewardShareRatio
 		)
 	end
 	if settings.autoStake ~= nil then
