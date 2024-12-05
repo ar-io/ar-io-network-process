@@ -599,4 +599,13 @@ function utils.filterDictionary(tbl, predicate)
 	return filtered
 end
 
+--- @param value string|boolean
+--- @return boolean
+function utils.booleanOrBooleanStringToBoolean(value)
+	if type(value) == "boolean" then
+		return value
+	end
+	return type(value) == "string" and string.lower(value) == "true"
+end
+
 return utils

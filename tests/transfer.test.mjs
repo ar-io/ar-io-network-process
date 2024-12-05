@@ -102,7 +102,7 @@ describe('Transfers', async () => {
   });
 
   for (const allowUnsafeAddresses of [false, undefined]) {
-    it(`should transfer when an invalid address is provided and \`Allow-Unsafe-Addresses\` is ${allowUnsafeAddresses}`, async () => {
+    it(`should not transfer when an invalid address is provided and \`Allow-Unsafe-Addresses\` is ${allowUnsafeAddresses}`, async () => {
       const recipient = 'invalid-address';
       const sender = PROCESS_OWNER;
       const senderBalance = await handle({
@@ -161,7 +161,7 @@ describe('Transfers', async () => {
     const transferResult = await handle({
       Tags: [
         { name: 'Action', value: 'Transfer' },
-        { name: 'Recipient', value: recipient.slice(0, -1) },
+        { name: 'Recipient', value: recipient },
         { name: 'Quantity', value: 100000000 }, // 100 IO
         { name: 'Cast', value: true },
         { name: 'Allow-Unsafe-Addresses', value: true },
@@ -176,8 +176,8 @@ describe('Transfers', async () => {
       transferResult.Memory,
     );
     const balances = JSON.parse(result.Messages[0].Data);
-    assert.equal(balances[recipient] || 0, 0);
-    assert.equal(balances[sender], senderBalanceData);
+    assert.equal(balances[recipient] || 0, 100000000);
+    assert.equal(balances[sender], senderBalanceData - 100000000);
   });
 
   it('should not transfer when an invalid quantity is provided', async () => {
