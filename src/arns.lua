@@ -324,6 +324,7 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp, msgId, f
 	local fundingPlan = gar.getFundingPlan(from, additionalUndernameCost, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
+	assert(fundingResult.totalFunded == additionalUndernameCost, "Funding plan application failed")
 
 	-- update the record with the new undername count
 	arns.modifyRecordundernameLimit(name, qty)
@@ -804,6 +805,7 @@ function arns.upgradeRecord(from, name, currentTimestamp, msgId, fundFrom)
 	local fundingPlan = gar.getFundingPlan(from, upgradeCost, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
+	assert(fundingResult.totalFunded == upgradeCost, "Funding plan application failed")
 	balances.increaseBalance(ao.id, upgradeCost)
 	demand.tallyNamePurchase(upgradeCost)
 

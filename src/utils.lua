@@ -15,7 +15,7 @@ function utils.isInteger(value)
 	if type(value) == "string" then
 		value = tonumber(value)
 	end
-	return value % 1 == 0
+	return type(value) == "number" and value % 1 == 0
 end
 
 --- Rounds a number to a given precision
@@ -32,6 +32,7 @@ end
 function utils.sumTableValues(tbl)
 	local sum = 0
 	for _, value in pairs(tbl) do
+		assert(type(value) == "number", "Table values must be numbers. Found: " .. type(value))
 		sum = sum + value
 	end
 	return sum
@@ -460,12 +461,20 @@ function utils.getHashFromBase64URL(str)
 	return crypto.digest.sha2_256(hashStream).asBytes()
 end
 
+--- Escapes Lua pattern characters in a string
+--- @param str string The string to escape
+--- @return string # The escaped string
+local function escapePattern(str)
+	return (str:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1"))
+end
+
 --- Splits a string by a delimiter
 --- @param input string The string to split
 --- @param delimiter string|nil The delimiter to split by
---- @return table The split string
+--- @return table # The split string
 function utils.splitString(input, delimiter)
 	delimiter = delimiter or ","
+	delimiter = escapePattern(delimiter)
 	local result = {}
 	for token in (input or ""):gmatch(string.format("([^%s]+)", delimiter)) do
 		table.insert(result, token)
