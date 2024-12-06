@@ -10,7 +10,7 @@ constants.twoWeeksMs = constants.oneWeekMs * 2
 constants.oneYearMs = 31536000 * 1000
 
 -- EPOCHS
-constants.defaultEpochLength = constants.oneDayMs
+constants.defaultEpochDurationMs = constants.oneDayMs
 
 -- GAR
 constants.DEFAULT_UNDERNAME_COUNT = 10
@@ -20,7 +20,7 @@ constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.10 -- the minimum penalty ra
 constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.50 -- the maximum penalty rate for an expedited withdrawal (50% of the amount being withdrawn)
 constants.mIOPerIO = 1000000
 constants.minimumWithdrawalAmount = constants.mIOPerIO -- the minimum amount that can be withdrawn from the GAR
-constants.redelegationFeeResetIntervalMs = constants.defaultEpochLength * 7 -- 7 epochs
+constants.redelegationFeeResetIntervalMs = constants.defaultEpochDurationMs * 7 -- 7 epochs
 constants.maxDelegateRewardShareRatio = 95 -- 95% of rewards can be shared with delegates
 
 -- ARNS
@@ -40,9 +40,9 @@ constants.ARNS_NAME_DOES_NOT_EXIST_MESSAGE = "Name not found in the ArNS Registr
 constants.UNDERNAME_LEASE_FEE_PERCENTAGE = 0.001
 constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE = 0.005
 constants.PRIMARY_NAME_REQUEST_COST = 10000000 -- 10 IO
-constants.gracePeriodMs = constants.defaultEpochLength * 14 -- 14 epochs
+constants.gracePeriodMs = constants.defaultEpochDurationMs * 14 -- 14 epochs
 constants.maxLeaseLengthYears = 5
-constants.returnedNamePeriod = constants.defaultEpochLength * 14 -- 14 epochs
+constants.returnedNamePeriod = constants.defaultEpochDurationMs * 14 -- 14 epochs
 constants.returnedNameMaxMultiplier = 50 -- Freshly returned names will have a multiplier of 50x
 
 constants.ARNS_DISCOUNT_PERCENTAGE = 0.2

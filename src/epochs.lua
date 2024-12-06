@@ -67,7 +67,7 @@ EpochSettings = EpochSettings
 		rewardPercentage = 0.0005, -- 0.05%
 		maxObservers = 50,
 		epochZeroStartTimestamp = 1719900000000, -- July 9th, 00:00:00 UTC
-		durationMs = constants.defaultEpochLength, -- 24 hours
+		durationMs = constants.defaultEpochDurationMs, -- 24 hours
 		distributionDelayMs = 60 * 1000 * 40, -- 40 minutes (~ 20 arweave blocks)
 	}
 
