@@ -923,9 +923,9 @@ function arns.getReturnedNamePremiumMultiplier(startTimestamp, currentTimestamp)
 	-- The percentage of the period that has passed e.g: 0.5 if half the period has passed
 	local percentageOfReturnedNamePeriodPassed = timestampDiff / constants.returnedNamePeriod
 	-- Take the inverse so that a fresh returned name has the full multiplier, and a name almost expired has a multiplier close to base price
-	local inversePercentage = 1 - percentageOfReturnedNamePeriodPassed
+	local pctOfReturnPeriodRemaining = 1 - percentageOfReturnedNamePeriodPassed
 
-	return constants.returnedNameMaxMultiplier * inversePercentage
+	return constants.returnedNameMaxMultiplier * pctOfReturnPeriodRemaining
 end
 
 --- Removes an returnedName by name
