@@ -818,11 +818,11 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 		}),
 	})
 
-	--  If was returned name, send a notice to the initiator
+	-- If was returned name, send a credit notice to the initiator
 	if result ~= nil and result.returnedName ~= nil then
 		Send(msg, {
 			Target = result.returnedName.initiator,
-			Action = "Debit-Notice",
+			Action = "Credit-Notice",
 			Quantity = tostring(result.returnedName.rewardForInitiator),
 			Data = json.encode({
 				name = name,

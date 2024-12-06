@@ -919,18 +919,18 @@ describe('ArNS', async () => {
         ...expectedRecord,
       });
 
-      // should send a debit notice
-      const debitNoticeTag = newBuyResult.Messages?.[1]?.Tags?.find(
-        (tag) => tag.name === 'Action' && tag.value === 'Debit-Notice',
+      // should send a credit notice
+      const creditNoticeTag = newBuyResult.Messages?.[1]?.Tags?.find(
+        (tag) => tag.name === 'Action' && tag.value === 'Credit-Notice',
       );
-      assert.ok(debitNoticeTag);
+      assert.ok(creditNoticeTag);
 
       // expect the target to be to the initiator
       assert.equal(newBuyResult.Messages?.[1]?.Target, initiator);
 
       // assert the data response contains the record
-      const debitNoticeData = JSON.parse(newBuyResult.Messages?.[1]?.Data);
-      assert.deepEqual(debitNoticeData, {
+      const creditNoticeData = JSON.parse(newBuyResult.Messages?.[1]?.Data);
+      assert.deepEqual(creditNoticeData, {
         record: { ...expectedRecord, type: 'permabuy' },
         buyer: newBuyerAddress,
         rewardForInitiator: expectedRewardForInitiator,
@@ -1131,20 +1131,20 @@ describe('ArNS', async () => {
         ...(fundFrom === 'stakes' ? expectedFundingResults : {}),
       });
 
-      // should send a debit notice
-      const debitNoticeTag = buyReturnedNameResult.Messages?.[1]?.Tags?.find(
-        (tag) => tag.name === 'Action' && tag.value === 'Debit-Notice',
+      // should send a credit notice
+      const creditNoticeTag = buyReturnedNameResult.Messages?.[1]?.Tags?.find(
+        (tag) => tag.name === 'Action' && tag.value === 'Credit-Notice',
       );
-      assert.ok(debitNoticeTag);
+      assert.ok(creditNoticeTag);
 
       // expect the target to be to the protocol balance
       assert.equal(buyReturnedNameResult.Messages?.[1]?.Target, PROCESS_ID);
 
       // assert the data response contains the record
-      const debitNoticeData = JSON.parse(
+      const creditNoticeData = JSON.parse(
         buyReturnedNameResult.Messages?.[1]?.Data,
       );
-      assert.deepEqual(debitNoticeData, {
+      assert.deepEqual(creditNoticeData, {
         record: { ...expectedRecord, type: 'lease' },
         buyer: bidderAddress,
         rewardForInitiator: 0,
