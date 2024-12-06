@@ -39,17 +39,15 @@ NameRegistry = NameRegistry or {
 --- @field target string|nil The address of the target of the reserved record
 --- @field endTimestamp number|nil The time at which the record is no longer reserved
 
---- @alias ReturnedNameInitiator string -- The address of the initiator of the returned name
-
 --- @class ReturnedName
 --- @field name string The name of the returned record
---- @field initiator ReturnedNameInitiator
---- @field startTimestamp number The timestamp of when the record was returned
+--- @field initiator WalletAddress
+--- @field startTimestamp Timestamp -- The timestamp of when the record was returned
 
 --- @class ReturnedNameBuyRecordResult -- extends above
---- @field initiator ReturnedNameInitiator
---- @field rewardForProtocol number -- The reward for the protocol from the returned name purchase
---- @field rewardForInitiator number -- The reward for the protocol from the returned name purchase
+--- @field initiator WalletAddress
+--- @field rewardForProtocol mIO -- The reward for the protocol from the returned name purchase
+--- @field rewardForInitiator mIO -- The reward for the protocol from the returned name purchase
 
 --- @class BuyRecordResponse
 --- @field record Record The updated record
@@ -662,7 +660,6 @@ function arns.getTokenCost(intendedAction)
 		arns.assertValidBuyRecord(name, years, purchaseType, processId, false)
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
 		local returnedName = arns.getReturnedName(name)
-		-- TODO: unit test for token cost on returned name
 		if returnedName then
 			tokenCost = math.floor(
 				tokenCost * arns.getReturnedNamePremiumMultiplier(returnedName.startTimestamp, currentTimestamp)
