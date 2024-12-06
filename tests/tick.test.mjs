@@ -174,7 +174,7 @@ describe('Tick', async () => {
 
     const joinNetworkResult = await handle(
       {
-        Tags: validGatewayTags,
+        Tags: validGatewayTags(),
         From: STUB_ADDRESS,
         Owner: STUB_ADDRESS,
       },

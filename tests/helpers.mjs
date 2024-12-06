@@ -19,8 +19,12 @@ export const baseLeasePrice = 600_000_000;
 const { handle: originalHandle, memory } = await createAosLoader();
 export const startMemory = memory;
 
-export async function handle(options = {}, mem = startMemory) {
-  return originalHandle(
+export async function handle(
+  options = {},
+  mem = startMemory,
+  shouldAssertNoResultError = true,
+) {
+  const result = await originalHandle(
     mem,
     {
       ...DEFAULT_HANDLE_OPTIONS,
@@ -28,6 +32,10 @@ export async function handle(options = {}, mem = startMemory) {
     },
     AO_LOADER_HANDLER_ENV,
   );
+  if (shouldAssertNoResultError) {
+    assertNoResultError(result);
+  }
+  return result;
 }
 
 export function assertNoResultError(result) {
@@ -83,7 +91,6 @@ export const transfer = async ({
     },
     memory,
   );
-  assertNoResultError(transferResult);
   return transferResult.Memory;
 };
 
@@ -91,7 +98,8 @@ export const joinNetwork = async ({
   memory,
   timestamp = STUB_TIMESTAMP,
   address,
-  tags = validGatewayTags,
+  observerAddress,
+  tags = validGatewayTags({ observerAddress }),
   quantity = 100_000_000_000,
 }) => {
   // give them the join network token amount
@@ -109,7 +117,6 @@ export const joinNetwork = async ({
     },
     transferMemory,
   );
-  assertNoResultError(joinNetworkResult);
   return {
     memory: joinNetworkResult.Memory,
     result: joinNetworkResult,
@@ -120,7 +127,7 @@ export const setUpStake = async ({
   memory,
   timestamp = STUB_TIMESTAMP,
   gatewayAddress = STUB_OPERATOR_ADDRESS,
-  gatewayTags = validGatewayTags,
+  gatewayTags = validGatewayTags(),
   stakerAddress = STUB_ADDRESS,
   transferQty,
   stakeQty,
@@ -158,7 +165,6 @@ export const setUpStake = async ({
     },
     memory,
   );
-  assertNoResultError(stakeResult);
   return {
     memory: stakeResult.Memory,
     result: stakeResult,
@@ -177,7 +183,6 @@ export const getBaseRegistrationFeeForName = async ({
     },
     memory,
   );
-  assertNoResultError(result);
   return JSON.parse(result.Messages[0].Data)[name.length.toString()]['lease'][
     '1'
   ];
@@ -191,7 +196,6 @@ export const getDemandFactor = async ({ memory, timestamp }) => {
     },
     memory,
   );
-  assertNoResultError(result);
   return result.Messages[0].Data;
 };
 
@@ -213,7 +217,6 @@ export const getDelegates = async ({
     },
     memory,
   );
-  assertNoResultError(delegatesResult);
   return {
     result: delegatesResult,
     memory: delegatesResult.Memory,
@@ -240,7 +243,6 @@ export const getDelegations = async ({ memory, address }) => {
     },
     memory,
   );
-  assertNoResultError(result);
   return JSON.parse(result.Messages?.[0]?.Data);
 };
 
@@ -279,7 +281,6 @@ export const getGatewayVaultsItems = async ({ memory, gatewayAddress }) => {
     },
     memory,
   );
-  assertNoResultError(gatewayVaultsResult);
   return JSON.parse(gatewayVaultsResult.Messages?.[0]?.Data).items;
 };
 
@@ -314,11 +315,8 @@ export const createVault = async ({
       ],
     },
     memory,
+    assert,
   );
-
-  if (assert) {
-    assertNoResultError(createVaultResult);
-  }
 
   return { result: createVaultResult, memory: createVaultResult.Memory };
 };
@@ -356,10 +354,8 @@ export const createVaultedTransfer = async ({
       Timestamp: timestamp,
     },
     memory,
+    assert,
   );
-  if (assert) {
-    assertNoResultError(createVaultedTransferResult);
-  }
   return {
     result: createVaultedTransferResult,
     memory: createVaultedTransferResult.Memory,
@@ -393,10 +389,8 @@ export const delegateStake = async ({
       Timestamp: timestamp,
     },
     transferMemory,
+    assert,
   );
-  if (assert) {
-    assertNoResultError(delegateResult);
-  }
   return {
     result: delegateResult,
     memory: delegateResult.Memory,
@@ -440,7 +434,6 @@ export const getAllowedDelegates = async ({
     },
     memory,
   );
-  assertNoResultError(delegatesResult);
 
   return {
     result: delegatesResult,
@@ -480,10 +473,9 @@ export const decreaseOperatorStake = async ({
       ],
     },
     memory,
+    assert,
   );
-  if (assert) {
-    assertNoResultError(result);
-  }
+
   return {
     memory: result.Memory,
     result,
@@ -514,10 +506,9 @@ export const decreaseDelegateStake = async ({
       ],
     },
     memory,
+    assert,
   );
-  if (assert) {
-    assertNoResultError(result);
-  }
+
   return {
     memory: result.Memory,
     result,
@@ -544,7 +535,6 @@ export const cancelWithdrawal = async ({
     },
     memory,
   );
-  assertNoResultError(result);
   return {
     memory: result.Memory,
     result,
@@ -571,7 +561,6 @@ export const instantWithdrawal = async ({
     },
     memory,
   );
-  assertNoResultError(result);
   return {
     memory: result.Memory,
     result,
@@ -602,7 +591,6 @@ export const increaseOperatorStake = async ({
     },
     transferMemory,
   );
-  assertNoResultError(result);
   return {
     memory: result.Memory,
     result,
@@ -623,7 +611,6 @@ export const leaveNetwork = async ({
     },
     memory,
   );
-  assertNoResultError(result);
   return {
     memory: result.Memory,
     result,
@@ -645,7 +632,6 @@ export const updateGatewaySettings = async ({
     },
     memory,
   );
-  assertNoResultError(result);
   return {
     memory: result.Memory,
     result,
@@ -674,9 +660,36 @@ export const buyRecord = async ({
     },
     memory,
   );
-  assertNoResultError(buyRecordResult);
   return {
     result: buyRecordResult,
     memory: buyRecordResult.Memory,
+  };
+};
+
+export const saveObservations = async ({
+  from = STUB_ADDRESS,
+  timestamp = STUB_TIMESTAMP,
+  assert = true,
+  failedGateways = 'failed-gateway-'.padEnd(43, 'e'),
+  reportTxId = 'report-tx-id-'.padEnd(43, 'f'),
+  memory = startMemory,
+}) => {
+  const result = await handle(
+    {
+      From: from,
+      Owner: from,
+      Tags: [
+        { name: 'Action', value: 'Save-Observations' },
+        { name: 'Report-Tx-Id', value: reportTxId },
+        { name: 'Failed-Gateways', value: failedGateways },
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+    assert,
+  );
+  return {
+    memory: result.Memory,
+    result,
   };
 };

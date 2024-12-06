@@ -18,6 +18,7 @@ import {
   instantWithdrawal,
   delegateStake,
   decreaseOperatorStake,
+  saveObservations,
 } from './helpers.mjs';
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
@@ -111,7 +112,7 @@ describe('GatewayRegistry', async () => {
       });
 
       const tagNames = tags.map((tag) => tag.name);
-      const joinNetworkTags = validGatewayTags.filter(
+      const joinNetworkTags = validGatewayTags().filter(
         (tag) => ![...tagNames, 'Observer-Address'].includes(tag.name),
       );
       const { memory: joinNetworkMemory } = await joinNetwork({
@@ -1202,8 +1203,164 @@ describe('GatewayRegistry', async () => {
 
   // save observations
   describe('Save-Observations', () => {
-    it('should save observations', async () => {
-      // Steps: add a gateway, create the first epoch to prescribe it, submit an observation from the gateway, tick to the epoch distribution timestamp, check the rewards were distributed correctly
+    // Steps: add a gateway, create the first epoch to prescribe it, submit an observation from the gateway, tick to the epoch distribution timestamp, check the rewards were distributed correctly
+    const distributionDelay = 1000 * 60 * 40; // 40 minutes
+    const genesisEpochTimestamp = 1719900000000;
+    const distributionTimestamp = genesisEpochTimestamp + distributionDelay;
+    const observerAddress = 'observer-address-'.padEnd(43, 'a');
+
+    let gatewayMemory = sharedMemory;
+    before(async () => {
+      const gatewayAddress = 'gateway-address-'.padEnd(43, 'a');
+      const { memory: addGatewayMemory } = await joinNetwork({
+        address: gatewayAddress,
+        memory: sharedMemory,
+        timestamp: genesisEpochTimestamp,
+        observerAddress,
+      });
+
+      // Create the first epoch
+      const futureTick = await handle(
+        {
+          Tags: [{ name: 'Action', value: 'Tick' }],
+          Timestamp: distributionTimestamp, // Tick to when we'll accept observations
+        },
+        addGatewayMemory,
+      );
+      gatewayMemory = futureTick.Memory;
+
+      // Assert distributions are correct
+      const {
+        totalEligibleObserverReward,
+        totalEligibleGatewayReward,
+        totalEligibleRewards,
+        totalEligibleGateways,
+        rewards,
+      } = JSON.parse(futureTick.Messages[0].Data).maybeNewEpoch.distributions;
+      assert.equal(totalEligibleObserverReward, 1_250_000_000);
+      assert.equal(totalEligibleGatewayReward, 11_250_000_000);
+      assert.equal(totalEligibleRewards, 25_000_000_000);
+      assert.equal(totalEligibleGateways, 2);
+      assert.deepEqual(rewards, {
+        eligible: {
+          '2222222222222222222222222222222222222222222': {
+            operatorReward: 12_500_000_000,
+            delegateRewards: [],
+          },
+          'gateway-address-aaaaaaaaaaaaaaaaaaaaaaaaaaa': {
+            operatorReward: 12_500_000_000,
+            delegateRewards: [],
+          },
+        },
+      });
+
+      // Assert prescribed observers
+      const prescribedObservers = JSON.parse(futureTick.Messages[0].Data)
+        .maybeNewEpoch.prescribedObservers;
+      assert.equal(prescribedObservers.length, 2);
+      assert.equal(prescribedObservers[0].observerAddress, STUB_ADDRESS);
+      assert.equal(prescribedObservers[1].observerAddress, observerAddress);
+    });
+
+    const failedGateways = [
+      'failed-gateway-a-'.padEnd(43, 'c'),
+      'failed-gateway-b-'.padEnd(43, 'd'),
+    ].join(',');
+    const reportTxId = 'report-tx-id-'.padEnd(43, 'e');
+    const observationTimestamp = distributionTimestamp + 1;
+
+    it('should save a valid observation from a prescribed observer', async () => {
+      const { result } = await saveObservations({
+        from: observerAddress,
+        failedGateways,
+        reportTxId,
+        timestamp: observationTimestamp,
+        memory: gatewayMemory,
+      });
+
+      assert.equal(result.Messages.length, 1);
+      assert.equal(result.Messages[0].Target, observerAddress);
+      assert.deepEqual(JSON.parse(result.Messages[0].Data), {
+        reports: {
+          [observerAddress]: reportTxId,
+        },
+        failureSummaries: [],
+      });
+    });
+
+    it('should fail to save an observation from an invalid observer', async () => {
+      const invalidObserver = 'some-invalid-observer'.padEnd(43, 'w');
+      const { result } = await saveObservations({
+        from: invalidObserver,
+        failedGateways,
+        reportTxId,
+        timestamp: observationTimestamp,
+        memory: gatewayMemory,
+        assert: false,
+      });
+
+      assert.equal(result.Messages.length, 1);
+      assert.equal(result.Messages[0].Target, invalidObserver);
+      assert.ok(
+        result.Messages[0].Data.includes(
+          'Caller is not a prescribed observer for the current epoch.',
+        ),
+      );
+    });
+
+    // And invalid report tx Id from a valid observer wallet
+    it('should fail to save an observation with an invalid report tx id', async () => {
+      const { result } = await saveObservations({
+        from: observerAddress,
+        failedGateways,
+        reportTxId: 'invalid-report-tx-id',
+        timestamp: observationTimestamp,
+        memory: gatewayMemory,
+        assert: false,
+      });
+      assert.equal(result.Messages.length, 1);
+      assert.ok(
+        result.Messages[0].Data.includes(
+          'Invalid report tx id. Must be a valid Arweave address.',
+        ),
+      );
+    });
+
+    it('should fail to save an observation with an invalid failed gateways tag', async () => {
+      const { result } = await saveObservations({
+        from: observerAddress,
+        failedGateways: 'failed-gateway,is,good,strings?....',
+        reportTxId,
+        timestamp: observationTimestamp,
+        memory: gatewayMemory,
+        assert: false,
+      });
+
+      assert.equal(result.Messages?.length, 1);
+      assert.ok(
+        result.Messages[0].Data.includes('Invalid failed gateway address:'),
+      );
+    });
+
+    const epochLength = 1000 * 60 * 60 * 24; // 24 hours
+
+    // A valid observation AFTER the epoch has completed (should fail)
+    it('should fail to save an observation after the epoch has completed', async () => {
+      const { result } = await saveObservations({
+        from: observerAddress,
+        failedGateways,
+        reportTxId,
+        timestamp: genesisEpochTimestamp + epochLength,
+        memory: gatewayMemory,
+        assert: false,
+      });
+
+      assert.equal(result.Messages.length, 1);
+      assert.ok(
+        result.Messages[0].Data.includes(
+          'Observations for the current epoch cannot be submitted before: 1720075200000',
+        ),
+      );
     });
   });
 
