@@ -39,10 +39,17 @@ NameRegistry = NameRegistry or {
 --- @field target string|nil The address of the target of the reserved record
 --- @field endTimestamp number|nil The time at which the record is no longer reserved
 
---- @class ReturnedName
+--- @class ReturnedName -- Returned name saved into the registry
 --- @field name string The name of the returned record
 --- @field initiator WalletAddress
 --- @field startTimestamp Timestamp -- The timestamp of when the record was returned
+
+--- @class ReturnedNameReturn -- Returned name with endTimestamp and premiumMultiplier
+--- @field name string The name of the returned record
+--- @field initiator WalletAddress
+--- @field startTimestamp Timestamp -- The timestamp of when the record was returned
+--- @field endTimestamp Timestamp -- The timestamp of when the record will no longer be in the returned period
+--- @field premiumMultiplier number -- The current multiplier for the returned name
 
 --- @class ReturnedNameBuyRecordResult -- extends above
 --- @field initiator WalletAddress
