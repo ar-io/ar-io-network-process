@@ -760,4 +760,8 @@ function epochs.pruneEpochs(timestamp)
 	return prunedEpochIndexes
 end
 
+function epochs.nextEpochsPruneTimestamp()
+	return NextEpochsPruneTimestamp
+end
+
 return epochs
