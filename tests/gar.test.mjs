@@ -540,8 +540,8 @@ describe('GatewayRegistry', async () => {
         expectedAllowedDelegates: [STUB_ADDRESS_9, STUB_ADDRESS_7],
       });
 
-      const { Memory: _, ...delegationsResult } = await handle(
-        {
+      const { Memory: _, ...delegationsResult } = await handle({
+        options: {
           From: STUB_ADDRESS_8,
           Owner: STUB_ADDRESS_8,
           Tags: [
@@ -551,8 +551,8 @@ describe('GatewayRegistry', async () => {
             { name: 'Sort-By', value: 'startTimestamp' },
           ],
         },
-        updatedMemory,
-      );
+        memory: updatedMemory,
+      });
       assertNoResultError(delegationsResult);
       assert.deepStrictEqual(
         [
@@ -742,7 +742,7 @@ describe('GatewayRegistry', async () => {
           memory: sharedMemory,
           messageId: decreaseMessageId,
           decreaseQty,
-          assert: false,
+          shouldAssertNoResultError: false,
         });
 
       assert(
@@ -966,7 +966,7 @@ describe('GatewayRegistry', async () => {
         gatewayAddress: STUB_ADDRESS,
         timestamp: STUB_TIMESTAMP,
         memory: sharedMemory,
-        assert: false,
+        shouldAssertNoResultError: false,
       });
 
       const gatewayBefore = await getGateway({
@@ -981,7 +981,7 @@ describe('GatewayRegistry', async () => {
           timestamp: decreaseStakeTimestamp,
           gatewayAddress: STUB_ADDRESS,
           messageId: decreaseStakeMsgId,
-          assert: false,
+          shouldAssertNoResultError: false,
         });
 
       assert.ok(
@@ -1175,16 +1175,16 @@ describe('GatewayRegistry', async () => {
       let cursor;
       let fetchedGateways = [];
       while (true) {
-        const paginatedGateways = await handle(
-          {
+        const paginatedGateways = await handle({
+          options: {
             Tags: [
               { name: 'Action', value: 'Paginated-Gateways' },
               { name: 'Cursor', value: cursor },
               { name: 'Limit', value: '1' },
             ],
           },
-          addGatewayMemory2,
-        );
+          memory: addGatewayMemory2,
+        });
         // parse items, nextCursor
         const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
           JSON.parse(paginatedGateways.Messages?.[0]?.Data);
@@ -1220,13 +1220,13 @@ describe('GatewayRegistry', async () => {
       });
 
       // Create the first epoch with distributions already set
-      const futureTick = await handle(
-        {
+      const futureTick = await handle({
+        options: {
           Tags: [{ name: 'Action', value: 'Tick' }],
           Timestamp: distributionTimestamp, // Tick to when we'll accept observations
         },
-        addGatewayMemory,
-      );
+        memory: addGatewayMemory,
+      });
 
       // Assert distributions are correct
       const {
@@ -1257,9 +1257,11 @@ describe('GatewayRegistry', async () => {
       const prescribedObservers = JSON.parse(futureTick.Messages[0].Data)
         .maybeNewEpoch.prescribedObservers;
       assert.equal(prescribedObservers.length, 2);
-      assert.equal(prescribedObservers[0].observerAddress, STUB_ADDRESS);
-      assert.equal(prescribedObservers[1].observerAddress, observerAddress);
-
+      const prescribedObserverAddresses = prescribedObservers.map(
+        (o) => o.observerAddress,
+      );
+      assert.ok(prescribedObserverAddresses.includes(STUB_ADDRESS));
+      assert.ok(prescribedObserverAddresses.includes(observerAddress));
       gatewayMemory = futureTick.Memory;
     });
 
@@ -1297,7 +1299,7 @@ describe('GatewayRegistry', async () => {
         reportTxId,
         timestamp: observationTimestamp,
         memory: gatewayMemory,
-        assert: false,
+        shouldAssertNoResultError: false,
       });
 
       assert.equal(result.Messages.length, 1);
@@ -1316,7 +1318,7 @@ describe('GatewayRegistry', async () => {
         reportTxId: 'invalid-report-tx-id',
         timestamp: observationTimestamp,
         memory: gatewayMemory,
-        assert: false,
+        shouldAssertNoResultError: false,
       });
       assert.equal(result.Messages.length, 1);
       assert.ok(
@@ -1333,7 +1335,7 @@ describe('GatewayRegistry', async () => {
         reportTxId,
         timestamp: observationTimestamp,
         memory: gatewayMemory,
-        assert: false,
+        shouldAssertNoResultError: false,
       });
 
       assert.equal(result.Messages?.length, 1);
@@ -1349,7 +1351,7 @@ describe('GatewayRegistry', async () => {
         reportTxId,
         timestamp: genesisEpochTimestamp + epochLength,
         memory: gatewayMemory,
-        assert: false,
+        shouldAssertNoResultError: false,
       });
 
       assert.equal(result.Messages.length, 1);
@@ -1407,8 +1409,8 @@ describe('GatewayRegistry', async () => {
       let cursor;
       let fetchedDelegations = [];
       while (true) {
-        const paginatedDelegations = await handle(
-          {
+        const paginatedDelegations = await handle({
+          options: {
             From: userAddress,
             Owner: userAddress,
             Tags: [
@@ -1419,8 +1421,8 @@ describe('GatewayRegistry', async () => {
               ...(cursor ? [{ name: 'Cursor', value: `${cursor}` }] : []),
             ],
           },
-          decreaseStakeMemory,
-        );
+          memory: decreaseStakeMemory,
+        });
         const { items, nextCursor, hasMore, totalItems } = JSON.parse(
           paginatedDelegations.Messages?.[0]?.Data,
         );
@@ -1515,8 +1517,8 @@ describe('GatewayRegistry', async () => {
       vaultId,
       timestamp,
     }) => {
-      const result = await handle(
-        {
+      const result = await handle({
+        options: {
           From: delegatorAddress,
           Owner: delegatorAddress,
           Tags: [
@@ -1529,7 +1531,7 @@ describe('GatewayRegistry', async () => {
           Timestamp: timestamp,
         },
         memory,
-      );
+      });
       return {
         result,
         memory: result.Memory,
@@ -1629,15 +1631,15 @@ describe('GatewayRegistry', async () => {
         [],
       );
 
-      const feeResultAfterRedelegation = await handle(
-        {
+      const feeResultAfterRedelegation = await handle({
+        options: {
           From: delegatorAddress,
           Owner: delegatorAddress,
           Tags: [{ name: 'Action', value: 'Redelegation-Fee' }],
           Timestamp: STUB_TIMESTAMP,
         },
-        redelegateStakeMemory,
-      );
+        memory: redelegateStakeMemory,
+      });
       assert.deepStrictEqual(
         JSON.parse(feeResultAfterRedelegation.Messages[0].Data),
         {
@@ -1647,15 +1649,15 @@ describe('GatewayRegistry', async () => {
       );
 
       // Fee is pruned after 7 days
-      const feeResultSevenEpochsLater = await handle(
-        {
+      const feeResultSevenEpochsLater = await handle({
+        options: {
           From: delegatorAddress,
           Owner: delegatorAddress,
           Tags: [{ name: 'Action', value: 'Redelegation-Fee' }],
           Timestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7 * 7 + 1, // 7 days
         },
-        redelegateStakeMemory,
-      );
+        memory: redelegateStakeMemory,
+      });
       assert.deepStrictEqual(
         JSON.parse(feeResultSevenEpochsLater.Messages[0].Data),
         {

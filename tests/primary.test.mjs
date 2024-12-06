@@ -16,8 +16,8 @@ describe('primary names', function () {
     years = 1,
     memory,
   }) => {
-    const buyRecordResult = await handle(
-      {
+    const buyRecordResult = await handle({
+      options: {
         Tags: [
           { name: 'Action', value: 'Buy-Record' },
           { name: 'Name', value: name },
@@ -27,7 +27,7 @@ describe('primary names', function () {
         ],
       },
       memory,
-    );
+    });
     return {
       record: JSON.parse(buyRecordResult.Messages[0].Data),
       memory: buyRecordResult.Memory,
@@ -50,8 +50,8 @@ describe('primary names', function () {
       });
       memory = transferMemory;
     }
-    const requestPrimaryNameResult = await handle(
-      {
+    const requestPrimaryNameResult = await handle({
+      options: {
         From: caller,
         Owner: caller,
         Timestamp: timestamp,
@@ -62,7 +62,7 @@ describe('primary names', function () {
         ],
       },
       memory,
-    );
+    });
     return {
       result: requestPrimaryNameResult,
       memory: requestPrimaryNameResult.Memory,
@@ -70,15 +70,15 @@ describe('primary names', function () {
   };
 
   const getPrimaryNameRequest = async ({ initiator, memory }) => {
-    const getPrimaryNameRequestResult = await handle(
-      {
+    const getPrimaryNameRequestResult = await handle({
+      options: {
         Tags: [
           { name: 'Action', value: 'Primary-Name-Request' },
           { name: 'Initiator', value: initiator },
         ],
       },
       memory,
-    );
+    });
     return {
       result: getPrimaryNameRequestResult,
       memory: getPrimaryNameRequestResult.Memory,
@@ -92,8 +92,8 @@ describe('primary names', function () {
     timestamp,
     memory,
   }) => {
-    const approvePrimaryNameRequestResult = await handle(
-      {
+    const approvePrimaryNameRequestResult = await handle({
+      options: {
         From: caller,
         Owner: caller,
         Timestamp: timestamp,
@@ -104,7 +104,7 @@ describe('primary names', function () {
         ],
       },
       memory,
-    );
+    });
     return {
       result: approvePrimaryNameRequestResult,
       memory: approvePrimaryNameRequestResult.Memory,
@@ -112,8 +112,8 @@ describe('primary names', function () {
   };
 
   const removePrimaryNames = async ({ names, caller, memory }) => {
-    const removePrimaryNamesResult = await handle(
-      {
+    const removePrimaryNamesResult = await handle({
+      options: {
         From: caller,
         Owner: caller,
         Tags: [
@@ -122,7 +122,7 @@ describe('primary names', function () {
         ],
       },
       memory,
-    );
+    });
     return {
       result: removePrimaryNamesResult,
       memory: removePrimaryNamesResult.Memory,
@@ -132,18 +132,18 @@ describe('primary names', function () {
   const getPrimaryNameForAddress = async ({
     address,
     memory,
-    assert = true,
+    shouldAssertNoResultError = true,
   }) => {
-    const getPrimaryNameResult = await handle(
-      {
+    const getPrimaryNameResult = await handle({
+      options: {
         Tags: [
           { name: 'Action', value: 'Primary-Name' },
           { name: 'Address', value: address },
         ],
       },
       memory,
-      assert,
-    );
+      shouldAssertNoResultError,
+    });
     return {
       result: getPrimaryNameResult,
       memory: getPrimaryNameResult.Memory,
@@ -151,15 +151,15 @@ describe('primary names', function () {
   };
 
   const getOwnerOfPrimaryName = async ({ name, memory }) => {
-    const getOwnerResult = await handle(
-      {
+    const getOwnerResult = await handle({
+      options: {
         Tags: [
           { name: 'Action', value: 'Primary-Name' },
           { name: 'Name', value: name },
         ],
       },
       memory,
-    );
+    });
     return {
       result: getOwnerResult,
       memory: getOwnerResult.Memory,
@@ -404,7 +404,7 @@ describe('primary names', function () {
       await getPrimaryNameForAddress({
         address: recipient,
         memory: removePrimaryNameResult.Memory,
-        assert: false, // we expect an error here, don't throw
+        shouldAssertNoResultError: false, // we expect an error here, don't throw
       });
 
     const errorTag = primaryNameForAddressResult.Messages[0].Tags.find(
@@ -416,12 +416,14 @@ describe('primary names', function () {
   describe('getPaginatedPrimaryNames', function () {
     it('should return all primary names', async function () {
       const getPaginatedPrimaryNamesResult = await handle({
-        Tags: [
-          { name: 'Action', value: 'Primary-Names' },
-          { name: 'Limit', value: 10 },
-          { name: 'Sort-By', value: 'owner' },
-          { name: 'Sort-Order', value: 'asc' },
-        ],
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Primary-Names' },
+            { name: 'Limit', value: 10 },
+            { name: 'Sort-By', value: 'owner' },
+            { name: 'Sort-Order', value: 'asc' },
+          ],
+        },
       });
       assertNoResultError(getPaginatedPrimaryNamesResult);
       const primaryNames = JSON.parse(
@@ -441,14 +443,16 @@ describe('primary names', function () {
   describe('getPaginatedPrimaryNameRequests', function () {
     it('should return all primary name requests', async function () {
       const getPaginatedPrimaryNameRequestsResult = await handle({
-        Tags: [
-          { name: 'Action', value: 'Primary-Name-Requests' },
-          { name: 'Limit', value: 10 },
-          { name: 'Sort-By', value: 'startTimestamp' },
-          { name: 'Sort-Order', value: 'asc' },
-        ],
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Primary-Name-Requests' },
+            { name: 'Limit', value: 10 },
+            { name: 'Sort-By', value: 'startTimestamp' },
+            { name: 'Sort-Order', value: 'asc' },
+          ],
+        },
       });
-      assertNoResultError(getPaginatedPrimaryNameRequestsResult);
+
       const primaryNameRequests = JSON.parse(
         getPaginatedPrimaryNameRequestsResult.Messages[0].Data,
       );
