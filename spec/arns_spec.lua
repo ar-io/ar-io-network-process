@@ -1324,7 +1324,15 @@ describe("arns", function()
 				local currentTimestamp = 1000000 + constants.returnedNamePeriod + 1
 				local status, error = pcall(arns.getReturnedNamePremiumMultiplier, startTimestamp, currentTimestamp)
 				assert.is_false(status)
-				assert.match("Timestamp is outside of the returned name period", error)
+				assert.match("Current timestamp is after the returned name period", error)
+			end)
+
+			it("should throw an error if the provided timestamp falls before the start timestamp", function()
+				local startTimestamp = 1000000
+				local currentTimestamp = 999999
+				local status, error = pcall(arns.getReturnedNamePremiumMultiplier, startTimestamp, currentTimestamp)
+				assert.is_false(status)
+				assert.match("Current timestamp must be after the start timestamp", error)
 			end)
 		end)
 

@@ -914,8 +914,12 @@ function arns.getReturnedNamesUnsafe()
 end
 
 function arns.getReturnedNamePremiumMultiplier(startTimestamp, currentTimestamp)
+	assert(currentTimestamp >= startTimestamp, "Current timestamp must be after the start timestamp")
+	assert(
+		currentTimestamp < startTimestamp + constants.returnedNamePeriod,
+		"Current timestamp is after the returned name period"
+	)
 	local timestampDiff = currentTimestamp - startTimestamp
-	assert(timestampDiff < constants.returnedNamePeriod, "Timestamp is outside of the returned name period")
 	-- The percentage of the period that has passed e.g: 0.5 if half the period has passed
 	local percentageOfReturnedNamePeriodPassed = timestampDiff / constants.returnedNamePeriod
 	-- Take the inverse so that a fresh returned name has the full multiplier, and a name almost expired has a multiplier close to base price
