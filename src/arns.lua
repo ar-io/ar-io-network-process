@@ -659,7 +659,7 @@ function arns.getTokenCost(intendedAction)
 		local processId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 		arns.assertValidBuyRecord(name, years, purchaseType, processId, false)
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
-		local returnedName = arns.getReturnedName(name)
+		local returnedName = arns.getReturnedNameUnsafe(name)
 		if returnedName then
 			tokenCost = math.floor(
 				tokenCost * arns.getReturnedNamePremiumMultiplier(returnedName.startTimestamp, currentTimestamp)
@@ -882,7 +882,7 @@ function arns.createReturnedName(name, timestamp, initiator)
 		not arns.getReservedName(name),
 		"Name is reserved. Returned names can only be created for unregistered names."
 	)
-	assert(not arns.getReturnedName(name), "Returned name already exists")
+	assert(not arns.getReturnedNameUnsafe(name), "Returned name already exists")
 	local returnedName = {
 		name = name,
 		startTimestamp = timestamp,
@@ -896,13 +896,20 @@ end
 --- Gets a returned name
 --- @param name string The name of the returned name
 --- @return ReturnedName|nil
-function arns.getReturnedName(name)
+function arns.getReturnedNameUnsafe(name)
 	return NameRegistry.returned[name]
+end
+
+--- Gets a returned name as a deep copy
+--- @param name string The name of the returned name
+--- @return ReturnedName|nil
+function arns.getReturnedName(name)
+	return utils.deepCopy(arns.getReturnedNameUnsafe(name))
 end
 
 --- Gets all returned names
 --- @return table<string, ReturnedName> returnedNames - the returned names
-function arns.getReturnedNames()
+function arns.getReturnedNamesUnsafe()
 	return NameRegistry.returned or {}
 end
 
@@ -997,7 +1004,7 @@ function arns.pruneReturnedNames(currentTimestamp)
 	end
 
 	local minNextEndTimestamp
-	for name, returnedName in pairs(arns.getReturnedNames()) do
+	for name, returnedName in pairs(arns.getReturnedNamesUnsafe()) do
 		local endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod
 		if endTimestamp <= currentTimestamp then
 			prunedReturnedNames[name] = arns.removeReturnedName(name)

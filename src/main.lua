@@ -2114,7 +2114,7 @@ end)
 
 addEventingHandler(ActionMap.ReturnedNames, utils.hasMatchingTag("Action", ActionMap.ReturnedNames), function(msg)
 	local page = utils.parsePaginationTags(msg)
-	local returnedNames = arns.getReturnedNames()
+	local returnedNames = arns.getReturnedNamesUnsafe()
 	local returnedNamesWithEndTimestampAndPremiumMultiplier = {}
 
 	for _, v in ipairs(returnedNames) do
@@ -2144,7 +2144,7 @@ end)
 
 addEventingHandler(ActionMap.ReturnedName, utils.hasMatchingTag("Action", ActionMap.ReturnedName), function(msg)
 	local name = string.lower(msg.Tags.Name)
-	local returnedName = arns.getReturnedName(name)
+	local returnedName = arns.getReturnedNameUnsafe(name)
 
 	assert(returnedName, "Returned name not found")
 
