@@ -343,6 +343,7 @@ local function addNextPruneTimestampsResults(ioEvent, prunedStateResult)
 		or pruneGatewaysResult.stakeSlashed > 0
 	then
 		ioEvent:addField("Next-Auctions-Prune-Timestamp", arns.nextAuctionsPruneTimestamp())
+		ioEvent:addField("Next-Epochs-Prune-Timestamp", epochs.nextEpochsPruneTimestamp())
 		ioEvent:addField("Next-Records-Prune-Timestamp", arns.nextRecordsPruneTimestamp())
 		ioEvent:addField("Next-Vaults-Prune-Timestamp", vaults.nextVaultsPruneTimestamp())
 		ioEvent:addField("Next-Gateways-Prune-Timestamp", gar.nextGatewaysPruneTimestamp())
@@ -2605,5 +2606,21 @@ addEventingHandler(
 		})
 	end
 )
+
+addEventingHandler("getPruningTimestamps", utils.hasMatchingTag("Action", "Pruning-Timestamps"), function(msg)
+	return Send(msg, {
+		Target = msg.From,
+		Action = "Pruning-Timestamps-Notice",
+		Data = json.encode({
+			auctions = arns.nextAuctionsPruneTimestamp(),
+			epochs = epochs.nextEpochsPruneTimestamp(),
+			gateways = gar.nextGatewaysPruneTimestamp(),
+			primaryNames = primaryNames.nextPrimaryNamesPruneTimestamp(),
+			records = arns.nextRecordsPruneTimestamp(),
+			redelegations = gar.nextRedelegationsPruneTimestamp(),
+			vaults = vaults.nextVaultsPruneTimestamp(),
+		}),
+	})
+end)
 
 return process
