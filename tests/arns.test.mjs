@@ -187,6 +187,7 @@ describe('ArNS', async () => {
           ],
         },
         buyRecordResult.Memory,
+        false,
       );
 
       const failedBuyRecordError = failedBuyRecordResult.Messages[0].Tags.find(
@@ -1469,6 +1470,7 @@ describe('ArNS', async () => {
           Owner: STUB_ADDRESS,
         },
         memory,
+        false,
       );
 
       // assert error
@@ -1498,6 +1500,7 @@ describe('ArNS', async () => {
           Owner: processId,
         },
         memory,
+        false,
       );
 
       // assert error

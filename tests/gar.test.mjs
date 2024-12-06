@@ -19,6 +19,9 @@ import {
   delegateStake,
   decreaseOperatorStake,
   saveObservations,
+  genesisEpochTimestamp,
+  distributionDelay,
+  epochLength,
 } from './helpers.mjs';
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
@@ -1201,16 +1204,13 @@ describe('GatewayRegistry', async () => {
     });
   });
 
-  // save observations
   describe('Save-Observations', () => {
-    // Steps: add a gateway, create the first epoch to prescribe it, submit an observation from the gateway, tick to the epoch distribution timestamp, check the rewards were distributed correctly
-    const distributionDelay = 1000 * 60 * 40; // 40 minutes
-    const genesisEpochTimestamp = 1719900000000;
     const distributionTimestamp = genesisEpochTimestamp + distributionDelay;
     const observerAddress = 'observer-address-'.padEnd(43, 'a');
 
     let gatewayMemory = sharedMemory;
     before(async () => {
+      // Join a gateway with the observer
       const gatewayAddress = 'gateway-address-'.padEnd(43, 'a');
       const { memory: addGatewayMemory } = await joinNetwork({
         address: gatewayAddress,
@@ -1219,7 +1219,7 @@ describe('GatewayRegistry', async () => {
         observerAddress,
       });
 
-      // Create the first epoch
+      // Create the first epoch with distributions already set
       const futureTick = await handle(
         {
           Tags: [{ name: 'Action', value: 'Tick' }],
@@ -1227,7 +1227,6 @@ describe('GatewayRegistry', async () => {
         },
         addGatewayMemory,
       );
-      gatewayMemory = futureTick.Memory;
 
       // Assert distributions are correct
       const {
@@ -1260,6 +1259,8 @@ describe('GatewayRegistry', async () => {
       assert.equal(prescribedObservers.length, 2);
       assert.equal(prescribedObservers[0].observerAddress, STUB_ADDRESS);
       assert.equal(prescribedObservers[1].observerAddress, observerAddress);
+
+      gatewayMemory = futureTick.Memory;
     });
 
     const failedGateways = [
@@ -1308,7 +1309,6 @@ describe('GatewayRegistry', async () => {
       );
     });
 
-    // And invalid report tx Id from a valid observer wallet
     it('should fail to save an observation with an invalid report tx id', async () => {
       const { result } = await saveObservations({
         from: observerAddress,
@@ -1342,9 +1342,6 @@ describe('GatewayRegistry', async () => {
       );
     });
 
-    const epochLength = 1000 * 60 * 60 * 24; // 24 hours
-
-    // A valid observation AFTER the epoch has completed (should fail)
     it('should fail to save an observation after the epoch has completed', async () => {
       const { result } = await saveObservations({
         from: observerAddress,

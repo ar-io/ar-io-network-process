@@ -16,6 +16,10 @@ const initialOperatorStake = 100_000_000_000;
 export const basePermabuyPrice = 2_500_000_000;
 export const baseLeasePrice = 600_000_000;
 
+export const genesisEpochTimestamp = 1719900000000; // Tuesday, July 2, 2024, 06:00:00 AM UTC
+export const epochLength = 1000 * 60 * 60 * 24; // 24 hours
+export const distributionDelay = 1000 * 60 * 40; // 40 minutes
+
 const { handle: originalHandle, memory } = await createAosLoader();
 export const startMemory = memory;
 

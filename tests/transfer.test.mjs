@@ -80,14 +80,18 @@ describe('Transfers', async () => {
       ],
     });
     const senderBalanceData = JSON.parse(senderBalance.Messages[0].Data);
-    const transferResult = await handle({
-      Tags: [
-        { name: 'Action', value: 'Transfer' },
-        { name: 'Recipient', value: recipient },
-        { name: 'Quantity', value: senderBalanceData + 1 },
-        { name: 'Cast', value: true },
-      ],
-    });
+    const transferResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Transfer' },
+          { name: 'Recipient', value: recipient },
+          { name: 'Quantity', value: senderBalanceData + 1 },
+          { name: 'Cast', value: true },
+        ],
+      },
+      undefined,
+      false,
+    );
     // get balances
     const result = await handle(
       {
@@ -112,15 +116,19 @@ describe('Transfers', async () => {
         ],
       });
       const senderBalanceData = JSON.parse(senderBalance.Messages[0].Data);
-      const transferResult = await handle({
-        Tags: [
-          { name: 'Action', value: 'Transfer' },
-          { name: 'Recipient', value: recipient },
-          { name: 'Quantity', value: 100000000 }, // 100 IO
-          { name: 'Cast', value: true },
-          { name: 'Allow-Unsafe-Addresses', value: allowUnsafeAddresses },
-        ],
-      });
+      const transferResult = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Transfer' },
+            { name: 'Recipient', value: recipient },
+            { name: 'Quantity', value: 100000000 }, // 100 IO
+            { name: 'Cast', value: true },
+            { name: 'Allow-Unsafe-Addresses', value: allowUnsafeAddresses },
+          ],
+        },
+        undefined,
+        false,
+      );
 
       // assert the error tag
       const errorTag = transferResult.Messages?.[0]?.Tags?.find(
@@ -190,14 +198,19 @@ describe('Transfers', async () => {
       ],
     });
     const senderBalanceData = JSON.parse(senderBalance.Messages[0].Data);
-    const transferResult = await handle({
-      Tags: [
-        { name: 'Action', value: 'Transfer' },
-        { name: 'Recipient', value: recipient },
-        { name: 'Quantity', value: 100000000.1 },
-        { name: 'Cast', value: true },
-      ],
-    });
+    const transferResult = await handle(
+      {
+        Tags: [
+          { name: 'Action', value: 'Transfer' },
+          { name: 'Recipient', value: recipient },
+          { name: 'Quantity', value: 100000000.1 },
+          { name: 'Cast', value: true },
+        ],
+      },
+      undefined,
+      false,
+    );
+
     // get balances
     const result = await handle(
       {

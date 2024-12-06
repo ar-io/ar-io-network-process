@@ -28,7 +28,6 @@ describe('primary names', function () {
       },
       memory,
     );
-    assertNoResultError(buyRecordResult);
     return {
       record: JSON.parse(buyRecordResult.Messages[0].Data),
       memory: buyRecordResult.Memory,
@@ -64,7 +63,6 @@ describe('primary names', function () {
       },
       memory,
     );
-    assertNoResultError(requestPrimaryNameResult);
     return {
       result: requestPrimaryNameResult,
       memory: requestPrimaryNameResult.Memory,
@@ -81,7 +79,6 @@ describe('primary names', function () {
       },
       memory,
     );
-    assertNoResultError(getPrimaryNameRequestResult);
     return {
       result: getPrimaryNameRequestResult,
       memory: getPrimaryNameRequestResult.Memory,
@@ -108,7 +105,6 @@ describe('primary names', function () {
       },
       memory,
     );
-    assertNoResultError(approvePrimaryNameRequestResult);
     return {
       result: approvePrimaryNameRequestResult,
       memory: approvePrimaryNameRequestResult.Memory,
@@ -127,7 +123,6 @@ describe('primary names', function () {
       },
       memory,
     );
-    assertNoResultError(removePrimaryNamesResult);
     return {
       result: removePrimaryNamesResult,
       memory: removePrimaryNamesResult.Memory,
@@ -147,10 +142,8 @@ describe('primary names', function () {
         ],
       },
       memory,
+      assert,
     );
-    if (assert) {
-      assertNoResultError(getPrimaryNameResult);
-    }
     return {
       result: getPrimaryNameResult,
       memory: getPrimaryNameResult.Memory,
@@ -167,7 +160,6 @@ describe('primary names', function () {
       },
       memory,
     );
-    assertNoResultError(getOwnerResult);
     return {
       result: getOwnerResult,
       memory: getOwnerResult.Memory,
