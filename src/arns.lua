@@ -613,6 +613,7 @@ end
 --- @field intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name/Primary-Name-Request)
 --- @field currentTimestamp number The current timestamp
 --- @field from string|nil The target address of the intended action
+--- @field record StoredRecord|nil The record to perform the intended action on
 
 --- @param intendedAction IntendedAction The intended action to get token cost for
 --- @return TokenCostResult tokenCostResult The token cost result of the intended action
@@ -624,7 +625,7 @@ function arns.getTokenCost(intendedAction)
 	local baseFee = demand.baseFeeForNameLength(#name)
 	local intent = intendedAction.intent
 	local qty = tonumber(intendedAction.quantity)
-	local record = arns.getRecord(name)
+	local record = intendedAction.record or arns.getRecord(name)
 	local currentTimestamp = tonumber(intendedAction.currentTimestamp)
 
 	assert(type(intent) == "string", "Intent is required and must be a string.")
@@ -656,8 +657,13 @@ function arns.getTokenCost(intendedAction)
 		arns.assertValidUpgradeName(record, currentTimestamp)
 		tokenCost = arns.calculatePermabuyFee(baseFee, demand.getDemandFactor())
 	elseif intent == "Primary-Name-Request" then
-		-- TODO: this may change to the cost of a single undername
-		tokenCost = constants.PRIMARY_NAME_REQUEST_COST
+		assert(record, "Name is not registered")
+		assert(currentTimestamp, "Timestamp is required")
+		local yearsRemaining = constants.PERMABUY_LEASE_FEE_LENGTH
+		if record.type == "lease" then
+			yearsRemaining = arns.calculateYearsBetweenTimestamps(currentTimestamp, record.endTimestamp)
+		end
+		tokenCost = arns.calculateUndernameCost(baseFee, 1, record.type, yearsRemaining, demand.getDemandFactor())
 	else
 		error("Invalid intent: " .. intent)
 	end
