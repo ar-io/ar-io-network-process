@@ -316,7 +316,7 @@ end
 
 --- @param ioEvent table
 local function addNextPruneTimestampsData(ioEvent)
-	ioEvent:addField("Next-Auctions-Prune-Timestamp", arns.nextAuctionsPruneTimestamp())
+	ioEvent:addField("Next-Returned-Names-Prune-Timestamp", arns.nextReturnedNamesPruneTimestamp())
 	ioEvent:addField("Next-Epochs-Prune-Timestamp", epochs.nextEpochsPruneTimestamp())
 	ioEvent:addField("Next-Records-Prune-Timestamp", arns.nextRecordsPruneTimestamp())
 	ioEvent:addField("Next-Vaults-Prune-Timestamp", vaults.nextVaultsPruneTimestamp())
@@ -2054,7 +2054,6 @@ addEventingHandler(
 
 -- END READ HANDLERS
 
--- AUCTION HANDLER
 addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.ReleaseName), function(msg)
 	-- validate the name and process id exist, then create the returned name
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name)
@@ -2487,7 +2486,7 @@ addEventingHandler("getPruningTimestamps", utils.hasMatchingTag("Action", "Pruni
 		Target = msg.From,
 		Action = "Pruning-Timestamps-Notice",
 		Data = json.encode({
-			auctions = arns.nextAuctionsPruneTimestamp(),
+			returnedNames = arns.nextReturnedNamesPruneTimestamp(),
 			epochs = epochs.nextEpochsPruneTimestamp(),
 			gateways = gar.nextGatewaysPruneTimestamp(),
 			primaryNames = primaryNames.nextPrimaryNamesPruneTimestamp(),
