@@ -1010,7 +1010,7 @@ function arns.pruneReturnedNames(currentTimestamp)
 	local minNextEndTimestamp
 	for name, returnedName in pairs(arns.getReturnedNamesUnsafe()) do
 		local endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod
-		if endTimestamp <= currentTimestamp then
+		if currentTimestamp >= endTimestamp then
 			prunedReturnedNames[name] = arns.removeReturnedName(name)
 		else
 			minNextEndTimestamp = math.min(minNextEndTimestamp or endTimestamp, endTimestamp)
