@@ -44,7 +44,7 @@ NameRegistry = NameRegistry or {
 --- @field initiator WalletAddress
 --- @field startTimestamp Timestamp -- The timestamp of when the record was returned
 
---- @class ReturnedNameReturn -- Returned name with endTimestamp and premiumMultiplier
+--- @class ReturnedNameData -- Returned name with endTimestamp and premiumMultiplier
 --- @field name string The name of the returned record
 --- @field initiator WalletAddress
 --- @field startTimestamp Timestamp -- The timestamp of when the record was returned

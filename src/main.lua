@@ -2121,11 +2121,11 @@ addEventingHandler(ActionMap.ReturnedNames, utils.hasMatchingTag("Action", Actio
 	local page = utils.parsePaginationTags(msg)
 	local returnedNames = arns.getReturnedNamesUnsafe()
 
-	--- @type ReturnedNameReturn[] -- Returned Names with End Timestamp and Premium Multiplier
-	local returnedNameReturns = {}
+	--- @type ReturnedNameData[] -- Returned Names with End Timestamp and Premium Multiplier
+	local returnedNameDataArray = {}
 
 	for _, v in ipairs(returnedNames) do
-		table.insert(returnedNameReturns, {
+		table.insert(returnedNameDataArray, {
 			name = v.name,
 			startTimestamp = v.startTimestamp,
 			endTimestamp = v.startTimestamp + constants.returnedNamePeriod,
@@ -2135,7 +2135,7 @@ addEventingHandler(ActionMap.ReturnedNames, utils.hasMatchingTag("Action", Actio
 	end
 	-- paginate the returnedNames by name, showing returnedNames nearest to the endTimestamp first
 	local paginatedReturnedNames = utils.paginateTableWithCursor(
-		returnedNameReturns,
+		returnedNameDataArray,
 		page.cursor,
 		"name",
 		page.limit,
