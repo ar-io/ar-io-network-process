@@ -321,6 +321,17 @@ local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
 end
 
 --- @param ioEvent table
+local function addNextPruneTimestampsData(ioEvent)
+	ioEvent:addField("Next-Auctions-Prune-Timestamp", arns.nextAuctionsPruneTimestamp())
+	ioEvent:addField("Next-Epochs-Prune-Timestamp", epochs.nextEpochsPruneTimestamp())
+	ioEvent:addField("Next-Records-Prune-Timestamp", arns.nextRecordsPruneTimestamp())
+	ioEvent:addField("Next-Vaults-Prune-Timestamp", vaults.nextVaultsPruneTimestamp())
+	ioEvent:addField("Next-Gateways-Prune-Timestamp", gar.nextGatewaysPruneTimestamp())
+	ioEvent:addField("Next-Redelegations-Prune-Timestamp", gar.nextRedelegationsPruneTimestamp())
+	ioEvent:addField("Next-Primary-Names-Prune-Timestamp", primaryNames.nextPrimaryNamesPruneTimestamp())
+end
+
+--- @param ioEvent table
 --- @param prunedStateResult PruneStateResult
 local function addNextPruneTimestampsResults(ioEvent, prunedStateResult)
 	--- @type PrunedGatewaysResult
@@ -342,12 +353,7 @@ local function addNextPruneTimestampsResults(ioEvent, prunedStateResult)
 		or pruneGatewaysResult.gatewayStakeWithdrawing > 0
 		or pruneGatewaysResult.stakeSlashed > 0
 	then
-		ioEvent:addField("Next-Auctions-Prune-Timestamp", arns.nextAuctionsPruneTimestamp())
-		ioEvent:addField("Next-Records-Prune-Timestamp", arns.nextRecordsPruneTimestamp())
-		ioEvent:addField("Next-Vaults-Prune-Timestamp", vaults.nextVaultsPruneTimestamp())
-		ioEvent:addField("Next-Gateways-Prune-Timestamp", gar.nextGatewaysPruneTimestamp())
-		ioEvent:addField("Next-Redelegations-Prune-Timestamp", gar.nextRedelegationsPruneTimestamp())
-		ioEvent:addField("Next-Primary-Names-Prune-Timestamp", primaryNames.nextPrimaryNamesPruneTimestamp())
+		addNextPruneTimestampsData(ioEvent)
 	end
 end
 
@@ -2605,5 +2611,22 @@ addEventingHandler(
 		})
 	end
 )
+
+addEventingHandler("getPruningTimestamps", utils.hasMatchingTag("Action", "Pruning-Timestamps"), function(msg)
+	addNextPruneTimestampsData(msg.ioEvent)
+	return Send(msg, {
+		Target = msg.From,
+		Action = "Pruning-Timestamps-Notice",
+		Data = json.encode({
+			auctions = arns.nextAuctionsPruneTimestamp(),
+			epochs = epochs.nextEpochsPruneTimestamp(),
+			gateways = gar.nextGatewaysPruneTimestamp(),
+			primaryNames = primaryNames.nextPrimaryNamesPruneTimestamp(),
+			records = arns.nextRecordsPruneTimestamp(),
+			redelegations = gar.nextRedelegationsPruneTimestamp(),
+			vaults = vaults.nextVaultsPruneTimestamp(),
+		}),
+	})
+end)
 
 return process
