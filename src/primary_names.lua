@@ -85,6 +85,7 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 	local fundingPlan = gar.getFundingPlan(initiator, requestCost.tokenCost, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0, "Insufficient balances")
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, timestamp)
+	assert(fundingResult.totalFunded == requestCost.tokenCost, "Funding plan application failed")
 
 	--- transfer the primary name cost from the initiator to the protocol balance
 	balances.increaseBalance(ao.id, requestCost.tokenCost)
@@ -157,9 +158,6 @@ function primaryNames.approvePrimaryNameRequest(recipient, name, from, timestamp
 	local record = arns.getRecord(baseName)
 	assert(record, "ArNS record '" .. baseName .. "' does not exist")
 	assert(record.processId == from, "Primary name request must be approved by the owner of the base name")
-
-	-- assert the name matches the request
-	assert(request.name == name, "Provided name does not match the primary name request")
 
 	-- set the primary name
 	local newPrimaryName = primaryNames.setPrimaryNameFromRequest(recipient, request, timestamp)

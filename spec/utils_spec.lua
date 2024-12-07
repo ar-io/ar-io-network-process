@@ -377,6 +377,12 @@ describe("utils", function()
 			local result = utils.splitAndTrimString(input)
 			assert.are.same({ "apple", "banana", "cherry" }, result)
 		end)
+
+		it("should handle regex characters as delimiters", function()
+			local input = "apple|banana.cherry[date]eggplant"
+			local result = utils.splitAndTrimString(input, "[|.]")
+			assert.are.same({ "apple", "banana", "cherry", "date", "eggplant" }, result)
+		end)
 	end)
 
 	describe("createLookupTable", function()
@@ -775,22 +781,143 @@ describe("utils", function()
 	end)
 
 	describe("isInteger", function()
-		it("should return true for an integer", function()
-			local input = 1
-			local result = utils.isInteger(input)
-			assert.is_true(result)
+		it("should return true for valid integers", function()
+			assert.is_true(utils.isInteger(0))
+			assert.is_true(utils.isInteger(-1))
+			assert.is_true(utils.isInteger(123456789))
+			assert.is_true(utils.isInteger("0"))
+			assert.is_true(utils.isInteger("-1"))
+			assert.is_true(utils.isInteger("123456789"))
 		end)
 
-		it("should return false for a non-integer", function()
-			local input = 1.234
-			local result = utils.isInteger(input)
-			assert.is_false(result)
+		it("should return false for non-integer floating-point numbers", function()
+			assert.is_false(utils.isInteger(1.23))
+			assert.is_false(utils.isInteger(-0.456))
+			assert.is_false(utils.isInteger("1.23"))
+			assert.is_false(utils.isInteger("-0.456"))
 		end)
 
-		it("should convert string to integer", function()
-			local input = "1"
-			local result = utils.isInteger(input)
-			assert.is_true(result)
+		it("should return true for integer floating-point numbers", function()
+			assert.is_true(utils.isInteger(1.0))
+			assert.is_true(utils.isInteger(1.))
+			assert.is_true(utils.isInteger(-100.0))
+			assert.is_true(utils.isInteger(0.0))
+			assert.is_true(utils.isInteger(-0.0))
+			assert.is_true(utils.isInteger("1.0"))
+			assert.is_true(utils.isInteger("-100.0"))
+			assert.is_true(utils.isInteger("1."))
+		end)
+
+		it("should return true for integers in scientific notation", function()
+			assert.is_true(utils.isInteger("1e3")) -- 1000
+			assert.is_true(utils.isInteger("-1e3")) -- -1000
+			assert.is_true(utils.isInteger("1.0e3")) -- 1000
+			assert.is_true(utils.isInteger("-1.0e3")) -- -1000
+			assert.is_true(utils.isInteger("1.23e3")) -- 1230
+			assert.is_true(utils.isInteger("-1.23e3")) -- -1230
+		end)
+
+		it("should return false for non-integers in scientific notation", function()
+			assert.is_false(utils.isInteger("1.23e-3")) -- 0.00123
+			assert.is_false(utils.isInteger("-1.23e-3")) -- -0.00123
+		end)
+
+		it("should return true for hexadecimal integers and hexadecimal integer floats", function()
+			assert.is_true(utils.isInteger("0x1F")) -- 31
+			assert.is_true(utils.isInteger("0xABC")) -- 2748
+			assert.is_true(utils.isInteger("-0x10")) -- -16
+			assert.is_true(utils.isInteger("0x1.8p3")) -- 12.0
+		end)
+
+		it("should return false for hexadecimal floats", function()
+			assert.is_false(utils.isInteger("-0x1.921fbp+1")) -- ~3.14
+		end)
+
+		it("should return false for invalid strings", function()
+			assert.is_false(utils.isInteger("123abc"))
+			assert.is_false(utils.isInteger("1.2.3"))
+			assert.is_false(utils.isInteger("1.0e--2"))
+			assert.is_false(utils.isInteger("abc"))
+			assert.is_false(utils.isInteger(""))
+		end)
+
+		it("should handle edge cases for `inf` and `nan`", function()
+			assert.is_false(utils.isInteger(math.huge)) -- Infinity
+			assert.is_false(utils.isInteger(-math.huge)) -- -Infinity
+			assert.is_false(utils.isInteger(0 / 0)) -- NaN
+			assert.is_false(utils.isInteger("inf"))
+			assert.is_false(utils.isInteger("-inf"))
+			assert.is_false(utils.isInteger("nan"))
+		end)
+
+		it("should handle large and small numbers", function()
+			assert.is_true(utils.isInteger("1.7976931348623157e+308")) -- Max finite value, treated as integer
+			assert.is_false(utils.isInteger("4.9406564584124654e-324")) -- Min positive subnormal value, not an integer
+			assert.is_false(utils.isInteger("-4.9406564584124654e-324"))
+		end)
+
+		it("should handle negative zero", function()
+			assert.is_true(utils.isInteger(-0.0))
+			assert.is_true(utils.isInteger("0.0"))
+			assert.is_true(utils.isInteger("-0.0"))
+		end)
+
+		it("should handle numbers with leading zeros", function()
+			assert.is_true(utils.isInteger("000123"))
+			assert.is_true(utils.isInteger("000000"))
+			assert.is_true(utils.isInteger("-000456"))
+		end)
+
+		it("should return false for non-numbers and non-integer strings", function()
+			assert.is_false(utils.isInteger({}))
+			assert.is_false(utils.isInteger(nil))
+			assert.is_false(utils.isInteger(true))
+			assert.is_false(utils.isInteger(false))
+			assert.is_false(utils.isInteger(function() end))
+			assert.is_false(utils.isInteger("true"))
+			assert.is_false(utils.isInteger("false"))
+			assert.is_false(utils.isInteger("foo"))
+			assert.is_false(utils.isInteger("1.234"))
+			assert.is_false(utils.isInteger("1.0e-10"))
+			assert.is_false(utils.isInteger("1.0e")) -- not a valid lua number
+			assert.is_false(utils.isInteger("1.0e-")) -- not a valid lua number
+			assert.is_false(utils.isInteger("1.0e+")) -- not a valid lua number
+		end)
+	end)
+
+	describe("booleanOrBooleanStringToBoolean", function()
+		it("should return a boolean as itself", function()
+			assert.is_true(utils.booleanOrBooleanStringToBoolean(true))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean(false))
+		end)
+
+		it("should convert any casing of true or false to the analogous boolean value", function()
+			assert.is_true(utils.booleanOrBooleanStringToBoolean("true"))
+			assert.is_true(utils.booleanOrBooleanStringToBoolean("True"))
+			assert.is_true(utils.booleanOrBooleanStringToBoolean("TRUE"))
+			assert.is_true(utils.booleanOrBooleanStringToBoolean("tRuE"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("false"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("False"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("FALSE"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("fAlSe"))
+		end)
+
+		it("should not convert other truthy-like string values to boolean", function()
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("1"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("yes"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("Yes"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("YES"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("y"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("Y"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("t"))
+			---@ diagnostic disable-next-line: param-type-mismatch
+			assert.is_false(utils.booleanOrBooleanStringToBoolean({
+				True = true,
+			}))
+			---@ diagnostic disable-next-line: param-type-mismatch
+			assert.is_false(utils.booleanOrBooleanStringToBoolean(nil))
+			---@ diagnostic disable-next-line: param-type-mismatch
+			assert.is_false(utils.booleanOrBooleanStringToBoolean(1))
 		end)
 	end)
 end)

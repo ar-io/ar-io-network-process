@@ -760,7 +760,7 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 	assert(type(stake) == "number", "stake is required and must be a number")
 	assert(type(settings) == "table", "settings is required and must be a table")
 	assert(
-		type(observerAddress) == "string" and utils.isValidAOAddress(observerAddress),
+		type(observerAddress) == "string" and utils.isValidAddress(observerAddress, true),
 		"Observer-Address is required and must be a a valid arweave address"
 	)
 	if settings.allowDelegatedStaking ~= nil then
@@ -768,7 +768,7 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 	end
 	if type(settings.allowedDelegates) == "table" then
 		for _, delegate in ipairs(settings.allowedDelegates) do
-			assert(utils.isValidAOAddress(delegate), "delegates in allowedDelegates must be valid AO addresses")
+			assert(utils.isValidAddress(delegate, true), "delegates in allowedDelegates must be valid AO addresses")
 		end
 	else
 		assert(
@@ -795,7 +795,7 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 		)
 	end
 	assert(
-		type(settings.properties) == "string" and utils.isValidArweaveAddress(settings.properties),
+		type(settings.properties) == "string" and utils.isValidAddress(settings.properties, true),
 		"properties is required and must be a string"
 	)
 	assert(
@@ -807,8 +807,8 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 			type(settings.delegateRewardShareRatio) == "number"
 				and utils.isInteger(settings.delegateRewardShareRatio)
 				and settings.delegateRewardShareRatio >= 0
-				and settings.delegateRewardShareRatio <= 100,
-			"delegateRewardShareRatio must be an integer between 0 and 100"
+				and settings.delegateRewardShareRatio <= constants.maxDelegateRewardShareRatio,
+			"delegateRewardShareRatio must be an integer between 0 and " .. constants.maxDelegateRewardShareRatio
 		)
 	end
 	if settings.autoStake ~= nil then
@@ -1000,15 +1000,17 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				result.slashedGateways[address] = slashAmount
 				result.stakeSlashed = result.stakeSlashed + slashAmount
 			else
-				if gateway.status == "leaving" and gateway.endTimestamp <= currentTimestamp then
-					-- if the timestamp is after gateway end timestamp, mark the gateway as nil
-					GatewayRegistry[address] = nil
-					table.insert(result.prunedGateways, address)
-				elseif gateway.endTimestamp ~= nil then
-					-- find the next prune timestamp
-					minNextEndTimestamp =
-						--- @diagnostic disable-next-line: param-type-mismatch
-						math.min(minNextEndTimestamp or gateway.endTimestamp, gateway.endTimestamp)
+				if gateway.status == "leaving" and gateway.endTimestamp ~= nil then
+					if gateway.endTimestamp <= currentTimestamp then
+						-- prune the gateway
+						GatewayRegistry[address] = nil
+						table.insert(result.prunedGateways, address)
+					else
+						-- find the next prune timestamp
+						minNextEndTimestamp =
+							--- @diagnostic disable-next-line: param-type-mismatch
+							math.min(minNextEndTimestamp or gateway.endTimestamp, gateway.endTimestamp)
+					end
 				end
 			end
 		end
@@ -1245,7 +1247,7 @@ function gar.allowDelegates(delegateAddresses, gatewayAddress)
 
 	local addedDelegates = {}
 	for _, delegateAddress in ipairs(delegateAddresses) do
-		assert(utils.isValidAOAddress(delegateAddress), "Invalid delegate address: " .. delegateAddress)
+		assert(utils.isValidAddress(delegateAddress, true), "Invalid delegate address: " .. delegateAddress)
 		-- Skip over delegates that are already in the allow list or that have a stake balance
 		if not gar.delegateAllowedToStake(delegateAddress, gateway) then
 			gateway.settings.allowedDelegatesLookup[delegateAddress] = true
@@ -1293,7 +1295,7 @@ function gar.disallowDelegates(delegates, gatewayAddress, msgId, currentTimestam
 
 	local removedDelegates = {}
 	for _, delegateToDisallow in ipairs(delegates) do
-		assert(utils.isValidAOAddress(delegateToDisallow), "Invalid delegate address: " .. delegateToDisallow)
+		assert(utils.isValidAddress(delegateToDisallow, true), "Invalid delegate address: " .. delegateToDisallow)
 
 		-- Skip over delegates that are not in the allow list
 		if gateway.settings.allowedDelegatesLookup[delegateToDisallow] then
@@ -1797,9 +1799,9 @@ function gar.redelegateStake(params)
 
 	assert(type(stakeToTakeFromSource) == "number", "Quantity is required and must be a number")
 	assert(stakeToTakeFromSource > 0, "Quantity must be greater than 0")
-	assert(utils.isValidAOAddress(targetAddress), "Target address is required and must be a string")
-	assert(utils.isValidAOAddress(sourceAddress), "Source address is required and must be a string")
-	assert(utils.isValidAOAddress(delegateAddress), "Delegate address is required and must be a string")
+	assert(utils.isValidAddress(targetAddress, true), "Target address is required and must be a string")
+	assert(utils.isValidAddress(sourceAddress, true), "Source address is required and must be a string")
+	assert(utils.isValidAddress(delegateAddress, true), "Delegate address is required and must be a string")
 	assert(type(currentTimestamp) == "number", "Current timestamp is required and must be a number")
 	assert(sourceAddress ~= targetAddress, "Source and target gateway addresses must be different.")
 

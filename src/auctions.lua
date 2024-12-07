@@ -1,4 +1,6 @@
 local Auction = {}
+local utils = require("utils")
+local constants = require("constants")
 
 -- Default Auction Settings
 AuctionSettings = {
@@ -32,6 +34,13 @@ AuctionSettings = {
 --- @param registrationFeeCalculator function Function to calculate registration fee that supports type, baseFee, years, demandFactor
 --- @return Auction The new Auction instance
 function Auction:new(name, startTimestamp, demandFactor, baseFee, initiator, registrationFeeCalculator)
+	assert(type(name) == "string" and #name > 0, "name must be a string with length > 0")
+	-- TODO: Use new assertions for valid addresses from latest codebase on initiator
+	assert(utils.isInteger(startTimestamp) and startTimestamp > 0, "startTimestamp must be a positive integer")
+	assert(demandFactor > 0, "demandFactor must be a positive number")
+	assert(utils.isInteger(baseFee) and baseFee > 0, "baseFee must be a positive integer")
+	assert(type(registrationFeeCalculator) == "function", "registrationFeeCalculator must be a function")
+
 	local auction = {
 		name = name,
 		initiator = initiator,
@@ -58,6 +67,10 @@ end
 --- @param intervalMs number The interval in milliseconds, must be at least 15 minutes
 --- @return table A table of prices indexed by timestamp
 function Auction:computePricesForAuction(type, years, intervalMs)
+	assert(
+		utils.isInteger(intervalMs) and intervalMs >= constants.MIN_PRICE_INTERVAL_MS,
+		"intervalMs must be an integer >= " .. constants.MIN_PRICE_INTERVAL_MS .. "ms (15 minutes)"
+	)
 	local prices = {}
 	for i = self.startTimestamp, self.endTimestamp, intervalMs do
 		local priceAtTimestamp = self:getPriceForAuctionAtTimestamp(i, type, years)

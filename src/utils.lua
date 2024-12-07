@@ -1,6 +1,7 @@
 local base64 = require("base64")
 local crypto = require("crypto.init")
 local json = require("json")
+local constants = require("constants")
 local utils = {}
 
 function utils.hasMatchingTag(tag, value)
@@ -14,7 +15,7 @@ function utils.isInteger(value)
 	if type(value) == "string" then
 		value = tonumber(value)
 	end
-	return value % 1 == 0
+	return type(value) == "number" and value % 1 == 0
 end
 
 --- Rounds a number to a given precision
@@ -31,6 +32,7 @@ end
 function utils.sumTableValues(tbl)
 	local sum = 0
 	for _, value in pairs(tbl) do
+		assert(type(value) == "number", "Table values must be numbers. Found: " .. type(value))
 		sum = sum + value
 	end
 	return sum
@@ -246,7 +248,7 @@ end
 
 --- Checks if an address is a valid Arweave address
 --- @param address string The address to check
---- @return boolean isValidArweaveAddress - whether the address is a valid Arweave address
+--- @return boolean # whether the address is a valid Arweave address
 function utils.isValidArweaveAddress(address)
 	return type(address) == "string" and #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
 end
@@ -258,11 +260,29 @@ function utils.isValidEthAddress(address)
 	return type(address) == "string" and #address == 42 and string.match(address, "^0x[%x]+$") ~= nil
 end
 
+function utils.isValidUnsafeAddress(address)
+	if not address then
+		return false
+	end
+	local match = string.match(address, "^[%w_-]+$")
+	return match ~= nil
+		and #address >= constants.MIN_UNSAFE_ADDRESS_LENGTH
+		and #address <= constants.MAX_UNSAFE_ADDRESS_LENGTH
+end
+
 --- Checks if an address is a valid AO address
---- @param url string|nil The address to check
---- @return boolean isValidAOAddress - whether the address is a valid AO address
-function utils.isValidAOAddress(url)
-	return url and (utils.isValidArweaveAddress(url) or utils.isValidEthAddress(url)) or false
+--- @param address string|nil The address to check
+--- @param allowUnsafe boolean|nil Whether to allow unsafe addresses, defaults to false
+--- @return boolean # whether the address is valid, depending on the allowUnsafe flag
+function utils.isValidAddress(address, allowUnsafe)
+	allowUnsafe = allowUnsafe or false -- default to false, only allow unsafe addresses if explicitly set
+	if not address then
+		return false
+	end
+	if allowUnsafe then
+		return utils.isValidUnsafeAddress(address)
+	end
+	return utils.isValidArweaveAddress(address) or utils.isValidEthAddress(address)
 end
 
 --- Converts an address to EIP-55 checksum format
@@ -441,12 +461,20 @@ function utils.getHashFromBase64URL(str)
 	return crypto.digest.sha2_256(hashStream).asBytes()
 end
 
+--- Escapes Lua pattern characters in a string
+--- @param str string The string to escape
+--- @return string # The escaped string
+local function escapePattern(str)
+	return (str:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1"))
+end
+
 --- Splits a string by a delimiter
 --- @param input string The string to split
 --- @param delimiter string|nil The delimiter to split by
---- @return table The split string
+--- @return table # The split string
 function utils.splitString(input, delimiter)
 	delimiter = delimiter or ","
+	delimiter = escapePattern(delimiter)
 	local result = {}
 	for token in (input or ""):gmatch(string.format("([^%s]+)", delimiter)) do
 		table.insert(result, token)
@@ -578,6 +606,15 @@ function utils.filterDictionary(tbl, predicate)
 		end
 	end
 	return filtered
+end
+
+--- @param value string|boolean
+--- @return boolean
+function utils.booleanOrBooleanStringToBoolean(value)
+	if type(value) == "boolean" then
+		return value
+	end
+	return type(value) == "string" and string.lower(value) == "true"
 end
 
 return utils

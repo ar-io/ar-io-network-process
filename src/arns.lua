@@ -59,10 +59,12 @@ NameRegistry = NameRegistry or {
 --- @param processId string The process id
 --- @param msgId string The current message id
 --- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
+--- @param allowUnsafeProcessId boolean|nil Whether to allow unsafe processIds. Default false.
 --- @return BuyRecordResponse buyRecordResponse - The response including relevant metadata about the purchase
-function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, msgId, fundFrom)
+function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, msgId, fundFrom, allowUnsafeProcessId)
 	fundFrom = fundFrom or "balance"
-	arns.assertValidBuyRecord(name, years, purchaseType, processId)
+	allowUnsafeProcessId = allowUnsafeProcessId or false
+	arns.assertValidBuyRecord(name, years, purchaseType, processId, allowUnsafeProcessId)
 	if purchaseType == nil then
 		purchaseType = "lease" -- set to lease by default
 	end
@@ -296,6 +298,7 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp, msgId, f
 	local fundingPlan = gar.getFundingPlan(from, additionalUndernameCost, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
+	assert(fundingResult.totalFunded == additionalUndernameCost, "Funding plan application failed")
 
 	-- update the record with the new undername count
 	arns.modifyRecordundernameLimit(name, qty)
@@ -487,16 +490,30 @@ function arns.calculateYearsBetweenTimestamps(startTimestamp, endTimestamp)
 	return yearsRemainingFloat
 end
 
+--- Asserts that a name is a valid ARNS name
+--- @param name string The name to check
+function arns.assertValidArNSName(name)
+	assert(name and type(name) == "string", "Name is required and must be a string.")
+	assert(
+		#name >= constants.MIN_NAME_LENGTH and #name <= constants.MAX_NAME_LENGTH,
+		"Name length is invalid. Must be between "
+			.. constants.MIN_NAME_LENGTH
+			.. " and "
+			.. constants.MAX_NAME_LENGTH
+			.. " characters."
+	)
+	assert(name:match(constants.ARNS_NAME_REGEX), "Name pattern is invalid. Must match " .. constants.ARNS_NAME_REGEX)
+end
+
 --- Asserts that a buy record is valid
 --- @param name string The name of the record
 --- @param years number|nil The number of years to check
 --- @param purchaseType string|nil The purchase type to check
 --- @param processId string|nil The processId of the record
-function arns.assertValidBuyRecord(name, years, purchaseType, processId)
-	assert(type(name) == "string", "Name is required and must be a string.")
-	assert(#name >= 1 and #name <= 51, "Name pattern is invalid.")
-	assert(name:match("^%w") and name:match("%w$") and name:match("^[%w-]+$"), "Name pattern is invalid.")
-	assert(not utils.isValidAOAddress(name), "Name cannot be a wallet address.")
+--- @param allowUnsafeProcessId boolean|nil Whether to allow unsafe processIds. Default false.
+function arns.assertValidBuyRecord(name, years, purchaseType, processId, allowUnsafeProcessId)
+	allowUnsafeProcessId = allowUnsafeProcessId or false
+	arns.assertValidArNSName(name)
 
 	-- assert purchase type if present is lease or permabuy
 	assert(purchaseType == nil or purchaseType == "lease" or purchaseType == "permabuy", "Purchase-Type is invalid.")
@@ -512,7 +529,7 @@ function arns.assertValidBuyRecord(name, years, purchaseType, processId)
 
 	-- assert processId is valid pattern
 	assert(type(processId) == "string", "Process id is required and must be a string.")
-	assert(utils.isValidAOAddress(processId), "Process Id must be a valid AO signer address..")
+	assert(utils.isValidAddress(processId, allowUnsafeProcessId), "Process Id must be a valid address.")
 end
 
 --- Asserts that a record is valid for extending the lease
@@ -615,7 +632,7 @@ function arns.getTokenCost(intendedAction)
 	if intent == "Buy-Record" then
 		-- stub the process id as it is not required for this intent
 		local processId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-		arns.assertValidBuyRecord(name, years, purchaseType, processId)
+		arns.assertValidBuyRecord(name, years, purchaseType, processId, false)
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
 	elseif intent == "Extend-Lease" then
 		assert(record, "Name is not registered")
@@ -756,6 +773,7 @@ function arns.upgradeRecord(from, name, currentTimestamp, msgId, fundFrom)
 	local fundingPlan = gar.getFundingPlan(from, upgradeCost, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
+	assert(fundingResult.totalFunded == upgradeCost, "Funding plan application failed")
 	balances.increaseBalance(ao.id, upgradeCost)
 	demand.tallyNamePurchase(upgradeCost)
 
@@ -903,6 +921,7 @@ function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, ty
 
 	-- apply the funding plan
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, timestamp)
+	assert(fundingResult.totalFunded == finalBidAmount, "Funding plan application failed")
 
 	local record = {
 		processId = processId,
@@ -988,11 +1007,10 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 		if arns.recordExpired(record, currentTimestamp) then
 			prunedRecords[name] = record
 			NameRegistry.records[name] = nil
-		elseif
-			arns.recordInGracePeriod(record, currentTimestamp)
-			and record.endTimestamp > lastGracePeriodEntryEndTimestamp
-		then
-			newGracePeriodRecords[name] = record
+		elseif arns.recordInGracePeriod(record, currentTimestamp) then
+			if record.endTimestamp > lastGracePeriodEntryEndTimestamp then
+				newGracePeriodRecords[name] = record
+			end
 			-- Make sure we prune when the grace period is over
 			arns.scheduleNextRecordsPrune(record.endTimestamp + constants.gracePeriodMs)
 		elseif record.endTimestamp then
@@ -1055,10 +1073,12 @@ end
 --- @param currentTimestamp number The current timestamp
 --- @param from string The address of the sender
 --- @param newProcessId string The new process id
-function arns.assertValidReassignName(record, currentTimestamp, from, newProcessId)
+--- @param allowUnsafeProcessId boolean|nil Whether to allow unsafe processIds. Default false.
+function arns.assertValidReassignName(record, currentTimestamp, from, newProcessId, allowUnsafeProcessId)
+	allowUnsafeProcessId = allowUnsafeProcessId or false
 	assert(record, "Name is not registered")
 	assert(currentTimestamp, "Timestamp is required")
-	assert(utils.isValidAOAddress(newProcessId), "Invalid Process-Id")
+	assert(utils.isValidAddress(newProcessId, allowUnsafeProcessId), "Invalid Process-Id")
 	assert(record.processId == from, "Not authorized to reassign this name")
 
 	if record.endTimestamp then
@@ -1077,11 +1097,13 @@ end
 --- @param from string The address of the sender
 --- @param currentTimestamp number The current timestamp
 --- @param newProcessId string The new process id
+--- @param allowUnsafeProcessId boolean|nil Whether to allow unsafe processIds. Default false.
 --- @return StoredRecord|nil updatedRecord - the updated record
-function arns.reassignName(name, from, currentTimestamp, newProcessId)
+function arns.reassignName(name, from, currentTimestamp, newProcessId, allowUnsafeProcessId)
+	allowUnsafeProcessId = allowUnsafeProcessId or false
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
-	arns.assertValidReassignName(record, currentTimestamp, from, newProcessId)
+	arns.assertValidReassignName(record, currentTimestamp, from, newProcessId, allowUnsafeProcessId)
 	local updatedRecord = arns.modifyProcessId(name, newProcessId)
 	return updatedRecord
 end
