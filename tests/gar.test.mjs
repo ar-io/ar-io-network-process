@@ -19,7 +19,7 @@ import {
   delegateStake,
   decreaseOperatorStake,
 } from './helpers.mjs';
-import { describe, it, before } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import {
   STUB_TIMESTAMP,
@@ -29,6 +29,7 @@ import {
   INITIAL_OPERATOR_STAKE,
   INITIAL_DELEGATE_STAKE,
 } from '../tools/constants.mjs';
+import { assertNoInvariants } from './invariants.mjs';
 
 const delegatorAddress = 'delegator-address-'.padEnd(43, 'x');
 
@@ -40,13 +41,20 @@ describe('GatewayRegistry', async () => {
 
   let sharedMemory = startMemory; // memory we'll use across unique tests;
 
-  before(async () => {
+  beforeEach(async () => {
     const { memory: joinNetworkMemory } = await joinNetwork({
       address: STUB_ADDRESS,
-      memory: sharedMemory,
+      memory: startMemory,
     });
     // NOTE: all tests will start with this gateway joined to the network - use `sharedMemory` for the first interaction for each test to avoid having to join the network again
     sharedMemory = joinNetworkMemory;
+  });
+
+  afterEach(async () => {
+    await assertNoInvariants({
+      timestamp: STUB_TIMESTAMP,
+      memory: sharedMemory,
+    });
   });
 
   describe('Join-Network', () => {
@@ -210,7 +218,7 @@ describe('GatewayRegistry', async () => {
 
     it('should allow joining of the network with an allow list', async () => {
       const otherGatewayAddress = ''.padEnd(43, '3');
-      const updatedMemory = await allowlistJoinTest({
+      sharedMemory = await allowlistJoinTest({
         gatewayAddress: otherGatewayAddress,
         tags: [
           { name: 'Allow-Delegated-Staking', value: 'allowlist' },
@@ -229,7 +237,7 @@ describe('GatewayRegistry', async () => {
       });
 
       const delegateItems = await getDelegatesItems({
-        memory: updatedMemory,
+        memory: sharedMemory,
         gatewayAddress: otherGatewayAddress,
       });
       assert.deepStrictEqual(
@@ -244,7 +252,7 @@ describe('GatewayRegistry', async () => {
       );
 
       const { result: getAllowedDelegatesResult } = await getAllowedDelegates({
-        memory: updatedMemory,
+        memory: sharedMemory,
         from: STUB_ADDRESS,
         timestamp: STUB_TIMESTAMP,
         gatewayAddress: otherGatewayAddress,
@@ -342,6 +350,8 @@ describe('GatewayRegistry', async () => {
           },
         ],
       );
+
+      sharedMemory = leaveNetworkMemory;
     });
   });
 
@@ -444,7 +454,7 @@ describe('GatewayRegistry', async () => {
     }
 
     it('should allow updating the gateway settings', async () => {
-      await updateGatewaySettingsTest({
+      sharedMemory = await updateGatewaySettingsTest({
         settingsTags: [
           { name: 'Label', value: 'new-label' },
           { name: 'Note', value: 'new-note' },
@@ -494,7 +504,7 @@ describe('GatewayRegistry', async () => {
         expectedAllowedDelegates: [STUB_ADDRESS_9], // probs empty
       });
 
-      await updateGatewaySettingsTest({
+      sharedMemory = await updateGatewaySettingsTest({
         settingsTags: [
           { name: 'Allow-Delegated-Staking', value: 'false' },
           { name: 'Allowed-Delegates', value: STUB_ADDRESS_9 },
@@ -573,7 +583,7 @@ describe('GatewayRegistry', async () => {
         JSON.parse(delegationsResult.Messages[0].Data).items,
       );
 
-      await updateGatewaySettingsTest({
+      sharedMemory = await updateGatewaySettingsTest({
         inputMemory: updatedMemory,
         settingsTags: [{ name: 'Allow-Delegated-Staking', value: 'false' }],
         expectedUpdatedGatewayProps: {
@@ -640,6 +650,7 @@ describe('GatewayRegistry', async () => {
           sortOrder: 'desc',
         },
       );
+      sharedMemory = updatedMemory;
     });
   });
 
@@ -666,6 +677,7 @@ describe('GatewayRegistry', async () => {
         ...gatewayBefore,
         operatorStake: INITIAL_OPERATOR_STAKE + increaseQty, // matches the initial operator stake from the test setup plus the increase
       });
+      sharedMemory = increaseStakeMemory;
     });
   });
 
@@ -722,6 +734,7 @@ describe('GatewayRegistry', async () => {
           },
         ],
       );
+      sharedMemory = decreaseStakeMemory;
     });
 
     it('should not allow decreasing the operator stake if below the minimum withdrawal', async () => {
@@ -752,6 +765,7 @@ describe('GatewayRegistry', async () => {
         ),
         'Error tag should be present',
       );
+      sharedMemory = decreaseOperatorStakeResult.Memory;
     });
 
     it('should allow decreasing the operator stake instantly, for a fee', async () => {
@@ -832,6 +846,7 @@ describe('GatewayRegistry', async () => {
         balancesBefore[STUB_ADDRESS] + amountWithdrawn;
       assert.equal(balancesAfter[PROCESS_ID], expectedProtocolBalance);
       assert.equal(balancesAfter[STUB_ADDRESS], expectedOperatorBalance);
+      sharedMemory = decreaseInstantMemory;
     });
   });
 
@@ -874,6 +889,7 @@ describe('GatewayRegistry', async () => {
         ],
         delegateItems,
       );
+      sharedMemory = delegatedStakeMemory;
     });
   });
 
@@ -949,6 +965,7 @@ describe('GatewayRegistry', async () => {
           type: 'stake',
         },
       ]);
+      sharedMemory = decreaseStakeMemory;
     });
 
     it('should fail to withdraw a delegated stake if below the minimum withdrawal limitation', async () => {
@@ -995,6 +1012,7 @@ describe('GatewayRegistry', async () => {
         memory: decreaseStakeMemory,
       });
       assert.deepStrictEqual(gatewayAfter, gatewayBefore);
+      sharedMemory = decreaseStakeMemory;
     });
   });
 
@@ -1039,6 +1057,7 @@ describe('GatewayRegistry', async () => {
       });
       // no changes to the gateway after a withdrawal is cancelled
       assert.deepStrictEqual(gatewayAfter, gatewayBefore);
+      sharedMemory = cancelWithdrawalMemory;
     });
     it('should allow cancelling an operator withdrawal', async () => {
       const decreaseStakeTimestamp = STUB_TIMESTAMP + 1000 * 60 * 15; // 15 minutes after stubbedTimestamp
@@ -1084,6 +1103,7 @@ describe('GatewayRegistry', async () => {
         ...gatewayBefore,
         operatorStake: INITIAL_OPERATOR_STAKE + decreaseQty, // the decrease was cancelled and returned to the operator
       });
+      sharedMemory = cancelWithdrawalMemory;
     });
   });
 
@@ -1156,6 +1176,8 @@ describe('GatewayRegistry', async () => {
         balancesAfter[PROCESS_ID],
         balancesBefore[PROCESS_ID] + penaltyAmount,
       ); // original stake + penalty
+
+      sharedMemory = instantWithdrawalMemory;
     });
   });
 
@@ -1197,6 +1219,7 @@ describe('GatewayRegistry', async () => {
         fetchedGateways.map((g) => g.gatewayAddress),
         [STUB_ADDRESS, secondGatewayAddress],
       );
+      sharedMemory = addGatewayMemory2;
     });
   });
 
@@ -1278,6 +1301,7 @@ describe('GatewayRegistry', async () => {
         if (!cursor) break;
       }
       assert.deepStrictEqual(fetchedDelegations, expectedDelegations);
+      sharedMemory = decreaseStakeMemory;
     }
 
     it('should paginate active and vaulted stakes by ascending balance correctly', async () => {
@@ -1508,6 +1532,7 @@ describe('GatewayRegistry', async () => {
           redelegationFeeRate: 0,
         },
       );
+      sharedMemory = redelegateStakeMemory;
     });
 
     it("should allow re-delegating stake with a vault and the vault's balance", async () => {
@@ -1608,6 +1633,7 @@ describe('GatewayRegistry', async () => {
         }),
         [],
       );
+      sharedMemory = redelegateStakeMemory;
     });
   });
 });
