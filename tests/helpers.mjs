@@ -16,18 +16,39 @@ const initialOperatorStake = 100_000_000_000;
 export const basePermabuyPrice = 2_500_000_000;
 export const baseLeasePrice = 600_000_000;
 
+export const genesisEpochTimestamp = 1719900000000; // Tuesday, July 2, 2024, 06:00:00 AM UTC
+export const epochLength = 1000 * 60 * 60 * 24; // 24 hours
+export const distributionDelay = 1000 * 60 * 40; // 40 minutes
+
 const { handle: originalHandle, memory } = await createAosLoader();
 export const startMemory = memory;
 
-export async function handle(options = {}, mem = startMemory) {
-  return originalHandle(
-    mem,
+/**
+ *
+ * @param {{
+ *  options: Object,
+ *  memory: WebAssembly.Memory,
+ *  shouldAssertNoResultError: boolean
+ * }} options
+ * @returns {Promise<Object>}
+ */
+export async function handle({
+  options = {},
+  memory = startMemory,
+  shouldAssertNoResultError = true,
+}) {
+  const result = await originalHandle(
+    memory,
     {
       ...DEFAULT_HANDLE_OPTIONS,
       ...options,
     },
     AO_LOADER_HANDLER_ENV,
   );
+  if (shouldAssertNoResultError) {
+    assertNoResultError(result);
+  }
+  return result;
 }
 
 export function assertNoResultError(result) {
@@ -38,13 +59,13 @@ export function assertNoResultError(result) {
 }
 
 export const getBalances = async ({ memory, timestamp = STUB_TIMESTAMP }) => {
-  const result = await handle(
-    {
+  const result = await handle({
+    options: {
       Tags: [{ name: 'Action', value: 'Balances' }],
       Timestamp: timestamp,
     },
     memory,
-  );
+  });
 
   const balances = JSON.parse(result.Messages?.[0]?.Data);
   return balances;
@@ -70,8 +91,8 @@ export const transfer = async ({
     return memory;
   }
 
-  const transferResult = await handle(
-    {
+  const transferResult = await handle({
+    options: {
       From: PROCESS_OWNER,
       Owner: PROCESS_OWNER,
       Tags: [
@@ -82,8 +103,7 @@ export const transfer = async ({
       ],
     },
     memory,
-  );
-  assertNoResultError(transferResult);
+  });
   return transferResult.Memory;
 };
 
@@ -91,7 +111,8 @@ export const joinNetwork = async ({
   memory,
   timestamp = STUB_TIMESTAMP,
   address,
-  tags = validGatewayTags,
+  observerAddress,
+  tags = validGatewayTags({ observerAddress }),
   quantity = 100_000_000_000,
 }) => {
   // give them the join network token amount
@@ -100,16 +121,15 @@ export const joinNetwork = async ({
     quantity,
     memory,
   });
-  const joinNetworkResult = await handle(
-    {
+  const joinNetworkResult = await handle({
+    options: {
       From: address,
       Owner: address,
       Tags: tags,
       Timestamp: timestamp,
     },
-    transferMemory,
-  );
-  assertNoResultError(joinNetworkResult);
+    memory: transferMemory,
+  });
   return {
     memory: joinNetworkResult.Memory,
     result: joinNetworkResult,
@@ -120,7 +140,7 @@ export const setUpStake = async ({
   memory,
   timestamp = STUB_TIMESTAMP,
   gatewayAddress = STUB_OPERATOR_ADDRESS,
-  gatewayTags = validGatewayTags,
+  gatewayTags = validGatewayTags(),
   stakerAddress = STUB_ADDRESS,
   transferQty,
   stakeQty,
@@ -144,8 +164,8 @@ export const setUpStake = async ({
   assertNoResultError(joinNetworkResult);
   memory = joinNetworkResult.memory;
 
-  const stakeResult = await handle(
-    {
+  const stakeResult = await handle({
+    options: {
       From: stakerAddress,
       Owner: stakerAddress,
       Tags: [
@@ -157,8 +177,7 @@ export const setUpStake = async ({
       Timestamp: timestamp,
     },
     memory,
-  );
-  assertNoResultError(stakeResult);
+  });
   return {
     memory: stakeResult.Memory,
     result: stakeResult,
@@ -170,28 +189,26 @@ export const getBaseRegistrationFeeForName = async ({
   timestamp,
   name = 'great-nam',
 }) => {
-  const result = await handle(
-    {
+  const result = await handle({
+    options: {
       Tags: [{ name: 'Action', value: 'Get-Registration-Fees' }],
       Timestamp: timestamp,
     },
     memory,
-  );
-  assertNoResultError(result);
+  });
   return JSON.parse(result.Messages[0].Data)[name.length.toString()]['lease'][
     '1'
   ];
 };
 
 export const getDemandFactor = async ({ memory, timestamp }) => {
-  const result = await handle(
-    {
+  const result = await handle({
+    options: {
       Tags: [{ name: 'Action', value: 'Demand-Factor' }],
       Timestamp: timestamp,
     },
     memory,
-  );
-  assertNoResultError(result);
+  });
   return result.Messages[0].Data;
 };
 
@@ -201,8 +218,8 @@ export const getDelegates = async ({
   timestamp,
   gatewayAddress,
 }) => {
-  const delegatesResult = await handle(
-    {
+  const delegatesResult = await handle({
+    options: {
       From: from,
       Owner: from,
       Tags: [
@@ -212,8 +229,7 @@ export const getDelegates = async ({
       Timestamp: timestamp,
     },
     memory,
-  );
-  assertNoResultError(delegatesResult);
+  });
   return {
     result: delegatesResult,
     memory: delegatesResult.Memory,
@@ -231,16 +247,15 @@ export const getDelegatesItems = async ({ memory, gatewayAddress }) => {
 };
 
 export const getDelegations = async ({ memory, address }) => {
-  const result = await handle(
-    {
+  const result = await handle({
+    options: {
       Tags: [
         { name: 'Action', value: 'Paginated-Delegations' },
         { name: 'Address', value: address },
       ],
     },
     memory,
-  );
-  assertNoResultError(result);
+  });
   return JSON.parse(result.Messages?.[0]?.Data);
 };
 
@@ -251,8 +266,8 @@ export const getVaults = async ({
   sortBy,
   sortOrder,
 }) => {
-  const { Memory, ...rest } = await handle(
-    {
+  const { Memory, ...rest } = await handle({
+    options: {
       Tags: [
         { name: 'Action', value: 'Paginated-Vaults' },
         ...(cursor ? [{ name: 'Cursor', value: cursor }] : []),
@@ -262,7 +277,7 @@ export const getVaults = async ({
       ],
     },
     memory,
-  );
+  });
   return {
     result: rest,
     memory: Memory,
@@ -270,16 +285,15 @@ export const getVaults = async ({
 };
 
 export const getGatewayVaultsItems = async ({ memory, gatewayAddress }) => {
-  const gatewayVaultsResult = await handle(
-    {
+  const gatewayVaultsResult = await handle({
+    options: {
       Tags: [
         { name: 'Action', value: 'Paginated-Gateway-Vaults' },
         { name: 'Address', value: gatewayAddress },
       ],
     },
     memory,
-  );
-  assertNoResultError(gatewayVaultsResult);
+  });
   return JSON.parse(gatewayVaultsResult.Messages?.[0]?.Data).items;
 };
 
@@ -290,10 +304,10 @@ export const createVault = async ({
   from = PROCESS_OWNER,
   msgId = STUB_MESSAGE_ID,
   timestamp = STUB_TIMESTAMP,
-  assert = true,
+  shouldAssertNoResultError = true,
 }) => {
-  const createVaultResult = await handle(
-    {
+  const createVaultResult = await handle({
+    options: {
       Id: msgId,
       From: from,
       Owner: from,
@@ -314,11 +328,8 @@ export const createVault = async ({
       ],
     },
     memory,
-  );
-
-  if (assert) {
-    assertNoResultError(createVaultResult);
-  }
+    shouldAssertNoResultError,
+  });
 
   return { result: createVaultResult, memory: createVaultResult.Memory };
 };
@@ -332,10 +343,10 @@ export const createVaultedTransfer = async ({
   msgId = STUB_MESSAGE_ID,
   timestamp = STUB_TIMESTAMP,
   from = PROCESS_OWNER,
-  assert = true,
+  shouldAssertNoResultError = true,
 }) => {
-  const createVaultedTransferResult = await handle(
-    {
+  const createVaultedTransferResult = await handle({
+    options: {
       Id: msgId,
       From: from,
       Owner: from,
@@ -356,10 +367,8 @@ export const createVaultedTransfer = async ({
       Timestamp: timestamp,
     },
     memory,
-  );
-  if (assert) {
-    assertNoResultError(createVaultedTransferResult);
-  }
+    shouldAssertNoResultError,
+  });
   return {
     result: createVaultedTransferResult,
     memory: createVaultedTransferResult.Memory,
@@ -372,7 +381,7 @@ export const delegateStake = async ({
   delegatorAddress,
   quantity,
   gatewayAddress,
-  assert = true,
+  shouldAssertNoResultError = true,
 }) => {
   // give the wallet the delegate tokens
   const transferMemory = await transfer({
@@ -381,8 +390,8 @@ export const delegateStake = async ({
     memory,
   });
 
-  const delegateResult = await handle(
-    {
+  const delegateResult = await handle({
+    options: {
       From: delegatorAddress,
       Owner: delegatorAddress,
       Tags: [
@@ -392,11 +401,9 @@ export const delegateStake = async ({
       ],
       Timestamp: timestamp,
     },
-    transferMemory,
-  );
-  if (assert) {
-    assertNoResultError(delegateResult);
-  }
+    memory: transferMemory,
+    shouldAssertNoResultError,
+  });
   return {
     result: delegateResult,
     memory: delegateResult.Memory,
@@ -408,8 +415,8 @@ export const getGateway = async ({
   timestamp = STUB_TIMESTAMP,
   address,
 }) => {
-  const gatewayResult = await handle(
-    {
+  const gatewayResult = await handle({
+    options: {
       Tags: [
         { name: 'Action', value: 'Gateway' },
         { name: 'Address', value: address },
@@ -417,7 +424,7 @@ export const getGateway = async ({
       Timestamp: timestamp,
     },
     memory,
-  );
+  });
   const gateway = JSON.parse(gatewayResult.Messages?.[0]?.Data);
   return gateway;
 };
@@ -428,8 +435,8 @@ export const getAllowedDelegates = async ({
   timestamp,
   gatewayAddress,
 }) => {
-  const delegatesResult = await handle(
-    {
+  const delegatesResult = await handle({
+    options: {
       From: from,
       Owner: from,
       Tags: [
@@ -439,8 +446,7 @@ export const getAllowedDelegates = async ({
       Timestamp: timestamp,
     },
     memory,
-  );
-  assertNoResultError(delegatesResult);
+  });
 
   return {
     result: delegatesResult,
@@ -465,10 +471,10 @@ export const decreaseOperatorStake = async ({
   instant = false,
   messageId = STUB_MESSAGE_ID,
   timestamp = STUB_TIMESTAMP,
-  assert = true,
+  shouldAssertNoResultError = true,
 }) => {
-  const result = await handle(
-    {
+  const result = await handle({
+    options: {
       From: address,
       Owner: address,
       Timestamp: timestamp,
@@ -480,10 +486,9 @@ export const decreaseOperatorStake = async ({
       ],
     },
     memory,
-  );
-  if (assert) {
-    assertNoResultError(result);
-  }
+    shouldAssertNoResultError,
+  });
+
   return {
     memory: result.Memory,
     result,
@@ -498,10 +503,10 @@ export const decreaseDelegateStake = async ({
   instant = false,
   messageId,
   timestamp = STUB_TIMESTAMP,
-  assert = true,
+  shouldAssertNoResultError = true,
 }) => {
-  const result = await handle(
-    {
+  const result = await handle({
+    options: {
       From: delegatorAddress,
       Owner: delegatorAddress,
       Timestamp: timestamp,
@@ -514,10 +519,9 @@ export const decreaseDelegateStake = async ({
       ],
     },
     memory,
-  );
-  if (assert) {
-    assertNoResultError(result);
-  }
+    shouldAssertNoResultError,
+  });
+
   return {
     memory: result.Memory,
     result,
@@ -531,8 +535,8 @@ export const cancelWithdrawal = async ({
   timestamp = STUB_TIMESTAMP,
   vaultId,
 }) => {
-  const result = await handle(
-    {
+  const result = await handle({
+    options: {
       From: vaultOwner,
       Owner: vaultOwner,
       Tags: [
@@ -543,8 +547,7 @@ export const cancelWithdrawal = async ({
       Timestamp: timestamp,
     },
     memory,
-  );
-  assertNoResultError(result);
+  });
   return {
     memory: result.Memory,
     result,
@@ -558,8 +561,8 @@ export const instantWithdrawal = async ({
   gatewayAddress,
   vaultId,
 }) => {
-  const result = await handle(
-    {
+  const result = await handle({
+    options: {
       From: address,
       Owner: address,
       Tags: [
@@ -570,8 +573,7 @@ export const instantWithdrawal = async ({
       Timestamp: timestamp,
     },
     memory,
-  );
-  assertNoResultError(result);
+  });
   return {
     memory: result.Memory,
     result,
@@ -590,8 +592,8 @@ export const increaseOperatorStake = async ({
     quantity: increaseQty,
     recipient: address,
   });
-  const result = await handle(
-    {
+  const result = await handle({
+    options: {
       From: address,
       Owner: address,
       Tags: [
@@ -600,9 +602,8 @@ export const increaseOperatorStake = async ({
       ],
       Timestamp: timestamp,
     },
-    transferMemory,
-  );
-  assertNoResultError(result);
+    memory: transferMemory,
+  });
   return {
     memory: result.Memory,
     result,
@@ -614,16 +615,15 @@ export const leaveNetwork = async ({
   timestamp = STUB_TIMESTAMP,
   memory,
 }) => {
-  const result = await handle(
-    {
+  const result = await handle({
+    options: {
       From: address,
       Owner: address,
       Tags: [{ name: 'Action', value: 'Leave-Network' }],
       Timestamp: timestamp,
     },
     memory,
-  );
-  assertNoResultError(result);
+  });
   return {
     memory: result.Memory,
     result,
@@ -636,16 +636,15 @@ export const updateGatewaySettings = async ({
   timestamp = STUB_TIMESTAMP,
   memory,
 }) => {
-  const result = await handle(
-    {
+  const result = await handle({
+    options: {
       From: address,
       Owner: address,
       Tags: settingsTags,
       Timestamp: timestamp,
     },
     memory,
-  );
-  assertNoResultError(result);
+  });
   return {
     memory: result.Memory,
     result,
@@ -660,8 +659,8 @@ export const buyRecord = async ({
   type = 'lease',
   years = 1,
 }) => {
-  const buyRecordResult = await handle(
-    {
+  const buyRecordResult = await handle({
+    options: {
       From: from,
       Owner: from,
       Tags: [
@@ -673,10 +672,37 @@ export const buyRecord = async ({
       ],
     },
     memory,
-  );
-  assertNoResultError(buyRecordResult);
+  });
   return {
     result: buyRecordResult,
     memory: buyRecordResult.Memory,
+  };
+};
+
+export const saveObservations = async ({
+  from = STUB_ADDRESS,
+  timestamp = STUB_TIMESTAMP,
+  shouldAssertNoResultError = true,
+  failedGateways = 'failed-gateway-'.padEnd(43, 'e'),
+  reportTxId = 'report-tx-id-'.padEnd(43, 'f'),
+  memory = startMemory,
+}) => {
+  const result = await handle({
+    options: {
+      From: from,
+      Owner: from,
+      Tags: [
+        { name: 'Action', value: 'Save-Observations' },
+        { name: 'Report-Tx-Id', value: reportTxId },
+        { name: 'Failed-Gateways', value: failedGateways },
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+    shouldAssertNoResultError,
+  });
+  return {
+    memory: result.Memory,
+    result,
   };
 };
