@@ -2240,7 +2240,7 @@ describe("gar", function()
 
 	describe("getPaginatedDelegates", function()
 		it(
-			"should return paginated delegates sorted, by defualt, by startTimestamp in descending order (newest first)",
+			"should return paginated delegates sorted, by default, by startTimestamp in descending order (newest first)",
 			function()
 				local gateway = utils.deepCopy(testGateway)
 				local stubDelegate2Address = stubGatewayAddress
@@ -2300,7 +2300,7 @@ describe("gar", function()
 	end)
 
 	describe("getPaginatedAllowedDelegates", function()
-		it("should return paginated allowed delegates sorted, by defualt, by address in descending order", function()
+		it("should return paginated allowed delegates sorted, by default, by address in descending order", function()
 			local gateway = utils.deepCopy(testGateway)
 			local delegateAAddress = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 			local delegateBAddress = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"

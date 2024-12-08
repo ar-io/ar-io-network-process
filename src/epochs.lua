@@ -3,6 +3,7 @@ local crypto = require("crypto.init")
 local utils = require("utils")
 local balances = require("balances")
 local arns = require("arns")
+local constants = require("constants")
 local epochs = {}
 
 --- @class Epoch
@@ -66,7 +67,7 @@ EpochSettings = EpochSettings
 		rewardPercentage = 0.0005, -- 0.05%
 		maxObservers = 50,
 		epochZeroStartTimestamp = 1719900000000, -- July 9th, 00:00:00 UTC
-		durationMs = 60 * 1000 * 60 * 24, -- 24 hours
+		durationMs = constants.defaultEpochDurationMs, -- 24 hours
 		distributionDelayMs = 60 * 1000 * 40, -- 40 minutes (~ 20 arweave blocks)
 	}
 

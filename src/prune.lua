@@ -8,7 +8,7 @@ local primaryNames = require("primary_names")
 ---@class PruneStateResult
 ---@field prunedRecords table<string, Record>
 ---@field newGracePeriodRecords table<string, Record>
----@field prunedAuctions table<string, Auction>
+---@field prunedReturnedNames table<string, ReturnedName>
 ---@field prunedReserved table<string, ReservedName>
 ---@field prunedVaults table<string, Vault>
 ---@field pruneGatewaysResult table<string, table>
@@ -24,7 +24,7 @@ local primaryNames = require("primary_names")
 --- @return PruneStateResult pruneStateResult - the result of the state pruning
 function prune.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 	local prunedRecords, newGracePeriodRecords = arns.pruneRecords(timestamp, lastGracePeriodEntryEndTimestamp)
-	-- for all the pruned records, create auctions and remove primary name claims
+	-- for all the pruned records, create returned names and remove primary name claims
 	local prunedPrimaryNamesAndOwners = {}
 	for name, _ in pairs(prunedRecords) do
 		-- remove primary names
@@ -32,11 +32,11 @@ function prune.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 		if #removedPrimaryNamesAndOwners > 0 then
 			prunedPrimaryNamesAndOwners[name] = removedPrimaryNamesAndOwners
 		end
-		-- create auction for records that have finally expired
-		arns.createAuction(name, timestamp, ao.id)
+		-- create returned names for records that have finally expired
+		arns.createReturnedName(name, timestamp, ao.id)
 	end
 	local prunedPrimaryNameRequests = primaryNames.prunePrimaryNameRequests(timestamp)
-	local prunedAuctions = arns.pruneAuctions(timestamp)
+	local prunedReturnedNames = arns.pruneReturnedNames(timestamp)
 	local prunedReserved = arns.pruneReservedNames(timestamp)
 	local prunedVaults = vaults.pruneVaults(timestamp)
 	local pruneGatewaysResult = gar.pruneGateways(timestamp, msgId)
@@ -45,7 +45,7 @@ function prune.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 	return {
 		prunedRecords = prunedRecords,
 		newGracePeriodRecords = newGracePeriodRecords,
-		prunedAuctions = prunedAuctions,
+		prunedReturnedNames = prunedReturnedNames,
 		prunedReserved = prunedReserved,
 		prunedVaults = prunedVaults,
 		pruneGatewaysResult = pruneGatewaysResult,
