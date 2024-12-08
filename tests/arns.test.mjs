@@ -9,6 +9,7 @@ import {
   baseLeasePrice,
   basePermabuyPrice,
   getBalance,
+  buyRecord,
 } from './helpers.mjs';
 import assert from 'node:assert';
 import {
@@ -543,16 +544,28 @@ describe('ArNS', async () => {
     });
 
     it('should return the correct cost of creating a primary name request', async () => {
-      const result = await handle({
-        Tags: [
-          { name: 'Action', value: 'Token-Cost' },
-          { name: 'Intent', value: 'Primary-Name-Request' },
-          { name: 'Name', value: 'test-name' },
-        ],
+      const memory = await transfer({
+        quantity: 1000000000,
       });
+      const { memory: buyMemory } = await buyRecord({
+        from: STUB_ADDRESS,
+        memory,
+        name: 'test-name',
+        processId: ''.padEnd(43, 'a'),
+      });
+      const result = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Token-Cost' },
+            { name: 'Intent', value: 'Primary-Name-Request' },
+            { name: 'Name', value: 'test-name' },
+          ],
+        },
+        buyMemory,
+      );
       assertNoResultError(result);
       const tokenCost = JSON.parse(result.Messages[0].Data);
-      assert.equal(tokenCost, 10000000);
+      assert.equal(tokenCost, 500000);
     });
   });
 
