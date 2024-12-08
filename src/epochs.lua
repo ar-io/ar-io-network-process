@@ -752,7 +752,9 @@ function epochs.pruneEpochs(timestamp)
 			Epochs[nextEpochIndex] = nil
 		else
 			local _, endTimestamp = epochs.getEpochTimestampsForIndex(nextEpochIndex)
-			NextEpochsPruneTimestamp = math.min(NextEpochsPruneTimestamp or endTimestamp, endTimestamp)
+			if endTimestamp >= timestamp then
+				NextEpochsPruneTimestamp = math.min(NextEpochsPruneTimestamp or endTimestamp, endTimestamp)
+			end
 		end
 		nextEpochIndex = next(unsafeEpochs, nextEpochIndex)
 	end
