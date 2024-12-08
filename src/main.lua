@@ -1877,7 +1877,7 @@ end)
 addEventingHandler(ActionMap.Epochs, utils.hasMatchingTag("Action", ActionMap.Epochs), function(msg)
 	local allEpochs = epochs.getEpochs()
 
-	-- the json encoder will error on a table with numeric keys that don't start at 1
+	-- the json encoder will error on a table with numeric keys that don't start at 1.
 	-- at genesis, epochs will start indexing at 0 and within 2 epochs will continue indexing
 	-- from 2 (and so on as epochs continue to be pruned), so work around that by sorting the
 	-- epoch index keys and inserting the epochs in order into a fresh array
