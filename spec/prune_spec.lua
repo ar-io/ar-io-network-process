@@ -1,4 +1,5 @@
 local tick = require("prune")
+local constants = require("constants")
 
 describe("prune", function()
 	before_each(function()
@@ -14,9 +15,11 @@ describe("prune", function()
 					endTimestamp = 1000000,
 				},
 			},
-			auctions = {
-				["test-auction"] = {
-					endTimestamp = 1000000,
+			returned = {
+				["test-returned-name"] = {
+					name = "test-returned-name",
+					startTimestamp = 1000000,
+					initiator = "test-initiator",
 				},
 			},
 		}
@@ -41,7 +44,7 @@ describe("prune", function()
 	end)
 
 	it(
-		"should prune records and related primary names, and create auctions when endtimestamp is past the grace period",
+		"should prune records and related primary names, and create returned names when endTimestamp is past the grace period",
 		function()
 			local pruneTimestamp = 1000000 + 14 * 24 * 60 * 60 * 1000 + 1
 			local result = tick.pruneState(pruneTimestamp, "msgId", 0)
@@ -54,20 +57,10 @@ describe("prune", function()
 			assert.are.same({
 				["test-record"] = {
 					startTimestamp = pruneTimestamp,
-					endTimestamp = pruneTimestamp + 14 * 24 * 60 * 60 * 1000,
-					baseFee = 500000000,
-					demandFactor = 1,
 					initiator = "test",
 					name = "test-record",
-					registrationFeeCalculator = require("arns").calculateRegistrationFee,
-					settings = {
-						decayRate = 1.6847809193121693337e-11,
-						durationMs = 1209600000,
-						scalingExponent = 190,
-						startPriceMultiplier = 50,
-					},
 				},
-			}, _G.NameRegistry.auctions)
+			}, _G.NameRegistry.returned)
 			--- check that the primary names and owners were also pruned
 			assert.are.same({
 				["test-record"] = {
@@ -82,19 +75,21 @@ describe("prune", function()
 		end
 	)
 
-	it("should prune auctions at the time they expire", function()
-		_G.NextAuctionsPruneTimestamp = 0
-		local pruneTimestamp = 1000000
+	it("should prune returned names at the time they expire", function()
+		_G.NextReturnedNamesPruneTimestamp = 0
+		local pruneTimestamp = 1000000 + constants.returnedNamePeriod + 1
 		local result = tick.pruneState(pruneTimestamp, "msgId", 0)
 		assert.are.same({
-			["test-auction"] = {
-				endTimestamp = pruneTimestamp,
+			["test-returned-name"] = {
+				name = "test-returned-name",
+				startTimestamp = 1000000,
+				initiator = "test-initiator",
 			},
-		}, result.prunedAuctions)
-		assert.are.same({}, _G.NameRegistry.auctions)
+		}, result.prunedReturnedNames)
+		assert.are.same({}, _G.NameRegistry.returned)
 	end)
 
-	it("should prune reserved names, vaults, and gateways when endtimestamp is in the past", function()
+	it("should prune reserved names, vaults, and gateways when endTimestamp is in the past", function()
 		local pruneTimestamp = 1000000
 		local result = tick.pruneState(pruneTimestamp, "msgId", 0)
 		assert.are.same({
