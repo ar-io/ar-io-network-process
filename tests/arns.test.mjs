@@ -861,6 +861,23 @@ describe('ArNS', async () => {
         premiumMultiplier: 50,
       });
 
+      // should list the name from returned-names
+      const returnedNamesResult = await handle(
+        {
+          Tags: [{ name: 'Action', value: 'Returned-Names' }],
+          Timestamp: futureTimestamp,
+        },
+        returnedNameResult.Memory,
+      );
+      const { items, hasMore, cursor, sortBy, sortOrder, totalItems } =
+        JSON.parse(returnedNamesResult.Messages[0].Data);
+      assert.ok(Array.isArray(items));
+      assert.ok(hasMore === false);
+      assert.ok(cursor === undefined);
+      assert.equal(sortBy, 'endTimestamp');
+      assert.equal(sortOrder, 'desc');
+      assert.equal(totalItems, 1);
+
       // TRANSFER FROM THE OWNER TO A NEW STUB ADDRESS
       const newBuyerAddress = 'returned-name-buyer-'.padEnd(43, '0');
 
