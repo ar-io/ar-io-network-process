@@ -905,7 +905,16 @@ describe('ArNS', async () => {
         purchasePrice: expectedPurchasePrice,
         startTimestamp: newBuyTimestamp,
         undernameLimit: 10,
+        type: 'permabuy',
+        baseRegistrationFee: 500000000,
+        returnedName: {
+          initiator: 'ant-owner-000000000000000000000000000000000',
+          rewardForInitiator: Math.floor(expectedPurchasePrice * 0.5),
+          rewardForProtocol: Math.ceil(expectedPurchasePrice * 0.5),
+        },
+        remainingBalance: 0,
       };
+
       const expectedRewardForInitiator = Math.floor(
         expectedPurchasePrice * 0.5,
       );
@@ -931,7 +940,13 @@ describe('ArNS', async () => {
       // assert the data response contains the record
       const creditNoticeData = JSON.parse(newBuyResult.Messages?.[1]?.Data);
       assert.deepEqual(creditNoticeData, {
-        record: { ...expectedRecord, type: 'permabuy' },
+        record: {
+          processId,
+          purchasePrice: expectedPurchasePrice,
+          startTimestamp: newBuyTimestamp,
+          type: 'permabuy',
+          undernameLimit: 10,
+        },
         buyer: newBuyerAddress,
         rewardForInitiator: expectedRewardForInitiator,
         rewardForProtocol: expectedRewardForProtocol,
@@ -1097,6 +1112,7 @@ describe('ArNS', async () => {
         startTimestamp: bidTimestamp,
         endTimestamp: bidTimestamp + 60 * 60 * 1000 * 24 * 365 * 3,
         undernameLimit: 10,
+        type: 'lease',
       };
       const expectedFundingResults = {
         fundingPlan: {
@@ -1126,9 +1142,18 @@ describe('ArNS', async () => {
         buyReturnedNameResult.Messages?.[0]?.Data,
       );
       assert.deepEqual(buyRecordNoticeData, {
-        name: 'test-name',
         ...expectedRecord,
         ...(fundFrom === 'stakes' ? expectedFundingResults : {}),
+        ...{
+          name: 'test-name',
+          returnedName: {
+            initiator: PROCESS_ID,
+            rewardForInitiator: 0,
+            rewardForProtocol: expectedPurchasePrice,
+          },
+          remainingBalance: 0,
+          baseRegistrationFee: 500000000,
+        },
       });
 
       // should send a credit notice
@@ -1145,7 +1170,7 @@ describe('ArNS', async () => {
         buyReturnedNameResult.Messages?.[1]?.Data,
       );
       assert.deepEqual(creditNoticeData, {
-        record: { ...expectedRecord, type: 'lease' },
+        record: expectedRecord,
         buyer: bidderAddress,
         rewardForInitiator: 0,
         rewardForProtocol: expectedRewardForProtocol,

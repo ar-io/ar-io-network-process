@@ -799,16 +799,12 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 		fundFrom,
 		allowUnsafeProcessId
 	)
-	local record = {}
-	if result ~= nil then
-		record = result.record
-		addRecordResultFields(msg.ioEvent, result)
-		addSupplyData(msg.ioEvent)
-	end
+	local record = result.record
+	addRecordResultFields(msg.ioEvent, result)
+	addSupplyData(msg.ioEvent)
 
 	msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
 
-	-- TODO: Send back fundingPlan and fundingResult as well?
 	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.BuyRecord .. "-Notice", Name = name },
@@ -817,15 +813,19 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 			startTimestamp = record.startTimestamp,
 			endTimestamp = record.endTimestamp,
 			undernameLimit = record.undernameLimit,
+			type = record.type,
 			purchasePrice = record.purchasePrice,
 			processId = record.processId,
-			fundingResult = fundFrom and result and result.fundingResult or nil,
-			fundingPlan = fundFrom and result and result.fundingPlan or nil,
+			fundingResult = fundFrom and result.fundingResult or nil,
+			fundingPlan = fundFrom and result.fundingPlan or nil,
+			baseRegistrationFee = result.baseRegistrationFee,
+			remainingBalance = result.remainingBalance,
+			returnedName = result.returnedName,
 		}),
 	})
 
 	-- If was returned name, send a credit notice to the initiator
-	if result ~= nil and result.returnedName ~= nil then
+	if result.returnedName ~= nil then
 		Send(msg, {
 			Target = result.returnedName.initiator,
 			Action = "Credit-Notice",
