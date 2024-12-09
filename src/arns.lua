@@ -23,6 +23,10 @@ NameRegistry = NameRegistry or {
 	returned = {},
 }
 
+if not NameRegistry.returned then
+	NameRegistry.returned = {}
+end
+
 --- @class StoredRecord
 --- @field processId string The process id of the record
 --- @field startTimestamp number The start timestamp of the record
