@@ -1000,15 +1000,17 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				result.slashedGateways[address] = slashAmount
 				result.stakeSlashed = result.stakeSlashed + slashAmount
 			else
-				if gateway.status == "leaving" and gateway.endTimestamp <= currentTimestamp then
-					-- if the timestamp is after gateway end timestamp, mark the gateway as nil
-					GatewayRegistry[address] = nil
-					table.insert(result.prunedGateways, address)
-				elseif gateway.endTimestamp ~= nil then
-					-- find the next prune timestamp
-					minNextEndTimestamp =
-						--- @diagnostic disable-next-line: param-type-mismatch
-						math.min(minNextEndTimestamp or gateway.endTimestamp, gateway.endTimestamp)
+				if gateway.status == "leaving" and gateway.endTimestamp ~= nil then
+					if gateway.endTimestamp <= currentTimestamp then
+						-- prune the gateway
+						GatewayRegistry[address] = nil
+						table.insert(result.prunedGateways, address)
+					else
+						-- find the next prune timestamp
+						minNextEndTimestamp =
+							--- @diagnostic disable-next-line: param-type-mismatch
+							math.min(minNextEndTimestamp or gateway.endTimestamp, gateway.endTimestamp)
+					end
 				end
 			end
 		end
