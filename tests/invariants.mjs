@@ -29,11 +29,6 @@ function assertValidTimestampsAtTimestamp({
   );
 }
 
-export async function assertNoInvariants({ timestamp, memory }) {
-  await assertNoBalanceInvariants({ timestamp, memory });
-  await assertNoBalanceVaultInvariants({ timestamp, memory });
-}
-
 async function assertNoBalanceInvariants({ timestamp, memory }) {
   // Assert all balances are >= 0 and all belong to valid addresses
   const balances = await getBalances({
@@ -65,14 +60,18 @@ async function assertNoBalanceVaultInvariants({ timestamp, memory }) {
 }
 
 async function assertNoTotalSupplyInvariants({ timestamp, memory }) {
-  const supplyResult = await handle({
-    Tags: [
-      {
-        name: 'Action',
-        value: 'Total-Token-Supply',
-      },
-    ],
-  });
+  const supplyResult = await handle(
+    {
+      Tags: [
+        {
+          name: 'Action',
+          value: 'Total-Token-Supply',
+        },
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  );
 
   // assert no errors
   assert.deepEqual(supplyResult.Messages?.[0]?.Error, undefined);
@@ -86,12 +85,49 @@ async function assertNoTotalSupplyInvariants({ timestamp, memory }) {
 
   assert.ok(
     supplyData.total === 1000000000 * 1000000,
-    'total supply should be 1 billion IO but was ' + supplyData.total,
+    'total supply should be 1,000,000,000,000,000 mIO but was ' +
+      supplyData.total,
   );
-  assertValidBalance(supplyData.circulating);
+  assertValidBalance(supplyData.circulating, 0);
   assertValidBalance(supplyData.locked, 0);
   assertValidBalance(supplyData.staked, 0);
   assertValidBalance(supplyData.delegated, 0);
   assertValidBalance(supplyData.withdrawn, 0);
   assertValidBalance(supplyData.protocolBalance, 0);
+}
+
+// TODO: Add Gateway invariants
+// async function assertNoGatewayInvariants( { timestamp, memory } ) {
+//   const gatewayResult = await handle({
+//     Tags: [
+//       {
+//         name: 'Action',
+//         value: 'Gateway',
+//       },
+//     ],
+//     Timestamp: timestamp,
+//   }, memory);
+
+//   // assert no errors
+//   assert.deepEqual(gatewayResult.Messages?.[0]?.Error, undefined);
+//   // assert correct tag in message by finding the index of the tag in the message
+//   const notice = gatewayResult.Messages?.[0]?.Tags?.find(
+//     (tag) => tag.name === 'Action' && tag.value === 'Gateway-Notice',
+//   );
+//   assert.ok(notice, 'should have a Gateway-Notice tag');
+
+//   const gatewayData = JSON.parse(gatewayResult.Messages?.[0]?.Data);
+
+//   assertValidBalance(gatewayData.total, 0);
+//   assertValidBalance(gatewayData.locked, 0);
+//   assertValidBalance(gatewayData.staked, 0);
+//   assertValidBalance(gatewayData.delegated, 0);
+//   assertValidBalance(gatewayData.withdrawn, 0);
+//   assertValidBalance(gatewayData.protocolBalance, 0);
+// }
+
+export async function assertNoInvariants({ timestamp, memory }) {
+  await assertNoBalanceInvariants({ timestamp, memory });
+  await assertNoBalanceVaultInvariants({ timestamp, memory });
+  await assertNoTotalSupplyInvariants({ timestamp, memory });
 }
