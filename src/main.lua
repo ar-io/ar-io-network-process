@@ -2139,7 +2139,7 @@ addEventingHandler(ActionMap.ReturnedNames, utils.hasMatchingTag("Action", Actio
 	--- @type ReturnedNameData[] -- Returned Names with End Timestamp and Premium Multiplier
 	local returnedNameDataArray = {}
 
-	for _, v in ipairs(returnedNames) do
+	for _, v in pairs(returnedNames) do
 		table.insert(returnedNameDataArray, {
 			name = v.name,
 			startTimestamp = v.startTimestamp,
@@ -2148,6 +2148,7 @@ addEventingHandler(ActionMap.ReturnedNames, utils.hasMatchingTag("Action", Actio
 			premiumMultiplier = arns.getReturnedNamePremiumMultiplier(v.startTimestamp, msg.Timestamp),
 		})
 	end
+
 	-- paginate the returnedNames by name, showing returnedNames nearest to the endTimestamp first
 	local paginatedReturnedNames = utils.paginateTableWithCursor(
 		returnedNameDataArray,
