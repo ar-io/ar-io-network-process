@@ -3,7 +3,7 @@ local utils = require("utils")
 
 -- TODO: RENAME TO ARIOEvent
 -- Convenience factory function for prepopulating analytic and msg fields into AOEvents
-local function IOEvent(msg, initialData)
+local function ARIOEvent(msg, initialData)
 	local event = AOEvent({
 		Cron = msg.Cron or false,
 		Cast = msg.Cast or false,
@@ -18,4 +18,4 @@ local function IOEvent(msg, initialData)
 	return event
 end
 
-return IOEvent
+return ARIOEvent

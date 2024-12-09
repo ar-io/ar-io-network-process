@@ -2,7 +2,7 @@
 local process = { _version = "0.0.1" }
 local constants = require("constants")
 local token = require("token")
-local IOEvent = require("io_event")
+local ARIOEvent = require("ario_event")
 
 Name = Name or "Testnet ARIO"
 Ticker = Ticker or "tARIO"
@@ -363,7 +363,7 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical)
 	critical = critical or false
 	Handlers.add(handlerName, pattern, function(msg)
 		-- add an IOEvent to the message if it doesn't exist
-		msg.ioEvent = msg.ioEvent or IOEvent(msg)
+		msg.ioEvent = msg.ioEvent or ARIOEvent(msg)
 		-- global handler for all eventing errors, so we can log them and send a notice to the sender for non critical errors and discard the memory on critical errors
 		local status, resultOrError = eventingPcall(msg.ioEvent, function(error)
 			--- non critical errors will send an invalid notice back to the caller with the error information, memory is not discarded
@@ -375,7 +375,7 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical)
 			})
 		end, handleFn, msg)
 		if not status and critical then
-			local errorEvent = IOEvent(msg)
+			local errorEvent = ARIOEvent(msg)
 			-- For critical handlers we want to make sure the event data gets sent to the CU for processing, but that the memory is discarded on failures
 			-- These handlers (distribute, prune) severely modify global state, and partial updates are dangerous.
 			-- So we json encode the error and the event data and then throw, so the CU will discard the memory and still process the event data.
