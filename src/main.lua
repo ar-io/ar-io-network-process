@@ -99,11 +99,8 @@ local ActionMap = {
 	TokenCost = "Token-Cost",
 	CostDetails = "Get-Cost-Details-For-Action",
 	GetRegistrationFees = "Get-Registration-Fees",
-	-- auctions
-	Auctions = "Auctions",
-	AuctionInfo = "Auction-Info",
-	AuctionBid = "Auction-Bid",
-	AuctionPrices = "Auction-Prices",
+	ReturnedNames = "Returned-Names",
+	ReturnedName = "Returned-Name",
 	AllowDelegates = "Allow-Delegates",
 	DisallowDelegates = "Disallow-Delegates",
 	Delegations = "Delegations",
@@ -140,7 +137,7 @@ local function eventingPcall(ioEvent, onError, fnToCall, ...)
 end
 
 --- @param fundingPlan FundingPlan|nil
---- @param rewardForInitiator number|nil only applies in auction bids for released names
+--- @param rewardForInitiator number|nil only applies in buy record for returned names
 local function adjustSuppliesForFundingPlan(fundingPlan, rewardForInitiator)
 	if not fundingPlan then
 		return
@@ -220,7 +217,7 @@ local function addRecordResultFields(ioEvent, result)
 	addResultFundingPlanFields(ioEvent, result)
 end
 
-local function addAuctionResultFields(ioEvent, result)
+local function addReturnedNameResultFields(ioEvent, result)
 	ioEvent:addFieldsIfExist(result, {
 		"bidAmount",
 		"rewardForInitiator",
@@ -231,13 +228,10 @@ local function addAuctionResultFields(ioEvent, result)
 		"years",
 	})
 	ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
-	ioEvent:addFieldsIfExist(result.auction, {
+	ioEvent:addFieldsIfExist(result.returnedName, {
 		"name",
 		"initiator",
 		"startTimestamp",
-		"endTimestamp",
-		"baseFee",
-		"demandFactor",
 	})
 	-- TODO: add removedPrimaryNamesAndOwners to ioEvent
 	addResultFundingPlanFields(ioEvent, result)
@@ -322,7 +316,7 @@ end
 
 --- @param ioEvent table
 local function addNextPruneTimestampsData(ioEvent)
-	ioEvent:addField("Next-Auctions-Prune-Timestamp", arns.nextAuctionsPruneTimestamp())
+	ioEvent:addField("Next-Returned-Names-Prune-Timestamp", arns.nextReturnedNamesPruneTimestamp())
 	ioEvent:addField("Next-Epochs-Prune-Timestamp", epochs.nextEpochsPruneTimestamp())
 	ioEvent:addField("Next-Records-Prune-Timestamp", arns.nextRecordsPruneTimestamp())
 	ioEvent:addField("Next-Vaults-Prune-Timestamp", vaults.nextVaultsPruneTimestamp())
@@ -339,7 +333,7 @@ local function addNextPruneTimestampsResults(ioEvent, prunedStateResult)
 
 	-- If anything meaningful was pruned, collect the next prune timestamps
 	if
-		next(prunedStateResult.prunedAuctions)
+		next(prunedStateResult.prunedReturnedNames)
 		or next(prunedStateResult.prunedEpochs)
 		or next(prunedStateResult.prunedPrimaryNameRequests)
 		or next(prunedStateResult.prunedEpochs)
@@ -468,7 +462,7 @@ end, function(msg)
 	if msg.Tags["Force-Prune"] then
 		gar.scheduleNextGatewaysPruning(0)
 		gar.scheduleNextRedelegationsPruning(0)
-		arns.scheduleNextAuctionsPrune(0)
+		arns.scheduleNextReturnedNamesPrune(0)
 		arns.scheduleNextRecordsPrune(0)
 		primaryNames.scheduleNextPrimaryNamesPruning(0)
 		vaults.scheduleNextVaultsPruning(0)
@@ -502,11 +496,11 @@ end, function(msg)
 			msg.ioEvent:addField("New-Grace-Period-Records-Count", newGracePeriodRecordsCount)
 			msg.ioEvent:addField("Last-Grace-Period-Entry-End-Timestamp", LastGracePeriodEntryEndTimestamp)
 		end
-		local prunedAuctions = prunedStateResult.prunedAuctions or {}
-		local prunedAuctionsCount = utils.lengthOfTable(prunedAuctions)
-		if prunedAuctionsCount > 0 then
-			msg.ioEvent:addField("Pruned-Auctions", prunedAuctions)
-			msg.ioEvent:addField("Pruned-Auctions-Count", prunedAuctionsCount)
+		local prunedReturnedNames = prunedStateResult.prunedReturnedNames or {}
+		local prunedReturnedNamesCount = utils.lengthOfTable(prunedReturnedNames)
+		if prunedReturnedNamesCount > 0 then
+			msg.ioEvent:addField("Pruned-Returned-Names", prunedReturnedNames)
+			msg.ioEvent:addField("Pruned-Returned-Name-Count", prunedReturnedNamesCount)
 		end
 		local prunedReserved = prunedStateResult.prunedReserved or {}
 		local prunedReservedCount = utils.lengthOfTable(prunedReserved)
@@ -805,28 +799,46 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 		fundFrom,
 		allowUnsafeProcessId
 	)
-	local record = {}
-	if result ~= nil then
-		record = result.record
-		addRecordResultFields(msg.ioEvent, result)
-		addSupplyData(msg.ioEvent)
-	end
+	local record = result.record
+	addRecordResultFields(msg.ioEvent, result)
+	addSupplyData(msg.ioEvent)
 
 	msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
 
-	-- TODO: Send back fundingPlan and fundingResult as well?
 	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.BuyRecord .. "-Notice", Name = name },
-		Data = json.encode(fundFrom and result or {
+		Data = json.encode({
 			name = name,
 			startTimestamp = record.startTimestamp,
 			endTimestamp = record.endTimestamp,
 			undernameLimit = record.undernameLimit,
+			type = record.type,
 			purchasePrice = record.purchasePrice,
 			processId = record.processId,
+			fundingResult = fundFrom and result.fundingResult or nil,
+			fundingPlan = fundFrom and result.fundingPlan or nil,
+			baseRegistrationFee = result.baseRegistrationFee,
+			remainingBalance = result.remainingBalance,
+			returnedName = result.returnedName,
 		}),
 	})
+
+	-- If was returned name, send a credit notice to the initiator
+	if result.returnedName ~= nil then
+		Send(msg, {
+			Target = result.returnedName.initiator,
+			Action = "Credit-Notice",
+			Quantity = tostring(result.returnedName.rewardForInitiator),
+			Data = json.encode({
+				name = name,
+				buyer = msg.From,
+				rewardForInitiator = result.returnedName.rewardForInitiator,
+				rewardForProtocol = result.returnedName.rewardForProtocol,
+				record = result.record,
+			}),
+		})
+	end
 end)
 
 addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.UpgradeName), function(msg)
@@ -2057,9 +2069,8 @@ addEventingHandler(
 
 -- END READ HANDLERS
 
--- AUCTION HANDLER
 addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.ReleaseName), function(msg)
-	-- validate the name and process id exist, then create the auction using the auction function
+	-- validate the name and process id exist, then create the returned name
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name)
 	local processId = msg.From
 	local initiator = msg.Tags.Initiator or msg.From
@@ -2078,72 +2089,68 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 		"Primary names are associated with this name. They must be removed before releasing the name."
 	)
 	assert(timestamp, "Timestamp is required")
-	-- we should be able to create the auction here
+	-- we should be able to create the returned name here
 	local removedRecord = arns.removeRecord(name)
 	local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNamesForBaseName(name) -- NOTE: this should be empty if there are no primary names allowed before release
-	local createdAuction = arns.createAuction(name, timestamp, initiator)
-	local createAuctionData = {
+	local returnedName = arns.createReturnedName(name, timestamp, initiator)
+	local returnedNameData = {
 		removedRecord = removedRecord,
 		removedPrimaryNamesAndOwners = removedPrimaryNamesAndOwners,
-		auction = createdAuction,
+		returnedName = returnedName,
 	}
 
-	addAuctionResultFields(msg.ioEvent, {
+	addReturnedNameResultFields(msg.ioEvent, {
 		name = name,
-		auction = createAuctionData.createdAuction,
-		removedRecord = createAuctionData.removedRecord,
-		removedPrimaryNamesAndOwners = createAuctionData.removedPrimaryNamesAndOwners,
+		returnedName = returnedNameData.returnedName,
+		removedRecord = returnedNameData.removedRecord,
+		removedPrimaryNamesAndOwners = returnedNameData.removedPrimaryNamesAndOwners,
 	})
 
-	-- note: no change to token supply here - only on auction bids
-	msg.ioEvent:addField("Auctions-Count", utils.lengthOfTable(NameRegistry.auctions))
+	-- note: no change to token supply here - only on buy record of returned name
+	msg.ioEvent:addField("Returned-Name-Count", utils.lengthOfTable(NameRegistry.returned))
 	msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
 
-	local auction = {
+	local releaseNameData = {
 		name = name,
-		startTimestamp = createAuctionData.auction.startTimestamp,
-		endTimestamp = createAuctionData.auction.endTimestamp,
-		initiator = createAuctionData.auction.initiator,
-		baseFee = createAuctionData.auction.baseFee,
-		demandFactor = createAuctionData.auction.demandFactor,
-		settings = createAuctionData.auction.settings,
+		startTimestamp = returnedName.startTimestamp,
+		endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod,
+		initiator = returnedName.initiator,
 	}
 
 	-- send to the initiator and the process that released the name
 	Send(msg, {
 		Target = initiator,
-		Action = "Auction-Notice",
+		Action = "Returned-Name-Notice",
 		Name = name,
-		Data = json.encode(auction),
+		Data = json.encode(releaseNameData),
 	})
 	Send(msg, {
 		Target = processId,
-		Action = "Auction-Notice",
+		Action = "Returned-Name-Notice",
 		Name = name,
-		Data = json.encode(auction),
+		Data = json.encode(releaseNameData),
 	})
 end)
 
--- AUCTIONS
-addEventingHandler("auctions", utils.hasMatchingTag("Action", ActionMap.Auctions), function(msg)
+addEventingHandler(ActionMap.ReturnedNames, utils.hasMatchingTag("Action", ActionMap.ReturnedNames), function(msg)
 	local page = utils.parsePaginationTags(msg)
-	local auctions = arns.getAuctions()
-	local auctionsWithoutFunctions = {}
+	local returnedNames = arns.getReturnedNamesUnsafe()
 
-	for _, v in ipairs(auctions) do
-		table.insert(auctionsWithoutFunctions, {
+	--- @type ReturnedNameData[] -- Returned Names with End Timestamp and Premium Multiplier
+	local returnedNameDataArray = {}
+
+	for _, v in ipairs(returnedNames) do
+		table.insert(returnedNameDataArray, {
 			name = v.name,
 			startTimestamp = v.startTimestamp,
-			endTimestamp = v.endTimestamp,
+			endTimestamp = v.startTimestamp + constants.returnedNamePeriod,
 			initiator = v.initiator,
-			baseFee = v.baseFee,
-			demandFactor = v.demandFactor,
-			settings = v.settings,
+			premiumMultiplier = arns.getReturnedNamePremiumMultiplier(v.startTimestamp, msg.Timestamp),
 		})
 	end
-	-- paginate the auctions by name, showing auctions nearest to the endTimestamp first
-	local paginatedAuctions = utils.paginateTableWithCursor(
-		auctionsWithoutFunctions,
+	-- paginate the returnedNames by name, showing returnedNames nearest to the endTimestamp first
+	local paginatedReturnedNames = utils.paginateTableWithCursor(
+		returnedNameDataArray,
 		page.cursor,
 		"name",
 		page.limit,
@@ -2152,167 +2159,28 @@ addEventingHandler("auctions", utils.hasMatchingTag("Action", ActionMap.Auctions
 	)
 	Send(msg, {
 		Target = msg.From,
-		Action = ActionMap.Auctions .. "-Notice",
-		Data = json.encode(paginatedAuctions),
+		Action = ActionMap.ReturnedNames .. "-Notice",
+		Data = json.encode(paginatedReturnedNames),
 	})
 end)
 
-addEventingHandler("auctionInfo", utils.hasMatchingTag("Action", ActionMap.AuctionInfo), function(msg)
+addEventingHandler(ActionMap.ReturnedName, utils.hasMatchingTag("Action", ActionMap.ReturnedName), function(msg)
 	local name = string.lower(msg.Tags.Name)
-	local auction = arns.getAuction(name)
+	local returnedName = arns.getReturnedNameUnsafe(name)
 
-	assert(auction, "Auction not found")
+	assert(returnedName, "Returned name not found")
 
 	Send(msg, {
 		Target = msg.From,
-		Action = ActionMap.AuctionInfo .. "-Notice",
+		Action = ActionMap.ReturnedName .. "-Notice",
 		Data = json.encode({
-			name = auction.name,
-			startTimestamp = auction.startTimestamp,
-			endTimestamp = auction.endTimestamp,
-			initiator = auction.initiator,
-			baseFee = auction.baseFee,
-			demandFactor = auction.demandFactor,
-			settings = auction.settings,
+			name = returnedName.name,
+			startTimestamp = returnedName.startTimestamp,
+			endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod,
+			initiator = returnedName.initiator,
+			premiumMultiplier = arns.getReturnedNamePremiumMultiplier(returnedName.startTimestamp, msg.Timestamp),
 		}),
 	})
-end)
-
--- Handler to get auction prices for a name
-addEventingHandler("auctionPrices", utils.hasMatchingTag("Action", ActionMap.AuctionPrices), function(msg)
-	local name = string.lower(msg.Tags.Name)
-	local auction = arns.getAuction(name)
-	local timestamp = msg.Tags.Timestamp or msg.Timestamp
-	local type = msg.Tags["Purchase-Type"] or "permabuy"
-	local years = msg.Tags.Years or nil
-	local intervalMs = msg.Tags["Price-Interval-Ms"] or 15 * 60 * 1000 -- 15 minute intervals by default
-
-	assert(auction, "Auction not found")
-	assert(timestamp, "Timestamp is required")
-
-	if not type then
-		type = "permabuy"
-	end
-
-	if type == "lease" then
-		years = years or 1
-	else
-		years = 20
-	end
-
-	local currentPrice = auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
-	local prices = auction:computePricesForAuction(type, years, intervalMs)
-
-	local isEligibleForArNSDiscount = gar.isEligibleForArNSDiscount(msg.From)
-	local discounts = {}
-
-	if isEligibleForArNSDiscount then
-		table.insert(discounts, {
-			name = constants.ARNS_DISCOUNT_NAME,
-			multiplier = constants.ARNS_DISCOUNT_PERCENTAGE,
-		})
-	end
-
-	local jsonPrices = {}
-	for k, v in pairs(prices) do
-		jsonPrices[tostring(k)] = v
-	end
-
-	Send(msg, {
-		Target = msg.From,
-		Action = ActionMap.AuctionPrices .. "-Notice",
-		Data = json.encode({
-			name = auction.name,
-			type = type,
-			years = years,
-			prices = jsonPrices,
-			currentPrice = currentPrice,
-			discounts = discounts,
-		}),
-	})
-end)
-
-addEventingHandler("auctionBid", utils.hasMatchingTag("Action", ActionMap.AuctionBid), function(msg)
-	local fundFrom = msg.Tags["Fund-From"]
-	local name = string.lower(msg.Tags.Name)
-	local bidAmount = msg.Tags.Quantity or nil -- if nil, we use the current bid price
-	local bidder = msg.From
-	local processId = msg.Tags["Process-Id"]
-	local timestamp = msg.Timestamp
-	local type = msg.Tags["Purchase-Type"] or "permabuy"
-	local years = msg.Tags.Years or nil
-	local allowUnsafeProcessId = msg.Tags["Allow-Unsafe-Addresses"]
-
-	-- assert name, bidder, processId are provided
-	assert(name and #name > 0, "Name is required")
-	assert(bidder and utils.isValidAddress(bidder, true), "Bidder is required")
-	assert(processId and utils.isValidAddress(processId, allowUnsafeProcessId), "Process-Id must be a valid address")
-	assert(timestamp and timestamp > 0, "Timestamp is required")
-	-- if bidAmount is not nil assert that it is a number
-	if bidAmount then
-		assert(
-			type(bidAmount) == "number" and bidAmount > 0 and utils.isInteger(bidAmount),
-			"Bid amount must be a positive integer"
-		)
-	end
-	if type then
-		assert(type == "permabuy" or type == "lease", "Invalid auction type. Must be either 'permabuy' or 'lease'")
-	end
-	if type == "lease" then
-		if years then
-			assert(
-				years and utils.isInteger(years) and years > 0 and years <= constants.maxLeaseLengthYears,
-				"Years must be an integer between 1 and 5"
-			)
-		else
-			years = years or 1
-		end
-	end
-
-	local auction = arns.getAuction(name)
-	assert(auction, "Auction not found")
-	assertValidFundFrom(fundFrom)
-
-	local result = arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, type, years, msg.Id, fundFrom)
-
-	if result ~= nil then
-		local record = result.record
-		addAuctionResultFields(msg.ioEvent, result)
-		addSupplyData(msg.ioEvent)
-
-		msg.ioEvent:addField("Records-Count", utils.lengthOfTable(NameRegistry.records))
-		msg.ioEvent:addField("Auctions-Count", utils.lengthOfTable(NameRegistry.auctions))
-		-- send buy record notice and auction close notice
-		Send(msg, {
-			Target = result.bidder,
-			Action = ActionMap.BuyRecord .. "-Notice",
-			Data = json.encode({
-				name = name,
-				startTimestamp = record.startTimestamp,
-				endTimestamp = record.endTimestamp,
-				undernameLimit = record.undernameLimit,
-				purchasePrice = record.purchasePrice,
-				processId = record.processId,
-				type = record.type,
-				fundingPlan = result.fundingPlan,
-				fundingResult = result.fundingResult,
-			}),
-		})
-
-		Send(msg, {
-			Target = result.auction.initiator,
-			Action = "Debit-Notice",
-			Quantity = tostring(result.rewardForInitiator),
-			Data = json.encode({
-				name = name,
-				bidder = result.bidder,
-				bidAmount = result.bidAmount,
-				rewardForInitiator = result.rewardForInitiator,
-				rewardForProtocol = result.rewardForProtocol,
-				record = result.record,
-			}),
-		})
-	end
 end)
 
 addEventingHandler("allowDelegates", utils.hasMatchingTag("Action", ActionMap.AllowDelegates), function(msg)
@@ -2633,7 +2501,7 @@ addEventingHandler("getPruningTimestamps", utils.hasMatchingTag("Action", "Pruni
 		Target = msg.From,
 		Action = "Pruning-Timestamps-Notice",
 		Data = json.encode({
-			auctions = arns.nextAuctionsPruneTimestamp(),
+			returnedNames = arns.nextReturnedNamesPruneTimestamp(),
 			epochs = epochs.nextEpochsPruneTimestamp(),
 			gateways = gar.nextGatewaysPruneTimestamp(),
 			primaryNames = primaryNames.nextPrimaryNamesPruneTimestamp(),

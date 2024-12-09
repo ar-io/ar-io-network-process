@@ -14,7 +14,10 @@ import {
 const initialOperatorStake = 100_000_000_000;
 
 export const basePermabuyPrice = 2_500_000_000;
-export const baseLeasePrice = 600_000_000;
+export const baseLeasePriceFor9CharNameFor1Year = 600_000_000;
+export const baseLeasePriceFor9CharNameFor3Years = 800_000_000;
+
+export const returnedNamesPeriod = 1000 * 60 * 60 * 24 * 14; // 14 days
 
 const { handle: originalHandle, memory } = await createAosLoader();
 export const startMemory = memory;
@@ -659,6 +662,7 @@ export const buyRecord = async ({
   processId,
   type = 'lease',
   years = 1,
+  timestamp = STUB_TIMESTAMP,
 }) => {
   const buyRecordResult = await handle(
     {
@@ -671,6 +675,7 @@ export const buyRecord = async ({
         { name: 'Process-Id', value: processId },
         { name: 'Years', value: `${years}` },
       ],
+      Timestamp: timestamp,
     },
     memory,
   );
