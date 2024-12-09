@@ -560,12 +560,30 @@ describe('ArNS', async () => {
             { name: 'Intent', value: 'Primary-Name-Request' },
             { name: 'Name', value: 'test-name' },
           ],
+          Timestamp: STUB_TIMESTAMP,
         },
+
         buyMemory,
       );
       assertNoResultError(result);
       const tokenCost = JSON.parse(result.Messages[0].Data);
       assert.equal(tokenCost, 500000);
+
+      // assert is same as 1 undername
+      const undernameResult = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Token-Cost' },
+            { name: 'Intent', value: 'Increase-Undername-Limit' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Quantity', value: '1' },
+          ],
+          Timestamp: STUB_TIMESTAMP,
+        },
+        buyMemory,
+      );
+      const undernameTokenCost = JSON.parse(undernameResult.Messages[0].Data);
+      assert.equal(undernameTokenCost, tokenCost);
     });
   });
 
