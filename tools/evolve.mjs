@@ -6,7 +6,7 @@ import { execSync } from 'child_process';
 const wallet = JSON.parse(process.env.WALLET);
 const signer = createAoSigner(new ArweaveSigner(wallet));
 const networkProcess = new AOProcess({
-  processId: process.env.IO_NETWORK_PROCESS_ID,
+  processId: process.env.IO_NETWORK_PROCESS_ID, // TODO: Update to ARIO_NETWORK_PROCESS_ID
   ao: connect({
     CU_URL: process.env.AO_CU_URL,
   }),

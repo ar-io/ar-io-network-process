@@ -21,6 +21,7 @@ import {
   buyRecord,
   handle,
   startMemory,
+  returnedNamesPeriod,
 } from './helpers.mjs';
 
 const genesisEpochStart = 1722837600000 + 1;
@@ -56,7 +57,7 @@ describe('Tick', async () => {
     return transferResult.Memory;
   };
 
-  it('should prune record that are expired and after the grace period and create auctions for them', async () => {
+  it('should prune record that are expired and after the grace period and create returned names for them', async () => {
     let memory = startMemory;
     const buyRecordResult = await handle({
       options: {
@@ -126,30 +127,25 @@ describe('Tick', async () => {
 
     assert.deepEqual(undefined, prunedRecordData);
 
-    // the auction should have been created
-    const auctionData = await handle({
+    // the returnedName should have been created
+    const returnedNameData = await handle({
       options: {
         Tags: [
-          { name: 'Action', value: 'Auction-Info' },
+          { name: 'Action', value: 'Returned-Name' },
           { name: 'Name', value: 'test-name' },
         ],
+        Timestamp: futureTimestamp,
       },
+
       memory: futureTickResult.Memory,
     });
-    const auctionInfoData = JSON.parse(auctionData.Messages[0].Data);
-    assert.deepEqual(auctionInfoData, {
+    const returnedNameInfoData = JSON.parse(returnedNameData.Messages[0].Data);
+    assert.deepEqual(returnedNameInfoData, {
       name: 'test-name',
       startTimestamp: futureTimestamp,
-      endTimestamp: futureTimestamp + 60 * 1000 * 60 * 24 * 14,
+      endTimestamp: futureTimestamp + returnedNamesPeriod,
       initiator: PROCESS_ID,
-      baseFee: 500000000,
-      demandFactor: 1,
-      settings: {
-        decayRate: 0.02037911 / (1000 * 60 * 60 * 24 * 14),
-        scalingExponent: 190,
-        startPriceMultiplier: 50,
-        durationMs: 60 * 1000 * 60 * 24 * 14,
-      },
+      premiumMultiplier: 50,
     });
   });
 
@@ -419,7 +415,7 @@ describe('Tick', async () => {
     });
 
     // get the epoch timestamp and assert it is in 24 hours
-    const protocolBalanceAtStartOfEpoch = 50_000_000_0000; // 50M IO
+    const protocolBalanceAtStartOfEpoch = 50_000_000_0000; // 50M ARIO
     const totalEligibleRewards = protocolBalanceAtStartOfEpoch * 0.05; // 5% of the protocol balance
     const totalGatewayRewards = Math.ceil(totalEligibleRewards * 0.9); // 90% go to gateways
     const totalObserverRewards = Math.floor(totalEligibleRewards * 0.1); // 10% go to observers

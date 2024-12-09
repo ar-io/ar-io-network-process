@@ -14,7 +14,7 @@ describe('Transfers', async () => {
             Tags: [
               { name: 'Action', value: 'Transfer' },
               { name: 'Recipient', value: sender },
-              { name: 'Quantity', value: quantity }, // 100 IO
+              { name: 'Quantity', value: quantity },
               { name: 'Cast', value: true },
             ],
           },
@@ -40,7 +40,7 @@ describe('Transfers', async () => {
           Tags: [
             { name: 'Action', value: 'Transfer' },
             { name: 'Recipient', value: recipient },
-            { name: 'Quantity', value: quantity }, // 100 IO
+            { name: 'Quantity', value: quantity }, // 100 ARIO
             { name: 'Cast', value: true },
           ],
         },
@@ -127,7 +127,7 @@ describe('Transfers', async () => {
           Tags: [
             { name: 'Action', value: 'Transfer' },
             { name: 'Recipient', value: recipient },
-            { name: 'Quantity', value: 100000000 }, // 100 IO
+            { name: 'Quantity', value: 100000000 }, // 100 ARIO
             { name: 'Cast', value: true },
             { name: 'Allow-Unsafe-Addresses', value: allowUnsafeAddresses },
           ],
@@ -179,7 +179,7 @@ describe('Transfers', async () => {
         Tags: [
           { name: 'Action', value: 'Transfer' },
           { name: 'Recipient', value: recipient },
-          { name: 'Quantity', value: 100000000 }, // 100 IO
+          { name: 'Quantity', value: 100000000 }, // 100 ARIO
           { name: 'Cast', value: true },
           { name: 'Allow-Unsafe-Addresses', value: true },
         ],
