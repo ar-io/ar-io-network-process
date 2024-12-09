@@ -510,7 +510,7 @@ describe('ArNS', async () => {
         buyRecordResult.Memory,
       );
       const tokenCost = JSON.parse(result.Messages[0].Data);
-      assert.equal(tokenCost, 200000000); // known cost for extending a 9 character name by 2 years (500 IO * 0.2 * 2)
+      assert.equal(tokenCost, 200000000); // known cost for extending a 9 character name by 2 years (500 ARIO * 0.2 * 2)
     });
 
     it('should get the cost of upgrading an existing leased record to permanently owned', async () => {
@@ -676,7 +676,7 @@ describe('ArNS', async () => {
       );
       const recordBefore = JSON.parse(recordResultBefore.Messages[0].Data);
 
-      // Last 100,000,000 mIO will be paid from exit vault 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm'
+      // Last 100,000,000 mARIO will be paid from exit vault 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm'
       const extendResult = await handle(
         {
           From: STUB_ADDRESS,

@@ -70,7 +70,7 @@ describe('handlers', async () => {
     });
 
     describe('Total-Token-Supply', () => {
-      it('should compute the total supply and be equal to 1B IO, and return all the supply data', async () => {
+      it('should compute the total supply and be equal to 1B ARIO, and return all the supply data', async () => {
         const supplyResult = await handle({
           Tags: [
             {
@@ -93,11 +93,11 @@ describe('handlers', async () => {
 
         assert.ok(
           supplyData.total === 1000000000 * 1000000,
-          'total supply should be 1 billion IO but was ' + supplyData.total,
+          'total supply should be 1 billion ARIO but was ' + supplyData.total,
         );
         assert.ok(
           supplyData.circulating === 1000000000 * 1000000 - 50000000000000,
-          'circulating supply should be 0.95 billion IO but was ' +
+          'circulating supply should be 0.95 billion ARIO but was ' +
             supplyData.circulating,
         );
         assert.ok(
@@ -119,7 +119,7 @@ describe('handlers', async () => {
 
         assert.ok(
           supplyData.protocolBalance === 50000000000000,
-          'protocol balance should be 50M IO but was ' +
+          'protocol balance should be 50M ARIO but was ' +
             supplyData.protocolBalance,
         );
       });

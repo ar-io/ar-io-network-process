@@ -639,7 +639,7 @@ end
 ---@field multiplier number The multiplier for the discount
 
 ---@class TokenCostResult
----@field tokenCost number The token cost in mIO of the intended action
+---@field tokenCost number The token cost in mARIO of the intended action
 ---@field discounts table|nil The discounts applied to the token cost
 
 --- @class IntendedAction
@@ -735,7 +735,7 @@ function arns.getTokenCost(intendedAction)
 end
 
 ---@class TokenCostAndFundingPlan
----@field tokenCost number The token cost in mIO of the intended action
+---@field tokenCost number The token cost in mARIO of the intended action
 ---@field discounts table|nil The discounts applied to the token cost
 ---@field fundingPlan table|nil The funding plan for the intended action
 

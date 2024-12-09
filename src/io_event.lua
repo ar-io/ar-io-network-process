@@ -1,6 +1,7 @@
 local AOEvent = require("ao_event")
 local utils = require("utils")
 
+-- TODO: RENAME TO ARIOEvent
 -- Convenience factory function for prepopulating analytic and msg fields into AOEvents
 local function IOEvent(msg, initialData)
 	local event = AOEvent({

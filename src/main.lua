@@ -4,8 +4,8 @@ local constants = require("constants")
 local token = require("token")
 local IOEvent = require("io_event")
 
-Name = Name or "Testnet IO"
-Ticker = Ticker or "tIO"
+Name = Name or "Testnet ARIO"
+Ticker = Ticker or "tARIO"
 Logo = Logo or "qUjrTmHdVjXX4D6rU6Fik02bUOzWkOR6oOqUg39g4-s"
 Denomination = 6
 DemandFactor = DemandFactor or {}
@@ -14,8 +14,8 @@ Protocol = Protocol or ao.env.Process.Id
 Balances = Balances or {}
 if not Balances[Protocol] then -- initialize the balance for the process id
 	Balances = {
-		[Protocol] = math.floor(50000000 * 1000000), -- 50M IO
-		[Owner] = math.floor(constants.totalTokenSupply - (50000000 * 1000000)), -- 950M IO
+		[Protocol] = math.floor(50000000 * 1000000), -- 50M ARIO
+		[Owner] = math.floor(constants.totalTokenSupply - (50000000 * 1000000)), -- 950M ARIO
 	}
 end
 Vaults = Vaults or {}
@@ -626,7 +626,7 @@ addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionM
 	)
 	assert(
 		quantity and utils.isInteger(quantity) and quantity >= constants.MIN_VAULT_SIZE,
-		"Invalid quantity. Must be integer greater than or equal to " .. constants.MIN_VAULT_SIZE .. " mIO"
+		"Invalid quantity. Must be integer greater than or equal to " .. constants.MIN_VAULT_SIZE .. " mARIO"
 	)
 	assert(timestamp, "Timestamp is required for a tick interaction")
 	local vault = vaults.createVault(msg.From, quantity, lockLengthMs, timestamp, msgId)
@@ -666,7 +666,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 	)
 	assert(
 		quantity and utils.isInteger(quantity) and quantity >= constants.MIN_VAULT_SIZE,
-		"Invalid quantity. Must be integer greater than or equal to " .. constants.MIN_VAULT_SIZE .. " mIO"
+		"Invalid quantity. Must be integer greater than or equal to " .. constants.MIN_VAULT_SIZE .. " mARIO"
 	)
 	assert(timestamp, "Timestamp is required for a tick interaction")
 	assert(recipient ~= msg.From, "Cannot transfer to self")

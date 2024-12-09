@@ -18,8 +18,8 @@ constants.DEADLINE_DURATION_MS = constants.oneHourMs
 constants.totalTokenSupply = 1000000000 * 1000000 -- 1 billion tokens
 constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.10 -- the minimum penalty rate for an expedited withdrawal (10% of the amount being withdrawn)
 constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.50 -- the maximum penalty rate for an expedited withdrawal (50% of the amount being withdrawn)
-constants.mIOPerIO = 1000000
-constants.minimumWithdrawalAmount = constants.mIOPerIO -- the minimum amount that can be withdrawn from the GAR
+constants.mARIOPerARIO = 1000000
+constants.minimumWithdrawalAmount = constants.mARIOPerARIO -- the minimum amount that can be withdrawn from the GAR
 constants.redelegationFeeResetIntervalMs = constants.defaultEpochDurationMs * 7 -- 7 epochs
 constants.maxDelegateRewardShareRatio = 95 -- 95% of rewards can be shared with delegates
 
@@ -39,7 +39,7 @@ constants.ANNUAL_PERCENTAGE_FEE = 0.2 -- 20%
 constants.ARNS_NAME_DOES_NOT_EXIST_MESSAGE = "Name not found in the ArNS Registry!"
 constants.UNDERNAME_LEASE_FEE_PERCENTAGE = 0.001
 constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE = 0.005
-constants.PRIMARY_NAME_REQUEST_COST = 10000000 -- 10 IO
+constants.PRIMARY_NAME_REQUEST_COST = 10000000 -- 10 ARIO
 constants.gracePeriodMs = constants.defaultEpochDurationMs * 14 -- 14 epochs
 constants.maxLeaseLengthYears = 5
 constants.returnedNamePeriod = constants.defaultEpochDurationMs * 14 -- 14 epochs
@@ -63,7 +63,7 @@ constants.demandSettings = {
 }
 
 -- VAULTS
-constants.MIN_VAULT_SIZE = 100000000 -- 100 IO
+constants.MIN_VAULT_SIZE = 100000000 -- 100 ARIO
 constants.MAX_TOKEN_LOCK_TIME_MS = 12 * 365 * 24 * 60 * 60 * 1000 -- The maximum amount of blocks tokens can be locked in a vault (12 years of blocks)
 constants.MIN_TOKEN_LOCK_TIME_MS = 14 * 24 * 60 * 60 * 1000 -- The minimum amount of blocks tokens can be locked in a vault (14 days of blocks)
 
