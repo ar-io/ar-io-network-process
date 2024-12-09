@@ -2,10 +2,10 @@
 local process = { _version = "0.0.1" }
 local constants = require("constants")
 local token = require("token")
-local IOEvent = require("io_event")
+local ARIOEvent = require("ario_event")
 
-Name = Name or "Testnet IO"
-Ticker = Ticker or "tIO"
+Name = Name or "Testnet ARIO"
+Ticker = Ticker or "tARIO"
 Logo = Logo or "qUjrTmHdVjXX4D6rU6Fik02bUOzWkOR6oOqUg39g4-s"
 Denomination = 6
 DemandFactor = DemandFactor or {}
@@ -14,8 +14,8 @@ Protocol = Protocol or ao.env.Process.Id
 Balances = Balances or {}
 if not Balances[Protocol] then -- initialize the balance for the process id
 	Balances = {
-		[Protocol] = math.floor(50000000 * 1000000), -- 50M IO
-		[Owner] = math.floor(constants.totalTokenSupply - (50000000 * 1000000)), -- 950M IO
+		[Protocol] = math.floor(50000000 * 1000000), -- 50M ARIO
+		[Owner] = math.floor(constants.totalTokenSupply - (50000000 * 1000000)), -- 950M ARIO
 	}
 end
 Vaults = Vaults or {}
@@ -363,7 +363,7 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical)
 	critical = critical or false
 	Handlers.add(handlerName, pattern, function(msg)
 		-- add an IOEvent to the message if it doesn't exist
-		msg.ioEvent = msg.ioEvent or IOEvent(msg)
+		msg.ioEvent = msg.ioEvent or ARIOEvent(msg)
 		-- global handler for all eventing errors, so we can log them and send a notice to the sender for non critical errors and discard the memory on critical errors
 		local status, resultOrError = eventingPcall(msg.ioEvent, function(error)
 			--- non critical errors will send an invalid notice back to the caller with the error information, memory is not discarded
@@ -375,7 +375,7 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical)
 			})
 		end, handleFn, msg)
 		if not status and critical then
-			local errorEvent = IOEvent(msg)
+			local errorEvent = ARIOEvent(msg)
 			-- For critical handlers we want to make sure the event data gets sent to the CU for processing, but that the memory is discarded on failures
 			-- These handlers (distribute, prune) severely modify global state, and partial updates are dangerous.
 			-- So we json encode the error and the event data and then throw, so the CU will discard the memory and still process the event data.
@@ -626,7 +626,7 @@ addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionM
 	)
 	assert(
 		quantity and utils.isInteger(quantity) and quantity >= constants.MIN_VAULT_SIZE,
-		"Invalid quantity. Must be integer greater than or equal to " .. constants.MIN_VAULT_SIZE .. " mIO"
+		"Invalid quantity. Must be integer greater than or equal to " .. constants.MIN_VAULT_SIZE .. " mARIO"
 	)
 	assert(timestamp, "Timestamp is required for a tick interaction")
 	local vault = vaults.createVault(msg.From, quantity, lockLengthMs, timestamp, msgId)
@@ -666,7 +666,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 	)
 	assert(
 		quantity and utils.isInteger(quantity) and quantity >= constants.MIN_VAULT_SIZE,
-		"Invalid quantity. Must be integer greater than or equal to " .. constants.MIN_VAULT_SIZE .. " mIO"
+		"Invalid quantity. Must be integer greater than or equal to " .. constants.MIN_VAULT_SIZE .. " mARIO"
 	)
 	assert(timestamp, "Timestamp is required for a tick interaction")
 	assert(recipient ~= msg.From, "Cannot transfer to self")

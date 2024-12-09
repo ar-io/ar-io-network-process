@@ -113,7 +113,7 @@ describe('Vaults', async () => {
       );
       assert(
         errorTag.value.includes(
-          'Invalid quantity. Must be integer greater than or equal to 100000000 mIO',
+          'Invalid quantity. Must be integer greater than or equal to 100000000 mARIO',
         ),
       );
 
@@ -320,7 +320,7 @@ describe('Vaults', async () => {
       );
       assert(
         errorTag.value.includes(
-          'Invalid quantity. Must be integer greater than or equal to 100000000 mIO',
+          'Invalid quantity. Must be integer greater than or equal to 100000000 mARIO',
         ),
       );
     });
