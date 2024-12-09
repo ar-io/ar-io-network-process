@@ -89,7 +89,7 @@ describe('setup', () => {
   });
 
   describe('distribution totals', () => {
-    it('should always have correct eligible rewards for the current epoch (within 10 mIO)', async () => {
+    it('should always have correct eligible rewards for the current epoch (within 10 mARIO)', async () => {
       const { distributions: currentEpochDistributions } =
         await io.getCurrentEpoch();
 
@@ -129,11 +129,11 @@ describe('setup', () => {
   });
 
   describe('token supply', () => {
-    it('should always be 1 billion IO', async () => {
+    it('should always be 1 billion ARIO', async () => {
       const supplyData = await io.getTokenSupply();
       assert(
         supplyData.total === 1000000000 * 1000000,
-        `Total supply is not 1 billion IO: ${supplyData.total}`,
+        `Total supply is not 1 billion ARIO: ${supplyData.total}`,
       );
       assert(
         supplyData.protocolBalance > 0,
@@ -219,7 +219,7 @@ describe('setup', () => {
       assert(
         supplyData.total === computedTotal &&
           computedTotal === 1000000000 * 1000000,
-        `Computed total supply (${computedTotal}) is not equal to the sum of protocol balance, circulating, locked, staked, and delegated and withdrawn provided by the contract (${supplyData.total}) and does not match the expected total of 1 billion IO`,
+        `Computed total supply (${computedTotal}) is not equal to the sum of protocol balance, circulating, locked, staked, and delegated and withdrawn provided by the contract (${supplyData.total}) and does not match the expected total of 1 billion ARIO`,
       );
 
       const computedCirculating =
@@ -378,7 +378,7 @@ describe('setup', () => {
             );
             assert(
               gateway.operatorStake >= 10_000_000_000,
-              `Gateway ${gateway.gatewayAddress} has less than 10_000_000_000 IO staked`,
+              `Gateway ${gateway.gatewayAddress} has less than 10_000_000_000 ARIO staked`,
             );
             assert(
               gateway.stats.failedConsecutiveEpochs >= 0,

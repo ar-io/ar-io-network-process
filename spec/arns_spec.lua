@@ -689,13 +689,13 @@ describe("arns", function()
 
 		describe("calculateRegistrationFee [" .. addressType .. "]", function()
 			it("should return the correct fee for a lease", function()
-				local baseFee = 500000000 -- base fee is 500 IO
+				local baseFee = 500000000 -- base fee is 500 ARIO
 				local fee = arns.calculateRegistrationFee("lease", baseFee, 1, 1)
 				assert.are.equal(600000000, fee)
 			end)
 
 			it("should return the correct fee for registring a name permanently [" .. addressType .. "]", function()
-				local baseFee = 500000000 -- base fee is 500 IO
+				local baseFee = 500000000 -- base fee is 500 ARIO
 				local fee = arns.calculateRegistrationFee("permabuy", baseFee, 1, 1)
 				local expected = (baseFee * 0.2 * 20) + baseFee
 				assert.are.equal(expected, fee)

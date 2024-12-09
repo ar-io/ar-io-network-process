@@ -452,7 +452,7 @@ describe('GatewayRegistry', async () => {
           { name: 'Port', value: '80' },
           { name: 'Protocol', value: 'https' },
           { name: 'Allow-Delegated-Staking', value: 'false' },
-          { name: 'Min-Delegated-Stake', value: '1000000000' }, // 1K IO
+          { name: 'Min-Delegated-Stake', value: '1000000000' }, // 1K ARIO
           { name: 'Delegate-Reward-Share-Ratio', value: '10' },
           {
             name: 'Properties',
@@ -677,7 +677,7 @@ describe('GatewayRegistry', async () => {
         memory: sharedMemory,
       });
 
-      // add 10K IO to the operator stake
+      // add 10K ARIO to the operator stake
       const increaseQty = 10_000_000_000;
       const { memory: increaseStakeMemory } = await increaseOperatorStake({
         address: STUB_ADDRESS,

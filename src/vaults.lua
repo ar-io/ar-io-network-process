@@ -140,7 +140,7 @@ end
 --- @field vaultId string - the unique id of the vault
 --- @field startTimestamp number - the timestamp in ms of the vault started
 --- @field endTimestamp number - the ending timestamp of the vault
---- @field balance number - the number of mIO stored in the vault
+--- @field balance number - the number of mARIO stored in the vault
 
 --- Gets all paginated vaults
 --- @param cursor string|nil The address to start from

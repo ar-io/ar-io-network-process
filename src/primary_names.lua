@@ -80,6 +80,7 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 		intent = "Primary-Name-Request",
 		name = name,
 		currentTimestamp = timestamp,
+		record = record,
 	})
 
 	local fundingPlan = gar.getFundingPlan(initiator, requestCost.tokenCost, fundFrom)

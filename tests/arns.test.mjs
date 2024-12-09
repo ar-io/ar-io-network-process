@@ -510,7 +510,7 @@ describe('ArNS', async () => {
         buyRecordResult.Memory,
       );
       const tokenCost = JSON.parse(result.Messages[0].Data);
-      assert.equal(tokenCost, 200000000); // known cost for extending a 9 character name by 2 years (500 IO * 0.2 * 2)
+      assert.equal(tokenCost, 200000000); // known cost for extending a 9 character name by 2 years (500 ARIO * 0.2 * 2)
     });
 
     it('should get the cost of upgrading an existing leased record to permanently owned', async () => {
@@ -546,16 +546,46 @@ describe('ArNS', async () => {
     });
 
     it('should return the correct cost of creating a primary name request', async () => {
-      const result = await handle({
-        Tags: [
-          { name: 'Action', value: 'Token-Cost' },
-          { name: 'Intent', value: 'Primary-Name-Request' },
-          { name: 'Name', value: 'test-name' },
-        ],
+      const memory = await transfer({
+        quantity: 1000000000,
       });
+      const { memory: buyMemory } = await buyRecord({
+        from: STUB_ADDRESS,
+        memory,
+        name: 'test-name',
+        processId: ''.padEnd(43, 'a'),
+      });
+      const result = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Token-Cost' },
+            { name: 'Intent', value: 'Primary-Name-Request' },
+            { name: 'Name', value: 'test-name' },
+          ],
+          Timestamp: STUB_TIMESTAMP,
+        },
+
+        buyMemory,
+      );
       assertNoResultError(result);
       const tokenCost = JSON.parse(result.Messages[0].Data);
-      assert.equal(tokenCost, 10000000);
+      assert.equal(tokenCost, 500000);
+
+      // assert is same as 1 undername
+      const undernameResult = await handle(
+        {
+          Tags: [
+            { name: 'Action', value: 'Token-Cost' },
+            { name: 'Intent', value: 'Increase-Undername-Limit' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Quantity', value: '1' },
+          ],
+          Timestamp: STUB_TIMESTAMP,
+        },
+        buyMemory,
+      );
+      const undernameTokenCost = JSON.parse(undernameResult.Messages[0].Data);
+      assert.equal(undernameTokenCost, tokenCost);
     });
   });
 
@@ -646,7 +676,7 @@ describe('ArNS', async () => {
       );
       const recordBefore = JSON.parse(recordResultBefore.Messages[0].Data);
 
-      // Last 100,000,000 mIO will be paid from exit vault 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm'
+      // Last 100,000,000 mARIO will be paid from exit vault 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm'
       const extendResult = await handle(
         {
           From: STUB_ADDRESS,

@@ -11,7 +11,7 @@ LastKnownStakedSupply = LastKnownStakedSupply or 0 -- total operator stake acros
 LastKnownDelegatedSupply = LastKnownDelegatedSupply or 0 -- total delegated stake across all gateways
 LastKnownWithdrawSupply = LastKnownWithdrawSupply or 0 -- total withdraw supply across all gateways (gateways and delegates)
 
---- @return mIO # returns the last computed total supply, this is to avoid recomputing the total supply every time, and only when requested
+--- @return mARIO # returns the last computed total supply, this is to avoid recomputing the total supply every time, and only when requested
 function token.lastKnownTotalTokenSupply()
 	return LastKnownCirculatingSupply
 		+ LastKnownLockedSupply

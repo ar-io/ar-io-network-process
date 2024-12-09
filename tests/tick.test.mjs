@@ -421,7 +421,7 @@ describe('Tick', async () => {
     );
 
     // get the epoch timestamp and assert it is in 24 hours
-    const protocolBalanceAtStartOfEpoch = 50_000_000_0000; // 50M IO
+    const protocolBalanceAtStartOfEpoch = 50_000_000_0000; // 50M ARIO
     const totalEligibleRewards = protocolBalanceAtStartOfEpoch * 0.05; // 5% of the protocol balance
     const totalGatewayRewards = Math.ceil(totalEligibleRewards * 0.9); // 90% go to gateways
     const totalObserverRewards = Math.floor(totalEligibleRewards * 0.1); // 10% go to observers
