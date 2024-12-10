@@ -13,3 +13,4 @@ luacov-html
 dist
 luacov.stats.out
 coverage
+tools/fixtures/memory/*

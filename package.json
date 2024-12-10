@@ -12,6 +12,9 @@
     "monitor:devnet": "IO_PROCESS_ID=GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc node --test tests/monitor/monitor.test.mjs",
     "monitor:testnet": "IO_PROCESS_ID=agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA node --test tests/monitor/monitor.test.mjs",
     "evolve": "yarn build && node tools/evolve.mjs",
+    "update-memory-fixtures": "yarn update-testnet-memory && yarn update-devnet-memory",
+    "update-testnet-memory": "IO_NETWORK=\"testnet\" node tools/update-memory.mjs",
+    "update-devnet-memory": "IO_NETWORK=\"devnet\" node tools/update-memory.mjs",
     "prepare": "husky"
   },
   "devDependencies": {

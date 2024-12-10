@@ -45,6 +45,14 @@ export const AOS_WASM = fs.readFileSync(
   ),
 );
 
+export const TESTNET_MEMORY = fs.readFileSync(
+  path.join(__dirname, 'fixtures/memory/testnet'),
+);
+
+export const DEVNET_MEMORY = fs.readFileSync(
+  path.join(__dirname, 'fixtures/memory/devnet'),
+);
+
 export const BUNDLED_SOURCE_CODE = fs.readFileSync(
   path.join(__dirname, '../dist/aos-bundled.lua'),
   'utf-8',
