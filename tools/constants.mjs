@@ -62,18 +62,18 @@ export const DEFAULT_HANDLE_OPTIONS = {
   'Hash-Chain': STUB_HASH_CHAIN,
 };
 
-export const validGatewayTags = [
+export const validGatewayTags = ({ observerAddress = STUB_ADDRESS } = {}) => [
   { name: 'Action', value: 'Join-Network' },
   { name: 'Label', value: 'test-gateway' },
   { name: 'Note', value: 'test-note' },
   { name: 'FQDN', value: 'test-fqdn' },
-  { name: 'Operator-Stake', value: `${INITIAL_OPERATOR_STAKE}` }, // 10K ARIO
+  { name: 'Operator-Stake', value: `${INITIAL_OPERATOR_STAKE}` },
   { name: 'Port', value: '443' },
   { name: 'Protocol', value: 'https' },
   { name: 'Allow-Delegated-Staking', value: 'true' },
-  { name: 'Min-Delegated-Stake', value: `${INITIAL_DELEGATE_STAKE}` }, // 10 ARIO
+  { name: 'Min-Delegated-Stake', value: `${INITIAL_DELEGATE_STAKE}` },
   { name: 'Delegate-Reward-Share-Ratio', value: '25' }, // 25% go to the delegates
-  { name: 'Observer-Address', value: STUB_ADDRESS },
+  { name: 'Observer-Address', value: observerAddress },
   {
     name: 'Properties',
     value: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
