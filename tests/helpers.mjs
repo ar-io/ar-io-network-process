@@ -9,6 +9,7 @@ import {
   STUB_TIMESTAMP,
   STUB_MESSAGE_ID,
   validGatewayTags,
+  TESTNET_MEMORY,
 } from '../tools/constants.mjs';
 
 const initialOperatorStake = 100_000_000_000;
@@ -17,7 +18,7 @@ export const basePermabuyPrice = 2_500_000_000;
 export const baseLeasePrice = 600_000_000;
 
 const { handle: originalHandle, memory } = await createAosLoader();
-export const startMemory = memory;
+export const startMemory = TESTNET_MEMORY;
 
 export async function handle(options = {}, mem = startMemory) {
   return originalHandle(
