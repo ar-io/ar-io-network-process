@@ -359,6 +359,16 @@ local function assertValidFundFrom(fundFrom)
 	assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stake")
 end
 
+--- @param ioEvent table
+--- @param primaryNameRequestResult CreatePrimaryNameResult
+local function addPrimaryNameRequestData(ioEvent, primaryNameRequestResult)
+	ioEvent:addFieldsIfExist(primaryNameRequestResult, { "baseNameOwner", "newPrimaryName" })
+	ioEvent:addFieldsIfExist(primaryNameRequestResult.request, { "startTimestamp", "endTimestamp" })
+	addResultFundingPlanFields(ioEvent, primaryNameRequestResult)
+	ioEvent:addField("Total-Primary-Names", utils.lengthOfTable(primaryNames.getUnsafePrimaryNames()))
+	ioEvent:addField("Total-Primary-Name-Requests", utils.lengthOfTable(primaryNames.getUnsafePrimaryNameRequests()))
+end
+
 local function addEventingHandler(handlerName, pattern, handleFn, critical)
 	critical = critical or false
 	Handlers.add(handlerName, pattern, function(msg)
@@ -2357,6 +2367,7 @@ addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMa
 	local primaryNameResult = primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msg.Id, fundFrom)
 
 	adjustSuppliesForFundingPlan(primaryNameResult.fundingPlan)
+	addPrimaryNameRequestData(msg.ioEvent, primaryNameResult)
 
 	--- if the from is the new owner, then send an approved notice to the from
 	if primaryNameResult.newPrimaryName then
