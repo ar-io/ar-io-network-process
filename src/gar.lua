@@ -611,6 +611,10 @@ function gar.getSettings()
 	return utils.deepCopy(GatewayRegistrySettings)
 end
 
+function gar.getSettingsUnsafe()
+	return GatewayRegistrySettings
+end
+
 function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimestamp, messageId, instantWithdraw)
 	assert(type(qty) == "number", "Quantity is required and must be a number")
 	assert(qty > 0, "Quantity must be greater than 0")
@@ -878,6 +882,12 @@ function gar.updateGatewayStats(address, gateway, stats)
 
 	gateway.stats = stats
 	GatewayRegistry[address] = gateway
+
+	-- Schedule pruning if necessary
+	if stats.failedConsecutiveEpochs >= gar.getSettingsUnsafe().operators.failedEpochCountMax then
+		gar.scheduleNextGatewaysPruning(0)
+	end
+
 	return gateway
 end
 
