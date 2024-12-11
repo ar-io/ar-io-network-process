@@ -359,6 +359,17 @@ local function assertValidFundFrom(fundFrom)
 	assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stake")
 end
 
+--- @param ioEvent table
+--- @param primaryNameResult CreatePrimaryNameResult|PrimaryNameRequestApproval
+local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
+	ioEvent:addFieldsIfExist(primaryNameResult, { "baseNameOwner" })
+	ioEvent:addFieldsIfExist(primaryNameResult.newPrimaryName, { "owner", "startTimestamp" })
+	ioEvent:addFieldsWithPrefixIfExist(primaryNameResult.request, "Request-", { "startTimestamp", "endTimestamp" })
+	addResultFundingPlanFields(ioEvent, primaryNameResult)
+	ioEvent:addField("Total-Primary-Names", utils.lengthOfTable(primaryNames.getUnsafePrimaryNames()))
+	ioEvent:addField("Total-Primary-Name-Requests", utils.lengthOfTable(primaryNames.getUnsafePrimaryNameRequests()))
+end
+
 local function addEventingHandler(handlerName, pattern, handleFn, critical)
 	critical = critical or false
 	Handlers.add(handlerName, pattern, function(msg)
@@ -528,7 +539,7 @@ end, function(msg)
 
 		local prunedPrimaryNameRequests = prunedStateResult.prunedPrimaryNameRequests or {}
 		local prunedRequestsCount = utils.lengthOfTable(prunedPrimaryNameRequests)
-		if prunedRequestsCount then
+		if prunedRequestsCount > 0 then
 			msg.ioEvent:addField("Pruned-Requests-Count", prunedRequestsCount)
 		end
 
@@ -2357,6 +2368,7 @@ addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMa
 	local primaryNameResult = primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msg.Id, fundFrom)
 
 	adjustSuppliesForFundingPlan(primaryNameResult.fundingPlan)
+	addPrimaryNameRequestData(msg.ioEvent, primaryNameResult)
 
 	--- if the from is the new owner, then send an approved notice to the from
 	if primaryNameResult.newPrimaryName then
@@ -2396,6 +2408,7 @@ addEventingHandler(
 		assert(timestamp, "Timestamp is required")
 
 		local approvedPrimaryNameResult = primaryNames.approvePrimaryNameRequest(recipient, name, msg.From, timestamp)
+		addPrimaryNameRequestData(msg.ioEvent, approvedPrimaryNameResult)
 
 		--- send a notice to the from
 		Send(msg, {

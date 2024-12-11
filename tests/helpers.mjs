@@ -61,6 +61,22 @@ export function assertNoResultError(result) {
   assert.strictEqual(errorTag, undefined);
 }
 
+export function parseEventsFromResult(result) {
+  return (
+    result?.Output?.data
+      ?.split('\n')
+      ?.filter((line) => line.trim().startsWith('{"'))
+      ?.map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch (e) {
+          return {};
+        }
+      })
+      ?.filter((event) => Object.keys(event).length && event['_e']) || []
+  );
+}
+
 export const getBalances = async ({ memory, timestamp = STUB_TIMESTAMP }) => {
   const result = await handle({
     options: {
