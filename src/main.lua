@@ -359,6 +359,22 @@ local function assertValidFundFrom(fundFrom)
 	assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stake")
 end
 
+--- @param ioEvent table
+local function addPrimaryNameCounts(ioEvent)
+	ioEvent:addField("Total-Primary-Names", utils.lengthOfTable(primaryNames.getUnsafePrimaryNames()))
+	ioEvent:addField("Total-Primary-Name-Requests", utils.lengthOfTable(primaryNames.getUnsafePrimaryNameRequests()))
+end
+
+--- @param ioEvent table
+--- @param primaryNameResult CreatePrimaryNameResult|PrimaryNameRequestApproval
+local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
+	ioEvent:addFieldsIfExist(primaryNameResult, { "baseNameOwner" })
+	ioEvent:addFieldsIfExist(primaryNameResult.newPrimaryName, { "owner", "startTimestamp" })
+	ioEvent:addFieldsWithPrefixIfExist(primaryNameResult.request, "Request-", { "startTimestamp", "endTimestamp" })
+	addResultFundingPlanFields(ioEvent, primaryNameResult)
+	addPrimaryNameCounts(ioEvent)
+end
+
 local function addEventingHandler(handlerName, pattern, handleFn, critical)
 	critical = critical or false
 	Handlers.add(handlerName, pattern, function(msg)
@@ -528,7 +544,7 @@ end, function(msg)
 
 		local prunedPrimaryNameRequests = prunedStateResult.prunedPrimaryNameRequests or {}
 		local prunedRequestsCount = utils.lengthOfTable(prunedPrimaryNameRequests)
-		if prunedRequestsCount then
+		if prunedRequestsCount > 0 then
 			msg.ioEvent:addField("Pruned-Requests-Count", prunedRequestsCount)
 		end
 
@@ -2325,6 +2341,23 @@ addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap
 	assert(msg.From, "From is required")
 
 	local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNames(names, msg.From)
+	local removedPrimaryNamesCount = utils.lengthOfTable(removedPrimaryNamesAndOwners)
+	msg.ioEvent:addField("Num-Removed-Primary-Names", removedPrimaryNamesCount)
+	if removedPrimaryNamesCount > 0 then
+		msg.ioEvent:addField(
+			"Removed-Primary-Names",
+			utils.map(removedPrimaryNamesAndOwners, function(_, v)
+				return v.name
+			end)
+		)
+		msg.ioEvent:addField(
+			"Removed-Primary-Name-Owners",
+			utils.map(removedPrimaryNamesAndOwners, function(_, v)
+				return v.owner
+			end)
+		)
+	end
+	addPrimaryNameCounts(msg.ioEvent)
 
 	Send(msg, {
 		Target = msg.From,
@@ -2357,6 +2390,7 @@ addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMa
 	local primaryNameResult = primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msg.Id, fundFrom)
 
 	adjustSuppliesForFundingPlan(primaryNameResult.fundingPlan)
+	addPrimaryNameRequestData(msg.ioEvent, primaryNameResult)
 
 	--- if the from is the new owner, then send an approved notice to the from
 	if primaryNameResult.newPrimaryName then
@@ -2396,6 +2430,7 @@ addEventingHandler(
 		assert(timestamp, "Timestamp is required")
 
 		local approvedPrimaryNameResult = primaryNames.approvePrimaryNameRequest(recipient, name, msg.From, timestamp)
+		addPrimaryNameRequestData(msg.ioEvent, approvedPrimaryNameResult)
 
 		--- send a notice to the from
 		Send(msg, {
