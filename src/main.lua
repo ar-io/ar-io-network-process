@@ -360,12 +360,12 @@ local function assertValidFundFrom(fundFrom)
 end
 
 --- @param ioEvent table
---- @param primaryNameRequestResult CreatePrimaryNameResult
-local function addPrimaryNameRequestData(ioEvent, primaryNameRequestResult)
-	ioEvent:addFieldsIfExist(primaryNameRequestResult, { "baseNameOwner" })
-	ioEvent:addFieldsIfExist(primaryNameRequestResult.newPrimaryName, { "owner" })
-	ioEvent:addFieldsIfExist(primaryNameRequestResult.request, { "startTimestamp", "endTimestamp" })
-	addResultFundingPlanFields(ioEvent, primaryNameRequestResult)
+--- @param primaryNameResult CreatePrimaryNameResult|PrimaryNameRequestApproval
+local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
+	ioEvent:addFieldsIfExist(primaryNameResult, { "baseNameOwner" })
+	ioEvent:addFieldsIfExist(primaryNameResult.newPrimaryName, { "owner", "startTimestamp" })
+	ioEvent:addFieldsWithPrefixIfExist(primaryNameResult.request, "Request-", { "startTimestamp", "endTimestamp" })
+	addResultFundingPlanFields(ioEvent, primaryNameResult)
 	ioEvent:addField("Total-Primary-Names", utils.lengthOfTable(primaryNames.getUnsafePrimaryNames()))
 	ioEvent:addField("Total-Primary-Name-Requests", utils.lengthOfTable(primaryNames.getUnsafePrimaryNameRequests()))
 end
@@ -2408,6 +2408,7 @@ addEventingHandler(
 		assert(timestamp, "Timestamp is required")
 
 		local approvedPrimaryNameResult = primaryNames.approvePrimaryNameRequest(recipient, name, msg.From, timestamp)
+		addPrimaryNameRequestData(msg.ioEvent, approvedPrimaryNameResult)
 
 		--- send a notice to the from
 		Send(msg, {
