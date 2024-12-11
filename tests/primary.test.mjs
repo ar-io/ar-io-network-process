@@ -468,6 +468,27 @@ describe('primary names', function () {
       owner: recipient,
       name: 'test-name',
     });
+    const removePrimaryNameEvents = parseEventsFromResult(
+      removePrimaryNameResult,
+    );
+    assert.equal(removePrimaryNameEvents.length, 1);
+    assert.deepStrictEqual(removePrimaryNameEvents[0], {
+      _e: 1,
+      Action: 'Remove-Primary-Names',
+      Cast: false,
+      Cron: false,
+      'Epoch-Index': -19657,
+      From: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'From-Formatted': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'Message-Id': 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
+      Names: 'test-name',
+      'Num-Removed-Primary-Names': 1,
+      'Removed-Primary-Names': ['test-name'],
+      'Removed-Primary-Name-Owners': [recipient],
+      Timestamp: 21600000,
+      'Total-Primary-Name-Requests': 0,
+      'Total-Primary-Names': 0,
+    });
     // assert the primary name is no longer set
     const { result: primaryNameForAddressResult } =
       await getPrimaryNameForAddress({

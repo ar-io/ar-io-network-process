@@ -360,14 +360,19 @@ local function assertValidFundFrom(fundFrom)
 end
 
 --- @param ioEvent table
+local function addPrimaryNameCounts(ioEvent)
+	ioEvent:addField("Total-Primary-Names", utils.lengthOfTable(primaryNames.getUnsafePrimaryNames()))
+	ioEvent:addField("Total-Primary-Name-Requests", utils.lengthOfTable(primaryNames.getUnsafePrimaryNameRequests()))
+end
+
+--- @param ioEvent table
 --- @param primaryNameResult CreatePrimaryNameResult|PrimaryNameRequestApproval
 local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
 	ioEvent:addFieldsIfExist(primaryNameResult, { "baseNameOwner" })
 	ioEvent:addFieldsIfExist(primaryNameResult.newPrimaryName, { "owner", "startTimestamp" })
 	ioEvent:addFieldsWithPrefixIfExist(primaryNameResult.request, "Request-", { "startTimestamp", "endTimestamp" })
 	addResultFundingPlanFields(ioEvent, primaryNameResult)
-	ioEvent:addField("Total-Primary-Names", utils.lengthOfTable(primaryNames.getUnsafePrimaryNames()))
-	ioEvent:addField("Total-Primary-Name-Requests", utils.lengthOfTable(primaryNames.getUnsafePrimaryNameRequests()))
+	addPrimaryNameCounts(ioEvent)
 end
 
 local function addEventingHandler(handlerName, pattern, handleFn, critical)
@@ -2336,6 +2341,23 @@ addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap
 	assert(msg.From, "From is required")
 
 	local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNames(names, msg.From)
+	local removedPrimaryNamesCount = utils.lengthOfTable(removedPrimaryNamesAndOwners)
+	msg.ioEvent:addField("Num-Removed-Primary-Names", removedPrimaryNamesCount)
+	if removedPrimaryNamesCount > 0 then
+		msg.ioEvent:addField(
+			"Removed-Primary-Names",
+			utils.map(removedPrimaryNamesAndOwners, function(_, v)
+				return v.name
+			end)
+		)
+		msg.ioEvent:addField(
+			"Removed-Primary-Name-Owners",
+			utils.map(removedPrimaryNamesAndOwners, function(_, v)
+				return v.owner
+			end)
+		)
+	end
+	addPrimaryNameCounts(msg.ioEvent)
 
 	Send(msg, {
 		Target = msg.From,
