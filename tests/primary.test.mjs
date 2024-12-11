@@ -1,6 +1,7 @@
 import {
   assertNoResultError,
   handle,
+  parseEventsFromResult,
   setUpStake,
   transfer,
 } from './helpers.mjs';
@@ -189,6 +190,29 @@ describe('primary names', function () {
       fundFrom: 'stakes',
     });
 
+    const parsedEvents = parseEventsFromResult(requestPrimaryNameResult);
+    assert.equal(parsedEvents.length, 1);
+    assert.deepStrictEqual(parsedEvents[0], {
+      _e: 1,
+      Action: 'Request-Primary-Name',
+      'Base-Name-Owner': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      Cast: false,
+      Cron: false,
+      'End-Timestamp': 1839367890,
+      'Epoch-Index': -5618,
+      'FP-Balance': 0,
+      'FP-Stakes-Amount': 50000000,
+      From: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      'From-Formatted': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      'Fund-From': 'stakes',
+      'Message-Id': 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
+      Name: 'test-name',
+      'Start-Timestamp': 1234567890,
+      Timestamp: 1234567890,
+      'Total-Primary-Name-Requests': 1,
+      'Total-Primary-Names': 0,
+    });
+
     const { result: getPrimaryNameRequestResult } = await getPrimaryNameRequest(
       {
         initiator: recipient,
@@ -283,6 +307,27 @@ describe('primary names', function () {
     });
 
     assertNoResultError(requestPrimaryNameResult);
+    const parsedEvents = parseEventsFromResult(requestPrimaryNameResult);
+    assert.equal(parsedEvents.length, 1);
+    assert.deepStrictEqual(parsedEvents[0], {
+      _e: 1,
+      Action: 'Request-Primary-Name',
+      'Base-Name-Owner': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      Cast: false,
+      Cron: false,
+      'End-Timestamp': 1839367899,
+      'Epoch-Index': -5618,
+      'FP-Balance': 50000000,
+      From: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'From-Formatted': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'Message-Id': 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
+      Name: 'test-name',
+      Owner: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'Start-Timestamp': 1234567899,
+      Timestamp: 1234567899,
+      'Total-Primary-Name-Requests': 0,
+      'Total-Primary-Names': 1,
+    });
 
     // there should be only one message with the Approve-Primary-Name-Request-Notice action
     assert.equal(requestPrimaryNameResult.Messages.length, 1);
