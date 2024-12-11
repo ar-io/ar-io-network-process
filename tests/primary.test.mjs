@@ -206,7 +206,7 @@ describe('primary names', function () {
       'Base-Name-Owner': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       Cast: false,
       Cron: false,
-      'End-Timestamp': 1839367890,
+      'Request-End-Timestamp': 1839367890,
       'Epoch-Index': -5618,
       'FP-Balance': 0,
       'FP-Stakes-Amount': 50000000,
@@ -215,7 +215,7 @@ describe('primary names', function () {
       'Fund-From': 'stakes',
       'Message-Id': 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
       Name: 'test-name',
-      'Start-Timestamp': 1234567890,
+      'Request-Start-Timestamp': 1234567890,
       Timestamp: 1234567890,
       'Total-Primary-Name-Requests': 1,
       'Total-Primary-Names': 0,
@@ -249,6 +249,29 @@ describe('primary names', function () {
       });
 
     assertNoResultError(approvePrimaryNameRequestResult);
+    const parsedApproveEvents = parseEventsFromResult(
+      approvePrimaryNameRequestResult,
+    );
+    assert.equal(parsedApproveEvents.length, 1);
+    assert.deepStrictEqual(parsedApproveEvents[0], {
+      _e: 1,
+      Action: 'Approve-Primary-Name-Request',
+      Cast: false,
+      Cron: false,
+      'Epoch-Index': -5618,
+      From: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'From-Formatted': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'Message-Id': 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
+      Name: 'test-name',
+      Owner: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      Recipient: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      'Request-End-Timestamp': 1839367890,
+      'Request-Start-Timestamp': 1234567890,
+      'Start-Timestamp': 1234567899,
+      Timestamp: 1234567899,
+      'Total-Primary-Names': 1,
+      'Total-Primary-Name-Requests': 0,
+    });
 
     // there should be two messages, one to the ant and one to the owner
     assert.equal(approvePrimaryNameRequestResult.Messages.length, 2);
@@ -323,7 +346,7 @@ describe('primary names', function () {
       'Base-Name-Owner': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       Cast: false,
       Cron: false,
-      'End-Timestamp': 1839367899,
+      'Request-End-Timestamp': 1839367899,
       'Epoch-Index': -5618,
       'FP-Balance': 50000000,
       From: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -331,6 +354,7 @@ describe('primary names', function () {
       'Message-Id': 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
       Name: 'test-name',
       Owner: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'Request-Start-Timestamp': 1234567899,
       'Start-Timestamp': 1234567899,
       Timestamp: 1234567899,
       'Total-Primary-Name-Requests': 0,
