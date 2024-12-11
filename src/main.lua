@@ -362,7 +362,8 @@ end
 --- @param ioEvent table
 --- @param primaryNameRequestResult CreatePrimaryNameResult
 local function addPrimaryNameRequestData(ioEvent, primaryNameRequestResult)
-	ioEvent:addFieldsIfExist(primaryNameRequestResult, { "baseNameOwner", "newPrimaryName" })
+	ioEvent:addFieldsIfExist(primaryNameRequestResult, { "baseNameOwner" })
+	ioEvent:addFieldsIfExist(primaryNameRequestResult.newPrimaryName, { "owner" })
 	ioEvent:addFieldsIfExist(primaryNameRequestResult.request, { "startTimestamp", "endTimestamp" })
 	addResultFundingPlanFields(ioEvent, primaryNameRequestResult)
 	ioEvent:addField("Total-Primary-Names", utils.lengthOfTable(primaryNames.getUnsafePrimaryNames()))
@@ -538,7 +539,7 @@ end, function(msg)
 
 		local prunedPrimaryNameRequests = prunedStateResult.prunedPrimaryNameRequests or {}
 		local prunedRequestsCount = utils.lengthOfTable(prunedPrimaryNameRequests)
-		if prunedRequestsCount then
+		if prunedRequestsCount > 0 then
 			msg.ioEvent:addField("Pruned-Requests-Count", prunedRequestsCount)
 		end
 
