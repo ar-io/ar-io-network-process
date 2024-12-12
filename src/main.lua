@@ -2389,7 +2389,6 @@ addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMa
 
 	local primaryNameResult = primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msg.Id, fundFrom)
 
-	adjustSuppliesForFundingPlan(primaryNameResult.fundingPlan)
 	addPrimaryNameRequestData(msg.ioEvent, primaryNameResult)
 
 	--- if the from is the new owner, then send an approved notice to the from
