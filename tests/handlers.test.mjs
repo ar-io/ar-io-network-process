@@ -1,4 +1,4 @@
-import { createAosLoader } from './utils.mjs';
+import { handle } from './helpers.mjs';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import {
@@ -7,28 +7,16 @@ import {
 } from '../tools/constants.mjs';
 
 describe('handlers', async () => {
-  const { handle: originalHandle, memory: startMemory } =
-    await createAosLoader();
-
-  async function handle(options = {}, mem = startMemory) {
-    return originalHandle(
-      mem,
-      {
-        ...DEFAULT_HANDLE_OPTIONS,
-        ...options,
-      },
-      AO_LOADER_HANDLER_ENV,
-    );
-  }
-
   it('should maintain order of handlers, with _eval and _default first, followed by prune', async () => {
     const handlers = await handle({
-      Tags: [
-        {
-          name: 'Action',
-          value: 'Info',
-        },
-      ],
+      options: {
+        Tags: [
+          {
+            name: 'Action',
+            value: 'Info',
+          },
+        ],
+      },
     });
     const { Handlers: handlersList } = JSON.parse(handlers.Messages[0].Data);
     assert.ok(handlersList.includes('_eval'));
@@ -55,12 +43,14 @@ describe('handlers', async () => {
     describe('Total-Supply', () => {
       it('should compute the total supply and return just the total supply', async () => {
         const tokenSupplyResult = await handle({
-          Tags: [
-            {
-              name: 'Action',
-              value: 'Total-Supply',
-            },
-          ],
+          options: {
+            Tags: [
+              {
+                name: 'Action',
+                value: 'Total-Supply',
+              },
+            ],
+          },
         });
         const tokenSupplyData = JSON.parse(
           tokenSupplyResult.Messages?.[0]?.Data,
@@ -72,12 +62,14 @@ describe('handlers', async () => {
     describe('Total-Token-Supply', () => {
       it('should compute the total supply and be equal to 1B ARIO, and return all the supply data', async () => {
         const supplyResult = await handle({
-          Tags: [
-            {
-              name: 'Action',
-              value: 'Total-Token-Supply',
-            },
-          ],
+          options: {
+            Tags: [
+              {
+                name: 'Action',
+                value: 'Total-Token-Supply',
+              },
+            ],
+          },
         });
 
         // assert no errors
