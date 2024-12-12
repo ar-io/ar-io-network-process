@@ -870,12 +870,14 @@ function assertTokenCostTags(msg)
 	assert(msg.Tags.Name, "Name is required")
 	-- if years is provided, assert it is a number and integer between 1 and 5
 	if msg.Tags.Years then
-		assert(utils.isInteger(msg.Tags.Years), "Invalid years. Must be integer between 1 and 5")
+		assert(utils.isInteger(msg.Tags.Years), "Invalid years. Must be integer")
+		assert(msg.Tags.Years > 0 and msg.Tags.Years < 6, "Invalid years. Must be between 1 and 5")
 	end
 
 	-- if quantity provided must be a number and integer greater than 0
 	if msg.Tags.Quantity then
-		assert(utils.isInteger(msg.Tags.Quantity), "Invalid quantity. Must be integer greater than 0")
+		assert(utils.isInteger(msg.Tags.Quantity), "Invalid quantity. Must be integer")
+		assert(msg.Tags.Quantity > 0, "Invalid quantity. Must be greater than 0")
 	end
 end
 
