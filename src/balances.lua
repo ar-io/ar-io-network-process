@@ -16,6 +16,7 @@ function balances.transfer(recipient, from, qty)
 	assert(type(recipient) == "string", "Recipient is required!")
 	assert(type(from) == "string", "From is required!")
 	assert(type(qty) == "number", "Quantity is required and must be a number!")
+	assert(recipient ~= from, "Cannot transfer to self")
 	assert(utils.isInteger(qty), "Quantity must be an integer: " .. qty)
 	assert(qty > 0, "Quantity must be greater than 0")
 
