@@ -1,61 +1,38 @@
-import { createAosLoader, assertNoResultError } from './utils.mjs';
+import { assertNoResultError } from './utils.mjs';
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
 import {
   DEFAULT_HANDLE_OPTIONS,
-  AO_LOADER_HANDLER_ENV,
   PROCESS_OWNER,
+  STUB_TIMESTAMP,
 } from '../tools/constants.mjs';
-import { getVaults } from './helpers.mjs';
+import {
+  getVaults,
+  handle,
+  startMemory,
+  createVault,
+  createVaultedTransfer,
+} from './helpers.mjs';
 
 describe('Vaults', async () => {
-  const { handle: originalHandle, memory: startMemory } =
-    await createAosLoader();
-
-  async function handle(options = {}, mem = startMemory) {
-    return originalHandle(
-      mem,
-      {
-        ...DEFAULT_HANDLE_OPTIONS,
-        ...options,
-      },
-
-      AO_LOADER_HANDLER_ENV,
-    );
-  }
-
-  const createVault = async ({
-    memory,
-    quantity,
-    lockLengthMs,
-    from = PROCESS_OWNER,
-    messageId,
-  }) => {
-    const createVaultResult = await handle(
-      {
-        Id: messageId,
-        From: from,
-        Owner: from,
+  const assertVaultExists = async ({ vaultId, address, memory }) => {
+    const vault = await handle({
+      options: {
         Tags: [
-          {
-            name: 'Action',
-            value: 'Create-Vault',
-          },
-          {
-            name: 'Quantity',
-            value: quantity.toString(),
-          },
-          {
-            name: 'Lock-Length',
-            value: lockLengthMs.toString(),
-          },
+          { name: 'Action', value: 'Vault' },
+          { name: 'Vault-Id', value: vaultId },
+          { name: 'Address', value: address },
         ],
       },
       memory,
+    });
+    assertNoResultError(vault);
+    // make sure it is a vault
+    assert.strictEqual(
+      vault.Messages[0].Tags.find((tag) => tag.name === 'Vault-Id').value,
+      vaultId,
     );
-
-    assertNoResultError(createVaultResult);
-    return { result: createVaultResult, memory: createVaultResult.Memory };
+    return JSON.parse(vault.Messages[0].Data);
   };
 
   describe('createVault', () => {
@@ -63,24 +40,15 @@ describe('Vaults', async () => {
       const lockLengthMs = 1209600000;
       const quantity = 1000000000;
       const balanceBefore = await handle({
-        Tags: [{ name: 'Action', value: 'Balance' }],
+        options: {
+          Tags: [{ name: 'Action', value: 'Balance' }],
+        },
       });
       const balanceBeforeData = JSON.parse(balanceBefore.Messages[0].Data);
-      const createVaultResult = await handle({
-        Tags: [
-          {
-            name: 'Action',
-            value: 'Create-Vault',
-          },
-          {
-            name: 'Quantity',
-            value: quantity.toString(),
-          },
-          {
-            name: 'Lock-Length',
-            value: lockLengthMs.toString(), // the minimum lock length is 14 days
-          },
-        ],
+      const { result: createVaultResult } = await createVault({
+        quantity,
+        lockLengthMs,
+        from: PROCESS_OWNER,
       });
       // parse the data and ensure the vault was created
       const createVaultResultData = JSON.parse(
@@ -93,34 +61,22 @@ describe('Vaults', async () => {
       assert.deepEqual(vaultId, DEFAULT_HANDLE_OPTIONS.Id);
 
       // assert the balance is deducted
-      const balanceAfterVault = await handle(
-        {
+      const balanceAfterVault = await handle({
+        options: {
           Tags: [{ name: 'Action', value: 'Balance' }],
         },
-        createVaultResult.Memory,
-      );
+        memory: createVaultResult.Memory,
+      });
       const balanceAfterVaultData = JSON.parse(
         balanceAfterVault.Messages[0].Data,
       );
       assert.deepEqual(balanceAfterVaultData, balanceBeforeData - quantity);
 
-      // check that vault exists
-      const vault = await handle(
-        {
-          Tags: [
-            {
-              name: 'Action',
-              value: 'Vault',
-            },
-            {
-              name: 'Vault-Id',
-              value: vaultId,
-            },
-          ],
-        },
-        createVaultResult.Memory,
-      );
-      const vaultData = JSON.parse(vault.Messages[0].Data);
+      const vaultData = await assertVaultExists({
+        vaultId,
+        address: PROCESS_OWNER,
+        memory: createVaultResult.Memory,
+      });
       assert.deepEqual(
         createVaultResultData.balance,
         vaultData.balance,
@@ -141,24 +97,15 @@ describe('Vaults', async () => {
       const lockLengthMs = 1209600000;
       const quantity = 99999999;
       const balanceBefore = await handle({
-        Tags: [{ name: 'Action', value: 'Balance' }],
+        options: {
+          Tags: [{ name: 'Action', value: 'Balance' }],
+        },
       });
       const balanceBeforeData = JSON.parse(balanceBefore.Messages[0].Data);
-      const createVaultResult = await handle({
-        Tags: [
-          {
-            name: 'Action',
-            value: 'Create-Vault',
-          },
-          {
-            name: 'Quantity',
-            value: quantity.toString(),
-          },
-          {
-            name: 'Lock-Length',
-            value: lockLengthMs.toString(), // the minimum lock length is 14 days
-          },
-        ],
+      const { result: createVaultResult } = await createVault({
+        quantity,
+        lockLengthMs,
+        shouldAssertNoResultError: false,
       });
 
       const actionTag = createVaultResult.Messages?.[0]?.Tags?.find(
@@ -170,17 +117,17 @@ describe('Vaults', async () => {
       );
       assert(
         errorTag.value.includes(
-          'Invalid quantity. Must be integer greater than or equal to 100000000 mIO',
+          'Invalid quantity. Must be integer greater than or equal to 100000000 mARIO',
         ),
       );
 
       // assert the balance is deducted
-      const balanceAfterVault = await handle(
-        {
+      const balanceAfterVault = await handle({
+        options: {
           Tags: [{ name: 'Action', value: 'Balance' }],
         },
-        createVaultResult.Memory,
-      );
+        memory: createVaultResult.Memory,
+      });
       const balanceAfterVaultData = JSON.parse(
         balanceAfterVault.Messages[0].Data,
       );
@@ -193,21 +140,9 @@ describe('Vaults', async () => {
       const lockLengthMs = 1209600000;
       const quantity = 1000000000;
 
-      const createVaultResult = await handle({
-        Tags: [
-          {
-            name: 'Action',
-            value: 'Create-Vault',
-          },
-          {
-            name: 'Quantity',
-            value: quantity.toString(),
-          },
-          {
-            name: 'Lock-Length',
-            value: lockLengthMs.toString(),
-          },
-        ],
+      const { result: createVaultResult } = await createVault({
+        quantity,
+        lockLengthMs,
       });
 
       // ensure no error
@@ -223,8 +158,8 @@ describe('Vaults', async () => {
         (tag) => tag.name === 'Vault-Id',
       ).value;
 
-      const extendVaultResult = await handle(
-        {
+      const extendVaultResult = await handle({
+        options: {
           Tags: [
             {
               name: 'Action',
@@ -240,14 +175,11 @@ describe('Vaults', async () => {
             },
           ],
         },
-        createVaultResult.Memory,
-      );
+        memory: createVaultResult.Memory,
+      });
 
       // ensure no error
-      const extendVaultErrorTag = extendVaultResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
-      assert.deepEqual(extendVaultErrorTag, undefined);
+      assertNoResultError(extendVaultResult);
 
       const extendVaultResultData = JSON.parse(
         extendVaultResult.Messages[0].Data,
@@ -264,21 +196,9 @@ describe('Vaults', async () => {
     it('should increase a vault balance', async () => {
       const quantity = 1000000000;
       const lockLengthMs = 1209600000;
-      const createVaultResult = await handle({
-        Tags: [
-          {
-            name: 'Action',
-            value: 'Create-Vault',
-          },
-          {
-            name: 'Quantity',
-            value: quantity.toString(),
-          },
-          {
-            name: 'Lock-Length',
-            value: lockLengthMs.toString(),
-          },
-        ],
+      const { result: createVaultResult } = await createVault({
+        quantity,
+        lockLengthMs,
       });
 
       // ensure no error
@@ -295,8 +215,8 @@ describe('Vaults', async () => {
         (tag) => tag.name === 'Vault-Id',
       ).value;
 
-      const increaseVaultBalanceResult = await handle(
-        {
+      const increaseVaultBalanceResult = await handle({
+        options: {
           Tags: [
             {
               name: 'Action',
@@ -312,8 +232,8 @@ describe('Vaults', async () => {
             },
           ],
         },
-        createVaultResult.Memory,
-      );
+        memory: createVaultResult.Memory,
+      });
 
       // ensure no error
       const increaseVaultBalanceErrorTag =
@@ -333,36 +253,16 @@ describe('Vaults', async () => {
   });
 
   describe('vaultedTransfer', () => {
-    it('should create a vault for the recipient', async () => {
+    it('should create a vault for the recipient with a valid address', async () => {
       const quantity = 1000000000;
       const lockLengthMs = 1209600000;
       const recipient = '0x0000000000000000000000000000000000000000';
-      const createVaultedTransferResult = await handle({
-        Tags: [
-          {
-            name: 'Action',
-            value: 'Vaulted-Transfer',
-          },
-          {
-            name: 'Quantity',
-            value: quantity.toString(),
-          },
-          {
-            name: 'Lock-Length',
-            value: lockLengthMs.toString(),
-          },
-          {
-            name: 'Recipient',
-            value: recipient,
-          },
-        ],
-      });
-
-      // ensure no error
-      const errorTag = createVaultedTransferResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
-      assert.deepEqual(errorTag, undefined);
+      const { result: createVaultedTransferResult } =
+        await createVaultedTransfer({
+          quantity,
+          lockLengthMs,
+          recipient,
+        });
 
       // it should create two messages, one for sender and other for recipient
       assert.deepEqual(createVaultedTransferResult.Messages.length, 2);
@@ -393,39 +293,17 @@ describe('Vaults', async () => {
       // ensure vault id is defined
       assert.ok(vaultId);
 
-      const vault = await handle(
-        {
-          Tags: [
-            {
-              name: 'Action',
-              value: 'Vault',
-            },
-            {
-              name: 'Vault-Id',
-              value: vaultId,
-            },
-            {
-              name: 'Address',
-              value: recipient,
-            },
-          ],
-        },
-        createVaultedTransferResult.Memory,
-      );
+      const createdVaultData = await assertVaultExists({
+        vaultId,
+        address: recipient,
+        memory: createVaultedTransferResult.Memory,
+      });
 
-      const createdVaultData = JSON.parse(
-        createVaultedTransferResult.Messages[0].Data,
-      );
-
-      const vaultData = JSON.parse(vault.Messages[0].Data);
-      assert.deepEqual(vaultData.balance, quantity);
+      assert.deepEqual(createdVaultData.balance, quantity);
+      assert.deepEqual(createdVaultData.startTimestamp, STUB_TIMESTAMP);
       assert.deepEqual(
-        vaultData.startTimestamp,
-        createdVaultData.startTimestamp,
-      );
-      assert.deepEqual(
-        vaultData.endTimestamp,
-        createdVaultData.startTimestamp + lockLengthMs,
+        createdVaultData.endTimestamp,
+        STUB_TIMESTAMP + lockLengthMs,
       );
     });
 
@@ -433,34 +311,67 @@ describe('Vaults', async () => {
       const quantity = 99999999;
       const lockLengthMs = 1209600000;
       const recipient = '0x0000000000000000000000000000000000000000';
-      const createVaultedTransferResult = await handle({
-        Tags: [
-          {
-            name: 'Action',
-            value: 'Vaulted-Transfer',
-          },
-          {
-            name: 'Quantity',
-            value: quantity.toString(),
-          },
-          {
-            name: 'Lock-Length',
-            value: lockLengthMs.toString(),
-          },
-          {
-            name: 'Recipient',
-            value: recipient,
-          },
-        ],
-      });
+      const { result: createVaultedTransferResult } =
+        await createVaultedTransfer({
+          quantity,
+          lockLengthMs,
+          recipient,
+          shouldAssertNoResultError: false,
+        });
 
       const errorTag = createVaultedTransferResult.Messages?.[0]?.Tags?.find(
         (tag) => tag.name === 'Error',
       );
       assert(
         errorTag.value.includes(
-          'Invalid quantity. Must be integer greater than or equal to 100000000 mIO',
+          'Invalid quantity. Must be integer greater than or equal to 100000000 mARIO',
         ),
+      );
+    });
+
+    it('should fail if the recipient address is invalid and Allow-Unsafe-Addresses is not provided', async () => {
+      const quantity = 1000000000;
+      const lockLengthMs = 1209600000;
+      const recipient = 'invalid-address';
+      const { result: createVaultedTransferResult } =
+        await createVaultedTransfer({
+          quantity,
+          lockLengthMs,
+          recipient,
+          shouldAssertNoResultError: false,
+        });
+
+      const errorTag = createVaultedTransferResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Error',
+      );
+      assert.ok(errorTag);
+      assert(errorTag.value.includes('Invalid recipient'));
+    });
+
+    it('should create a vault for the recipient with an invalid address and Allow-Unsafe-Addresses is provided', async () => {
+      const quantity = 1000000000;
+      const lockLengthMs = 1209600000;
+      const recipient = 'invalid-address';
+      const msgId = 'unique-id-'.padEnd(43, 'a');
+      const { result: createVaultedTransferResult } =
+        await createVaultedTransfer({
+          quantity,
+          lockLengthMs,
+          recipient,
+          allowUnsafeAddresses: true,
+          msgId,
+        });
+
+      const createdVaultData = await assertVaultExists({
+        vaultId: msgId,
+        address: recipient,
+        memory: createVaultedTransferResult.Memory,
+      });
+      assert.deepEqual(createdVaultData.balance, quantity);
+      assert.deepEqual(createdVaultData.startTimestamp, STUB_TIMESTAMP);
+      assert.deepEqual(
+        createdVaultData.endTimestamp,
+        STUB_TIMESTAMP + lockLengthMs,
       );
     });
   });
@@ -476,11 +387,11 @@ describe('Vaults', async () => {
         quantity: 500000000,
         lockLengthMs: 1209600000,
         memory: startMemory,
-        messageId: vaultId1,
+        msgId: vaultId1,
       });
 
-      const transferResult = await handle(
-        {
+      const transferResult = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Transfer' },
             { name: 'Recipient', value: secondVaulter },
@@ -488,15 +399,15 @@ describe('Vaults', async () => {
             { name: 'Cast', value: true },
           ],
         },
-        updatedMemory,
-      );
+        memory: updatedMemory,
+      });
 
       const { memory: updatedMemory2 } = await createVault({
         quantity: 600000000,
         lockLengthMs: 1209600000,
         memory: transferResult.Memory,
         from: secondVaulter,
-        messageId: vaultId2,
+        msgId: vaultId2,
       });
       paginatedVaultMemory = updatedMemory2;
     });

@@ -1,78 +1,61 @@
-import { createAosLoader } from './utils.mjs';
+import { handle, startMemory } from './helpers.mjs';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import {
-  AO_LOADER_HANDLER_ENV,
-  DEFAULT_HANDLE_OPTIONS,
-  STUB_ADDRESS,
-  PROCESS_OWNER,
-} from '../tools/constants.mjs';
+import { STUB_ADDRESS, PROCESS_OWNER } from '../tools/constants.mjs';
 
 describe('Transfers', async () => {
-  const { handle: originalHandle, memory: startMemory } =
-    await createAosLoader();
-
-  async function handle(options = {}, mem = startMemory) {
-    return originalHandle(
-      mem,
-      {
-        ...DEFAULT_HANDLE_OPTIONS,
-        ...options,
-      },
-      AO_LOADER_HANDLER_ENV,
-    );
-  }
-
   it('should transfer tokens to another wallet', async () => {
     const checkTransfer = async (recipient, sender, quantity) => {
       let mem = startMemory;
 
       if (sender != STUB_ADDRESS) {
         const transferResult = await handle({
-          Tags: [
-            { name: 'Action', value: 'Transfer' },
-            { name: 'Recipient', value: sender },
-            { name: 'Quantity', value: quantity }, // 100 IO
-            { name: 'Cast', value: true },
-          ],
+          options: {
+            Tags: [
+              { name: 'Action', value: 'Transfer' },
+              { name: 'Recipient', value: sender },
+              { name: 'Quantity', value: quantity },
+              { name: 'Cast', value: true },
+            ],
+          },
         });
         mem = transferResult.Memory;
       }
 
-      const senderBalance = await handle(
-        {
+      const senderBalance = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Balance' },
             { name: 'Target', value: sender },
           ],
         },
-        mem,
-      );
+        memory: mem,
+      });
       const senderBalanceData = JSON.parse(senderBalance.Messages[0].Data);
 
-      const transferResult = await handle(
-        {
+      const transferResult = await handle({
+        options: {
           From: sender,
           Owner: sender,
           Tags: [
             { name: 'Action', value: 'Transfer' },
             { name: 'Recipient', value: recipient },
-            { name: 'Quantity', value: quantity }, // 100 IO
+            { name: 'Quantity', value: quantity }, // 100 ARIO
             { name: 'Cast', value: true },
           ],
         },
-        mem,
-      );
+        memory: mem,
+      });
 
       // get balances
-      const result = await handle(
-        {
+      const result = await handle({
+        options: {
           From: sender,
           Owner: sender,
           Tags: [{ name: 'Action', value: 'Balances' }],
         },
-        transferResult.Memory,
-      );
+        memory: transferResult.Memory,
+      });
       const balances = JSON.parse(result.Messages[0].Data);
       assert.equal(balances[recipient], quantity);
       assert.equal(balances[sender], senderBalanceData - quantity);
@@ -93,95 +76,159 @@ describe('Transfers', async () => {
     const recipient = STUB_ADDRESS;
     const sender = PROCESS_OWNER;
     const senderBalance = await handle({
-      Tags: [
-        { name: 'Action', value: 'Balance' },
-        { name: 'Address', value: sender },
-      ],
+      options: {
+        Tags: [
+          { name: 'Action', value: 'Balance' },
+          { name: 'Address', value: sender },
+        ],
+      },
     });
     const senderBalanceData = JSON.parse(senderBalance.Messages[0].Data);
     const transferResult = await handle({
-      Tags: [
-        { name: 'Action', value: 'Transfer' },
-        { name: 'Recipient', value: recipient },
-        { name: 'Quantity', value: senderBalanceData + 1 },
-        { name: 'Cast', value: true },
-      ],
+      options: {
+        Tags: [
+          { name: 'Action', value: 'Transfer' },
+          { name: 'Recipient', value: recipient },
+          { name: 'Quantity', value: senderBalanceData + 1 },
+          { name: 'Cast', value: true },
+        ],
+      },
+
+      shouldAssertNoResultError: false,
     });
     // get balances
-    const result = await handle(
-      {
+    const result = await handle({
+      options: {
         Tags: [{ name: 'Action', value: 'Balances' }],
       },
-      transferResult.Memory,
-    );
+      memory: transferResult.Memory,
+    });
     const balances = JSON.parse(result.Messages[0].Data);
     // the new balance won't be defined
     assert.equal(balances[recipient] || 0, 0);
     assert.equal(balances[sender], senderBalanceData);
   });
 
-  it('should not transfer when an invalid recipient is provided', async () => {
-    const recipient = STUB_ADDRESS;
+  for (const allowUnsafeAddresses of [false, undefined]) {
+    it(`should not transfer when an invalid address is provided and \`Allow-Unsafe-Addresses\` is ${allowUnsafeAddresses}`, async () => {
+      const recipient = 'invalid-address';
+      const sender = PROCESS_OWNER;
+      const senderBalance = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Balance' },
+            { name: 'Target', value: sender },
+          ],
+        },
+      });
+      const senderBalanceData = JSON.parse(senderBalance.Messages[0].Data);
+      const transferResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Transfer' },
+            { name: 'Recipient', value: recipient },
+            { name: 'Quantity', value: 100000000 }, // 100 ARIO
+            { name: 'Cast', value: true },
+            { name: 'Allow-Unsafe-Addresses', value: allowUnsafeAddresses },
+          ],
+        },
+
+        shouldAssertNoResultError: false,
+      });
+
+      // assert the error tag
+      const errorTag = transferResult.Messages?.[0]?.Tags?.find(
+        (tag) => tag.name === 'Error',
+      );
+      assert.ok(errorTag, 'Error tag should be present');
+
+      const result = await handle({
+        options: {
+          Tags: [{ name: 'Action', value: 'Balances' }],
+        },
+        memory: transferResult.Memory,
+      });
+      const balances = JSON.parse(result.Messages[0].Data);
+      assert.equal(balances[recipient] || 0, 0);
+      assert.equal(balances[sender], senderBalanceData);
+    });
+  }
+
+  /**
+   * We allow transfers to addresses that may appear invalid if the `Allow-Unsafe-Addresses` tag is true for several reasons:
+   * 1. To support future address formats and signature schemes that may emerge
+   * 2. To maintain compatibility with new blockchain networks that could be integrated
+   * 3. To avoid breaking changes if address validation rules need to be updated
+   * 4. To give users flexibility in how they structure their addresses
+   * 5. To reduce protocol-level restrictions that could limit innovation
+   */
+  it('should transfer when an invalid address is provided and `Allow-Unsafe-Addresses` is true', async () => {
+    const recipient = 'invalid-address';
     const sender = PROCESS_OWNER;
     const senderBalance = await handle({
-      Tags: [
-        { name: 'Action', value: 'Balance' },
-        { name: 'Target', value: sender },
-      ],
+      options: {
+        Tags: [
+          { name: 'Action', value: 'Balance' },
+          { name: 'Target', value: sender },
+        ],
+      },
     });
     const senderBalanceData = JSON.parse(senderBalance.Messages[0].Data);
     const transferResult = await handle({
-      Tags: [
-        { name: 'Action', value: 'Transfer' },
-        { name: 'Recipient', value: recipient.slice(0, -1) },
-        { name: 'Quantity', value: 100000000 }, // 100 IO
-        { name: 'Cast', value: true },
-      ],
+      options: {
+        Tags: [
+          { name: 'Action', value: 'Transfer' },
+          { name: 'Recipient', value: recipient },
+          { name: 'Quantity', value: 100000000 }, // 100 ARIO
+          { name: 'Cast', value: true },
+          { name: 'Allow-Unsafe-Addresses', value: true },
+        ],
+      },
     });
 
-    // assert the error tag
-    const errorTag = transferResult.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.ok(errorTag, 'Error tag should be present');
-
     // get balances
-    const result = await handle(
-      {
+    const result = await handle({
+      options: {
         Tags: [{ name: 'Action', value: 'Balances' }],
       },
-      transferResult.Memory,
-    );
+      memory: transferResult.Memory,
+    });
     const balances = JSON.parse(result.Messages[0].Data);
-    assert.equal(balances[recipient] || 0, 0);
-    assert.equal(balances[sender], senderBalanceData);
+    assert.equal(balances[recipient] || 0, 100000000);
+    assert.equal(balances[sender], senderBalanceData - 100000000);
   });
 
   it('should not transfer when an invalid quantity is provided', async () => {
     const recipient = STUB_ADDRESS;
     const sender = PROCESS_OWNER;
     const senderBalance = await handle({
-      Tags: [
-        { name: 'Action', value: 'Balance' },
-        { name: 'Target', value: sender },
-      ],
+      options: {
+        Tags: [
+          { name: 'Action', value: 'Balance' },
+          { name: 'Target', value: sender },
+        ],
+      },
     });
     const senderBalanceData = JSON.parse(senderBalance.Messages[0].Data);
     const transferResult = await handle({
-      Tags: [
-        { name: 'Action', value: 'Transfer' },
-        { name: 'Recipient', value: recipient },
-        { name: 'Quantity', value: 100000000.1 },
-        { name: 'Cast', value: true },
-      ],
+      options: {
+        Tags: [
+          { name: 'Action', value: 'Transfer' },
+          { name: 'Recipient', value: recipient },
+          { name: 'Quantity', value: 100000000.1 },
+          { name: 'Cast', value: true },
+        ],
+      },
+      shouldAssertNoResultError: false,
     });
+
     // get balances
-    const result = await handle(
-      {
+    const result = await handle({
+      options: {
         Tags: [{ name: 'Action', value: 'Balances' }],
       },
-      transferResult.Memory,
-    );
+      memory: transferResult.Memory,
+    });
     const balances = JSON.parse(result.Messages[0].Data);
     assert.equal(balances[recipient] || 0, 0);
     assert.equal(balances[sender], senderBalanceData);

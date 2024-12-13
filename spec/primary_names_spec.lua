@@ -25,6 +25,8 @@ describe("Primary Names", function()
 			_G.NameRegistry.records = {
 				["test"] = {
 					processId = "base-name-owner",
+					type = "lease",
+					endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
 				},
 			}
 			_G.Balances = {
@@ -70,15 +72,37 @@ describe("Primary Names", function()
 			assert.match("Primary name is already owned", err)
 		end)
 
+		it("should fail if the caller already has a primary name request for the same name", function()
+			_G.PrimaryNames.requests = {
+				["user-requesting-primary-name"] = { name = "test", startTimestamp = 1234567890 },
+			}
+			local status, err = pcall(
+				primaryNames.createPrimaryNameRequest,
+				"test",
+				"user-requesting-primary-name",
+				1234567890,
+				"test-msg-id"
+			)
+			assert.is_false(status)
+			assert.match(
+				[[Primary name request by 'user-requesting-primary-name' for 'test' already exists]],
+				err,
+				nil,
+				true
+			)
+		end)
+
 		it(
 			"should create a primary name request and transfer the cost from the initiator to the protocol balance",
 			function()
 				_G.Balances = {
-					["user-requesting-primary-name"] = 100000000,
+					["user-requesting-primary-name"] = 821917,
 				}
 				_G.NameRegistry.records = {
 					["test"] = {
 						processId = "processId",
+						type = "lease",
+						endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
 					},
 				}
 				local primaryNameRequest = primaryNames.createPrimaryNameRequest(
@@ -96,17 +120,17 @@ describe("Primary Names", function()
 					baseNameOwner = "processId",
 					fundingPlan = {
 						address = "user-requesting-primary-name",
-						balance = 100000000,
+						balance = 821917,
 						shortfall = 0,
 						stakes = {},
 					},
 					fundingResult = {
 						newWithdrawVaults = {},
-						totalFunded = 100000000,
+						totalFunded = 821917,
 					},
 				}, primaryNameRequest)
 				assert.are.equal(0, _G.Balances["user-requesting-primary-name"])
-				assert.are.equal(100000000, _G.Balances[ao.id])
+				assert.are.equal(821917, _G.Balances[ao.id])
 			end
 		)
 	end)
@@ -175,6 +199,43 @@ describe("Primary Names", function()
 				}, _G.PrimaryNames.names)
 			end
 		)
+
+		it("should remove the existing primary name if the recipient already has one and set the new one", function()
+			_G.NameRegistry.records = {
+				["test"] = {
+					processId = "owning-process-id",
+				},
+			}
+			_G.PrimaryNames = {
+				owners = {
+					["owner"] = { name = "test", startTimestamp = 1234567890 },
+				},
+				names = {
+					["test"] = "owner",
+				},
+				requests = {
+					["owner"] = {
+						name = "new_test",
+						startTimestamp = 1234567890,
+						endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
+					},
+				},
+			}
+			primaryNames.approvePrimaryNameRequest("owner", "new_test", "owning-process-id", 1234567890)
+			assert.are.same({
+				name = "new_test",
+				startTimestamp = 1234567890,
+			}, _G.PrimaryNames.owners["owner"])
+			assert.are.same(nil, _G.PrimaryNames.names["test"]) -- old name should be removed
+			assert.are.same({}, _G.PrimaryNames.requests) -- request should be removed
+			-- new primary name should be set
+			assert.are.same({
+				["owner"] = { name = "new_test", startTimestamp = 1234567890 },
+			}, _G.PrimaryNames.owners)
+			assert.are.same({
+				["new_test"] = "owner",
+			}, _G.PrimaryNames.names)
+		end)
 	end)
 
 	describe("getAddressForPrimaryName", function()
@@ -351,6 +412,11 @@ describe("Primary Names", function()
 				{ name = "undername_test", owner = "primary-name-owner2" },
 				{ name = "undername2_test", owner = "primary-name-owner3" },
 			}, removedPrimaryNamesAndOwners)
+			assert.are.same({
+				owners = {},
+				names = {},
+				requests = {},
+			}, _G.PrimaryNames)
 		end)
 	end)
 

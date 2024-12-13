@@ -4,19 +4,28 @@ local constants = require("constants")
 local balances = require("balances")
 local demand = require("demand")
 local arns = {}
-local Auction = require("auctions")
 local gar = require("gar")
+
+--- @type Timestamp|nil
+NextRecordsPruneTimestamp = NextRecordsPruneTimestamp or 0
+
+--- @type Timestamp|nil
+NextReturnedNamesPruneTimestamp = NextReturnedNamesPruneTimestamp or 0
 
 --- @class NameRegistry
 --- @field reserved table<string, ReservedName> The reserved names
 --- @field records table<string, Record> The records
---- @field auctions table<string, Auction> The auctions
+--- @field returned table<string, ReturnedName> The returned records
 
 NameRegistry = NameRegistry or {
 	reserved = {},
 	records = {},
-	auctions = {},
+	returned = {},
 }
+
+if not NameRegistry.returned then
+	NameRegistry.returned = {}
+end
 
 --- @class StoredRecord
 --- @field processId string The process id of the record
@@ -34,6 +43,23 @@ NameRegistry = NameRegistry or {
 --- @field target string|nil The address of the target of the reserved record
 --- @field endTimestamp number|nil The time at which the record is no longer reserved
 
+--- @class ReturnedName -- Returned name saved into the registry
+--- @field name string The name of the returned record
+--- @field initiator WalletAddress
+--- @field startTimestamp Timestamp -- The timestamp of when the record was returned
+
+--- @class ReturnedNameData -- Returned name with endTimestamp and premiumMultiplier
+--- @field name string The name of the returned record
+--- @field initiator WalletAddress
+--- @field startTimestamp Timestamp -- The timestamp of when the record was returned
+--- @field endTimestamp Timestamp -- The timestamp of when the record will no longer be in the returned period
+--- @field premiumMultiplier number -- The current multiplier for the returned name
+
+--- @class ReturnedNameBuyRecordResult -- extends above
+--- @field initiator WalletAddress
+--- @field rewardForProtocol mIO -- The reward for the protocol from the returned name purchase
+--- @field rewardForInitiator mIO -- The reward for the protocol from the returned name purchase
+
 --- @class BuyRecordResponse
 --- @field record Record The updated record
 --- @field totalRegistrationFee number The total registration fee
@@ -43,6 +69,7 @@ NameRegistry = NameRegistry or {
 --- @field df table The demand factor info
 --- @field fundingPlan table The funding plan
 --- @field fundingResult table The funding result
+--- @field returnedName nil|ReturnedNameBuyRecordResult -- The initiator and reward details if returned name was purchased
 
 --- Buys a record
 --- @param name string The name of the record
@@ -53,10 +80,12 @@ NameRegistry = NameRegistry or {
 --- @param processId string The process id
 --- @param msgId string The current message id
 --- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
+--- @param allowUnsafeProcessId boolean|nil Whether to allow unsafe processIds. Default false.
 --- @return BuyRecordResponse buyRecordResponse - The response including relevant metadata about the purchase
-function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, msgId, fundFrom)
+function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, msgId, fundFrom, allowUnsafeProcessId)
 	fundFrom = fundFrom or "balance"
-	arns.assertValidBuyRecord(name, years, purchaseType, processId)
+	allowUnsafeProcessId = allowUnsafeProcessId or false
+	arns.assertValidBuyRecord(name, years, purchaseType, processId, allowUnsafeProcessId)
 	if purchaseType == nil then
 		purchaseType = "lease" -- set to lease by default
 	end
@@ -89,7 +118,6 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 	assert(not isPermabuy and not isActiveLease, "Name is already registered")
 
 	assert(not arns.getReservedName(name) or arns.getReservedName(name).target == from, "Name is reserved")
-	assert(not arns.getAuction(name), "Name is in auction")
 
 	--- @type StoredRecord
 	local newRecord = {
@@ -104,9 +132,21 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 	-- Register the leased or permanently owned name
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, timestamp)
 	assert(fundingResult.totalFunded == totalRegistrationFee, "Funding plan application failed")
+
+	local rewardForProtocol = totalRegistrationFee
+	local rewardForInitiator = 0
+	local returnedName = arns.getReturnedName(name)
+	if returnedName then
+		arns.removeReturnedName(name)
+		rewardForInitiator = returnedName.initiator ~= ao.id and math.floor(totalRegistrationFee * 0.5) or 0
+		rewardForProtocol = totalRegistrationFee - rewardForInitiator
+		balances.increaseBalance(returnedName.initiator, rewardForInitiator)
+	end
+
 	-- Transfer tokens to the protocol balance
-	balances.increaseBalance(ao.id, totalRegistrationFee)
+	balances.increaseBalance(ao.id, rewardForProtocol)
 	arns.addRecord(name, newRecord)
+
 	demand.tallyNamePurchase(totalRegistrationFee)
 	return {
 		record = arns.getRecord(name),
@@ -119,6 +159,11 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 		df = demand.getDemandFactorInfo(),
 		fundingPlan = fundingPlan,
 		fundingResult = fundingResult,
+		returnedName = returnedName and {
+			initiator = returnedName.initiator,
+			rewardForProtocol = rewardForProtocol,
+			rewardForInitiator = rewardForInitiator,
+		} or nil,
 	}
 end
 
@@ -131,6 +176,10 @@ function arns.addRecord(name, record)
 	-- remove reserved name if it exists in reserved
 	if arns.getReservedName(name) then
 		NameRegistry.reserved[name] = nil
+	end
+
+	if record.endTimestamp then
+		arns.scheduleNextRecordsPrune(record.endTimestamp)
 	end
 end
 
@@ -405,15 +454,18 @@ function arns.modifyRecordEndTimestamp(name, newEndTimestamp)
 	local maxEndTimestamp = record.startTimestamp + maxLeaseLength
 	assert(newEndTimestamp <= maxEndTimestamp, "Cannot extend lease beyond 5 years")
 	NameRegistry.records[name].endTimestamp = newEndTimestamp
+	-- Guard against the invariant case where record may not expire sooner
+	arns.scheduleNextRecordsPrune(newEndTimestamp)
 	return arns.getRecord(name)
 end
 
 ---Calculates the lease fee for a given base fee, years, and demand factor
 --- @param baseFee number The base fee for the name
---- @param years number The number of years
+--- @param years number|nil The number of years
 --- @param demandFactor number The demand factor
 --- @return number leaseFee - the lease fee
 function arns.calculateLeaseFee(baseFee, years, demandFactor)
+	assert(years, "Years is required for lease")
 	local annualRegistrationFee = arns.calculateAnnualRenewalFee(baseFee, years)
 	local totalLeaseCost = baseFee + annualRegistrationFee
 	return math.floor(demandFactor * totalLeaseCost)
@@ -475,16 +527,30 @@ function arns.calculateYearsBetweenTimestamps(startTimestamp, endTimestamp)
 	return yearsRemainingFloat
 end
 
+--- Asserts that a name is a valid ARNS name
+--- @param name string The name to check
+function arns.assertValidArNSName(name)
+	assert(name and type(name) == "string", "Name is required and must be a string.")
+	assert(
+		#name >= constants.MIN_NAME_LENGTH and #name <= constants.MAX_NAME_LENGTH,
+		"Name length is invalid. Must be between "
+			.. constants.MIN_NAME_LENGTH
+			.. " and "
+			.. constants.MAX_NAME_LENGTH
+			.. " characters."
+	)
+	assert(name:match(constants.ARNS_NAME_REGEX), "Name pattern is invalid. Must match " .. constants.ARNS_NAME_REGEX)
+end
+
 --- Asserts that a buy record is valid
 --- @param name string The name of the record
 --- @param years number|nil The number of years to check
 --- @param purchaseType string|nil The purchase type to check
 --- @param processId string|nil The processId of the record
-function arns.assertValidBuyRecord(name, years, purchaseType, processId)
-	assert(type(name) == "string", "Name is required and must be a string.")
-	assert(#name >= 1 and #name <= 51, "Name pattern is invalid.")
-	assert(name:match("^%w") and name:match("%w$") and name:match("^[%w-]+$"), "Name pattern is invalid.")
-	assert(not utils.isValidAOAddress(name), "Name cannot be a wallet address.")
+--- @param allowUnsafeProcessId boolean|nil Whether to allow unsafe processIds. Default false.
+function arns.assertValidBuyRecord(name, years, purchaseType, processId, allowUnsafeProcessId)
+	allowUnsafeProcessId = allowUnsafeProcessId or false
+	arns.assertValidArNSName(name)
 
 	-- assert purchase type if present is lease or permabuy
 	assert(purchaseType == nil or purchaseType == "lease" or purchaseType == "permabuy", "Purchase-Type is invalid.")
@@ -500,7 +566,7 @@ function arns.assertValidBuyRecord(name, years, purchaseType, processId)
 
 	-- assert processId is valid pattern
 	assert(type(processId) == "string", "Process id is required and must be a string.")
-	assert(utils.isValidAOAddress(processId), "Process Id must be a valid AO signer address..")
+	assert(utils.isValidAddress(processId, allowUnsafeProcessId), "Process Id must be a valid address.")
 end
 
 --- Asserts that a record is valid for extending the lease
@@ -573,7 +639,7 @@ end
 ---@field multiplier number The multiplier for the discount
 
 ---@class TokenCostResult
----@field tokenCost number The token cost in mIO of the intended action
+---@field tokenCost number The token cost in mARIO of the intended action
 ---@field discounts table|nil The discounts applied to the token cost
 
 --- @class IntendedAction
@@ -581,9 +647,10 @@ end
 --- @field years number|nil The number of years for lease
 --- @field quantity number|nil The quantity for increasing undername limit
 --- @field name string The name of the record
---- @field intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name)
+--- @field intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name/Primary-Name-Request)
 --- @field currentTimestamp number The current timestamp
 --- @field from string|nil The target address of the intended action
+--- @field record StoredRecord|nil The record to perform the intended action on
 
 --- @param intendedAction IntendedAction The intended action to get token cost for
 --- @return TokenCostResult tokenCostResult The token cost result of the intended action
@@ -595,7 +662,7 @@ function arns.getTokenCost(intendedAction)
 	local baseFee = demand.baseFeeForNameLength(#name)
 	local intent = intendedAction.intent
 	local qty = tonumber(intendedAction.quantity)
-	local record = arns.getRecord(name)
+	local record = intendedAction.record or arns.getRecord(name)
 	local currentTimestamp = tonumber(intendedAction.currentTimestamp)
 
 	assert(type(intent) == "string", "Intent is required and must be a string.")
@@ -603,8 +670,14 @@ function arns.getTokenCost(intendedAction)
 	if intent == "Buy-Record" then
 		-- stub the process id as it is not required for this intent
 		local processId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-		arns.assertValidBuyRecord(name, years, purchaseType, processId)
+		arns.assertValidBuyRecord(name, years, purchaseType, processId, false)
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
+		local returnedName = arns.getReturnedNameUnsafe(name)
+		if returnedName then
+			tokenCost = math.floor(
+				tokenCost * arns.getReturnedNamePremiumMultiplier(returnedName.startTimestamp, currentTimestamp)
+			)
+		end
 	elseif intent == "Extend-Lease" then
 		assert(record, "Name is not registered")
 		assert(currentTimestamp, "Timestamp is required")
@@ -626,6 +699,16 @@ function arns.getTokenCost(intendedAction)
 		assert(currentTimestamp, "Timestamp is required")
 		arns.assertValidUpgradeName(record, currentTimestamp)
 		tokenCost = arns.calculatePermabuyFee(baseFee, demand.getDemandFactor())
+	elseif intent == "Primary-Name-Request" then
+		assert(record, "Name is not registered")
+		assert(currentTimestamp, "Timestamp is required")
+		local yearsRemaining = constants.PERMABUY_LEASE_FEE_LENGTH
+		if record.type == "lease" then
+			yearsRemaining = arns.calculateYearsBetweenTimestamps(currentTimestamp, record.endTimestamp)
+		end
+		tokenCost = arns.calculateUndernameCost(baseFee, 1, record.type, yearsRemaining, demand.getDemandFactor())
+	else
+		error("Invalid intent: " .. intent)
 	end
 
 	local discounts = {}
@@ -652,7 +735,7 @@ function arns.getTokenCost(intendedAction)
 end
 
 ---@class TokenCostAndFundingPlan
----@field tokenCost number The token cost in mIO of the intended action
+---@field tokenCost number The token cost in mARIO of the intended action
 ---@field discounts table|nil The discounts applied to the token cost
 ---@field fundingPlan table|nil The funding plan for the intended action
 
@@ -744,6 +827,7 @@ function arns.upgradeRecord(from, name, currentTimestamp, msgId, fundFrom)
 	demand.tallyNamePurchase(upgradeCost)
 
 	record.endTimestamp = nil
+	-- figuring out the next prune timestamp would require a full scan of all records anyway so don't reschedule
 	record.type = "permabuy"
 	record.purchasePrice = upgradeCost
 
@@ -806,130 +890,70 @@ function arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
 	assert(qty > 0 and utils.isInteger(qty), "Qty is invalid")
 end
 
---- Creates an auction for a given name
---- @param name string The name of the auction
---- @param timestamp number The timestamp to start the auction
---- @param initiator string The address of the initiator of the auction
---- @return Auction|nil auction - the auction instance
-function arns.createAuction(name, timestamp, initiator)
-	assert(not arns.getRecord(name), "Name is registered. Auctions can only be created for unregistered names.")
-	assert(not arns.getReservedName(name), "Name is reserved. Auctions can only be created for unregistered names.")
-	assert(not arns.getAuction(name), "Auction already exists for name")
-	local baseFee = demand.baseFeeForNameLength(#name)
-	local demandFactor = demand.getDemandFactor()
-	local auction = Auction:new(name, timestamp, demandFactor, baseFee, initiator, arns.calculateRegistrationFee)
-	NameRegistry.auctions[name] = auction
-	return auction
-end
-
---- Gets an auction by name
---- @param name string The name of the auction
---- @return Auction|nil auction - the auction instance
-function arns.getAuction(name)
-	return NameRegistry.auctions[name]
-end
-
---- Gets all auctions
---- @return table<string, Auction> auctions - the auctions
-function arns.getAuctions()
-	return NameRegistry.auctions or {}
-end
-
---- @class AuctionBidResult
---- @field auction Auction The auction instance
---- @field bidder string The address of the bidder
---- @field bidAmount number The amount of the bid
---- @field rewardForInitiator number The reward for the initiator
---- @field rewardForProtocol number The reward for the protocol
---- @field record Record The record instance
---- @field fundingPlan table The funding plan
---- @field fundingResult table The funding result
-
---- Submits a bid to an auction
---- @param name string The name of the auction
---- @param bidAmount number|nil The amount of the bid
---- @param bidder string The address of the bidder
---- @param timestamp number The timestamp of the bid
---- @param processId string The processId of the bid
---- @param type string The type of the bid
---- @param years number|nil The number of years for the bid
---- @param msgId string The current messageId
---- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stakes". Default "balance"
---- @return AuctionBidResult auctionBidResult The result of the bid
-function arns.submitAuctionBid(name, bidAmount, bidder, timestamp, processId, type, years, msgId, fundFrom)
-	fundFrom = fundFrom or "balance"
-	local auction = arns.getAuction(name)
-	assert(auction, "Auction not found")
+--- Adds name to the recently returned name list
+--- @param name string The name of the returned name
+--- @param timestamp number The timestamp of the release
+--- @param initiator string The address of the initiator
+--- @returns ReturnedName
+function arns.createReturnedName(name, timestamp, initiator)
+	assert(not arns.getRecord(name), "Name is registered. Returned names can only be created for unregistered names.")
 	assert(
-		timestamp >= auction.startTimestamp and timestamp <= auction.endTimestamp,
-		"Bid timestamp is outside of auction start and end timestamps"
+		not arns.getReservedName(name),
+		"Name is reserved. Returned names can only be created for unregistered names."
 	)
-	local requiredBid = auction:getPriceForAuctionAtTimestamp(timestamp, type, years)
-	local floorPrice = auction:floorPrice(type, years) -- useful for analytics, used by getPriceForAuctionAtTimestamp
-	local startPrice = auction:startPrice(type, years) -- useful for analytics, used by getPriceForAuctionAtTimestamp
-	local requiredOrBidAmount = bidAmount or requiredBid
-
-	local finalBidAmount = requiredBid
-
-	-- check if bidder is eligible for ArNS discount
-	if gar.isEligibleForArNSDiscount(bidder) then
-		local discount = math.floor(finalBidAmount * constants.ARNS_DISCOUNT_PERCENTAGE)
-		finalBidAmount = finalBidAmount - discount
-	end
-
-	assert(requiredOrBidAmount >= requiredBid, "Bid amount is less than the required bid of " .. requiredBid)
-
-	-- check the balances of the bidder
-	local fundingPlan = gar.getFundingPlan(bidder, finalBidAmount, fundFrom)
-	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
-
-	-- apply the funding plan
-	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, timestamp)
-	assert(fundingResult.totalFunded == finalBidAmount, "Funding plan application failed")
-
-	local record = {
-		processId = processId,
+	assert(not arns.getReturnedNameUnsafe(name), "Returned name already exists")
+	local returnedName = {
+		name = name,
 		startTimestamp = timestamp,
-		endTimestamp = type == "lease" and timestamp + constants.oneYearMs * years or nil,
-		undernameLimit = constants.DEFAULT_UNDERNAME_COUNT,
-		purchasePrice = finalBidAmount,
-		type = type,
+		initiator = initiator,
 	}
-
-	-- if the initiator is the protocol, all funds go to the protocol
-	local rewardForInitiator = auction.initiator ~= ao.id and math.floor(finalBidAmount * 0.5) or 0
-	local rewardForProtocol = auction.initiator ~= ao.id and finalBidAmount - rewardForInitiator or finalBidAmount
-	-- reduce bidder balance by the final bid amount
-	balances.increaseBalance(auction.initiator, rewardForInitiator)
-	balances.increaseBalance(ao.id, rewardForProtocol)
-	arns.removeAuction(name)
-	arns.addRecord(name, record)
-	-- make sure we tally name purchase given, even though only half goes to protocol
-	-- TODO: DO WE WANT TO TALLY THE ENTIRE AMOUNT OR JUST THE REWARD FOR THE PROTOCOL?
-	demand.tallyNamePurchase(finalBidAmount)
-	return {
-		auction = auction,
-		bidder = bidder,
-		bidAmount = finalBidAmount,
-		rewardForInitiator = rewardForInitiator,
-		rewardForProtocol = rewardForProtocol,
-		record = record,
-		floorPrice = floorPrice,
-		startPrice = startPrice,
-		type = type,
-		years = years,
-		fundingPlan = fundingPlan,
-		fundingResult = fundingResult,
-	}
+	NameRegistry.returned[name] = returnedName
+	arns.scheduleNextReturnedNamesPrune(timestamp + constants.returnedNamePeriod)
+	return returnedName
 end
 
---- Removes an auction by name
---- @param name string The name of the auction
---- @return Auction|nil auction - the auction instance
-function arns.removeAuction(name)
-	local auction = arns.getAuction(name)
-	NameRegistry.auctions[name] = nil
-	return auction
+--- Gets a returned name
+--- @param name string The name of the returned name
+--- @return ReturnedName|nil
+function arns.getReturnedNameUnsafe(name)
+	return NameRegistry.returned[name]
+end
+
+--- Gets a returned name as a deep copy
+--- @param name string The name of the returned name
+--- @return ReturnedName|nil
+function arns.getReturnedName(name)
+	return utils.deepCopy(arns.getReturnedNameUnsafe(name))
+end
+
+--- Gets all returned names
+--- @return table<string, ReturnedName> returnedNames - the returned names
+function arns.getReturnedNamesUnsafe()
+	return NameRegistry.returned or {}
+end
+
+function arns.getReturnedNamePremiumMultiplier(startTimestamp, currentTimestamp)
+	assert(currentTimestamp >= startTimestamp, "Current timestamp must be after the start timestamp")
+	assert(
+		currentTimestamp < startTimestamp + constants.returnedNamePeriod,
+		"Current timestamp is after the returned name period"
+	)
+	local timestampDiff = currentTimestamp - startTimestamp
+	-- The percentage of the period that has passed e.g: 0.5 if half the period has passed
+	local percentageOfReturnedNamePeriodPassed = timestampDiff / constants.returnedNamePeriod
+	-- Take the inverse so that a fresh returned name has the full multiplier, and a name almost expired has a multiplier close to base price
+	local pctOfReturnPeriodRemaining = 1 - percentageOfReturnedNamePeriodPassed
+
+	return constants.returnedNameMaxMultiplier * pctOfReturnPeriodRemaining
+end
+
+--- Removes an returnedName by name
+--- @param name string The name of the returnedName
+--- @return ReturnedName|nil returnedName - the returnedName instance
+function arns.removeReturnedName(name)
+	local returnedName = arns.getReturnedName(name)
+	NameRegistry.returned[name] = nil
+	return returnedName
 end
 
 --- Removes a record by name
@@ -959,32 +983,65 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 	lastGracePeriodEntryEndTimestamp = lastGracePeriodEntryEndTimestamp or 0
 	local prunedRecords = {}
 	local newGracePeriodRecords = {}
+	if not NextRecordsPruneTimestamp or NextRecordsPruneTimestamp > currentTimestamp then
+		return prunedRecords, newGracePeriodRecords
+	end
+
+	--- @type Timestamp|nil
+	local minNextEndTimestamp
+
 	-- identify any records that are leases and that have expired, account for a one week grace period in seconds
 	for name, record in pairs(arns.getRecords()) do
 		if arns.recordExpired(record, currentTimestamp) then
 			prunedRecords[name] = record
 			NameRegistry.records[name] = nil
-		elseif
-			arns.recordInGracePeriod(record, currentTimestamp)
-			and record.endTimestamp > lastGracePeriodEntryEndTimestamp
-		then
-			newGracePeriodRecords[name] = record
+		elseif arns.recordInGracePeriod(record, currentTimestamp) then
+			if record.endTimestamp > lastGracePeriodEntryEndTimestamp then
+				newGracePeriodRecords[name] = record
+			end
+			-- Make sure we prune when the grace period is over
+			arns.scheduleNextRecordsPrune(record.endTimestamp + constants.gracePeriodMs)
+		elseif record.endTimestamp then
+			-- find the next prune timestamp
+			--- @diagnostic disable-next-line: param-type-mismatch
+			minNextEndTimestamp = math.min(minNextEndTimestamp or record.endTimestamp, record.endTimestamp)
 		end
+	end
+
+	-- Reset the next pruning timestamp now that pruning has completed
+	NextRecordsPruneTimestamp = nil
+	if minNextEndTimestamp then
+		arns.scheduleNextRecordsPrune(minNextEndTimestamp)
 	end
 	return prunedRecords, newGracePeriodRecords
 end
 
---- Prunes auctions that have expired
+--- Prunes returned names that have expired
 --- @param currentTimestamp number The current timestamp
---- @return Auction[] prunedAuctions - the pruned auctions
-function arns.pruneAuctions(currentTimestamp)
-	local prunedAuctions = {}
-	for name, auction in pairs(arns.getAuctions()) do
-		if auction.endTimestamp <= currentTimestamp then
-			prunedAuctions[name] = arns.removeAuction(name)
+--- @return ReturnedName[] prunedReturnedNames - the pruned returned names
+function arns.pruneReturnedNames(currentTimestamp)
+	local prunedReturnedNames = {}
+	if not NextReturnedNamesPruneTimestamp or currentTimestamp < NextReturnedNamesPruneTimestamp then
+		-- No known returned names to prune
+		return prunedReturnedNames
+	end
+
+	local minNextEndTimestamp
+	for name, returnedName in pairs(arns.getReturnedNamesUnsafe()) do
+		local endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod
+		if currentTimestamp >= endTimestamp then
+			prunedReturnedNames[name] = arns.removeReturnedName(name)
+		else
+			minNextEndTimestamp = math.min(minNextEndTimestamp or endTimestamp, endTimestamp)
 		end
 	end
-	return prunedAuctions
+
+	-- Reset the next pruning timestamp now that pruning has completed
+	NextReturnedNamesPruneTimestamp = nil
+	if minNextEndTimestamp then
+		arns.scheduleNextReturnedNamesPrune(minNextEndTimestamp)
+	end
+	return prunedReturnedNames
 end
 
 --- Prunes reserved names that have expired
@@ -1005,10 +1062,12 @@ end
 --- @param currentTimestamp number The current timestamp
 --- @param from string The address of the sender
 --- @param newProcessId string The new process id
-function arns.assertValidReassignName(record, currentTimestamp, from, newProcessId)
+--- @param allowUnsafeProcessId boolean|nil Whether to allow unsafe processIds. Default false.
+function arns.assertValidReassignName(record, currentTimestamp, from, newProcessId, allowUnsafeProcessId)
+	allowUnsafeProcessId = allowUnsafeProcessId or false
 	assert(record, "Name is not registered")
 	assert(currentTimestamp, "Timestamp is required")
-	assert(utils.isValidAOAddress(newProcessId), "Invalid Process-Id")
+	assert(utils.isValidAddress(newProcessId, allowUnsafeProcessId), "Invalid Process-Id")
 	assert(record.processId == from, "Not authorized to reassign this name")
 
 	if record.endTimestamp then
@@ -1027,13 +1086,33 @@ end
 --- @param from string The address of the sender
 --- @param currentTimestamp number The current timestamp
 --- @param newProcessId string The new process id
+--- @param allowUnsafeProcessId boolean|nil Whether to allow unsafe processIds. Default false.
 --- @return StoredRecord|nil updatedRecord - the updated record
-function arns.reassignName(name, from, currentTimestamp, newProcessId)
+function arns.reassignName(name, from, currentTimestamp, newProcessId, allowUnsafeProcessId)
+	allowUnsafeProcessId = allowUnsafeProcessId or false
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
-	arns.assertValidReassignName(record, currentTimestamp, from, newProcessId)
+	arns.assertValidReassignName(record, currentTimestamp, from, newProcessId, allowUnsafeProcessId)
 	local updatedRecord = arns.modifyProcessId(name, newProcessId)
 	return updatedRecord
+end
+
+--- @param timestamp Timestamp
+function arns.scheduleNextRecordsPrune(timestamp)
+	NextRecordsPruneTimestamp = math.min(NextRecordsPruneTimestamp or timestamp, timestamp)
+end
+
+--- @param timestamp Timestamp
+function arns.scheduleNextReturnedNamesPrune(timestamp)
+	NextReturnedNamesPruneTimestamp = math.min(NextReturnedNamesPruneTimestamp or timestamp, timestamp)
+end
+
+function arns.nextRecordsPruneTimestamp()
+	return NextRecordsPruneTimestamp
+end
+
+function arns.nextReturnedNamesPruneTimestamp()
+	return NextReturnedNamesPruneTimestamp
 end
 
 return arns

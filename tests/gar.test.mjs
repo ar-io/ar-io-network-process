@@ -7,15 +7,31 @@ import {
   getBalances,
   getDelegatesItems,
   getGatewayVaultsItems,
+  getDelegations,
+  getGateway,
+  getAllowedDelegates,
+  decreaseDelegateStake,
+  increaseOperatorStake,
+  leaveNetwork,
+  updateGatewaySettings,
+  cancelWithdrawal,
+  instantWithdrawal,
+  delegateStake,
+  decreaseOperatorStake,
+  saveObservations,
+  genesisEpochTimestamp,
+  distributionDelay,
+  epochLength,
 } from './helpers.mjs';
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
 import {
   STUB_TIMESTAMP,
-  STUB_MESSAGE_ID,
   STUB_ADDRESS,
   validGatewayTags,
   PROCESS_ID,
+  INITIAL_OPERATOR_STAKE,
+  INITIAL_DELEGATE_STAKE,
 } from '../tools/constants.mjs';
 
 const delegatorAddress = 'delegator-address-'.padEnd(43, 'x');
@@ -27,291 +43,6 @@ describe('GatewayRegistry', async () => {
   const STUB_ADDRESS_9 = ''.padEnd(43, '9');
 
   let sharedMemory = startMemory; // memory we'll use across unique tests;
-
-  const delegateStake = async ({
-    memory,
-    timestamp,
-    delegatorAddress,
-    quantity,
-    gatewayAddress,
-    assert = true,
-  }) => {
-    // give the wallet the delegate tokens
-    const transferMemory = await transfer({
-      recipient: delegatorAddress,
-      quantity,
-      memory,
-    });
-
-    const delegateResult = await handle(
-      {
-        From: delegatorAddress,
-        Owner: delegatorAddress,
-        Tags: [
-          { name: 'Action', value: 'Delegate-Stake' },
-          { name: 'Quantity', value: `${quantity}` }, // 2K IO
-          { name: 'Address', value: gatewayAddress }, // our gateway address
-        ],
-        Timestamp: timestamp,
-      },
-      transferMemory,
-    );
-    if (assert) {
-      assertNoResultError(delegateResult);
-    }
-    return {
-      result: delegateResult,
-      memory: delegateResult.Memory,
-    };
-  };
-
-  const getGateway = async ({
-    memory,
-    timestamp = STUB_TIMESTAMP,
-    address,
-  }) => {
-    const gatewayResult = await handle(
-      {
-        Tags: [
-          { name: 'Action', value: 'Gateway' },
-          { name: 'Address', value: address },
-        ],
-        Timestamp: timestamp,
-      },
-      memory,
-    );
-    const gateway = JSON.parse(gatewayResult.Messages?.[0]?.Data);
-    return gateway;
-  };
-
-  const getAllowedDelegates = async ({
-    memory,
-    from,
-    timestamp,
-    gatewayAddress,
-  }) => {
-    const delegatesResult = await handle(
-      {
-        From: from,
-        Owner: from,
-        Tags: [
-          { name: 'Action', value: 'Paginated-Allowed-Delegates' },
-          { name: 'Address', value: gatewayAddress },
-        ],
-        Timestamp: timestamp,
-      },
-      memory,
-    );
-    assertNoResultError(delegatesResult);
-    return {
-      result: delegatesResult,
-      memory: delegatesResult.Memory,
-    };
-  };
-
-  const getAllowedDelegatesItems = async ({ memory, gatewayAddress }) => {
-    const { result } = await getAllowedDelegates({
-      memory,
-      from: STUB_ADDRESS,
-      timestamp: STUB_TIMESTAMP,
-      gatewayAddress,
-    });
-    return JSON.parse(result.Messages?.[0]?.Data)?.items;
-  };
-
-  const decreaseOperatorStake = async ({
-    memory,
-    decreaseQty,
-    address,
-    instant = false,
-    messageId = STUB_MESSAGE_ID,
-    timestamp = STUB_TIMESTAMP,
-    assert = true,
-  }) => {
-    const result = await handle(
-      {
-        From: address,
-        Owner: address,
-        Timestamp: timestamp,
-        Id: messageId,
-        Tags: [
-          { name: 'Action', value: 'Decrease-Operator-Stake' },
-          { name: 'Quantity', value: `${decreaseQty}` },
-          { name: 'Instant', value: `${instant}` },
-        ],
-      },
-      memory,
-    );
-    if (assert) {
-      assertNoResultError(result);
-    }
-    return {
-      memory: result.Memory,
-      result,
-    };
-  };
-
-  const decreaseDelegateStake = async ({
-    memory,
-    gatewayAddress,
-    delegatorAddress,
-    decreaseQty,
-    instant = false,
-    messageId,
-    timestamp = STUB_TIMESTAMP,
-    assert = true,
-  }) => {
-    const result = await handle(
-      {
-        From: delegatorAddress,
-        Owner: delegatorAddress,
-        Timestamp: timestamp,
-        Id: messageId,
-        Tags: [
-          { name: 'Action', value: 'Decrease-Delegate-Stake' },
-          { name: 'Address', value: gatewayAddress },
-          { name: 'Quantity', value: `${decreaseQty}` }, // 500 IO
-          { name: 'Instant', value: `${instant}` },
-        ],
-      },
-      memory,
-    );
-    if (assert) {
-      assertNoResultError(result);
-    }
-    return {
-      memory: result.Memory,
-      result,
-    };
-  };
-
-  const cancelWithdrawal = async ({
-    memory,
-    vaultOwner,
-    gatewayAddress,
-    timestamp = STUB_TIMESTAMP,
-    vaultId,
-  }) => {
-    const result = await handle(
-      {
-        From: vaultOwner,
-        Owner: vaultOwner,
-        Tags: [
-          { name: 'Action', value: 'Cancel-Withdrawal' },
-          { name: 'Vault-Id', value: vaultId },
-          { name: 'Address', value: gatewayAddress },
-        ],
-        Timestamp: timestamp,
-      },
-      memory,
-    );
-    assertNoResultError(result);
-    return {
-      memory: result.Memory,
-      result,
-    };
-  };
-
-  const instantWithdrawal = async ({
-    memory,
-    address,
-    timestamp = STUB_TIMESTAMP,
-    gatewayAddress,
-    vaultId,
-  }) => {
-    const result = await handle(
-      {
-        From: address,
-        Owner: address,
-        Tags: [
-          { name: 'Action', value: 'Instant-Withdrawal' },
-          { name: 'Address', value: gatewayAddress },
-          { name: 'Vault-Id', value: vaultId },
-        ],
-        Timestamp: timestamp,
-      },
-      memory,
-    );
-    assertNoResultError(result);
-    return {
-      memory: result.Memory,
-      result,
-    };
-  };
-
-  const increaseOperatorStake = async ({
-    address,
-    increaseQty,
-    timestamp = STUB_TIMESTAMP,
-    memory,
-  }) => {
-    // give them the stake they are increasing by
-    const transferMemory = await transfer({
-      memory,
-      quantity: increaseQty,
-      recipient: address,
-    });
-    const result = await handle(
-      {
-        From: address,
-        Owner: address,
-        Tags: [
-          { name: 'Action', value: 'Increase-Operator-Stake' },
-          { name: 'Quantity', value: `${increaseQty}` },
-        ],
-        Timestamp: timestamp,
-      },
-      transferMemory,
-    );
-    assertNoResultError(result);
-    return {
-      memory: result.Memory,
-      result,
-    };
-  };
-
-  const leaveNetwork = async ({
-    address,
-    timestamp = STUB_TIMESTAMP,
-    memory,
-  }) => {
-    const result = await handle(
-      {
-        From: address,
-        Owner: address,
-        Tags: [{ name: 'Action', value: 'Leave-Network' }],
-        Timestamp: timestamp,
-      },
-      memory,
-    );
-    assertNoResultError(result);
-    return {
-      memory: result.Memory,
-      result,
-    };
-  };
-
-  const updateGatewaySettings = async ({
-    address,
-    settingsTags,
-    timestamp = STUB_TIMESTAMP,
-    memory,
-  }) => {
-    const result = await handle(
-      {
-        From: address,
-        Owner: address,
-        Tags: settingsTags,
-        Timestamp: timestamp,
-      },
-      memory,
-    );
-    assertNoResultError(result);
-    return {
-      memory: result.Memory,
-      result,
-    };
-  };
 
   before(async () => {
     const { memory: joinNetworkMemory } = await joinNetwork({
@@ -331,7 +62,7 @@ describe('GatewayRegistry', async () => {
       });
       assert.deepStrictEqual(gateway, {
         observerAddress: STUB_ADDRESS,
-        operatorStake: 100_000_000_000, // matches the initial operator stake from the test setup
+        operatorStake: INITIAL_OPERATOR_STAKE, // matches the initial operator stake from the test setup
         totalDelegatedStake: 0,
         status: 'joined',
         startTimestamp: STUB_TIMESTAMP,
@@ -342,7 +73,7 @@ describe('GatewayRegistry', async () => {
           port: 443,
           protocol: 'https',
           allowDelegatedStaking: true,
-          minDelegatedStake: 500_000_000,
+          minDelegatedStake: INITIAL_DELEGATE_STAKE,
           delegateRewardShareRatio: 25,
           properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
           autoStake: true,
@@ -384,7 +115,7 @@ describe('GatewayRegistry', async () => {
       });
 
       const tagNames = tags.map((tag) => tag.name);
-      const joinNetworkTags = validGatewayTags.filter(
+      const joinNetworkTags = validGatewayTags().filter(
         (tag) => ![...tagNames, 'Observer-Address'].includes(tag.name),
       );
       const { memory: joinNetworkMemory } = await joinNetwork({
@@ -402,9 +133,9 @@ describe('GatewayRegistry', async () => {
         address: gatewayAddress,
         memory: joinNetworkMemory,
       });
-      assert.deepEqual(gateway, {
+      assert.deepStrictEqual(gateway, {
         observerAddress: gatewayAddress,
-        operatorStake: 100_000_000_000,
+        operatorStake: INITIAL_OPERATOR_STAKE,
         totalDelegatedStake: 0,
         status: 'joined',
         startTimestamp: STUB_TIMESTAMP,
@@ -415,7 +146,7 @@ describe('GatewayRegistry', async () => {
           port: 443,
           protocol: 'https',
           allowDelegatedStaking: expectedAllowDelegatedStaking,
-          minDelegatedStake: 500_000_000,
+          minDelegatedStake: INITIAL_DELEGATE_STAKE,
           delegateRewardShareRatio: 25,
           properties: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
           autoStake: true,
@@ -444,7 +175,7 @@ describe('GatewayRegistry', async () => {
         timestamp: STUB_TIMESTAMP,
         gatewayAddress: gatewayAddress,
       });
-      assert.deepEqual(
+      assert.deepStrictEqual(
         Object.keys(expectedAllowedDelegatesLookup || []).sort(),
         JSON.parse(
           allowedDelegatesResult.result.Messages?.[0]?.Data,
@@ -459,7 +190,7 @@ describe('GatewayRegistry', async () => {
             memory: nextMemory,
             timestamp: STUB_TIMESTAMP,
             delegatorAddress: delegateAddress,
-            quantity: 500_000_000,
+            quantity: 10_000_000,
             gatewayAddress: gatewayAddress,
           }).catch(() => {});
           if (maybeDelegateResult?.memory) {
@@ -470,7 +201,7 @@ describe('GatewayRegistry', async () => {
           memory: nextMemory,
           gatewayAddress: gatewayAddress,
         });
-        assert.deepEqual(
+        assert.deepStrictEqual(
           updatedGatewayDelegates
             .map((delegateItem) => delegateItem.address)
             .sort(),
@@ -505,12 +236,11 @@ describe('GatewayRegistry', async () => {
         memory: updatedMemory,
         gatewayAddress: otherGatewayAddress,
       });
-      assert.deepEqual(
+      assert.deepStrictEqual(
         [
           {
             startTimestamp: STUB_TIMESTAMP,
-            delegatedStake: 500_000_000,
-            vaults: [],
+            delegatedStake: 10_000_000,
             address: STUB_ADDRESS_9,
           },
         ],
@@ -523,7 +253,7 @@ describe('GatewayRegistry', async () => {
         timestamp: STUB_TIMESTAMP,
         gatewayAddress: otherGatewayAddress,
       });
-      assert.deepEqual(
+      assert.deepStrictEqual(
         JSON.parse(getAllowedDelegatesResult.Messages?.[0]?.Data),
         {
           limit: 100,
@@ -610,15 +340,8 @@ describe('GatewayRegistry', async () => {
           {
             vaultId: '2222222222222222222222222222222222222222222',
             cursorId: `2222222222222222222222222222222222222222222_${leavingTimestamp}`,
-            balance: 50000000000,
+            balance: INITIAL_OPERATOR_STAKE,
             endTimestamp: 7797601500, // 90 days for the minimum operator stake
-            startTimestamp: leavingTimestamp,
-          },
-          {
-            vaultId: 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
-            cursorId: `mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm_${leavingTimestamp}`,
-            balance: 50000000000,
-            endTimestamp: 2613601500, // 30 days for the remaining stake
             startTimestamp: leavingTimestamp,
           },
         ],
@@ -674,7 +397,7 @@ describe('GatewayRegistry', async () => {
             memory: nextMemory,
             timestamp: STUB_TIMESTAMP,
             delegatorAddress: delegateAddress,
-            quantity: 500_000_000,
+            quantity: 10_000_000,
             gatewayAddress: STUB_ADDRESS,
           }).catch(() => {});
           if (maybeDelegateResult?.memory) {
@@ -685,17 +408,23 @@ describe('GatewayRegistry', async () => {
           memory: nextMemory,
           gatewayAddress: STUB_ADDRESS,
         });
-        assert.deepEqual(
+        assert.deepStrictEqual(
           updatedGatewayDelegates
             .map((delegateItem) => delegateItem.address)
             .sort(),
           expectedDelegates.slice().sort(),
         );
-        const updatedAllowedDelegates = await getAllowedDelegatesItems({
-          memory: nextMemory,
-          gatewayAddress: STUB_ADDRESS,
-        });
-        assert.deepEqual(
+        const { result: updatedAllowedDelegatesResult } =
+          await getAllowedDelegates({
+            memory: nextMemory,
+            from: STUB_ADDRESS,
+            timestamp: STUB_TIMESTAMP,
+            gatewayAddress: STUB_ADDRESS,
+          });
+        const updatedAllowedDelegates = JSON.parse(
+          updatedAllowedDelegatesResult.Messages?.[0]?.Data,
+        ).items;
+        assert.deepStrictEqual(
           updatedAllowedDelegates.sort(),
           (expectedAllowedDelegates?.slice() || []).sort(),
         );
@@ -727,7 +456,7 @@ describe('GatewayRegistry', async () => {
           { name: 'Port', value: '80' },
           { name: 'Protocol', value: 'https' },
           { name: 'Allow-Delegated-Staking', value: 'false' },
-          { name: 'Min-Delegated-Stake', value: '1000000000' }, // 1K IO
+          { name: 'Min-Delegated-Stake', value: '1000000000' }, // 1K ARIO
           { name: 'Delegate-Reward-Share-Ratio', value: '10' },
           {
             name: 'Properties',
@@ -788,7 +517,7 @@ describe('GatewayRegistry', async () => {
         memory: sharedMemory,
         timestamp: STUB_TIMESTAMP,
         delegatorAddress: STUB_ADDRESS_8,
-        quantity: 500_000_000,
+        quantity: 10_000_000,
         gatewayAddress: STUB_ADDRESS,
       });
       const updatedMemory = await updateGatewaySettingsTest({
@@ -811,8 +540,8 @@ describe('GatewayRegistry', async () => {
         expectedAllowedDelegates: [STUB_ADDRESS_9, STUB_ADDRESS_7],
       });
 
-      const { Memory: _, ...delegationsResult } = await handle(
-        {
+      const { Memory: _, ...delegationsResult } = await handle({
+        options: {
           From: STUB_ADDRESS_8,
           Owner: STUB_ADDRESS_8,
           Tags: [
@@ -822,10 +551,10 @@ describe('GatewayRegistry', async () => {
             { name: 'Sort-By', value: 'startTimestamp' },
           ],
         },
-        updatedMemory,
-      );
+        memory: updatedMemory,
+      });
       assertNoResultError(delegationsResult);
-      assert.deepEqual(
+      assert.deepStrictEqual(
         [
           {
             // Kicked out due to not being in allowlist
@@ -840,8 +569,8 @@ describe('GatewayRegistry', async () => {
             gatewayAddress: STUB_ADDRESS,
             delegationId: `${STUB_ADDRESS}_${STUB_TIMESTAMP}`,
             vaultId: 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
-            balance: 500_000_000,
-            endTimestamp: 2613600000,
+            balance: 10_000_000,
+            endTimestamp: 90 * 24 * 60 * 60 * 1000 + STUB_TIMESTAMP,
             startTimestamp: STUB_TIMESTAMP,
           },
         ],
@@ -868,7 +597,7 @@ describe('GatewayRegistry', async () => {
         memory: sharedMemory,
         timestamp: STUB_TIMESTAMP,
         delegatorAddress: STUB_ADDRESS_8,
-        quantity: 500_000_000,
+        quantity: 10_000_000,
         gatewayAddress: STUB_ADDRESS,
       });
 
@@ -888,18 +617,11 @@ describe('GatewayRegistry', async () => {
         memory: updatedMemory,
         gatewayAddress: STUB_ADDRESS,
       });
-      assert.deepEqual(
+      assert.deepStrictEqual(
         [
           {
             startTimestamp: STUB_TIMESTAMP,
             delegatedStake: 0,
-            vaults: {
-              mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm: {
-                balance: 500000000,
-                startTimestamp: STUB_TIMESTAMP,
-                endTimestamp: 2613600000,
-              },
-            },
             address: STUB_ADDRESS_8,
           },
         ],
@@ -912,7 +634,7 @@ describe('GatewayRegistry', async () => {
         timestamp: STUB_TIMESTAMP,
         gatewayAddress: STUB_ADDRESS,
       });
-      assert.deepEqual(
+      assert.deepStrictEqual(
         JSON.parse(getAllowedDelegatesResult.Messages?.[0]?.Data),
         {
           limit: 100,
@@ -946,7 +668,7 @@ describe('GatewayRegistry', async () => {
       });
       assert.deepStrictEqual(updatedGateway, {
         ...gatewayBefore,
-        operatorStake: 100_000_000_000 + increaseQty, // matches the initial operator stake from the test setup plus the increase
+        operatorStake: INITIAL_OPERATOR_STAKE + increaseQty, // matches the initial operator stake from the test setup plus the increase
       });
     });
   });
@@ -959,6 +681,14 @@ describe('GatewayRegistry', async () => {
         memory: sharedMemory,
       });
 
+      // add 10K ARIO to the operator stake
+      const increaseQty = 10_000_000_000;
+      const { memory: increaseStakeMemory } = await increaseOperatorStake({
+        address: STUB_ADDRESS,
+        increaseQty,
+        memory: sharedMemory,
+      });
+
       const decreaseQty = 10_000_000_000;
       const decreaseTimestamp = STUB_TIMESTAMP + 1500;
       const decreaseMessageId = 'decrease-operator-stake-message-'.padEnd(
@@ -968,7 +698,7 @@ describe('GatewayRegistry', async () => {
       const { memory: decreaseStakeMemory } = await decreaseOperatorStake({
         address: STUB_ADDRESS,
         timestamp: decreaseTimestamp,
-        memory: sharedMemory,
+        memory: increaseStakeMemory,
         messageId: decreaseMessageId,
         decreaseQty,
       });
@@ -979,9 +709,9 @@ describe('GatewayRegistry', async () => {
       });
       assert.deepStrictEqual(updatedGateway, {
         ...gatewayBefore,
-        operatorStake: 100_000_000_000 - decreaseQty, // matches the initial operator stake from the test setup minus the decrease
+        operatorStake: INITIAL_OPERATOR_STAKE, // matches the initial operator stake from the test setup minus the decrease
       });
-      assert.deepEqual(
+      assert.deepStrictEqual(
         await getGatewayVaultsItems({
           memory: decreaseStakeMemory,
           gatewayAddress: STUB_ADDRESS,
@@ -992,7 +722,7 @@ describe('GatewayRegistry', async () => {
             cursorId: `${decreaseMessageId}_${decreaseTimestamp}`,
             balance: decreaseQty,
             startTimestamp: decreaseTimestamp,
-            endTimestamp: decreaseTimestamp + 1000 * 60 * 60 * 24 * 30, // should be 30 days for anything above the minimum
+            endTimestamp: 90 * 24 * 60 * 60 * 1000 + decreaseTimestamp, // should be 90 days for anything above the minimum
           },
         ],
       );
@@ -1005,23 +735,25 @@ describe('GatewayRegistry', async () => {
         43,
         '2',
       );
-      const { memory: decreaseStakeMemory, result } =
+      const { result: decreaseOperatorStakeResult } =
         await decreaseOperatorStake({
           address: STUB_ADDRESS,
           timestamp: decreaseTimestamp,
           memory: sharedMemory,
           messageId: decreaseMessageId,
           decreaseQty,
-          assert: false,
+          shouldAssertNoResultError: false,
         });
 
       assert(
-        result.Messages[0].Data.includes(
+        decreaseOperatorStakeResult.Messages[0].Data.includes(
           'Invalid quantity. Must be integer greater than 1000000',
         ),
       );
       assert(
-        result.Messages[0].Tags.find((t) => t.name === 'Error'),
+        decreaseOperatorStakeResult.Messages[0].Tags.find(
+          (t) => t.name === 'Error',
+        ),
         'Error tag should be present',
       );
     });
@@ -1034,13 +766,18 @@ describe('GatewayRegistry', async () => {
       const balancesBefore = await getBalances({
         memory: sharedMemory,
       });
-      const decreaseQty = 5_000_000_000;
+      const decreaseQty = 10_000_000_000;
+      const { result: increaseResult } = await increaseOperatorStake({
+        address: STUB_ADDRESS,
+        increaseQty: decreaseQty, // we will decrease this amount immediately
+        memory: sharedMemory,
+      });
       const decreaseMessageId = 'decrease-stake-instantly-'.padEnd(43, 'x');
       const { memory: decreaseInstantMemory, result: decreaseInstantResult } =
         await decreaseOperatorStake({
           address: STUB_ADDRESS,
           decreaseQty,
-          memory: sharedMemory,
+          memory: increaseResult.Memory,
           messageId: decreaseMessageId,
           instant: true,
         });
@@ -1052,9 +789,9 @@ describe('GatewayRegistry', async () => {
 
       assert.deepStrictEqual(gatewayAfter, {
         ...gatewayBefore,
-        operatorStake: 100_000_000_000 - decreaseQty, // initial stake minus full decrease qty
+        operatorStake: INITIAL_OPERATOR_STAKE, // back to the initial operator stake after increase and decrease
       });
-      assert.deepEqual(
+      assert.deepStrictEqual(
         await getGatewayVaultsItems({
           memory: decreaseInstantMemory,
           gatewayAddress: STUB_ADDRESS,
@@ -1108,7 +845,7 @@ describe('GatewayRegistry', async () => {
         address: STUB_ADDRESS,
         memory: sharedMemory,
       });
-      const delegatedQty = 500_000_000;
+      const delegatedQty = 10_000_000;
       const delegationTimestamp = gatewayBefore.startTimestamp + 1500; // after the gateway has joined
       const { memory: delegatedStakeMemory } = await delegateStake({
         delegatorAddress,
@@ -1131,12 +868,11 @@ describe('GatewayRegistry', async () => {
         memory: delegatedStakeMemory,
         gatewayAddress: STUB_ADDRESS,
       });
-      assert.deepEqual(
+      assert.deepStrictEqual(
         [
           {
             startTimestamp: delegationTimestamp,
             delegatedStake: delegatedQty,
-            vaults: [],
             address: delegatorAddress,
           },
         ],
@@ -1183,23 +919,40 @@ describe('GatewayRegistry', async () => {
         memory: decreaseStakeMemory,
         gatewayAddress: STUB_ADDRESS,
       });
-      assert.deepEqual(
-        [
-          {
-            startTimestamp: STUB_TIMESTAMP,
-            delegatedStake: stakeQty - decreaseQty,
-            vaults: {
-              [decreaseStakeMsgId]: {
-                balance: decreaseQty,
-                startTimestamp: decreaseStakeTimestamp,
-                endTimestamp: decreaseStakeTimestamp + 1000 * 60 * 60 * 24 * 30,
-              },
-            },
-            address: delegatorAddress,
-          },
-        ],
-        delegateItems,
-      );
+
+      assert.deepStrictEqual(delegateItems, [
+        {
+          startTimestamp: STUB_TIMESTAMP,
+          delegatedStake: stakeQty - decreaseQty,
+          address: delegatorAddress,
+        },
+      ]);
+      const expectedDelegateId = `${STUB_ADDRESS}_${decreaseStakeTimestamp}`;
+      const expectedEndTimestamp =
+        90 * 24 * 60 * 60 * 1000 + decreaseStakeTimestamp;
+      // check the vault was created and delegation still exists
+      const delegationsForDelegator = await getDelegations({
+        memory: decreaseStakeMemory,
+        address: delegatorAddress,
+      });
+      assert.deepStrictEqual(delegationsForDelegator.items, [
+        {
+          balance: decreaseQty,
+          gatewayAddress: STUB_ADDRESS,
+          startTimestamp: decreaseStakeTimestamp,
+          endTimestamp: expectedEndTimestamp,
+          delegationId: expectedDelegateId,
+          type: 'vault',
+          vaultId: decreaseStakeMsgId,
+        },
+        {
+          balance: stakeQty - decreaseQty,
+          gatewayAddress: STUB_ADDRESS,
+          startTimestamp: STUB_TIMESTAMP,
+          delegationId: `${STUB_ADDRESS}_${STUB_TIMESTAMP}`,
+          type: 'stake',
+        },
+      ]);
     });
 
     it('should fail to withdraw a delegated stake if below the minimum withdrawal limitation', async () => {
@@ -1213,7 +966,7 @@ describe('GatewayRegistry', async () => {
         gatewayAddress: STUB_ADDRESS,
         timestamp: STUB_TIMESTAMP,
         memory: sharedMemory,
-        assert: false,
+        shouldAssertNoResultError: false,
       });
 
       const gatewayBefore = await getGateway({
@@ -1228,7 +981,7 @@ describe('GatewayRegistry', async () => {
           timestamp: decreaseStakeTimestamp,
           gatewayAddress: STUB_ADDRESS,
           messageId: decreaseStakeMsgId,
-          assert: false,
+          shouldAssertNoResultError: false,
         });
 
       assert.ok(
@@ -1293,7 +1046,7 @@ describe('GatewayRegistry', async () => {
     });
     it('should allow cancelling an operator withdrawal', async () => {
       const decreaseStakeTimestamp = STUB_TIMESTAMP + 1000 * 60 * 15; // 15 minutes after stubbedTimestamp
-      const stakeQty = 10000000000;
+      const stakeQty = INITIAL_OPERATOR_STAKE;
       const decreaseQty = stakeQty / 2;
       const decreaseStakeMsgId = 'decrease-stake-message-id-'.padEnd(43, 'x');
       // get the gateway before the delegation and cancellation
@@ -1302,13 +1055,22 @@ describe('GatewayRegistry', async () => {
         memory: sharedMemory,
       });
 
-      const { memory: decreaseStakeMemory } = await decreaseOperatorStake({
-        memory: sharedMemory,
+      // increase the operator stake to the initial stake
+      const { result: increaseResult } = await increaseOperatorStake({
         address: STUB_ADDRESS,
-        decreaseQty,
+        increaseQty: decreaseQty,
+        memory: sharedMemory,
+      });
+
+      // decrease the operator stake to the initial stake
+      const { memory: decreaseStakeMemory } = await decreaseOperatorStake({
+        memory: increaseResult.Memory,
+        address: STUB_ADDRESS,
+        decreaseQty: decreaseQty,
         timestamp: decreaseStakeTimestamp,
         messageId: decreaseStakeMsgId,
       });
+      // cancel the decrease
       const { memory: cancelWithdrawalMemory } = await cancelWithdrawal({
         vaultOwner: STUB_ADDRESS,
         gatewayAddress: STUB_ADDRESS,
@@ -1322,7 +1084,10 @@ describe('GatewayRegistry', async () => {
         memory: cancelWithdrawalMemory,
       });
       // no changes to the gateway after a withdrawal is cancelled
-      assert.deepStrictEqual(gatewayAfter, gatewayBefore);
+      assert.deepStrictEqual(gatewayAfter, {
+        ...gatewayBefore,
+        operatorStake: INITIAL_OPERATOR_STAKE + decreaseQty, // the decrease was cancelled and returned to the operator
+      });
     });
   });
 
@@ -1378,20 +1143,20 @@ describe('GatewayRegistry', async () => {
         ...gatewayBefore,
         totalDelegatedStake: 0, // the entire stake was withdrawn
       });
-      const getDelegatesResult = await getDelegatesItems({
+      const getVaultsResult = await getGatewayVaultsItems({
         memory: instantWithdrawalMemory,
         gatewayAddress: STUB_ADDRESS,
       });
-      assert.deepEqual(getDelegatesResult, []);
+      assert.deepStrictEqual(getVaultsResult, []);
 
       // validate the withdrawal went to the delegate balance and the penalty went to the protocol
       const withdrawalAmount = stakeQty * 0.5; // half the penalty
       const penaltyAmount = stakeQty * 0.5; // half the penalty
-      assert.deepEqual(
+      assert.deepStrictEqual(
         balancesAfter[delegatorAddress],
         balancesBefore[delegatorAddress] + withdrawalAmount,
       ); // half the penalty
-      assert.deepEqual(
+      assert.deepStrictEqual(
         balancesAfter[PROCESS_ID],
         balancesBefore[PROCESS_ID] + penaltyAmount,
       ); // original stake + penalty
@@ -1410,16 +1175,16 @@ describe('GatewayRegistry', async () => {
       let cursor;
       let fetchedGateways = [];
       while (true) {
-        const paginatedGateways = await handle(
-          {
+        const paginatedGateways = await handle({
+          options: {
             Tags: [
               { name: 'Action', value: 'Paginated-Gateways' },
               { name: 'Cursor', value: cursor },
               { name: 'Limit', value: '1' },
             ],
           },
-          addGatewayMemory2,
-        );
+          memory: addGatewayMemory2,
+        });
         // parse items, nextCursor
         const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
           JSON.parse(paginatedGateways.Messages?.[0]?.Data);
@@ -1432,17 +1197,169 @@ describe('GatewayRegistry', async () => {
         fetchedGateways.push(...items);
         if (!cursor) break;
       }
-      assert.deepEqual(
+      assert.deepStrictEqual(
         fetchedGateways.map((g) => g.gatewayAddress),
         [STUB_ADDRESS, secondGatewayAddress],
       );
     });
   });
 
-  // save observations
   describe('Save-Observations', () => {
-    it('should save observations', async () => {
-      // Steps: add a gateway, create the first epoch to prescribe it, submit an observation from the gateway, tick to the epoch distribution timestamp, check the rewards were distributed correctly
+    const distributionTimestamp = genesisEpochTimestamp + distributionDelay;
+    const observerAddress = 'observer-address-'.padEnd(43, 'a');
+
+    let gatewayMemory = sharedMemory;
+    before(async () => {
+      // Join a gateway with the observer
+      const gatewayAddress = 'gateway-address-'.padEnd(43, 'a');
+      const { memory: addGatewayMemory } = await joinNetwork({
+        address: gatewayAddress,
+        memory: sharedMemory,
+        timestamp: genesisEpochTimestamp,
+        observerAddress,
+      });
+
+      // Create the first epoch with distributions already set
+      const futureTick = await handle({
+        options: {
+          Tags: [{ name: 'Action', value: 'Tick' }],
+          Timestamp: distributionTimestamp, // Tick to when we'll accept observations
+        },
+        memory: addGatewayMemory,
+      });
+
+      // Assert distributions are correct
+      const {
+        totalEligibleObserverReward,
+        totalEligibleGatewayReward,
+        totalEligibleRewards,
+        totalEligibleGateways,
+        rewards,
+      } = JSON.parse(futureTick.Messages[0].Data).maybeNewEpoch.distributions;
+      assert.equal(totalEligibleObserverReward, 1_250_000_000);
+      assert.equal(totalEligibleGatewayReward, 11_250_000_000);
+      assert.equal(totalEligibleRewards, 25_000_000_000);
+      assert.equal(totalEligibleGateways, 2);
+      assert.deepEqual(rewards, {
+        eligible: {
+          '2222222222222222222222222222222222222222222': {
+            operatorReward: 12_500_000_000,
+            delegateRewards: [],
+          },
+          'gateway-address-aaaaaaaaaaaaaaaaaaaaaaaaaaa': {
+            operatorReward: 12_500_000_000,
+            delegateRewards: [],
+          },
+        },
+      });
+
+      // Assert prescribed observers
+      const prescribedObservers = JSON.parse(futureTick.Messages[0].Data)
+        .maybeNewEpoch.prescribedObservers;
+      assert.equal(prescribedObservers.length, 2);
+      const prescribedObserverAddresses = prescribedObservers.map(
+        (o) => o.observerAddress,
+      );
+      assert.ok(prescribedObserverAddresses.includes(STUB_ADDRESS));
+      assert.ok(prescribedObserverAddresses.includes(observerAddress));
+      gatewayMemory = futureTick.Memory;
+    });
+
+    const failedGateways = [
+      'failed-gateway-a-'.padEnd(43, 'c'),
+      'failed-gateway-b-'.padEnd(43, 'd'),
+    ].join(',');
+    const reportTxId = 'report-tx-id-'.padEnd(43, 'e');
+    const observationTimestamp = distributionTimestamp + 1;
+
+    it('should save a valid observation from a prescribed observer', async () => {
+      const { result } = await saveObservations({
+        from: observerAddress,
+        failedGateways,
+        reportTxId,
+        timestamp: observationTimestamp,
+        memory: gatewayMemory,
+      });
+
+      assert.equal(result.Messages.length, 1);
+      assert.equal(result.Messages[0].Target, observerAddress);
+      assert.deepEqual(JSON.parse(result.Messages[0].Data), {
+        reports: {
+          [observerAddress]: reportTxId,
+        },
+        failureSummaries: [],
+      });
+    });
+
+    it('should fail to save an observation from an invalid observer', async () => {
+      const invalidObserver = 'some-invalid-observer'.padEnd(43, 'w');
+      const { result } = await saveObservations({
+        from: invalidObserver,
+        failedGateways,
+        reportTxId,
+        timestamp: observationTimestamp,
+        memory: gatewayMemory,
+        shouldAssertNoResultError: false,
+      });
+
+      assert.equal(result.Messages.length, 1);
+      assert.equal(result.Messages[0].Target, invalidObserver);
+      assert.ok(
+        result.Messages[0].Data.includes(
+          'Caller is not a prescribed observer for the current epoch.',
+        ),
+      );
+    });
+
+    it('should fail to save an observation with an invalid report tx id', async () => {
+      const { result } = await saveObservations({
+        from: observerAddress,
+        failedGateways,
+        reportTxId: 'invalid-report-tx-id',
+        timestamp: observationTimestamp,
+        memory: gatewayMemory,
+        shouldAssertNoResultError: false,
+      });
+      assert.equal(result.Messages.length, 1);
+      assert.ok(
+        result.Messages[0].Data.includes(
+          'Invalid report tx id. Must be a valid Arweave address.',
+        ),
+      );
+    });
+
+    it('should fail to save an observation with an invalid failed gateways tag', async () => {
+      const { result } = await saveObservations({
+        from: observerAddress,
+        failedGateways: 'failed-gateway,is,good,strings?....',
+        reportTxId,
+        timestamp: observationTimestamp,
+        memory: gatewayMemory,
+        shouldAssertNoResultError: false,
+      });
+
+      assert.equal(result.Messages?.length, 1);
+      assert.ok(
+        result.Messages[0].Data.includes('Invalid failed gateway address:'),
+      );
+    });
+
+    it('should fail to save an observation after the epoch has completed', async () => {
+      const { result } = await saveObservations({
+        from: observerAddress,
+        failedGateways,
+        reportTxId,
+        timestamp: genesisEpochTimestamp + epochLength,
+        memory: gatewayMemory,
+        shouldAssertNoResultError: false,
+      });
+
+      assert.equal(result.Messages.length, 1);
+      assert.ok(
+        result.Messages[0].Data.includes(
+          'Observations for the current epoch cannot be submitted before: 1720075200000',
+        ),
+      );
     });
   });
 
@@ -1492,8 +1409,8 @@ describe('GatewayRegistry', async () => {
       let cursor;
       let fetchedDelegations = [];
       while (true) {
-        const paginatedDelegations = await handle(
-          {
+        const paginatedDelegations = await handle({
+          options: {
             From: userAddress,
             Owner: userAddress,
             Tags: [
@@ -1504,8 +1421,8 @@ describe('GatewayRegistry', async () => {
               ...(cursor ? [{ name: 'Cursor', value: `${cursor}` }] : []),
             ],
           },
-          decreaseStakeMemory,
-        );
+          memory: decreaseStakeMemory,
+        });
         const { items, nextCursor, hasMore, totalItems } = JSON.parse(
           paginatedDelegations.Messages?.[0]?.Data,
         );
@@ -1516,7 +1433,7 @@ describe('GatewayRegistry', async () => {
         fetchedDelegations.push(...items);
         if (!cursor) break;
       }
-      assert.deepEqual(fetchedDelegations, expectedDelegations);
+      assert.deepStrictEqual(fetchedDelegations, expectedDelegations);
     }
 
     it('should paginate active and vaulted stakes by ascending balance correctly', async () => {
@@ -1532,7 +1449,7 @@ describe('GatewayRegistry', async () => {
               '2222222222222222222222222222222222222222222_21600002',
             balance: 400000001,
             vaultId: 'decrease-stake-message-id',
-            endTimestamp: 2613600002,
+            endTimestamp: 7797600002,
           },
           {
             type: 'stake',
@@ -1567,7 +1484,7 @@ describe('GatewayRegistry', async () => {
               '2222222222222222222222222222222222222222222_21600002',
             balance: 400000001,
             vaultId: 'decrease-stake-message-id',
-            endTimestamp: 2613600002,
+            endTimestamp: 7797600002,
           },
           {
             type: 'stake',
@@ -1600,8 +1517,8 @@ describe('GatewayRegistry', async () => {
       vaultId,
       timestamp,
     }) => {
-      const result = await handle(
-        {
+      const result = await handle({
+        options: {
           From: delegatorAddress,
           Owner: delegatorAddress,
           Tags: [
@@ -1614,7 +1531,7 @@ describe('GatewayRegistry', async () => {
           Timestamp: timestamp,
         },
         memory,
-      );
+      });
       return {
         result,
         memory: result.Memory,
@@ -1624,7 +1541,7 @@ describe('GatewayRegistry', async () => {
     const sourceAddress = 'source-address-'.padEnd(43, 'a');
     const targetAddress = 'target-address-'.padEnd(43, 'b');
     const delegatorAddress = 'delegator-address-'.padEnd(43, 'c');
-    const stakeQty = 500_000_000;
+    const stakeQty = 10_000_000;
 
     it('should allow re-delegating stake', async () => {
       const { memory: joinSourceMemory } = await joinNetwork({
@@ -1660,12 +1577,11 @@ describe('GatewayRegistry', async () => {
         memory: delegatedStakeMemory,
         gatewayAddress: sourceAddress,
       });
-      assert.deepEqual(
+      assert.deepStrictEqual(
         [
           {
             startTimestamp: STUB_TIMESTAMP,
             delegatedStake: stakeQty,
-            vaults: [],
             address: delegatorAddress,
           },
         ],
@@ -1687,7 +1603,7 @@ describe('GatewayRegistry', async () => {
         timestamp: STUB_TIMESTAMP,
       });
       assert(targetGatewayAfter.totalDelegatedStake === stakeQty);
-      assert.deepEqual(
+      assert.deepStrictEqual(
         await getDelegatesItems({
           memory: redelegateStakeMemory,
           gatewayAddress: targetAddress,
@@ -1696,7 +1612,6 @@ describe('GatewayRegistry', async () => {
           {
             delegatedStake: stakeQty,
             startTimestamp: STUB_TIMESTAMP,
-            vaults: [],
             address: delegatorAddress,
           },
         ],
@@ -1708,7 +1623,7 @@ describe('GatewayRegistry', async () => {
         timestamp: STUB_TIMESTAMP,
       });
       assert(sourceGatewayAfter.totalDelegatedStake === 0);
-      assert.deepEqual(
+      assert.deepStrictEqual(
         await getDelegatesItems({
           memory: redelegateStakeMemory,
           gatewayAddress: sourceAddress,
@@ -1716,15 +1631,15 @@ describe('GatewayRegistry', async () => {
         [],
       );
 
-      const feeResultAfterRedelegation = await handle(
-        {
+      const feeResultAfterRedelegation = await handle({
+        options: {
           From: delegatorAddress,
           Owner: delegatorAddress,
           Tags: [{ name: 'Action', value: 'Redelegation-Fee' }],
           Timestamp: STUB_TIMESTAMP,
         },
-        redelegateStakeMemory,
-      );
+        memory: redelegateStakeMemory,
+      });
       assert.deepStrictEqual(
         JSON.parse(feeResultAfterRedelegation.Messages[0].Data),
         {
@@ -1734,15 +1649,15 @@ describe('GatewayRegistry', async () => {
       );
 
       // Fee is pruned after 7 days
-      const feeResultSevenEpochsLater = await handle(
-        {
+      const feeResultSevenEpochsLater = await handle({
+        options: {
           From: delegatorAddress,
           Owner: delegatorAddress,
           Tags: [{ name: 'Action', value: 'Redelegation-Fee' }],
           Timestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7 * 7 + 1, // 7 days
         },
-        redelegateStakeMemory,
-      );
+        memory: redelegateStakeMemory,
+      });
       assert.deepStrictEqual(
         JSON.parse(feeResultSevenEpochsLater.Messages[0].Data),
         {
@@ -1790,7 +1705,6 @@ describe('GatewayRegistry', async () => {
           {
             startTimestamp: STUB_TIMESTAMP,
             delegatedStake: stakeQty,
-            vaults: [],
             address: delegatorAddress,
           },
         ],
@@ -1833,7 +1747,6 @@ describe('GatewayRegistry', async () => {
             delegatedStake: stakeQty,
             startTimestamp: STUB_TIMESTAMP + 2,
             address: delegatorAddress,
-            vaults: [],
           },
         ],
       );

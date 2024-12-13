@@ -9,8 +9,10 @@ export const PROCESS_ID = ''.padEnd(43, '0');
 export const PROCESS_OWNER = ''.padEnd(43, '1');
 export const STUB_ADDRESS = ''.padEnd(43, '2');
 export const STUB_OPERATOR_ADDRESS = ''.padEnd(43, 'E');
-export const INITIAL_PROTOCOL_BALANCE = 50_000_000_000_000; // 50M IO
-export const INITIAL_OWNER_BALANCE = 950_000_000_000_000; // 950M IO
+export const INITIAL_PROTOCOL_BALANCE = 50_000_000_000_000; // 50M ARIO
+export const INITIAL_OPERATOR_STAKE = 10_000_000_000; // 10K ARIO
+export const INITIAL_DELEGATE_STAKE = 10_000_000; // 10K ARIO
+export const INITIAL_OWNER_BALANCE = 950_000_000_000_000; // 950M ARIO
 export const STUB_TIMESTAMP = 21600000; // 01-01-1970 00:00:00
 export const STUB_MESSAGE_ID = ''.padEnd(43, 'm');
 export const STUB_HASH_CHAIN = 'NGU1fq_ssL9m6kRbRU1bqiIDBht79ckvAwRMGElkSOg';
@@ -60,20 +62,18 @@ export const DEFAULT_HANDLE_OPTIONS = {
   'Hash-Chain': STUB_HASH_CHAIN,
 };
 
-export const INITIAL_OPERATOR_STAKE = '100000000000'; // 100K IO
-
-export const validGatewayTags = [
+export const validGatewayTags = ({ observerAddress = STUB_ADDRESS } = {}) => [
   { name: 'Action', value: 'Join-Network' },
   { name: 'Label', value: 'test-gateway' },
   { name: 'Note', value: 'test-note' },
   { name: 'FQDN', value: 'test-fqdn' },
-  { name: 'Operator-Stake', value: `${INITIAL_OPERATOR_STAKE}` }, // 100K IO
+  { name: 'Operator-Stake', value: `${INITIAL_OPERATOR_STAKE}` },
   { name: 'Port', value: '443' },
   { name: 'Protocol', value: 'https' },
   { name: 'Allow-Delegated-Staking', value: 'true' },
-  { name: 'Min-Delegated-Stake', value: '500000000' }, // 500 IO
+  { name: 'Min-Delegated-Stake', value: `${INITIAL_DELEGATE_STAKE}` },
   { name: 'Delegate-Reward-Share-Ratio', value: '25' }, // 25% go to the delegates
-  { name: 'Observer-Address', value: STUB_ADDRESS },
+  { name: 'Observer-Address', value: observerAddress },
   {
     name: 'Properties',
     value: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',

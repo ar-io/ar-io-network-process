@@ -884,4 +884,40 @@ describe("utils", function()
 			assert.is_false(utils.isInteger("1.0e+")) -- not a valid lua number
 		end)
 	end)
+
+	describe("booleanOrBooleanStringToBoolean", function()
+		it("should return a boolean as itself", function()
+			assert.is_true(utils.booleanOrBooleanStringToBoolean(true))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean(false))
+		end)
+
+		it("should convert any casing of true or false to the analogous boolean value", function()
+			assert.is_true(utils.booleanOrBooleanStringToBoolean("true"))
+			assert.is_true(utils.booleanOrBooleanStringToBoolean("True"))
+			assert.is_true(utils.booleanOrBooleanStringToBoolean("TRUE"))
+			assert.is_true(utils.booleanOrBooleanStringToBoolean("tRuE"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("false"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("False"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("FALSE"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("fAlSe"))
+		end)
+
+		it("should not convert other truthy-like string values to boolean", function()
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("1"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("yes"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("Yes"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("YES"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("y"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("Y"))
+			assert.is_false(utils.booleanOrBooleanStringToBoolean("t"))
+			---@ diagnostic disable-next-line: param-type-mismatch
+			assert.is_false(utils.booleanOrBooleanStringToBoolean({
+				True = true,
+			}))
+			---@ diagnostic disable-next-line: param-type-mismatch
+			assert.is_false(utils.booleanOrBooleanStringToBoolean(nil))
+			---@ diagnostic disable-next-line: param-type-mismatch
+			assert.is_false(utils.booleanOrBooleanStringToBoolean(1))
+		end)
+	end)
 end)

@@ -5,7 +5,6 @@ local gar = require("gar")
 local primaryNames = {}
 
 -- TODO: Figure out how to modulate this according to market conditions since it's actual spending
-local PRIMARY_NAME_COST = 100000000 -- 100 IO
 local ONE_WEEK_IN_MS = 604800000
 
 --- @alias WalletAddress string
@@ -21,6 +20,9 @@ PrimaryNames = PrimaryNames or {
 	names = {},
 	owners = {},
 }
+
+--- @type Timestamp|nil
+NextPrimaryNamesPruneTimestamp = NextPrimaryNamesPruneTimestamp or 0
 
 --- @class PrimaryName
 --- @field name ArNSName
@@ -48,7 +50,7 @@ local function baseNameForName(name)
 end
 
 --- Creates a transient request for a primary name. This is done by a user and must be approved by the name owner of the base name.
---- @param name string -- the name being requested, this could be an undername provided by the ant
+--- @param name string -- the name being requested, this could be an undername and should always be lower case
 --- @param initiator WalletAddress -- the address that is creating the primary name request, e.g. the ANT process id
 --- @param timestamp number -- the timestamp of the request
 --- @param msgId string -- the message id of the request
@@ -56,11 +58,16 @@ end
 --- @return CreatePrimaryNameResult # the request created, or the primary name with owner data if the request is approved
 function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
+	name = string.lower(name)
 	local baseName = baseNameForName(name)
 
-	--- existing request for primary name from wallet?
-	local existingRequest = primaryNames.getPrimaryNameRequest(name)
-	assert(not existingRequest, "Primary name request for '" .. name .. "' already exists") -- TODO: should we error here or just let them create a new request and pay the fee again?
+	--- check the primary name request for the initiator does not already exist for the same name
+	--- this allows the caller to create a new request and pay the fee again, so long as it is for a different name
+	local existingRequest = primaryNames.getPrimaryNameRequest(initiator)
+	assert(
+		not existingRequest or existingRequest.name ~= name,
+		"Primary name request by '" .. initiator .. "' for '" .. name .. "' already exists"
+	)
 
 	--- check the primary name is not already owned
 	local primaryNameOwner = primaryNames.getAddressForPrimaryName(name)
@@ -69,13 +76,20 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 	local record = arns.getRecord(baseName)
 	assert(record, "ArNS record '" .. baseName .. "' does not exist")
 
-	local fundingPlan = gar.getFundingPlan(initiator, PRIMARY_NAME_COST, fundFrom)
+	local requestCost = arns.getTokenCost({
+		intent = "Primary-Name-Request",
+		name = name,
+		currentTimestamp = timestamp,
+		record = record,
+	})
+
+	local fundingPlan = gar.getFundingPlan(initiator, requestCost.tokenCost, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0, "Insufficient balances")
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, timestamp)
-	assert(fundingResult.totalFunded == PRIMARY_NAME_COST, "Funding plan application failed")
+	assert(fundingResult.totalFunded == requestCost.tokenCost, "Funding plan application failed")
 
 	--- transfer the primary name cost from the initiator to the protocol balance
-	balances.increaseBalance(ao.id, PRIMARY_NAME_COST)
+	balances.increaseBalance(ao.id, requestCost.tokenCost)
 
 	local request = {
 		name = name,
@@ -90,6 +104,7 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 	else
 		-- otherwise store the request for asynchronous approval
 		PrimaryNames.requests[initiator] = request
+		primaryNames.scheduleNextPrimaryNamesPruning(request.endTimestamp)
 	end
 
 	return {
@@ -159,6 +174,11 @@ end
 --- @param startTimestamp number
 --- @return PrimaryNameWithOwner # the primary name with owner data
 function primaryNames.setPrimaryNameFromRequest(recipient, request, startTimestamp)
+	--- if the owner has an existing primary name, make sure we remove it from the maps before setting the new one
+	local existingPrimaryName = primaryNames.getPrimaryNameDataWithOwnerFromAddress(recipient)
+	if existingPrimaryName then
+		primaryNames.removePrimaryName(existingPrimaryName.name, recipient)
+	end
 	PrimaryNames.names[request.name] = recipient
 	PrimaryNames.owners[recipient] = {
 		name = request.name,
@@ -206,7 +226,9 @@ function primaryNames.removePrimaryName(name, from)
 
 	PrimaryNames.names[name] = nil
 	PrimaryNames.owners[primaryName.owner] = nil
-	PrimaryNames.requests[primaryName.owner] = nil -- should never happen, but cleanup anyway
+	if PrimaryNames.requests[primaryName.owner] and PrimaryNames.requests[primaryName.owner].name == name then
+		PrimaryNames.requests[primaryName.owner] = nil
+	end
 	return {
 		name = name,
 		owner = primaryName.owner,
@@ -333,13 +355,37 @@ end
 --- @return table<string, PrimaryNameRequest> prunedNameClaims - the names of the requests that were pruned
 function primaryNames.prunePrimaryNameRequests(timestamp)
 	local prunedNameRequests = {}
+	if not NextPrimaryNamesPruneTimestamp or timestamp < NextPrimaryNamesPruneTimestamp then
+		-- No known requests to prune
+		return prunedNameRequests
+	end
+
+	local minNextEndTimestamp
 	for initiator, request in pairs(primaryNames.getUnsafePrimaryNameRequests()) do
 		if request.endTimestamp <= timestamp then
 			PrimaryNames.requests[initiator] = nil
 			prunedNameRequests[initiator] = request
+		else
+			minNextEndTimestamp = math.min(minNextEndTimestamp or request.endTimestamp, request.endTimestamp)
 		end
 	end
+
+	-- Reset the pruning timestamp
+	NextPrimaryNamesPruneTimestamp = nil
+	if minNextEndTimestamp then
+		primaryNames.scheduleNextPrimaryNamesPruning(minNextEndTimestamp)
+	end
+
 	return prunedNameRequests
+end
+
+--- @param timestamp Timestamp
+function primaryNames.scheduleNextPrimaryNamesPruning(timestamp)
+	NextPrimaryNamesPruneTimestamp = math.min(NextPrimaryNamesPruneTimestamp or timestamp, timestamp)
+end
+
+function primaryNames.nextPrimaryNamesPruneTimestamp()
+	return NextPrimaryNamesPruneTimestamp
 end
 
 return primaryNames
