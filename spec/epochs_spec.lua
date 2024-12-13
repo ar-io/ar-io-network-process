@@ -1,6 +1,7 @@
 local epochs = require("epochs")
 local gar = require("gar")
 local utils = require("utils")
+local constants = require("constants")
 local testSettings = {
 	fqdn = "test.com",
 	protocol = "https",
@@ -496,11 +497,11 @@ describe("epochs", function()
 				local epochEndTimestamp = epochStartTimestamp + settings.durationMs
 				local epochDistributionTimestamp = epochEndTimestamp + settings.distributionDelayMs
 				local epochStartBlockHeight = 0
-				local expectedElibibleRewards = math.floor(protocolBalance * settings.rewardPercentage)
-				local expectedTotalGatewayReward = math.floor(expectedElibibleRewards * 0.90)
-				local expectedTotalObserverReward = math.floor(expectedElibibleRewards * 0.10)
+				local expectedEligibleRewards = math.floor(protocolBalance * constants.initialRewardRate)
+				local expectedTotalGatewayReward = math.floor(expectedEligibleRewards * 0.90)
+				local expectedTotalObserverReward = math.floor(expectedEligibleRewards * 0.10)
 				local expectedPerGatewayReward = math.floor(expectedTotalGatewayReward / 1) -- only one gateway in the registry
-				local expectedPerObserverReward = math.floor(expectedTotalObserverReward / 1) -- only one prescribed obserever
+				local expectedPerObserverReward = math.floor(expectedTotalObserverReward / 1) -- only one prescribed observer
 				local expectation = {
 					startTimestamp = epochStartTimestamp,
 					endTimestamp = epochEndTimestamp,
@@ -528,7 +529,7 @@ describe("epochs", function()
 					prescribedNames = {},
 					distributions = {
 						totalEligibleGateways = 1,
-						totalEligibleRewards = expectedElibibleRewards,
+						totalEligibleRewards = expectedEligibleRewards,
 						totalEligibleGatewayReward = expectedTotalGatewayReward,
 						totalEligibleObserverReward = expectedTotalObserverReward,
 						rewards = {
@@ -935,6 +936,32 @@ describe("epochs", function()
 			assert.are.same({}, result)
 			assert.are.same(startingEpochs, _G.Epochs)
 			assert.are.equal(currentTimestamp + 1, _G.NextEpochsPruneTimestamp)
+		end)
+	end)
+
+	describe("getRewardRateForEpoch", function()
+		it("returns 0.1% for the first 365 epochs (one year)", function()
+			assert.are.equal(0.001, epochs.getRewardRateForEpoch(0))
+			assert.are.equal(0.001, epochs.getRewardRateForEpoch(1))
+			assert.are.equal(0.001, epochs.getRewardRateForEpoch(364))
+			assert.are.equal(0.001, epochs.getRewardRateForEpoch(365))
+		end)
+
+		it("returns a linearly decreasing rate after 365 epochs", function()
+			assert.are.equal(0.00099726775956284147498, epochs.getRewardRateForEpoch(366))
+			assert.are.equal(0.00099453551912568314598, epochs.getRewardRateForEpoch(367))
+			assert.are.equal(0.00099180327868852460015, epochs.getRewardRateForEpoch(368))
+
+			assert.are.equal(0.0005109289617486338685, epochs.getRewardRateForEpoch(544))
+			assert.are.equal(0.00050819672131147543108, epochs.getRewardRateForEpoch(545))
+			assert.are.equal(0.00050546448087431699366, epochs.getRewardRateForEpoch(546))
+			assert.are.equal(0.00050273224043715855625, epochs.getRewardRateForEpoch(547))
+		end)
+
+		it("returns 0.05% after 548 epochs", function()
+			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(548))
+			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(730))
+			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(12053))
 		end)
 	end)
 end)
