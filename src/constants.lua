@@ -121,6 +121,7 @@ constants.genesisFees = {
 	[50] = 400000000,
 	[51] = 400000000,
 }
+constants.MIN_PRICE_INTERVAL_MS = 15 * 60 * 1000 -- 15 minutes
 
 -- General
 constants.MIN_UNSAFE_ADDRESS_LENGTH = 1
