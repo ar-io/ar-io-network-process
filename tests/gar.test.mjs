@@ -1236,18 +1236,18 @@ describe('GatewayRegistry', async () => {
         totalEligibleGateways,
         rewards,
       } = JSON.parse(futureTick.Messages[0].Data).maybeNewEpoch.distributions;
-      assert.equal(totalEligibleObserverReward, 1_250_000_000);
-      assert.equal(totalEligibleGatewayReward, 11_250_000_000);
-      assert.equal(totalEligibleRewards, 25_000_000_000);
+      assert.equal(totalEligibleObserverReward, 2_500_000_000);
+      assert.equal(totalEligibleGatewayReward, 22_500_000_000);
+      assert.equal(totalEligibleRewards, 50_000_000_000);
       assert.equal(totalEligibleGateways, 2);
       assert.deepEqual(rewards, {
         eligible: {
           '2222222222222222222222222222222222222222222': {
-            operatorReward: 12_500_000_000,
+            operatorReward: 25_000_000_000,
             delegateRewards: [],
           },
           'gateway-address-aaaaaaaaaaaaaaaaaaaaaaaaaaa': {
-            operatorReward: 12_500_000_000,
+            operatorReward: 25_000_000_000,
             delegateRewards: [],
           },
         },
