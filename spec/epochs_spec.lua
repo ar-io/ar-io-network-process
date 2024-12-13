@@ -497,7 +497,7 @@ describe("epochs", function()
 				local epochEndTimestamp = epochStartTimestamp + settings.durationMs
 				local epochDistributionTimestamp = epochEndTimestamp + settings.distributionDelayMs
 				local epochStartBlockHeight = 0
-				local expectedEligibleRewards = math.floor(protocolBalance * constants.initialRewardRate)
+				local expectedEligibleRewards = math.floor(protocolBalance * constants.defaultRewardRate)
 				local expectedTotalGatewayReward = math.floor(expectedEligibleRewards * 0.90)
 				local expectedTotalObserverReward = math.floor(expectedEligibleRewards * 0.10)
 				local expectedPerGatewayReward = math.floor(expectedTotalGatewayReward / 1) -- only one gateway in the registry
@@ -940,14 +940,14 @@ describe("epochs", function()
 	end)
 
 	describe("getRewardRateForEpoch", function()
-		it("returns 0.1% for the first 365 epochs (one year)", function()
-			assert.are.equal(0.001, epochs.getRewardRateForEpoch(0))
-			assert.are.equal(0.001, epochs.getRewardRateForEpoch(1))
-			assert.are.equal(0.001, epochs.getRewardRateForEpoch(364))
-			assert.are.equal(0.001, epochs.getRewardRateForEpoch(365))
+		it("returns 0.05% for the first 365 epochs (one year)", function()
+			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(0))
+			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(1))
+			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(364))
+			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(365))
 		end)
 
-		it("returns a linearly decreasing rate after 365 epochs", function()
+		it("returns a linearly decreasing rate starting from 0.1% after 365 epochs", function()
 			assert.are.equal(0.00099726775956284147498, epochs.getRewardRateForEpoch(366))
 			assert.are.equal(0.00099453551912568314598, epochs.getRewardRateForEpoch(367))
 			assert.are.equal(0.00099180327868852460015, epochs.getRewardRateForEpoch(368))
