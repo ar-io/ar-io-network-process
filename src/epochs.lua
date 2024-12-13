@@ -768,7 +768,6 @@ function epochs.nextEpochsPruneTimestamp()
 	return NextEpochsPruneTimestamp
 end
 
--- Swap out the use of the hard-coded value to use a time-based function with the above criteria.
 function epochs.getRewardRateForEpoch(epochIndex)
 	if epochIndex < constants.rewardDecayStartEpoch then
 		return constants.initialRewardRate
