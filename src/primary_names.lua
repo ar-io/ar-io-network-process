@@ -27,11 +27,18 @@ NextPrimaryNamesPruneTimestamp = NextPrimaryNamesPruneTimestamp or 0
 --- @class PrimaryName
 --- @field name ArNSName
 --- @field startTimestamp number
+--- @field processId WalletAddress | nil
 
 --- @class PrimaryNameWithOwner
 --- @field name ArNSName
 --- @field owner WalletAddress
 --- @field startTimestamp number
+
+--- @class PrimaryNameInfo
+--- @field name ArNSName
+--- @field owner WalletAddress
+--- @field startTimestamp number
+--- @field processId WalletAddress
 
 --- @class PrimaryNameRequest
 --- @field name ArNSName -- the name being requested
@@ -100,7 +107,7 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 	--- if the initiator is base name owner, then just set the primary name and return
 	local newPrimaryName
 	if record.processId == initiator then
-		newPrimaryName = primaryNames.setPrimaryNameFromRequest(initiator, request, timestamp)
+		newPrimaryName = primaryNames.setPrimaryNameFromRequest(initiator, request, timestamp, record.processId)
 	else
 		-- otherwise store the request for asynchronous approval
 		PrimaryNames.requests[initiator] = request
@@ -161,7 +168,7 @@ function primaryNames.approvePrimaryNameRequest(recipient, name, from, timestamp
 	assert(record.processId == from, "Primary name request must be approved by the owner of the base name")
 
 	-- set the primary name
-	local newPrimaryName = primaryNames.setPrimaryNameFromRequest(recipient, request, timestamp)
+	local newPrimaryName = primaryNames.setPrimaryNameFromRequest(recipient, request, timestamp, record.processId)
 	return {
 		newPrimaryName = newPrimaryName,
 		request = request,
@@ -172,8 +179,9 @@ end
 --- @param recipient string -- the address that is requesting the primary name
 --- @param request PrimaryNameRequest
 --- @param startTimestamp number
+--- @param processId WalletAddress
 --- @return PrimaryNameWithOwner # the primary name with owner data
-function primaryNames.setPrimaryNameFromRequest(recipient, request, startTimestamp)
+function primaryNames.setPrimaryNameFromRequest(recipient, request, startTimestamp, processId)
 	--- if the owner has an existing primary name, make sure we remove it from the maps before setting the new one
 	local existingPrimaryName = primaryNames.getPrimaryNameDataWithOwnerFromAddress(recipient)
 	if existingPrimaryName then
@@ -183,6 +191,7 @@ function primaryNames.setPrimaryNameFromRequest(recipient, request, startTimesta
 	PrimaryNames.owners[recipient] = {
 		name = request.name,
 		startTimestamp = startTimestamp,
+		processId = processId,
 	}
 	PrimaryNames.requests[recipient] = nil
 	return {
@@ -216,6 +225,7 @@ end
 function primaryNames.removePrimaryName(name, from)
 	--- assert the from is the current owner of the name
 	local primaryName = primaryNames.getPrimaryNameDataWithOwnerFromName(name)
+
 	assert(primaryName, "Primary name '" .. name .. "' does not exist")
 	local baseName = baseNameForName(name)
 	local record = arns.getRecord(baseName)
@@ -237,29 +247,39 @@ end
 
 --- Get the address for a primary name, allowing for forward lookups (e.g. "foo.bar" -> "0x123")
 --- @param name string
---- @return WalletAddress|nil address - the address for the primary name, or nil if it does not exist
+--- @return WalletAddress|nil address -- the address for the primary name, or nil if it does not exist
 function primaryNames.getAddressForPrimaryName(name)
 	return PrimaryNames.names[name]
 end
 
 --- Get the name data for an address, allowing for reverse lookups (e.g. "0x123" -> "foo.bar")
 --- @param address string
---- @return PrimaryNameWithOwner|nil primaryNameWithOwner - the primary name with owner data, or nil if it does not exist
+--- @return PrimaryNameInfo|nil -- the primary name with owner data, or nil if it does not exist
 function primaryNames.getPrimaryNameDataWithOwnerFromAddress(address)
 	local nameData = PrimaryNames.owners[address]
 	if not nameData then
 		return nil
 	end
+
+	if not nameData.processId then
+		-- TODO: After initial deployment, we can make processId not nil and remove this block
+		local record = arns.getRecord(baseNameForName(nameData.name))
+		if record then
+			nameData.processId = record.processId
+			PrimaryNames.owners[address] = nameData
+		end
+	end
 	return {
 		owner = address,
 		name = nameData.name,
 		startTimestamp = nameData.startTimestamp,
+		processId = nameData.processId,
 	}
 end
 
 --- Complete name resolution, returning the owner and name data for a name
 --- @param name string
---- @return PrimaryNameWithOwner|nil primaryNameWithOwner - the primary name with owner data, or nil if it does not exist
+--- @return PrimaryNameInfo|nil - the primary name with owner data and processId, or nil if it does not exist
 function primaryNames.getPrimaryNameDataWithOwnerFromName(name)
 	local owner = primaryNames.getAddressForPrimaryName(name)
 	if not owner then
@@ -269,11 +289,7 @@ function primaryNames.getPrimaryNameDataWithOwnerFromName(name)
 	if not nameData then
 		return nil
 	end
-	return {
-		name = name,
-		owner = owner,
-		startTimestamp = nameData.startTimestamp,
-	}
+	return nameData
 end
 
 ---Finds all primary names with a given base  name
@@ -304,6 +320,7 @@ end
 function primaryNames.removePrimaryNamesForBaseName(baseName)
 	local removedNames = {}
 	local primaryNamesForBaseName = primaryNames.getPrimaryNamesForBaseName(baseName)
+
 	for _, nameData in pairs(primaryNamesForBaseName) do
 		local removedName = primaryNames.removePrimaryName(nameData.name, nameData.owner)
 		table.insert(removedNames, removedName)
@@ -321,10 +338,19 @@ function primaryNames.getPaginatedPrimaryNames(cursor, limit, sortBy, sortOrder)
 	local primaryNamesArray = {}
 	local cursorField = "name"
 	for owner, primaryName in pairs(primaryNames.getUnsafePrimaryNameOwners()) do
+		if not primaryName.processId then
+			-- TODO: After initial deployment, we can make processId not nil and remove this block
+			local record = arns.getRecord(baseNameForName(primaryName.name))
+			if record then
+				primaryName.processId = record.processId
+				PrimaryNames.owners[owner] = primaryName
+			end
+		end
 		table.insert(primaryNamesArray, {
 			name = primaryName.name,
 			owner = owner,
 			startTimestamp = primaryName.startTimestamp,
+			processId = primaryName.processId,
 		})
 	end
 	return utils.paginateTableWithCursor(primaryNamesArray, cursor, cursorField, limit, sortBy, sortOrder)
