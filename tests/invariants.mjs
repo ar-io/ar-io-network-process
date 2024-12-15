@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { getBalances, getVaults } from './helpers.mjs';
+import { getBalances, getVaults, handle } from './helpers.mjs';
 
 function assertValidBalance(balance, expectedMin = 1) {
   assert(
