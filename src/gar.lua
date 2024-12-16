@@ -1584,8 +1584,10 @@ function gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
 	}
 
 	-- draw down balance first
-	balances.reduceBalance(fundingPlan.address, fundingPlan.balance)
-	appliedPlan.totalFunded = appliedPlan.totalFunded + fundingPlan.balance
+	if fundingPlan.balance > 0 then
+		balances.reduceBalance(fundingPlan.address, fundingPlan.balance)
+		appliedPlan.totalFunded = appliedPlan.totalFunded + fundingPlan.balance
+	end
 
 	--draw down stakes and vaults, creating withdraw vaults if necessary
 	for gatewayAddress, delegationPlan in pairs(fundingPlan.stakes) do

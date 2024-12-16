@@ -51,6 +51,8 @@ end
 ---@throws error If target has insufficient balance
 function balances.reduceBalance(target, qty)
 	assert(balances.walletHasSufficientBalance(target, qty), "Insufficient balance")
+	assert(qty > 0, "Quantity must be greater than 0")
+
 	local prevBalance = balances.getBalance(target)
 	Balances[target] = prevBalance - qty
 end
