@@ -85,7 +85,7 @@ async function assertNoTotalSupplyInvariants({ timestamp, memory }) {
 
   assert.ok(
     supplyData.total === 1000000000 * 1000000,
-    'total supply should be 1,000,000,000,000,000 mIO but was ' +
+    'total supply should be 1,000,000,000,000,000 mARIO but was ' +
       supplyData.total,
   );
   assertValidBalance(supplyData.circulating, 0);
