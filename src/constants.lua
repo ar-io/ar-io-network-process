@@ -11,6 +11,10 @@ constants.oneYearMs = 31536000 * 1000
 
 -- EPOCHS
 constants.defaultEpochDurationMs = constants.oneDayMs
+constants.maximumRewardRate = 0.001
+constants.minimumRewardRate = 0.0005
+constants.rewardDecayStartEpoch = 365
+constants.rewardDecayLastEpoch = 547
 
 -- GAR
 constants.DEFAULT_UNDERNAME_COUNT = 10
