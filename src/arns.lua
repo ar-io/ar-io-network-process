@@ -364,6 +364,13 @@ function arns.getRecord(name)
 	return utils.deepCopy(NameRegistry.records[name])
 end
 
+function arns.getProcessIdForRecord(name)
+	local record = arns.getRecord(name)
+	-- TODO: Could assert for type safety -- but on pruneState flow, the record does not exist
+	-- assert(record, "Name is not registered: " .. name)
+	return record ~= nil and record.processId or nil
+end
+
 --- Gets the active ARNS names between two timestamps
 --- @param startTimestamp number The start timestamp
 --- @param endTimestamp number The end timestamp

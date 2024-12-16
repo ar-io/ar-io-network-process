@@ -33,6 +33,12 @@ NextPrimaryNamesPruneTimestamp = NextPrimaryNamesPruneTimestamp or 0
 --- @field owner WalletAddress
 --- @field startTimestamp number
 
+--- @class PrimaryNameInfo
+--- @field name ArNSName
+--- @field owner WalletAddress
+--- @field startTimestamp number
+--- @field processId WalletAddress
+
 --- @class PrimaryNameRequest
 --- @field name ArNSName -- the name being requested
 --- @field startTimestamp number -- the timestamp of the request
@@ -237,29 +243,32 @@ end
 
 --- Get the address for a primary name, allowing for forward lookups (e.g. "foo.bar" -> "0x123")
 --- @param name string
---- @return WalletAddress|nil address - the address for the primary name, or nil if it does not exist
+--- @return WalletAddress|nil address -- the address for the primary name, or nil if it does not exist
 function primaryNames.getAddressForPrimaryName(name)
 	return PrimaryNames.names[name]
 end
 
 --- Get the name data for an address, allowing for reverse lookups (e.g. "0x123" -> "foo.bar")
 --- @param address string
---- @return PrimaryNameWithOwner|nil primaryNameWithOwner - the primary name with owner data, or nil if it does not exist
+--- @return PrimaryNameInfo|nil -- the primary name with owner data, or nil if it does not exist
 function primaryNames.getPrimaryNameDataWithOwnerFromAddress(address)
 	local nameData = PrimaryNames.owners[address]
+
 	if not nameData then
 		return nil
 	end
 	return {
+
 		owner = address,
 		name = nameData.name,
 		startTimestamp = nameData.startTimestamp,
+		processId = arns.getProcessIdForRecord(baseNameForName(nameData.name)),
 	}
 end
 
 --- Complete name resolution, returning the owner and name data for a name
 --- @param name string
---- @return PrimaryNameWithOwner|nil primaryNameWithOwner - the primary name with owner data, or nil if it does not exist
+--- @return PrimaryNameInfo|nil - the primary name with owner data and processId, or nil if it does not exist
 function primaryNames.getPrimaryNameDataWithOwnerFromName(name)
 	local owner = primaryNames.getAddressForPrimaryName(name)
 	if not owner then
@@ -269,11 +278,7 @@ function primaryNames.getPrimaryNameDataWithOwnerFromName(name)
 	if not nameData then
 		return nil
 	end
-	return {
-		name = name,
-		owner = owner,
-		startTimestamp = nameData.startTimestamp,
-	}
+	return nameData
 end
 
 ---Finds all primary names with a given base  name
@@ -325,6 +330,7 @@ function primaryNames.getPaginatedPrimaryNames(cursor, limit, sortBy, sortOrder)
 			name = primaryName.name,
 			owner = owner,
 			startTimestamp = primaryName.startTimestamp,
+			processId = arns.getProcessIdForRecord(baseNameForName(primaryName.name)),
 		})
 	end
 	return utils.paginateTableWithCursor(primaryNamesArray, cursor, cursorField, limit, sortBy, sortOrder)
