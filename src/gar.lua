@@ -289,13 +289,7 @@ function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWi
 		-- Calculate the penalty and withdraw using the utility function
 		expeditedWithdrawalFee, amountToWithdraw, penaltyRate = processInstantWithdrawal(qty, 0, 0, from)
 	else
-		createGatewayWithdrawVault(
-			gateway,
-			msgId,
-			qty,
-			currentTimestamp,
-			currentTimestamp + gar.getSettings().operators.withdrawLengthMs
-		)
+		createGatewayWithdrawVault(gateway, msgId, qty, currentTimestamp)
 	end
 
 	-- Update the gateway
