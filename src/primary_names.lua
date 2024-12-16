@@ -257,14 +257,12 @@ function primaryNames.getPrimaryNameDataWithOwnerFromAddress(address)
 	if not nameData then
 		return nil
 	end
-	local name = baseNameForName(nameData.name)
-	local processId = arns.getProcessIdForRecord(name)
 	return {
 
 		owner = address,
 		name = nameData.name,
 		startTimestamp = nameData.startTimestamp,
-		processId = processId,
+		processId = arns.getProcessIdForRecord(baseNameForName(nameData.name)),
 	}
 end
 
