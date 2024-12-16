@@ -1247,7 +1247,12 @@ addEventingHandler(
 		end
 
 		LastKnownStakedSupply = LastKnownStakedSupply - quantity
-		LastKnownWithdrawSupply = LastKnownWithdrawSupply + quantity
+		if instantWithdraw then
+			LastKnownCirculatingSupply = LastKnownCirculatingSupply + decreaseOperatorStakeResult.amountWithdrawn
+		else
+			LastKnownWithdrawSupply = LastKnownWithdrawSupply + quantity
+		end
+
 		addSupplyData(msg.ioEvent)
 
 		Send(msg, {
