@@ -59,6 +59,7 @@ export function assertNoResultError(result) {
     (tag) => tag.name === 'Error',
   );
   assert.strictEqual(errorTag, undefined);
+  assertValidSupplyEventData(result);
 }
 
 export function parseEventsFromResult(result) {
@@ -75,6 +76,20 @@ export function parseEventsFromResult(result) {
       })
       ?.filter((event) => Object.keys(event).length && event['_e']) || []
   );
+}
+
+export function assertValidSupplyEventData(result) {
+  const events = parseEventsFromResult(result);
+  for (const event of events) {
+    assert(event['_e'] === 1, 'Event flag _e is not the correct value');
+    if (event['Total-Token-Supply']) {
+      assert.strictEqual(
+        event['Total-Token-Supply'],
+        1_000_000_000_000_000,
+        `Total-Token-Supply is invariant for event ${JSON.stringify(event, null, 2)}`,
+      );
+    }
+  }
 }
 
 export const getBalances = async ({ memory, timestamp = STUB_TIMESTAMP }) => {
@@ -726,4 +741,19 @@ export const saveObservations = async ({
     memory: result.Memory,
     result,
   };
+};
+
+export const totalTokenSupply = async ({ memory, timestamp = 0 }) => {
+  return await handle({
+    options: {
+      Tags: [
+        {
+          name: 'Action',
+          value: 'Total-Token-Supply',
+        },
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
 };
