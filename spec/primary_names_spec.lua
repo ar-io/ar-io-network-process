@@ -192,7 +192,7 @@ describe("Primary Names", function()
 					},
 				}, approvePrimaryNameRequestResult)
 				assert.are.same({
-					["primary-name-recipient"] = { name = "test", startTimestamp = 1234567890, processId = "owner" },
+					["primary-name-recipient"] = { name = "test", startTimestamp = 1234567890 },
 				}, _G.PrimaryNames.owners)
 				assert.are.same({
 					["test"] = "primary-name-recipient",
@@ -208,7 +208,7 @@ describe("Primary Names", function()
 			}
 			_G.PrimaryNames = {
 				owners = {
-					["owner"] = { name = "test", startTimestamp = 1234567890, processId = "owning-process-id" },
+					["owner"] = { name = "test", startTimestamp = 1234567890 },
 				},
 				names = {
 					["test"] = "owner",
@@ -224,14 +224,13 @@ describe("Primary Names", function()
 			primaryNames.approvePrimaryNameRequest("owner", "new_test", "owning-process-id", 1234567890)
 			assert.are.same({
 				name = "new_test",
-				processId = "owning-process-id",
 				startTimestamp = 1234567890,
 			}, _G.PrimaryNames.owners["owner"])
 			assert.are.same(nil, _G.PrimaryNames.names["test"]) -- old name should be removed
 			assert.are.same({}, _G.PrimaryNames.requests) -- request should be removed
 			-- new primary name should be set
 			assert.are.same({
-				["owner"] = { name = "new_test", startTimestamp = 1234567890, processId = "owning-process-id" },
+				["owner"] = { name = "new_test", startTimestamp = 1234567890 },
 			}, _G.PrimaryNames.owners)
 			assert.are.same({
 				["new_test"] = "owner",
@@ -346,8 +345,15 @@ describe("Primary Names", function()
 					["test"] = "owner",
 				},
 			}
+			_G.NameRegistry = {
+				records = {
+					["test"] = {
+						processId = "base-name-owner",
+					},
+				},
+			}
 			assert.are.same(
-				{ name = "test", owner = "owner", startTimestamp = 1234567890 },
+				{ name = "test", owner = "owner", startTimestamp = 1234567890, processId = "base-name-owner" },
 				primaryNames.getPrimaryNameDataWithOwnerFromAddress("owner")
 			)
 		end)
@@ -371,11 +377,35 @@ describe("Primary Names", function()
 					["test3"] = "owner5",
 				},
 			}
+			_G.NameRegistry = {
+				records = {
+					["test"] = {
+						processId = "base-name-owner",
+					},
+					["test2"] = {
+						processId = "base-name-owner-2",
+					},
+					["test3"] = {
+						processId = "base-name-owner-3",
+					},
+				},
+			}
 			local allPrimaryNamesForArNSName = primaryNames.getPrimaryNamesForBaseName("test")
 			assert.are.same({
-				{ name = "test", owner = "owner3", startTimestamp = 1234567890 },
-				{ name = "undername_test", owner = "owner", startTimestamp = 1234567890 },
-				{ name = "undername2_test", owner = "owner2", startTimestamp = 1234567890 },
+				{ name = "test", owner = "owner3", startTimestamp = 1234567890, processId = "base-name-owner" },
+
+				{
+					name = "undername_test",
+					owner = "owner",
+					startTimestamp = 1234567890,
+					processId = "base-name-owner",
+				},
+				{
+					name = "undername2_test",
+					owner = "owner2",
+					startTimestamp = 1234567890,
+					processId = "base-name-owner",
+				},
 			}, allPrimaryNamesForArNSName)
 		end)
 	end)
@@ -427,6 +457,12 @@ describe("Primary Names", function()
 				["test"] = {
 					processId = "base-name-owner",
 				},
+				["test2"] = {
+					processId = "base-name-owner-2",
+				},
+				["test3"] = {
+					processId = "base-name-owner-3",
+				},
 			}
 			_G.PrimaryNames = {
 				owners = {
@@ -476,17 +512,24 @@ describe("Primary Names", function()
 		it("should return all primary names", function()
 			_G.PrimaryNames = {
 				owners = {
-					["owner"] = { name = "test", startTimestamp = 1234567890, processId = "processId" },
+					["owner"] = { name = "test", startTimestamp = 1234567890 },
 				},
 				names = {
 					["test"] = "owner",
 				},
 				requests = {},
 			}
+			_G.NameRegistry = {
+				records = {
+					["test"] = {
+						processId = "base-name-owner",
+					},
+				},
+			}
 			local paginatedPrimaryNames = primaryNames.getPaginatedPrimaryNames(nil, 10, "startTimestamp", "asc")
 			assert.are.same({
 				items = {
-					{ name = "test", owner = "owner", startTimestamp = 1234567890, processId = "processId" },
+					{ name = "test", owner = "owner", startTimestamp = 1234567890, processId = "base-name-owner" },
 				},
 				totalItems = 1,
 				limit = 10,
