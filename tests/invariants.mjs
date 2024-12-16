@@ -60,8 +60,8 @@ async function assertNoBalanceVaultInvariants({ timestamp, memory }) {
 }
 
 async function assertNoTotalSupplyInvariants({ timestamp, memory }) {
-  const supplyResult = await handle(
-    {
+  const supplyResult = await handle({
+    options: {
       Tags: [
         {
           name: 'Action',
@@ -71,7 +71,7 @@ async function assertNoTotalSupplyInvariants({ timestamp, memory }) {
       Timestamp: timestamp,
     },
     memory,
-  );
+  });
 
   // assert no errors
   assert.deepEqual(supplyResult.Messages?.[0]?.Error, undefined);

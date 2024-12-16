@@ -57,18 +57,22 @@ end
 
 --- @class ReturnedNameBuyRecordResult -- extends above
 --- @field initiator WalletAddress
---- @field rewardForProtocol mIO -- The reward for the protocol from the returned name purchase
---- @field rewardForInitiator mIO -- The reward for the protocol from the returned name purchase
+--- @field rewardForProtocol mARIO -- The reward for the protocol from the returned name purchase
+--- @field rewardForInitiator mARIO -- The reward for the protocol from the returned name purchase
 
---- @class BuyRecordResponse
+--- @class RecordInteractionResult
 --- @field record Record The updated record
---- @field totalRegistrationFee number The total registration fee
 --- @field baseRegistrationFee number The base registration fee
 --- @field remainingBalance number The remaining balance
 --- @field protocolBalance number The protocol balance
 --- @field df table The demand factor info
---- @field fundingPlan table The funding plan
+--- @field fundingPlan FundingPlan The funding plan
 --- @field fundingResult table The funding result
+--- @field totalFee mARIO The total fee for the name-related operation
+
+--- @class BuyRecordResult : RecordInteractionResult
+--- @field recordsCount number The total number of records
+--- @field reservedRecordsCount number The total number of reserved records
 --- @field returnedName nil|ReturnedNameBuyRecordResult -- The initiator and reward details if returned name was purchased
 
 --- Buys a record
@@ -81,7 +85,7 @@ end
 --- @param msgId string The current message id
 --- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
 --- @param allowUnsafeProcessId boolean|nil Whether to allow unsafe processIds. Default false.
---- @return BuyRecordResponse buyRecordResponse - The response including relevant metadata about the purchase
+--- @return BuyRecordResult # The result including relevant metadata about the purchase
 function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, msgId, fundFrom, allowUnsafeProcessId)
 	fundFrom = fundFrom or "balance"
 	allowUnsafeProcessId = allowUnsafeProcessId or false
@@ -106,9 +110,9 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 		from = from,
 	})
 
-	local totalRegistrationFee = tokenCostResult.tokenCost
+	local totalFee = tokenCostResult.tokenCost
 
-	local fundingPlan = gar.getFundingPlan(from, totalRegistrationFee, fundFrom)
+	local fundingPlan = gar.getFundingPlan(from, totalFee, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
 
 	local record = arns.getRecord(name)
@@ -125,21 +129,21 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 		startTimestamp = timestamp,
 		type = purchaseType,
 		undernameLimit = constants.DEFAULT_UNDERNAME_COUNT,
-		purchasePrice = totalRegistrationFee,
+		purchasePrice = totalFee,
 		endTimestamp = purchaseType == "lease" and timestamp + constants.oneYearMs * years or nil,
 	}
 
 	-- Register the leased or permanently owned name
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, timestamp)
-	assert(fundingResult.totalFunded == totalRegistrationFee, "Funding plan application failed")
+	assert(fundingResult.totalFunded == totalFee, "Funding plan application failed")
 
-	local rewardForProtocol = totalRegistrationFee
+	local rewardForProtocol = totalFee
 	local rewardForInitiator = 0
 	local returnedName = arns.getReturnedName(name)
 	if returnedName then
 		arns.removeReturnedName(name)
-		rewardForInitiator = returnedName.initiator ~= ao.id and math.floor(totalRegistrationFee * 0.5) or 0
-		rewardForProtocol = totalRegistrationFee - rewardForInitiator
+		rewardForInitiator = returnedName.initiator ~= ao.id and math.floor(totalFee * 0.5) or 0
+		rewardForProtocol = totalFee - rewardForInitiator
 		balances.increaseBalance(returnedName.initiator, rewardForInitiator)
 	end
 
@@ -147,10 +151,10 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 	balances.increaseBalance(ao.id, rewardForProtocol)
 	arns.addRecord(name, newRecord)
 
-	demand.tallyNamePurchase(totalRegistrationFee)
+	demand.tallyNamePurchase(totalFee)
 	return {
 		record = arns.getRecord(name),
-		totalRegistrationFee = totalRegistrationFee,
+		totalFee = totalFee,
 		baseRegistrationFee = baseRegistrationFee,
 		remainingBalance = balances.getBalance(from),
 		protocolBalance = balances.getBalance(ao.id),
@@ -221,16 +225,6 @@ function arns.getPaginatedReservedNames(cursor, limit, sortBy, sortOrder)
 	return utils.paginateTableWithCursor(reservedArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
---- @class ExtendLeaseResponse
---- @field record Record The updated record
---- @field totalExtensionFee number The total extension fee
---- @field baseRegistrationFee number The base registration fee
---- @field remainingBalance number The remaining balance
---- @field protocolBalance number The protocol balance
---- @field df table The demand factor info
---- @field fundingPlan table The funding plan
---- @field fundingResult table The funding result
-
 --- Extends the lease for a record
 --- @param from string The address of the sender
 --- @param name string The name of the record
@@ -238,6 +232,7 @@ end
 --- @param currentTimestamp number The current timestamp
 --- @param msgId string The current message id
 --- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
+--- @return RecordInteractionResult # The response including relevant metadata about the lease extension
 function arns.extendLease(from, name, years, currentTimestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
 	local record = arns.getRecord(name)
@@ -252,22 +247,23 @@ function arns.extendLease(from, name, years, currentTimestamp, msgId, fundFrom)
 		years = years,
 		from = from,
 	})
-	local totalExtensionFee = tokenCostResult.tokenCost
+	local totalFee = tokenCostResult.tokenCost
 
-	local fundingPlan = gar.getFundingPlan(from, totalExtensionFee, fundFrom)
+	local fundingPlan = gar.getFundingPlan(from, totalFee, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
-	assert(fundingResult.totalFunded == totalExtensionFee, "Funding plan application failed")
+	assert(fundingResult.totalFunded == totalFee, "Funding plan application failed")
 
 	-- modify the record with the new end timestamp
 	arns.modifyRecordEndTimestamp(name, record.endTimestamp + constants.oneYearMs * years)
 
 	-- Transfer tokens to the protocol balance
-	balances.increaseBalance(ao.id, totalExtensionFee)
-	demand.tallyNamePurchase(totalExtensionFee)
+	balances.increaseBalance(ao.id, totalFee)
+	demand.tallyNamePurchase(totalFee)
+
 	return {
 		record = arns.getRecord(name),
-		totalExtensionFee = totalExtensionFee,
+		totalFee = totalFee,
 		baseRegistrationFee = baseRegistrationFee,
 		remainingBalance = balances.getBalance(from),
 		protocolBalance = balances.getBalance(ao.id),
@@ -287,16 +283,6 @@ function arns.calculateExtensionFee(baseFee, years, demandFactor)
 	return math.floor(demandFactor * extensionFee)
 end
 
---- @class IncreaseUndernameResponse
---- @field record Record The updated record
---- @field additionalUndernameCost number The additional undername cost
---- @field baseRegistrationFee number The base registration fee
---- @field remainingBalance number The remaining balance
---- @field protocolBalance number The protocol balance
---- @field df table The demand factor info
---- @field fundingPlan table The funding plan
---- @field fundingResult table The funding result
-
 --- Increases the undername limit for a record
 --- @param from string The address of the sender
 --- @param name string The name of the record
@@ -304,7 +290,7 @@ end
 --- @param currentTimestamp number The current timestamp
 --- @param msgId string The current message id
 --- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
---- @return IncreaseUndernameResponse The response
+--- @return RecordInteractionResult # The result
 function arns.increaseundernameLimit(from, name, qty, currentTimestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
 	-- validate record can increase undernames
@@ -321,31 +307,31 @@ function arns.increaseundernameLimit(from, name, qty, currentTimestamp, msgId, f
 	end
 
 	local baseRegistrationFee = demand.baseFeeForNameLength(#name)
-	local additionalUndernameCost =
+	local totalFee =
 		arns.calculateUndernameCost(baseRegistrationFee, qty, record.type, yearsRemaining, demand.getDemandFactor())
 
 	-- if the address is eligible for the ArNS discount, apply the discount
 	if gar.isEligibleForArNSDiscount(from) then
-		local discount = math.floor(additionalUndernameCost * constants.ARNS_DISCOUNT_PERCENTAGE)
-		additionalUndernameCost = additionalUndernameCost - discount
+		local discount = math.floor(totalFee * constants.ARNS_DISCOUNT_PERCENTAGE)
+		totalFee = totalFee - discount
 	end
 
-	assert(additionalUndernameCost >= 0, "Invalid undername cost")
+	assert(totalFee >= 0, "Invalid undername cost")
 
-	local fundingPlan = gar.getFundingPlan(from, additionalUndernameCost, fundFrom)
+	local fundingPlan = gar.getFundingPlan(from, totalFee, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
-	assert(fundingResult.totalFunded == additionalUndernameCost, "Funding plan application failed")
+	assert(fundingResult.totalFunded == totalFee, "Funding plan application failed")
 
 	-- update the record with the new undername count
 	arns.modifyRecordundernameLimit(name, qty)
 
 	-- Transfer tokens to the protocol balance
-	balances.increaseBalance(ao.id, additionalUndernameCost)
-	demand.tallyNamePurchase(additionalUndernameCost)
+	balances.increaseBalance(ao.id, totalFee)
+	demand.tallyNamePurchase(totalFee)
 	return {
 		record = arns.getRecord(name),
-		additionalUndernameCost = additionalUndernameCost,
+		totalFee = totalFee,
 		baseRegistrationFee = baseRegistrationFee,
 		remainingBalance = balances.getBalance(from),
 		protocolBalance = balances.getBalance(ao.id),
@@ -794,22 +780,13 @@ function arns.assertValidUpgradeName(record, currentTimestamp)
 	)
 end
 
---- @class UpgradeRecordResult
---- @field name string The name of the record
---- @field record Record The updated record
---- @field totalUpgradeFee number The total upgrade fee
---- @field baseRegistrationFee number The base registration fee
---- @field remainingBalance number The remaining balance of the sender
---- @field protocolBalance number The protocol balance
---- @field df table The demand factor information
-
 --- Upgrades a leased record to permanently owned
 --- @param from string The address of the sender
 --- @param name string The name of the record
 --- @param currentTimestamp number The current timestamp
 --- @param msgId string The current message id
 --- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stakes". Default "balance"
---- @return UpgradeRecordResult upgradeRecordResult - the upgraded record with name and record fields
+--- @return RecordInteractionResult # the upgraded record with name and record fields
 function arns.upgradeRecord(from, name, currentTimestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
 	local record = arns.getRecord(name)
@@ -824,25 +801,25 @@ function arns.upgradeRecord(from, name, currentTimestamp, msgId, fundFrom)
 		name = name,
 		from = from,
 	})
-	local upgradeCost = tokenCostResult.tokenCost
+	local totalFee = tokenCostResult.tokenCost
 
-	local fundingPlan = gar.getFundingPlan(from, upgradeCost, fundFrom)
+	local fundingPlan = gar.getFundingPlan(from, totalFee, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
-	assert(fundingResult.totalFunded == upgradeCost, "Funding plan application failed")
-	balances.increaseBalance(ao.id, upgradeCost)
-	demand.tallyNamePurchase(upgradeCost)
+	assert(fundingResult.totalFunded == totalFee, "Funding plan application failed")
+	balances.increaseBalance(ao.id, totalFee)
+	demand.tallyNamePurchase(totalFee)
 
 	record.endTimestamp = nil
 	-- figuring out the next prune timestamp would require a full scan of all records anyway so don't reschedule
 	record.type = "permabuy"
-	record.purchasePrice = upgradeCost
+	record.purchasePrice = totalFee
 
 	NameRegistry.records[name] = record
 	return {
 		name = name,
 		record = record,
-		totalUpgradeFee = upgradeCost,
+		totalFee = totalFee,
 		baseRegistrationFee = baseFee,
 		remainingBalance = balances.getBalance(from),
 		protocolBalance = balances.getBalance(ao.id),

@@ -22,8 +22,9 @@ import {
   genesisEpochTimestamp,
   distributionDelay,
   epochLength,
+  totalTokenSupply,
 } from './helpers.mjs';
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { describe, it, beforeEach, afterEach, before } from 'node:test';
 import assert from 'node:assert';
 import {
   STUB_TIMESTAMP,
@@ -46,9 +47,12 @@ describe('GatewayRegistry', async () => {
   let sharedMemory = startMemory; // memory we'll use across unique tests;
 
   beforeEach(async () => {
+    const { Memory: totalTokenSupplyMemory } = await totalTokenSupply({
+      memory: startMemory,
+    });
     const { memory: joinNetworkMemory } = await joinNetwork({
       address: STUB_ADDRESS,
-      memory: startMemory,
+      memory: totalTokenSupplyMemory,
     });
     // NOTE: all tests will start with this gateway joined to the network - use `sharedMemory` for the first interaction for each test to avoid having to join the network again
     sharedMemory = joinNetworkMemory;
@@ -119,7 +123,7 @@ describe('GatewayRegistry', async () => {
       const transferMemory = await transfer({
         recipient: gatewayAddress,
         quantity: 100_000_000_000,
-        sharedMemory,
+        memory: sharedMemory,
       });
 
       const tagNames = tags.map((tag) => tag.name);

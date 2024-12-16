@@ -1,5 +1,5 @@
 import { assertNoResultError } from './utils.mjs';
-import { describe, it, before } from 'node:test';
+import { describe, it, before, beforeEach, afterEach } from 'node:test';
 import {
   handle,
   startMemory,
@@ -12,6 +12,7 @@ import {
   returnedNamesPeriod,
   buyRecord,
   baseLeasePriceFor9CharNameFor3Years,
+  totalTokenSupply,
 } from './helpers.mjs';
 import assert from 'node:assert';
 import {
@@ -23,18 +24,34 @@ import {
   STUB_OPERATOR_ADDRESS,
   STUB_TIMESTAMP,
 } from '../tools/constants.mjs';
+import { assertNoInvariants } from './invariants.mjs';
 
 // EIP55-formatted test address
 const testEthAddress = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa';
 
 describe('ArNS', async () => {
+  let sharedMemory;
+  beforeEach(async () => {
+    const { Memory: totalTokenSupplyMemory } = await totalTokenSupply({
+      memory: startMemory,
+    });
+    sharedMemory = totalTokenSupplyMemory;
+  });
+
+  afterEach(async () => {
+    await assertNoInvariants({
+      timestamp: STUB_TIMESTAMP,
+      memory: sharedMemory,
+    });
+  });
+
   const runBuyRecord = async ({
     sender = STUB_ADDRESS,
     processId = ''.padEnd(43, 'a'),
     transferQty = 1_000_000_000_000,
     name = 'test-name',
     type = 'lease',
-    memory,
+    memory = sharedMemory,
   }) => {
     if (sender != PROCESS_OWNER) {
       // transfer from the owner to the sender
@@ -42,6 +59,7 @@ describe('ArNS', async () => {
         recipient: sender,
         quantity: transferQty,
         cast: true,
+        memory,
       });
     }
 
@@ -158,6 +176,7 @@ describe('ArNS', async () => {
             { name: 'Process-Id', value: ''.padEnd(43, 'a') },
           ],
         },
+        memory: sharedMemory,
       });
       const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
 
@@ -216,6 +235,7 @@ describe('ArNS', async () => {
             { name: 'Process-Id', value: ''.padEnd(43, 'a') },
           ],
         },
+        memory: sharedMemory,
       });
 
       const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
@@ -246,7 +266,7 @@ describe('ArNS', async () => {
   describe('Increase-Undername-Limit', () => {
     it('should increase the undernames by spending from balance', async () => {
       const assertIncreaseUndername = async (sender) => {
-        let memory = startMemory;
+        let memory = sharedMemory;
 
         if (sender != PROCESS_OWNER) {
           const transferResult = await handle({
@@ -260,6 +280,7 @@ describe('ArNS', async () => {
                 { name: 'Cast', value: true },
               ],
             },
+            memory: sharedMemory,
           });
           memory = transferResult.Memory;
         }
@@ -311,7 +332,7 @@ describe('ArNS', async () => {
 
     it('should increase the undernames by spending from stakes', async () => {
       const assertIncreaseUndername = async (sender) => {
-        let memory = startMemory;
+        let memory = sharedMemory;
 
         if (sender != PROCESS_OWNER) {
           // Send enough money to the user to delegate stake, buy record, and increase undername limit
@@ -404,6 +425,7 @@ describe('ArNS', async () => {
         options: {
           Tags: [{ name: 'Action', value: 'Get-Registration-Fees' }],
         },
+        memory: sharedMemory,
       });
 
       const priceList = JSON.parse(priceListResult.Messages[0].Data);
@@ -425,6 +447,7 @@ describe('ArNS', async () => {
         recipient: STUB_ADDRESS,
         quantity: 400_000_000,
         cast: true,
+        memory: sharedMemory,
       });
 
       const result = await handle({
@@ -468,6 +491,7 @@ describe('ArNS', async () => {
             { name: 'Process-Id', value: ''.padEnd(43, 'a') },
           ],
         },
+        memory: sharedMemory,
       });
 
       // assert no error tag
@@ -503,6 +527,7 @@ describe('ArNS', async () => {
             { name: 'Process-Id', value: ''.padEnd(43, 'a') },
           ],
         },
+        memory: sharedMemory,
       });
 
       // assert no error tag
@@ -537,6 +562,7 @@ describe('ArNS', async () => {
             { name: 'Process-Id', value: ''.padEnd(43, 'a') },
           ],
         },
+        memory: sharedMemory,
       });
 
       // assert no error tag
@@ -563,6 +589,7 @@ describe('ArNS', async () => {
     it('should return the correct cost of creating a primary name request', async () => {
       const memory = await transfer({
         quantity: 1000000000,
+        memory: sharedMemory,
       });
       const { memory: buyMemory } = await buyRecord({
         from: STUB_ADDRESS,
@@ -616,6 +643,7 @@ describe('ArNS', async () => {
             { name: 'Process-Id', value: ''.padEnd(43, 'a') },
           ],
         },
+        memory: sharedMemory,
       });
       const recordResultBefore = await handle({
         options: {
@@ -654,7 +682,7 @@ describe('ArNS', async () => {
     });
 
     it('should properly handle extending a leased record paying with balance and stakes', async () => {
-      let memory = startMemory;
+      let memory = sharedMemory;
       const stakeResult = await setUpStake({
         memory,
         transferQty: 700000000, // 600000000 for name purchase + 100000000 for extending the lease
@@ -739,6 +767,7 @@ describe('ArNS', async () => {
           ],
           Timestamp: buyRecordTimestamp,
         },
+        memory: sharedMemory,
       });
 
       // assert no error tag
@@ -786,7 +815,7 @@ describe('ArNS', async () => {
     });
 
     it('should properly handle upgrading a name paying with balance and stakes', async () => {
-      let memory = startMemory;
+      let memory = sharedMemory;
       const stakeResult = await setUpStake({
         memory,
         transferQty: 3_100_000_000, // 60,000,0000 for name purchase + 2,500,000,000 for upgrading the name
@@ -1046,6 +1075,7 @@ describe('ArNS', async () => {
         processId: ''.padEnd(43, 'a'),
         type: 'lease',
         years: 1,
+        memory: sharedMemory,
       });
 
       // tick the contract after the lease leaves its grace period
@@ -1529,7 +1559,7 @@ describe('ArNS', async () => {
   describe('Paginated-Records', () => {
     it('should paginate records correctly', async () => {
       // buy 3 records
-      let buyRecordsMemory; // updated after each purchase
+      let buyRecordsMemory = sharedMemory; // updated after each purchase
       const recordsCount = 3;
       for (let i = 0; i < recordsCount; i++) {
         const buyRecordsResult = await handle({
@@ -1610,6 +1640,7 @@ describe('ArNS', async () => {
     before(async () => {
       // add a gateway and distribute to increment stats
       const { memory: join1Memory } = await joinNetwork({
+        memory: sharedMemory,
         address: joinedGateway,
         quantity: 300_000_000_000,
         timestamp: firstEpochTimestamp - 1000 * 60 * 60 * 24 * 365, // 365 days before the first epoch

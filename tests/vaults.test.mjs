@@ -1,5 +1,5 @@
 import { assertNoResultError } from './utils.mjs';
-import { describe, it, before } from 'node:test';
+import { describe, it, before, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import {
   DEFAULT_HANDLE_OPTIONS,
@@ -12,9 +12,26 @@ import {
   startMemory,
   createVault,
   createVaultedTransfer,
+  totalTokenSupply,
 } from './helpers.mjs';
+import { assertNoInvariants } from './invariants.mjs';
 
 describe('Vaults', async () => {
+  let sharedMemory = startMemory;
+  beforeEach(async () => {
+    const { Memory: totalTokenSupplyMemory } = await totalTokenSupply({
+      memory: startMemory,
+    });
+    sharedMemory = totalTokenSupplyMemory;
+  });
+
+  afterEach(async () => {
+    await assertNoInvariants({
+      timestamp: STUB_TIMESTAMP,
+      memory: sharedMemory,
+    });
+  });
+
   const assertVaultExists = async ({ vaultId, address, memory }) => {
     const vault = await handle({
       options: {
@@ -43,12 +60,14 @@ describe('Vaults', async () => {
         options: {
           Tags: [{ name: 'Action', value: 'Balance' }],
         },
+        memory: sharedMemory,
       });
       const balanceBeforeData = JSON.parse(balanceBefore.Messages[0].Data);
       const { result: createVaultResult } = await createVault({
         quantity,
         lockLengthMs,
         from: PROCESS_OWNER,
+        memory: sharedMemory,
       });
       // parse the data and ensure the vault was created
       const createVaultResultData = JSON.parse(
@@ -100,12 +119,14 @@ describe('Vaults', async () => {
         options: {
           Tags: [{ name: 'Action', value: 'Balance' }],
         },
+        memory: sharedMemory,
       });
       const balanceBeforeData = JSON.parse(balanceBefore.Messages[0].Data);
       const { result: createVaultResult } = await createVault({
         quantity,
         lockLengthMs,
         shouldAssertNoResultError: false,
+        memory: sharedMemory,
       });
 
       const actionTag = createVaultResult.Messages?.[0]?.Tags?.find(
@@ -143,6 +164,7 @@ describe('Vaults', async () => {
       const { result: createVaultResult } = await createVault({
         quantity,
         lockLengthMs,
+        memory: sharedMemory,
       });
 
       // ensure no error
@@ -199,6 +221,7 @@ describe('Vaults', async () => {
       const { result: createVaultResult } = await createVault({
         quantity,
         lockLengthMs,
+        memory: sharedMemory,
       });
 
       // ensure no error
@@ -262,6 +285,7 @@ describe('Vaults', async () => {
           quantity,
           lockLengthMs,
           recipient,
+          memory: sharedMemory,
         });
 
       // it should create two messages, one for sender and other for recipient
@@ -317,6 +341,7 @@ describe('Vaults', async () => {
           lockLengthMs,
           recipient,
           shouldAssertNoResultError: false,
+          memory: sharedMemory,
         });
 
       const errorTag = createVaultedTransferResult.Messages?.[0]?.Tags?.find(
@@ -339,6 +364,7 @@ describe('Vaults', async () => {
           lockLengthMs,
           recipient,
           shouldAssertNoResultError: false,
+          memory: sharedMemory,
         });
 
       const errorTag = createVaultedTransferResult.Messages?.[0]?.Tags?.find(
@@ -360,6 +386,7 @@ describe('Vaults', async () => {
           recipient,
           allowUnsafeAddresses: true,
           msgId,
+          memory: sharedMemory,
         });
 
       const createdVaultData = await assertVaultExists({
@@ -377,7 +404,7 @@ describe('Vaults', async () => {
   });
 
   describe('getPaginatedVaults', () => {
-    let paginatedVaultMemory = startMemory; // save the memory
+    let paginatedVaultMemory = sharedMemory; // save the memory
     const vaultId1 = 'unique-id-1-'.padEnd(43, 'a');
     const secondVaulter = 'unique-second-address-'.padEnd(43, 'a');
     const vaultId2 = 'unique-id-2-'.padEnd(43, 'a');
@@ -386,7 +413,7 @@ describe('Vaults', async () => {
       const { memory: updatedMemory } = await createVault({
         quantity: 500000000,
         lockLengthMs: 1209600000,
-        memory: startMemory,
+        memory: sharedMemory,
         msgId: vaultId1,
       });
 
