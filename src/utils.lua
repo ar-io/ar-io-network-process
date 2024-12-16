@@ -255,11 +255,18 @@ function utils.isValidArweaveAddress(address)
 	return type(address) == "string" and #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
 end
 
---- Checks if an address is a valid Ethereum address
+--- Checks if an address looks like an unformatted Ethereum address
+--- @param address string The address to check
+--- @return boolean isValidUnformattedEthAddress - whether the address is a valid unformatted Ethereum address
+function utils.isValidUnformattedEthAddress(address)
+	return type(address) == "string" and #address == 42 and string.match(address, "^0x[%x]+$") ~= nil
+end
+
+--- Checks if an address is a valid Ethereum address and is in EIP-55 checksum format
 --- @param address string The address to check
 --- @return boolean isValidEthAddress - whether the address is a valid Ethereum address
 function utils.isValidEthAddress(address)
-	return type(address) == "string" and #address == 42 and string.match(address, "^0x[%x]+$") ~= nil
+	return utils.isValidUnformattedEthAddress(address) and address == utils.formatEIP55Address(address)
 end
 
 --- Checks if an address is a valid AO address
@@ -299,7 +306,7 @@ end
 --- @param address string The address to format
 --- @return string formattedAddress - the EIP-55 checksum formatted address
 function utils.formatAddress(address)
-	if utils.isValidEthAddress(address) then
+	if utils.isValidUnformattedEthAddress(address) then
 		return utils.formatEIP55Address(address)
 	end
 	return address
