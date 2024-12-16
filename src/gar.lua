@@ -181,19 +181,17 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 	assert(gar.isGatewayEligibleToLeave(gateway, currentTimestamp), "The gateway is not eligible to leave the network.")
 
 	local gatewayEndTimestamp = currentTimestamp + gar.getSettings().operators.leaveLengthMs
-	local gatewayStakeWithdrawTimestamp = currentTimestamp + gar.getSettings().operators.withdrawLengthMs
-
 	local minimumStakedTokens = math.min(gar.getSettings().operators.minStake, gateway.operatorStake)
 
 	-- if the slash happens to be 100% we do not need to vault anything
 	if minimumStakedTokens > 0 then
-		createGatewayWithdrawVault(gateway, from, minimumStakedTokens, currentTimestamp, gatewayEndTimestamp)
+		createGatewayExitVault(gateway, minimumStakedTokens, currentTimestamp, from)
 
 		-- if there is more than the minimum staked tokens, we need to vault the rest but on shorter term
 		local remainingStake = gateway.operatorStake - gar.getSettings().operators.minStake
 
 		if remainingStake > 0 then
-			createGatewayWithdrawVault(gateway, msgId, remainingStake, currentTimestamp, gatewayStakeWithdrawTimestamp)
+			createGatewayWithdrawVault(gateway, msgId, remainingStake, currentTimestamp)
 		end
 	end
 
@@ -896,7 +894,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 			-- first, return any expired vaults regardless of the gateway status
 			for vaultId, vault in pairs(gateway.vaults) do
 				if vault.endTimestamp <= currentTimestamp then
-					fulfillGatewayWithdrawVault(gateway, address, vaultId)
+					unlockGatewayWithdrawVault(gateway, address, vaultId)
 
 					result.gatewayStakeReturned = result.gatewayStakeReturned + vault.balance
 				end
@@ -905,7 +903,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 			for delegateAddress, delegate in pairs(gateway.delegates) do
 				for vaultId, vault in pairs(delegate.vaults) do
 					if vault.endTimestamp <= currentTimestamp then
-						fulfillGatewayDelegateVault(gateway, delegateAddress, vaultId)
+						unlockGatewayDelegateVault(gateway, delegateAddress, vaultId)
 						result.delegateStakeReturned = result.delegateStakeReturned + vault.balance
 					end
 				end
@@ -1882,14 +1880,26 @@ end
 --- @param vaultId WalletAddress | MessageId
 --- @param qty mIO
 --- @param currentTimestamp Timestamp
---- @param endTimestamp Timestamp
-function createGatewayWithdrawVault(gateway, vaultId, qty, currentTimestamp, endTimestamp)
+function createGatewayWithdrawVault(gateway, vaultId, qty, currentTimestamp)
 	assert(not gateway.vaults[vaultId], "Vault already exists")
 
 	gateway.vaults[vaultId] = {
 		balance = qty,
 		startTimestamp = currentTimestamp,
-		endTimestamp = endTimestamp,
+		endTimestamp = currentTimestamp + gar.getSettings().operators.withdrawLengthMs,
+	}
+end
+
+--- @param gateway Gateway
+--- @param qty mIO
+--- @param currentTimestamp Timestamp
+--- @param gatewayAddress WalletAddress
+function createGatewayExitVault(gateway, qty, currentTimestamp, gatewayAddress)
+	assert(not gateway.vaults[gatewayAddress], "Exit Vault already exists")
+	gateway.vaults[gatewayAddress] = {
+		balance = qty,
+		startTimestamp = currentTimestamp,
+		endTimestamp = currentTimestamp + gar.getSettings().operators.leaveLengthMs,
 	}
 end
 
@@ -1919,7 +1929,7 @@ end
 ---@param gateway Gateway
 ---@param gatewayAddress WalletAddress
 ---@param vaultId MessageId
-function fulfillGatewayWithdrawVault(gateway, gatewayAddress, vaultId)
+function unlockGatewayWithdrawVault(gateway, gatewayAddress, vaultId)
 	local vault = gateway.vaults[vaultId]
 	assert(vault, "Vault not found")
 	balances.increaseBalance(gatewayAddress, vault.balance)
@@ -1941,7 +1951,7 @@ end
 
 ---@param gateway Gateway
 ---@param delegateAddress WalletAddress
-function fulfillGatewayDelegateVault(gateway, delegateAddress, vaultId)
+function unlockGatewayDelegateVault(gateway, delegateAddress, vaultId)
 	local delegate = gateway.delegates[delegateAddress]
 	assert(delegate, "Delegate not found")
 	local vault = delegate.vaults[vaultId]
