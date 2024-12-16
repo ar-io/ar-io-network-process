@@ -24,7 +24,7 @@ import {
   epochLength,
   totalTokenSupply,
 } from './helpers.mjs';
-import { describe, it, beforeEach, afterEach, before } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import {
   STUB_TIMESTAMP,
@@ -1236,7 +1236,7 @@ describe('GatewayRegistry', async () => {
     const observerAddress = 'observer-address-'.padEnd(43, 'a');
 
     let gatewayMemory = sharedMemory;
-    before(async () => {
+    beforeEach(async () => {
       // Join a gateway with the observer
       const gatewayAddress = 'gateway-address-'.padEnd(43, 'a');
       const { memory: addGatewayMemory } = await joinNetwork({
