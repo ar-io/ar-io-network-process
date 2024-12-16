@@ -508,7 +508,9 @@ end
 function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
 	local epochStartTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 	local activeGatewayAddresses = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
-	local totalEligibleRewards = math.floor(balances.getBalance(ao.id) * epochs.getSettings().rewardPercentage)
+	local protocolBalance = balances.getBalance(ao.id)
+	local rewardRate = epochs.getRewardRateForEpoch(epochIndex)
+	local totalEligibleRewards = math.floor(protocolBalance * rewardRate)
 	local eligibleGatewayReward = math.floor(totalEligibleRewards * 0.90 / #activeGatewayAddresses) -- TODO: make these setting variables
 	local eligibleObserverReward = math.floor(totalEligibleRewards * 0.10 / #prescribedObservers) -- TODO: make these setting variables
 	local prescribedObserversLookup = utils.reduce(prescribedObservers, function(acc, _, observer)
@@ -764,6 +766,21 @@ end
 
 function epochs.nextEpochsPruneTimestamp()
 	return NextEpochsPruneTimestamp
+end
+
+---@param epochIndex number
+---@returns number
+function epochs.getRewardRateForEpoch(epochIndex)
+	if epochIndex <= constants.rewardDecayStartEpoch then
+		return constants.minimumRewardRate
+	elseif epochIndex <= constants.rewardDecayLastEpoch then
+		local totalDecayPeriod = (constants.rewardDecayLastEpoch - constants.rewardDecayStartEpoch) + 1
+		local epochsAlreadyDecayed = (epochIndex - constants.rewardDecayStartEpoch)
+		local decayRatePerEpoch = (constants.maximumRewardRate - constants.minimumRewardRate) / totalDecayPeriod
+		return constants.maximumRewardRate - (decayRatePerEpoch * epochsAlreadyDecayed)
+	else
+		return constants.minimumRewardRate
+	end
 end
 
 return epochs

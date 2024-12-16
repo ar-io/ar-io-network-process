@@ -3,19 +3,37 @@ import {
   handle,
   parseEventsFromResult,
   setUpStake,
+  startMemory,
+  totalTokenSupply,
   transfer,
 } from './helpers.mjs';
 import assert from 'assert';
-import { describe, it } from 'node:test';
-import { STUB_ADDRESS } from '../tools/constants.mjs';
+import { describe, it, beforeEach, afterEach } from 'node:test';
+import { STUB_ADDRESS, STUB_TIMESTAMP } from '../tools/constants.mjs';
+import { assertNoInvariants } from './invariants.mjs';
 
 describe('primary names', function () {
+  let sharedMemory;
+  beforeEach(async () => {
+    const { Memory: totalTokenSupplyMemory } = await totalTokenSupply({
+      memory: startMemory,
+    });
+    sharedMemory = totalTokenSupplyMemory;
+  });
+
+  afterEach(async () => {
+    await assertNoInvariants({
+      timestamp: STUB_TIMESTAMP,
+      memory: sharedMemory,
+    });
+  });
+
   const buyRecord = async ({
     name,
     processId,
     type = 'permabuy',
     years = 1,
-    memory,
+    memory = sharedMemory,
   }) => {
     const buyRecordResult = await handle({
       options: {
@@ -302,7 +320,10 @@ describe('primary names', function () {
     const primaryNameLookupResult = JSON.parse(
       primaryNameForAddressResult.Messages[0].Data,
     );
-    assert.deepStrictEqual(primaryNameLookupResult, expectedNewPrimaryName);
+    assert.deepStrictEqual(primaryNameLookupResult, {
+      ...expectedNewPrimaryName,
+      processId,
+    });
 
     // reverse lookup the owner of the primary name
     const { result: ownerOfPrimaryNameResult } = await getOwnerOfPrimaryName({
@@ -311,7 +332,10 @@ describe('primary names', function () {
     });
 
     const ownerResult = JSON.parse(ownerOfPrimaryNameResult.Messages[0].Data);
-    assert.deepStrictEqual(ownerResult, expectedNewPrimaryName);
+    assert.deepStrictEqual(ownerResult, {
+      ...expectedNewPrimaryName,
+      processId,
+    });
   });
 
   it('should immediately approve a primary name for an existing base name when the caller of the request is the base name owner', async function () {
@@ -402,7 +426,10 @@ describe('primary names', function () {
     const primaryNameLookupResult = JSON.parse(
       primaryNameForAddressResult.Messages[0].Data,
     );
-    assert.deepStrictEqual(primaryNameLookupResult, expectedNewPrimaryName);
+    assert.deepStrictEqual(primaryNameLookupResult, {
+      ...expectedNewPrimaryName,
+      processId,
+    });
 
     // reverse lookup the owner of the primary name
     const { result: ownerOfPrimaryNameResult } = await getOwnerOfPrimaryName({
@@ -411,7 +438,10 @@ describe('primary names', function () {
     });
 
     const ownerResult = JSON.parse(ownerOfPrimaryNameResult.Messages[0].Data);
-    assert.deepStrictEqual(ownerResult, expectedNewPrimaryName);
+    assert.deepStrictEqual(ownerResult, {
+      ...expectedNewPrimaryName,
+      processId,
+    });
   });
 
   it('should allow removing a primary named by the owner or the owner of the base record', async function () {

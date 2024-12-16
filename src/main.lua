@@ -157,6 +157,8 @@ local function adjustSuppliesForFundingPlan(fundingPlan, rewardForInitiator)
 	LastKnownCirculatingSupply = LastKnownCirculatingSupply - fundingPlan.balance + rewardForInitiator
 end
 
+--- @param ioEvent table
+--- @param result BuyRecordResult|RecordInteractionResult
 local function addResultFundingPlanFields(ioEvent, result)
 	ioEvent:addFieldsWithPrefixIfExist(result.fundingPlan, "FP-", { "balance" })
 	local fundingPlanVaultsCount = 0
@@ -194,14 +196,20 @@ local function addResultFundingPlanFields(ioEvent, result)
 		ioEvent:addField("New-Withdraw-Vaults-Count", newWithdrawVaultsTallies.count)
 		ioEvent:addField("New-Withdraw-Vaults-Total-Balance", newWithdrawVaultsTallies.totalBalance)
 	end
-	adjustSuppliesForFundingPlan(result.fundingPlan, result.rewardForInitiator)
+	adjustSuppliesForFundingPlan(result.fundingPlan, result.returnedName and result.returnedName.rewardForInitiator)
 end
 
+--- @param ioEvent table
+---@param result RecordInteractionResult|BuyRecordResult
 local function addRecordResultFields(ioEvent, result)
-	ioEvent:addFieldsIfExist(
-		result,
-		{ "baseRegistrationFee", "remainingBalance", "protocolBalance", "recordsCount", "reservedRecordsCount" }
-	)
+	ioEvent:addFieldsIfExist(result, {
+		"baseRegistrationFee",
+		"remainingBalance",
+		"protocolBalance",
+		"recordsCount",
+		"reservedRecordsCount",
+		"totalFee",
+	})
 	ioEvent:addFieldsIfExist(result.record, { "startTimestamp", "endTimestamp", "undernameLimit", "purchasePrice" })
 	if result.df ~= nil and type(result.df) == "table" then
 		ioEvent:addField("DF-Trailing-Period-Purchases", (result.df.trailingPeriodPurchases or {}))
@@ -904,7 +912,6 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 	local result = arns.extendLease(msg.From, name, years, timestamp, msg.Id, fundFrom)
 	local recordResult = {}
 	if result ~= nil then
-		msg.ioEvent:addField("Total-Extension-Fee", result.totalExtensionFee)
 		addRecordResultFields(msg.ioEvent, result)
 		addSupplyData(msg.ioEvent)
 		recordResult = result.record
@@ -938,8 +945,7 @@ addEventingHandler(
 		if result ~= nil then
 			recordResult = result.record
 			addRecordResultFields(msg.ioEvent, result)
-			msg.ioEvent:addField("previousUndernameLimit", recordResult.undernameLimit - msg.Tags.Quantity)
-			msg.ioEvent:addField("additionalUndernameCost", result.additionalUndernameCost)
+			msg.ioEvent:addField("Previous-Undername-Limit", recordResult.undernameLimit - msg.Tags.Quantity)
 			addSupplyData(msg.ioEvent)
 		end
 

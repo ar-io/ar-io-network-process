@@ -1,5 +1,5 @@
-import { assertNoResultError, createAosLoader } from './utils.mjs';
-import { describe, it } from 'node:test';
+import { assertNoResultError } from './utils.mjs';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import {
   DEFAULT_HANDLE_OPTIONS,
@@ -22,17 +22,34 @@ import {
   handle,
   startMemory,
   returnedNamesPeriod,
+  totalTokenSupply,
 } from './helpers.mjs';
+import { assertNoInvariants } from './invariants.mjs';
 
 const genesisEpochStart = 1722837600000 + 1;
 const epochDurationMs = 60 * 1000 * 60 * 24; // 24 hours
 const distributionDelayMs = 60 * 1000 * 40; // 40 minutes (~ 20 arweave blocks)
 
 describe('Tick', async () => {
+  let sharedMemory;
+  beforeEach(async () => {
+    const { Memory: totalTokenSupplyMemory } = await totalTokenSupply({
+      memory: startMemory,
+    });
+    sharedMemory = totalTokenSupplyMemory;
+  });
+
+  afterEach(async () => {
+    await assertNoInvariants({
+      timestamp: STUB_TIMESTAMP,
+      memory: sharedMemory,
+    });
+  });
+
   const transfer = async ({
     recipient = STUB_ADDRESS,
     quantity = 100_000_000_000,
-    memory = startMemory,
+    memory = sharedMemory,
   } = {}) => {
     const transferResult = await handle({
       options: {
@@ -58,7 +75,7 @@ describe('Tick', async () => {
   };
 
   it('should prune record that are expired and after the grace period and create returned names for them', async () => {
-    let memory = startMemory;
+    let memory = sharedMemory;
     const buyRecordResult = await handle({
       options: {
         Tags: [
@@ -221,6 +238,7 @@ describe('Tick', async () => {
       options: {
         Tags: [{ name: 'Action', value: 'Balance' }],
       },
+      memory: sharedMemory,
     });
     const balanceBeforeData = JSON.parse(balanceBefore.Messages[0].Data);
     const createVaultResult = await handle({
@@ -240,6 +258,7 @@ describe('Tick', async () => {
           },
         ],
       },
+      memory: sharedMemory,
     });
     // parse the data and ensure the vault was created
     const createVaultResultData = JSON.parse(
@@ -415,8 +434,8 @@ describe('Tick', async () => {
     });
 
     // get the epoch timestamp and assert it is in 24 hours
-    const protocolBalanceAtStartOfEpoch = 50_000_000_0000; // 50M ARIO
-    const totalEligibleRewards = protocolBalanceAtStartOfEpoch * 0.05; // 5% of the protocol balance
+    const protocolBalanceAtStartOfEpoch = 50_000_000_000_000; // 50M ARIO
+    const totalEligibleRewards = protocolBalanceAtStartOfEpoch * 0.0005; // 0.05% of the protocol balance
     const totalGatewayRewards = Math.ceil(totalEligibleRewards * 0.9); // 90% go to gateways
     const totalObserverRewards = Math.floor(totalEligibleRewards * 0.1); // 10% go to observers
     const totalEligibleGatewayRewards =
@@ -612,7 +631,7 @@ describe('Tick', async () => {
         Tags: [{ name: 'Action', value: 'Tick' }],
         Timestamp: genesisEpochStart,
       },
-      memory: startMemory,
+      memory: sharedMemory,
     });
     const genesisFee = await getBaseRegistrationFeeForName({
       memory: genesisEpochTick.Memory,
@@ -698,7 +717,7 @@ describe('Tick', async () => {
         Tags: [{ name: 'Action', value: 'Tick' }],
         Timestamp: genesisEpochStart,
       },
-      memory: startMemory,
+      memory: sharedMemory,
     });
 
     const baseFeeAtZeroEpoch = await getBaseRegistrationFeeForName({
