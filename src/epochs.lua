@@ -672,7 +672,9 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 							delegateAddress,
 							actualDelegateReward
 						)
-						balances.reduceBalance(ao.id, actualDelegateReward)
+						if actualDelegateReward > 0 then
+							balances.reduceBalance(ao.id, actualDelegateReward)
+						end
 					end
 					-- increment the total distributed
 					totalDistributed = math.floor(totalDistributed + actualDelegateReward)
