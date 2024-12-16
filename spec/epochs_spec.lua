@@ -497,7 +497,7 @@ describe("epochs", function()
 				local epochEndTimestamp = epochStartTimestamp + settings.durationMs
 				local epochDistributionTimestamp = epochEndTimestamp + settings.distributionDelayMs
 				local epochStartBlockHeight = 0
-				local expectedEligibleRewards = math.floor(protocolBalance * constants.defaultRewardRate)
+				local expectedEligibleRewards = math.floor(protocolBalance * constants.minimumRewardRate)
 				local expectedTotalGatewayReward = math.floor(expectedEligibleRewards * 0.90)
 				local expectedTotalObserverReward = math.floor(expectedEligibleRewards * 0.10)
 				local expectedPerGatewayReward = math.floor(expectedTotalGatewayReward / 1) -- only one gateway in the registry
@@ -940,9 +940,9 @@ describe("epochs", function()
 	end)
 
 	describe("getRewardRateForEpoch", function()
-		it("returns 0.05% for the first 365 epochs (one year)", function()
-			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(0))
+		it("returns 0.05% for the first 365 epochs (approximately one year)", function()
 			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(1))
+			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(2))
 			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(364))
 			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(365))
 		end)
@@ -955,10 +955,10 @@ describe("epochs", function()
 			assert.are.equal(0.0005109289617486338685, epochs.getRewardRateForEpoch(544))
 			assert.are.equal(0.00050819672131147543108, epochs.getRewardRateForEpoch(545))
 			assert.are.equal(0.00050546448087431699366, epochs.getRewardRateForEpoch(546))
-			assert.are.equal(0.00050273224043715855625, epochs.getRewardRateForEpoch(547))
+			assert.are.equal(0.00050273224043715844783, epochs.getRewardRateForEpoch(547))
 		end)
 
-		it("returns 0.05% after 548 epochs", function()
+		it("returns 0.05% after 547 epochs (approximately 1.5 years)", function()
 			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(548))
 			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(730))
 			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(12053))

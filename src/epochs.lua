@@ -768,16 +768,18 @@ function epochs.nextEpochsPruneTimestamp()
 	return NextEpochsPruneTimestamp
 end
 
+---@param epochIndex number
+---@returns number
 function epochs.getRewardRateForEpoch(epochIndex)
 	if epochIndex <= constants.rewardDecayStartEpoch then
-		return constants.defaultRewardRate
-	elseif epochIndex < constants.rewardDecayEndEpoch then
-		return constants.decayStartingRewardRate
-			- (epochIndex - constants.rewardDecayStartEpoch)
-				* (constants.decayStartingRewardRate - constants.defaultRewardRate)
-				/ (constants.rewardDecayEndEpoch - constants.rewardDecayStartEpoch)
+		return constants.minimumRewardRate
+	elseif epochIndex <= constants.rewardDecayLastEpoch then
+		local totalDecayPeriod = (constants.rewardDecayLastEpoch - constants.rewardDecayStartEpoch) + 1
+		local epochsAlreadyDecayed = (epochIndex - constants.rewardDecayStartEpoch)
+		local decayRatePerEpoch = (constants.maximumRewardRate - constants.minimumRewardRate) / totalDecayPeriod
+		return constants.maximumRewardRate - (decayRatePerEpoch * epochsAlreadyDecayed)
 	else
-		return constants.defaultRewardRate
+		return constants.minimumRewardRate
 	end
 end
 
