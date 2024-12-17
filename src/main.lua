@@ -1909,12 +1909,8 @@ end)
 
 addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
-	local providedEpochIndex = msg.Tags["Epoch-Index"]
-	local timestamp = msg.Timestamp
-
-	assert(providedEpochIndex or timestamp, "Epoch index or timestamp is required")
-
-	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
+	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
+		or epochs.getEpochIndexForTimestamp(msg.Timestamp or msg.Tags.Timestamp)
 	local epoch = epochs.getEpoch(epochIndex)
 	Send(msg, { Target = msg.From, Action = "Epoch-Notice", Data = json.encode(epoch) })
 end)

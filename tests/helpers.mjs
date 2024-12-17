@@ -762,11 +762,16 @@ export const totalTokenSupply = async ({ memory, timestamp = 0 }) => {
   });
 };
 
-export const tick = async ({ memory, timestamp = STUB_TIMESTAMP }) => {
+export const tick = async ({
+  memory,
+  timestamp = STUB_TIMESTAMP,
+  forcePrune = false,
+}) => {
   const tickResult = await handle({
     options: {
       Tags: [{ name: 'Action', value: 'Tick' }],
       Timestamp: timestamp,
+      ...(forcePrune ? { name: 'Force-Prune', value: 'true' } : {}),
     },
     memory,
   });
@@ -785,7 +790,9 @@ export const getEpoch = async ({
     options: {
       Tags: [
         { name: 'Action', value: 'Epoch' },
-        ...(epochIndex ? [{ name: 'Epoch-Index', value: epochIndex }] : []),
+        ...(epochIndex !== undefined
+          ? [{ name: 'Epoch-Index', value: epochIndex }]
+          : []),
       ],
       Timestamp: timestamp,
     },
@@ -804,7 +811,9 @@ export const getPrescribedObservers = async ({
     options: {
       Tags: [
         { name: 'Action', value: 'Epoch-Prescribed-Observers' },
-        ...(epochIndex ? [{ name: 'Epoch-Index', value: epochIndex }] : []),
+        ...(epochIndex !== undefined
+          ? [{ name: 'Epoch-Index', value: epochIndex }]
+          : []),
       ],
       Timestamp: timestamp,
     },
@@ -823,7 +832,9 @@ export const getPrescribedNames = async ({
     options: {
       Tags: [
         { name: 'Action', value: 'Epoch-Prescribed-Names' },
-        ...(epochIndex ? [{ name: 'Epoch-Index', value: epochIndex }] : []),
+        ...(epochIndex !== undefined
+          ? [{ name: 'Epoch-Index', value: epochIndex }]
+          : []),
       ],
       Timestamp: timestamp,
     },
