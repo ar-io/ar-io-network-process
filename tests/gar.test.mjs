@@ -30,7 +30,7 @@ describe('GatewayRegistry', async () => {
 
   const delegateStake = async ({
     memory,
-    timestamp,
+    timestamp = STUB_TIMESTAMP,
     delegatorAddress,
     quantity,
     gatewayAddress,
@@ -41,6 +41,7 @@ describe('GatewayRegistry', async () => {
       recipient: delegatorAddress,
       quantity,
       memory,
+      timestamp,
     });
 
     const delegateResult = await handle(
@@ -578,6 +579,7 @@ describe('GatewayRegistry', async () => {
       const gateway = await getGateway({
         memory: sharedMemory,
         address: STUB_ADDRESS,
+        timestamp: STUB_TIMESTAMP,
       });
 
       // leave at timestamp
@@ -592,6 +594,7 @@ describe('GatewayRegistry', async () => {
       const leavingGateway = await getGateway({
         memory: leaveNetworkMemory,
         address: STUB_ADDRESS,
+        timestamp: leavingTimestamp,
       });
       assert.deepStrictEqual(leavingGateway, {
         ...gateway,
@@ -605,6 +608,7 @@ describe('GatewayRegistry', async () => {
         await getGatewayVaultsItems({
           memory: leaveNetworkMemory,
           gatewayAddress: STUB_ADDRESS,
+          timestamp: leavingTimestamp,
         }),
         [
           {
@@ -672,7 +676,6 @@ describe('GatewayRegistry', async () => {
         for (const delegateAddress of delegateAddresses) {
           const maybeDelegateResult = await delegateStake({
             memory: nextMemory,
-            timestamp: STUB_TIMESTAMP,
             delegatorAddress: delegateAddress,
             quantity: 500_000_000,
             gatewayAddress: STUB_ADDRESS,
@@ -976,6 +979,7 @@ describe('GatewayRegistry', async () => {
       const updatedGateway = await getGateway({
         address: STUB_ADDRESS,
         memory: decreaseStakeMemory,
+        timestamp: decreaseTimestamp,
       });
       assert.deepStrictEqual(updatedGateway, {
         ...gatewayBefore,
@@ -985,6 +989,7 @@ describe('GatewayRegistry', async () => {
         await getGatewayVaultsItems({
           memory: decreaseStakeMemory,
           gatewayAddress: STUB_ADDRESS,
+          timestamp: decreaseTimestamp,
         }),
         [
           {
@@ -1122,6 +1127,7 @@ describe('GatewayRegistry', async () => {
       const gatewayAfter = await getGateway({
         address: STUB_ADDRESS,
         memory: delegatedStakeMemory,
+        timestamp: delegationTimestamp,
       });
       assert.deepStrictEqual(gatewayAfter, {
         ...gatewayBefore,
@@ -1130,6 +1136,7 @@ describe('GatewayRegistry', async () => {
       const delegateItems = await getDelegatesItems({
         memory: delegatedStakeMemory,
         gatewayAddress: STUB_ADDRESS,
+        timestamp: delegationTimestamp,
       });
       assert.deepEqual(
         [
@@ -1161,6 +1168,7 @@ describe('GatewayRegistry', async () => {
       const gatewayBefore = await getGateway({
         address: STUB_ADDRESS,
         memory: delegatedStakeMemory,
+        timestamp: STUB_TIMESTAMP,
       });
       const { memory: decreaseStakeMemory } = await decreaseDelegateStake({
         memory: delegatedStakeMemory,
@@ -1174,6 +1182,7 @@ describe('GatewayRegistry', async () => {
       const gatewayAfter = await getGateway({
         address: STUB_ADDRESS,
         memory: decreaseStakeMemory,
+        timestamp: decreaseStakeTimestamp,
       });
       assert.deepStrictEqual(gatewayAfter, {
         ...gatewayBefore,
@@ -1182,6 +1191,7 @@ describe('GatewayRegistry', async () => {
       const delegateItems = await getDelegatesItems({
         memory: decreaseStakeMemory,
         gatewayAddress: STUB_ADDRESS,
+        timestamp: decreaseStakeTimestamp,
       });
       assert.deepEqual(
         [
@@ -1219,6 +1229,7 @@ describe('GatewayRegistry', async () => {
       const gatewayBefore = await getGateway({
         address: STUB_ADDRESS,
         memory: delegatedStakeMemory,
+        timestamp: STUB_TIMESTAMP,
       });
       const { memory: decreaseStakeMemory, result } =
         await decreaseDelegateStake({
@@ -1244,6 +1255,7 @@ describe('GatewayRegistry', async () => {
       const gatewayAfter = await getGateway({
         address: STUB_ADDRESS,
         memory: decreaseStakeMemory,
+        timestamp: decreaseStakeTimestamp,
       });
       assert.deepStrictEqual(gatewayAfter, gatewayBefore);
     });
@@ -1287,6 +1299,7 @@ describe('GatewayRegistry', async () => {
       const gatewayAfter = await getGateway({
         address: STUB_ADDRESS,
         memory: cancelWithdrawalMemory,
+        timestamp: decreaseStakeTimestamp,
       });
       // no changes to the gateway after a withdrawal is cancelled
       assert.deepStrictEqual(gatewayAfter, gatewayBefore);
@@ -1320,6 +1333,7 @@ describe('GatewayRegistry', async () => {
       const gatewayAfter = await getGateway({
         address: STUB_ADDRESS,
         memory: cancelWithdrawalMemory,
+        timestamp: decreaseStakeTimestamp,
       });
       // no changes to the gateway after a withdrawal is cancelled
       assert.deepStrictEqual(gatewayAfter, gatewayBefore);
@@ -1405,7 +1419,6 @@ describe('GatewayRegistry', async () => {
       const { memory: addGatewayMemory2 } = await joinNetwork({
         address: secondGatewayAddress,
         memory: sharedMemory,
-        timestamp: STUB_TIMESTAMP - 1,
       });
       let cursor;
       let fetchedGateways = [];
@@ -1459,7 +1472,6 @@ describe('GatewayRegistry', async () => {
       const { memory: addGatewayMemory2 } = await joinNetwork({
         address: secondGatewayAddress,
         memory: sharedMemory,
-        timestamp: STUB_TIMESTAMP - 1,
       });
 
       // Stake to both gateways
@@ -1503,6 +1515,7 @@ describe('GatewayRegistry', async () => {
               { name: 'Sort-Order', value: sortOrder },
               ...(cursor ? [{ name: 'Cursor', value: `${cursor}` }] : []),
             ],
+            Timestamp: STUB_TIMESTAMP + 2,
           },
           decreaseStakeMemory,
         );
@@ -1659,6 +1672,7 @@ describe('GatewayRegistry', async () => {
       const delegateItems = await getDelegatesItems({
         memory: delegatedStakeMemory,
         gatewayAddress: sourceAddress,
+        timestamp: STUB_TIMESTAMP,
       });
       assert.deepEqual(
         [
@@ -1784,6 +1798,7 @@ describe('GatewayRegistry', async () => {
       const delegateItems = await getDelegatesItems({
         memory: delegatedStakeMemory,
         gatewayAddress: sourceAddress,
+        timestamp: STUB_TIMESTAMP,
       });
       assert.deepStrictEqual(
         [
@@ -1827,6 +1842,7 @@ describe('GatewayRegistry', async () => {
         await getDelegatesItems({
           memory: redelegateStakeMemory,
           gatewayAddress: targetAddress,
+          timestamp: STUB_TIMESTAMP + 2,
         }),
         [
           {
@@ -1848,6 +1864,7 @@ describe('GatewayRegistry', async () => {
         await getDelegatesItems({
           memory: redelegateStakeMemory,
           gatewayAddress: sourceAddress,
+          timestamp: STUB_TIMESTAMP + 2,
         }),
         [],
       );

@@ -101,10 +101,8 @@ describe('Tick', async () => {
       buyRecordData.endTimestamp + 1000 * 60 * 60 * 24 * 14 + 1;
     const futureTickResult = await handle(
       {
-        Tags: [
-          { name: 'Action', value: 'Tick' },
-          { name: 'Timestamp', value: futureTimestamp.toString() },
-        ],
+        Tags: [{ name: 'Action', value: 'Tick' }],
+        Timestamp: futureTimestamp,
       },
       buyRecordResult.Memory,
     );
@@ -125,6 +123,7 @@ describe('Tick', async () => {
           { name: 'Action', value: 'Record' },
           { name: 'Name', value: 'test-name' },
         ],
+        Timestamp: futureTimestamp,
       },
       futureTickResult.Memory,
     );
@@ -140,6 +139,7 @@ describe('Tick', async () => {
           { name: 'Action', value: 'Auction-Info' },
           { name: 'Name', value: 'test-name' },
         ],
+        Timestamp: futureTimestamp,
       },
       futureTickResult.Memory,
     );
@@ -176,10 +176,7 @@ describe('Tick', async () => {
     );
 
     // assert no error tag
-    const errorTag = joinNetworkResult.Messages?.[0]?.Tags?.find(
-      (tag) => tag.name === 'Error',
-    );
-    assert.strictEqual(errorTag, undefined);
+    assertNoResultError(joinNetworkResult);
 
     // check the gateway record from contract
     const gateway = await handle(
@@ -223,10 +220,8 @@ describe('Tick', async () => {
     const futureTimestamp = leavingGatewayData.endTimestamp + 1;
     const futureTick = await handle(
       {
-        Tags: [
-          { name: 'Action', value: 'Tick' },
-          { name: 'Timestamp', value: futureTimestamp.toString() },
-        ],
+        Tags: [{ name: 'Action', value: 'Tick' }],
+        Timestamp: futureTimestamp,
       },
       leaveNetworkResult.Memory,
     );
@@ -238,6 +233,7 @@ describe('Tick', async () => {
           { name: 'Action', value: 'Gateway' },
           { name: 'Address', value: STUB_ADDRESS },
         ],
+        Timestamp: futureTimestamp,
       },
       futureTick.Memory,
     );
@@ -337,6 +333,7 @@ describe('Tick', async () => {
     const prunedVault = await handle(
       {
         Tags: [{ name: 'Action', value: 'Vault' }],
+        Timestamp: futureTimestamp,
       },
       futureTick.Memory,
     );
@@ -353,6 +350,7 @@ describe('Tick', async () => {
           { name: 'Action', value: 'Balance' },
           { name: 'Target', value: DEFAULT_HANDLE_OPTIONS.Owner },
         ],
+        Timestamp: futureTimestamp,
       },
       futureTick.Memory,
     );
@@ -655,6 +653,7 @@ describe('Tick', async () => {
     const delegateItems = await getDelegatesItems({
       memory: distributionTick.Memory,
       gatewayAddress: STUB_ADDRESS,
+      timestamp: distributionTimestamp,
     });
     assert.deepEqual(delegateItems, [
       {
@@ -691,6 +690,7 @@ describe('Tick', async () => {
       recipient: fundedUser,
       quantity: 100_000_000_000_000,
       memory: genesisEpochTick.Memory,
+      timestamp: genesisEpochStart,
     });
 
     // Buy records in this epoch
@@ -703,6 +703,7 @@ describe('Tick', async () => {
             { name: 'Name', value: 'test-name-' + i },
             { name: 'Purchase-Type', value: 'permabuy' },
           ],
+          Timestamp: genesisEpochStart,
         },
         buyRecordMemory,
       );
@@ -776,10 +777,7 @@ describe('Tick', async () => {
       const epochTimestamp = genesisEpochStart + (epochDurationMs + 1) * i;
       const { Memory } = await handle(
         {
-          Tags: [
-            { name: 'Action', value: 'Tick' },
-            { name: 'Timestamp', value: epochTimestamp.toString() },
-          ],
+          Tags: [{ name: 'Action', value: 'Tick' }],
           Timestamp: epochTimestamp,
         },
         tickMemory,

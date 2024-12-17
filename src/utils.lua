@@ -568,4 +568,70 @@ function utils.filterDictionary(tbl, predicate)
 	return filtered
 end
 
+--- Sanitizes inputs to ensure they are valid strings
+--- @param table table The table to sanitize
+--- @return table sanitizedTable - the sanitized table
+function utils.validateAndSanitizeInputs(table)
+	assert(type(table) == "table", "Table must be a table")
+	local sanitizedTable = {}
+	for key, value in pairs(table) do
+		assert(type(key) == "string", "Key must be a string")
+		assert(
+			type(value) == "string" or type(value) == "number" or type(value) == "boolean",
+			"Value must be a string, integer, or boolean"
+		)
+		if type(value) == "string" then
+			assert(#key > 0, "Key cannot be empty")
+			assert(#value > 0, "Value cannot be empty")
+			assert(not string.match(key, "^%s+$"), "Key cannot be only whitespace")
+			assert(not string.match(value, "^%s+$"), "Value cannot be only whitespace")
+		end
+		if type(value) == "boolean" then
+			assert(value == true or value == false, "Boolean value must be true or false")
+		end
+		if type(value) == "number" then
+			assert(utils.isInteger(value), "Number must be an integer")
+		end
+		sanitizedTable[key] = value
+	end
+
+	local knownAddressTags = {
+		"Recipient",
+		"Initiator",
+		"Target",
+		"Source",
+		"Address",
+		"Vault-Id",
+		"Process-Id",
+		"Observer-Address",
+	}
+
+	for _, tagName in ipairs(knownAddressTags) do
+		-- Format all incoming addresses
+		sanitizedTable[tagName] = sanitizedTable[tagName] and utils.formatAddress(sanitizedTable[tagName]) or nil
+	end
+
+	local knownNumberTags = {
+		"Quantity",
+		"Lock-Length",
+		"Operator-Stake",
+		"Delegated-Stake",
+		"Withdraw-Stake",
+		"Timestamp",
+		"Years",
+		"Min-Delegated-Stake",
+		"Port",
+		"Extend-Length",
+		"Delegate-Reward-Share-Ratio",
+		"Epoch-Index",
+		"Price-Interval-Ms",
+		"Block-Height",
+	}
+	for _, tagName in ipairs(knownNumberTags) do
+		-- Format all incoming numbers
+		sanitizedTable[tagName] = sanitizedTable[tagName] and tonumber(sanitizedTable[tagName]) or nil
+	end
+	return sanitizedTable
+end
+
 return utils
