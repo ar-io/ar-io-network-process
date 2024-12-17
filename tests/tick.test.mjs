@@ -108,6 +108,7 @@ describe('Tick', async () => {
           { name: 'Action', value: 'Record' },
           { name: 'Name', value: 'test-name' },
         ],
+        Timestamp: futureTimestamp,
       },
       memory: futureTickResult.Memory,
     });
@@ -181,6 +182,7 @@ describe('Tick', async () => {
     const prunedGateway = await getGateway({
       memory: futureTick.memory,
       address: STUB_ADDRESS,
+      timestamp: futureTimestamp,
     });
 
     assert.deepEqual(undefined, prunedGateway);
@@ -280,6 +282,7 @@ describe('Tick', async () => {
     const prunedVault = await handle({
       options: {
         Tags: [{ name: 'Action', value: 'Vault' }],
+        Timestamp: futureTimestamp,
       },
       memory: futureTick.Memory,
       shouldAssertNoResultError: false,
@@ -297,6 +300,7 @@ describe('Tick', async () => {
           { name: 'Action', value: 'Balance' },
           { name: 'Target', value: DEFAULT_HANDLE_OPTIONS.Owner },
         ],
+        Timestamp: futureTimestamp,
       },
       memory: futureTick.Memory,
     });
@@ -480,6 +484,7 @@ describe('Tick', async () => {
     const gateway = await getGateway({
       memory: distributionTick.memory,
       address: STUB_ADDRESS,
+      timestamp: distributionTimestamp,
     });
     assert.deepStrictEqual(gateway, {
       status: 'joined',
@@ -521,6 +526,7 @@ describe('Tick', async () => {
     const delegateItems = await getDelegatesItems({
       memory: distributionTick.memory,
       gatewayAddress: STUB_ADDRESS,
+      timestamp: distributionTimestamp,
     });
     assert.deepEqual(delegateItems, [
       {
@@ -557,6 +563,7 @@ describe('Tick', async () => {
       recipient: fundedUser,
       quantity: 100_000_000_000_000,
       memory: genesisEpochTick.Memory,
+      timestamp: genesisEpochStart,
     });
 
     // Buy records in this epoch
@@ -568,6 +575,7 @@ describe('Tick', async () => {
         name: `test-name-${i}`,
         purchaseType: 'permabuy',
         processId: processId,
+        timestamp: genesisEpochStart,
       });
       buyRecordMemory = buyRecordResult.Memory;
     }

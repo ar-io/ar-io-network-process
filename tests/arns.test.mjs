@@ -74,6 +74,7 @@ describe('ArNS', async () => {
           { name: 'Process-Id', value: processId },
           { name: 'Years', value: '1' },
         ],
+        Timestamp: STUB_TIMESTAMP,
       },
       memory,
     });
@@ -359,7 +360,6 @@ describe('ArNS', async () => {
                 { name: 'Quantity', value: `${650000000}` }, // delegate all of their balance
                 { name: 'Address', value: STUB_OPERATOR_ADDRESS }, // our gateway address
               ],
-              Timestamp: STUB_TIMESTAMP + 1,
             },
             memory,
           });
@@ -687,6 +687,7 @@ describe('ArNS', async () => {
         memory,
         transferQty: 700000000, // 600000000 for name purchase + 100000000 for extending the lease
         stakeQty: 650000000, // delegate most of their balance so that name purchase uses balance and stakes
+        timestamp: STUB_TIMESTAMP,
       });
 
       memory = stakeResult.memory;
@@ -821,6 +822,7 @@ describe('ArNS', async () => {
         transferQty: 3_100_000_000, // 60,000,0000 for name purchase + 2,500,000,000 for upgrading the name
         stakeQty: 3_100_000_000 - 50_000_000, // delegate most of their balance so that name purchase uses balance and stakes
         stakerAddress: STUB_ADDRESS,
+        timestamp: STUB_TIMESTAMP,
       });
       memory = stakeResult.memory;
 
@@ -1055,6 +1057,7 @@ describe('ArNS', async () => {
       const balancesResult = await handle({
         options: {
           Tags: [{ name: 'Action', value: 'Balances' }],
+          Timestamp: newBuyTimestamp,
         },
         memory: newBuyResult.Memory,
       });
@@ -1064,6 +1067,7 @@ describe('ArNS', async () => {
         initialRecord.purchasePrice +
         expectedRewardForProtocol;
       const balances = JSON.parse(balancesResult.Messages[0].Data);
+
       assert.equal(balances[initiator], expectedRewardForInitiator);
       assert.equal(balances[PROCESS_ID], expectedProtocolBalance);
       assert.equal(balances[newBuyerAddress], 0);
@@ -1075,6 +1079,7 @@ describe('ArNS', async () => {
         processId: ''.padEnd(43, 'a'),
         type: 'lease',
         years: 1,
+        timestamp: STUB_TIMESTAMP,
         memory: sharedMemory,
       });
 
@@ -1148,6 +1153,7 @@ describe('ArNS', async () => {
         recipient: bidderAddress,
         quantity: expectedPurchasePrice,
         memory: tickResult.Memory,
+        timestamp: bidTimestamp,
       });
 
       let memoryToUse = transferMemory;
@@ -1158,6 +1164,7 @@ describe('ArNS', async () => {
           transferQty: 0,
           stakeQty: expectedPurchasePrice,
           stakerAddress: bidderAddress,
+          timestamp: bidTimestamp,
         });
         memoryToUse = stakeResult.memory;
       }
@@ -1291,6 +1298,7 @@ describe('ArNS', async () => {
       const balancesResult = await handle({
         options: {
           Tags: [{ name: 'Action', value: 'Balances' }],
+          Timestamp: bidTimestamp,
         },
         memory: buyReturnedNameResult.Memory,
       });
@@ -1559,6 +1567,7 @@ describe('ArNS', async () => {
   describe('Paginated-Records', () => {
     it('should paginate records correctly', async () => {
       // buy 3 records
+      let lastTimestamp = STUB_TIMESTAMP;
       let buyRecordsMemory = sharedMemory; // updated after each purchase
       const recordsCount = 3;
       for (let i = 0; i < recordsCount; i++) {
@@ -1569,11 +1578,12 @@ describe('ArNS', async () => {
               { name: 'Name', value: `test-name-${i}` },
               { name: 'Process-Id', value: ''.padEnd(43, `${i}`) },
             ],
-            Timestamp: STUB_TIMESTAMP + i * 1000, // order of names is based on timestamp
+            Timestamp: lastTimestamp + i * 1000, // order of names is based on timestamp
           },
           memory: buyRecordsMemory,
         });
         buyRecordsMemory = buyRecordsResult.Memory;
+        lastTimestamp = lastTimestamp + i * 1000;
       }
 
       // call the paginated records handler repeatedly until all records are fetched
@@ -1587,6 +1597,7 @@ describe('ArNS', async () => {
               { name: 'Cursor', value: cursor },
               { name: 'Limit', value: 1 },
             ],
+            Timestamp: lastTimestamp,
           },
           memory: buyRecordsMemory,
         });
@@ -1661,6 +1672,7 @@ describe('ArNS', async () => {
             { name: 'Action', value: 'Gateway' },
             { name: 'Address', value: joinedGateway },
           ],
+          Timestamp: afterDistributionTimestamp,
         },
         memory: firstTickAndDistribution.Memory,
       });
@@ -1680,7 +1692,7 @@ describe('ArNS', async () => {
       const transferMemory = await transfer({
         recipient: nonEligibleAddress,
         quantity: 200_000_000_000,
-        timestamp: afterDistributionTimestamp - 1,
+        timestamp: afterDistributionTimestamp,
         memory: firstTickAndDistribution.Memory,
       });
       arnsDiscountMemory = transferMemory;
@@ -1725,6 +1737,7 @@ describe('ArNS', async () => {
             { name: 'Intent', value: 'Buy-Record' },
             { name: 'Name', value: 'test-name' },
           ],
+          Timestamp: afterDistributionTimestamp,
         },
         memory: arnsDiscountMemory,
       });
@@ -1918,6 +1931,7 @@ describe('ArNS', async () => {
                 From: nonEligibleAddress,
                 Owner: nonEligibleAddress,
                 Tags: upgradeToPermabuyTags,
+                Timestamp: upgradeToPermabuyTimestamp,
               },
               memory: buyRecordResult.Memory,
             });

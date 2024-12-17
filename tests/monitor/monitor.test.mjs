@@ -65,10 +65,13 @@ describe('setup', () => {
       );
       const evalIndex = handlersList.indexOf('_eval');
       const defaultIndex = handlersList.indexOf('_default');
+      const sanitizeIndex = handlersList.indexOf('sanitize');
       const pruneIndex = handlersList.indexOf('prune');
       assert(
-        pruneIndex > evalIndex && pruneIndex === defaultIndex + 1,
-        `Prune index (${pruneIndex}) is not the first handler after _default (${defaultIndex + 1})`,
+        pruneIndex > sanitizeIndex &&
+          sanitizeIndex > evalIndex &&
+          pruneIndex === defaultIndex + 1,
+        `Prune index (${pruneIndex}) and sanitize index (${sanitizeIndex}) are not the first and second handlers after _default (${defaultIndex + 1})`,
       );
     });
   });

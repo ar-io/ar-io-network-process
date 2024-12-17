@@ -42,6 +42,7 @@ describe('Vaults', async () => {
         ],
       },
       memory,
+      shouldAssertNoResultError: false,
     });
     assertNoResultError(vault);
     // make sure it is a vault

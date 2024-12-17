@@ -40,7 +40,10 @@ export async function handle({
   options = {},
   memory = startMemory,
   shouldAssertNoResultError = true,
+  timestamp = STUB_TIMESTAMP,
 }) {
+  options.Timestamp ??= timestamp;
+
   const result = await originalHandle(
     memory,
     {
@@ -97,8 +100,8 @@ export const getBalances = async ({ memory, timestamp = STUB_TIMESTAMP }) => {
   const result = await handle({
     options: {
       Tags: [{ name: 'Action', value: 'Balances' }],
-      Timestamp: timestamp,
     },
+    timestamp,
     memory,
   });
 
@@ -120,6 +123,7 @@ export const transfer = async ({
   quantity = initialOperatorStake,
   memory = startMemory,
   cast = false,
+  timestamp = STUB_TIMESTAMP,
 } = {}) => {
   if (quantity === 0) {
     // Nothing to do
@@ -136,6 +140,7 @@ export const transfer = async ({
         { name: 'Quantity', value: quantity },
         { name: 'Cast', value: cast },
       ],
+      Timestamp: timestamp,
     },
     memory,
   });
@@ -151,11 +156,11 @@ export const joinNetwork = async ({
   tags = validGatewayTags({ observerAddress }),
   quantity = 100_000_000_000,
 }) => {
-  // give them the join network token amount
   const transferMemory = await transfer({
     recipient: address,
     quantity,
     memory,
+    timestamp,
   });
   const joinNetworkResult = await handle({
     options: {
@@ -189,6 +194,7 @@ export const setUpStake = async ({
     quantity: transferQty,
     memory,
     cast: true,
+    timestamp,
   });
 
   // Stake a gateway for the user to delegate to
@@ -196,7 +202,7 @@ export const setUpStake = async ({
     memory,
     address: gatewayAddress,
     tags: gatewayTags,
-    timestamp: timestamp - 1,
+    timestamp: timestamp,
   });
   assertNoResultError(joinNetworkResult);
   memory = joinNetworkResult.memory;
@@ -273,17 +279,21 @@ export const getDelegates = async ({
   };
 };
 
-export const getDelegatesItems = async ({ memory, gatewayAddress }) => {
+export const getDelegatesItems = async ({
+  memory,
+  gatewayAddress,
+  timestamp = STUB_TIMESTAMP,
+}) => {
   const { result } = await getDelegates({
     memory,
     from: STUB_ADDRESS,
-    timestamp: STUB_TIMESTAMP,
+    timestamp,
     gatewayAddress,
   });
   return JSON.parse(result.Messages?.[0]?.Data).items;
 };
 
-export const getDelegations = async ({ memory, address }) => {
+export const getDelegations = async ({ memory, address, timestamp }) => {
   const result = await handle({
     options: {
       Tags: [
@@ -292,6 +302,7 @@ export const getDelegations = async ({ memory, address }) => {
       ],
     },
     memory,
+    timestamp,
   });
   return JSON.parse(result.Messages?.[0]?.Data);
 };
@@ -302,6 +313,7 @@ export const getVaults = async ({
   limit,
   sortBy,
   sortOrder,
+  timestamp = STUB_TIMESTAMP,
 }) => {
   const { Memory, ...rest } = await handle({
     options: {
@@ -312,6 +324,7 @@ export const getVaults = async ({
         ...(sortBy ? [{ name: 'Sort-By', value: sortBy }] : []),
         ...(sortOrder ? [{ name: 'Sort-Order', value: sortOrder }] : []),
       ],
+      Timestamp: timestamp,
     },
     memory,
   });
@@ -321,13 +334,18 @@ export const getVaults = async ({
   };
 };
 
-export const getGatewayVaultsItems = async ({ memory, gatewayAddress }) => {
+export const getGatewayVaultsItems = async ({
+  memory,
+  gatewayAddress,
+  timestamp = STUB_TIMESTAMP,
+}) => {
   const gatewayVaultsResult = await handle({
     options: {
       Tags: [
         { name: 'Action', value: 'Paginated-Gateway-Vaults' },
         { name: 'Address', value: gatewayAddress },
       ],
+      Timestamp: timestamp,
     },
     memory,
   });
@@ -425,6 +443,7 @@ export const delegateStake = async ({
     recipient: delegatorAddress,
     quantity,
     memory,
+    timestamp,
   });
 
   const delegateResult = await handle({
@@ -458,8 +477,8 @@ export const getGateway = async ({
         { name: 'Action', value: 'Gateway' },
         { name: 'Address', value: address },
       ],
-      Timestamp: timestamp,
     },
+    timestamp,
     memory,
   });
   const gateway = JSON.parse(gatewayResult.Messages?.[0]?.Data);
@@ -708,8 +727,8 @@ export const buyRecord = async ({
         { name: 'Process-Id', value: processId },
         { name: 'Years', value: `${years}` },
       ],
-      Timestamp: timestamp,
     },
+    timestamp,
     memory,
   });
   assertNoResultError(buyRecordResult);

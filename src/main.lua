@@ -24,6 +24,8 @@ NameRegistry = NameRegistry or {}
 Epochs = Epochs or {}
 LastTickedEpochIndex = LastTickedEpochIndex or -1
 LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
+LastKnownMessageTimestamp = LastKnownMessageTimestamp or 0
+LastKnownMessageId = LastKnownMessageId or ""
 
 local utils = require("utils")
 local json = require("json")
@@ -383,8 +385,34 @@ local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
 	addPrimaryNameCounts(ioEvent)
 end
 
-local function addEventingHandler(handlerName, pattern, handleFn, critical)
+-- Sanitize inputs before every interaction
+local function assertAndSanitizeInputs(msg)
+	assert(
+		msg.Timestamp and tonumber(msg.Timestamp) >= LastKnownMessageTimestamp,
+		"Timestamp must be greater than or equal to the last known message timestamp of "
+			.. LastKnownMessageTimestamp
+			.. " but was "
+			.. msg.Timestamp
+	)
+	assert(msg.From, "From is required")
+	assert(msg.Id, "Id is required")
+	assert(msg.Tags and type(msg.Tags) == "table", "Tags are required")
+
+	msg.Tags = utils.validateAndSanitizeInputs(msg.Tags)
+	msg.From = utils.formatAddress(msg.From)
+	msg.Timestamp = msg.Timestamp and tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp) or nil
+end
+
+local function updateLastKnownMessage(msg)
+	if msg.Timestamp >= LastKnownMessageTimestamp then
+		LastKnownMessageTimestamp = msg.Timestamp
+		LastKnownMessageId = msg.Id
+	end
+end
+
+local function addEventingHandler(handlerName, pattern, handleFn, critical, printEvent)
 	critical = critical or false
+	printEvent = printEvent == nil and true or printEvent
 	Handlers.add(handlerName, pattern, function(msg)
 		-- add an IOEvent to the message if it doesn't exist
 		msg.ioEvent = msg.ioEvent or ARIOEvent(msg)
@@ -408,21 +436,24 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical)
 			local errorWithEvent = tostring(resultOrError) .. "\n" .. errorEvent:toJSON()
 			error(errorWithEvent, 0) -- 0 ensures not to include this line number in the error message
 		end
-		-- isolate out prune handler here when printing
-		if handlerName ~= "prune" then
+		if printEvent then
 			msg.ioEvent:printEvent()
 		end
 	end)
 end
 
--- prune state before every interaction
+addEventingHandler("sanitize", function()
+	return "continue"
+end, function(msg)
+	assertAndSanitizeInputs(msg)
+	updateLastKnownMessage(msg)
+end, CRITICAL, false)
+
 -- NOTE: THIS IS A CRITICAL HANDLER AND WILL DISCARD THE MEMORY ON ERROR
 addEventingHandler("prune", function()
 	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
 end, function(msg)
-	local msgTimestamp = tonumber(msg.Timestamp or msg.Tags.Timestamp)
-	assert(msgTimestamp, "Timestamp is required for a tick interaction")
-	local epochIndex = epochs.getEpochIndexForTimestamp(msgTimestamp)
+	local epochIndex = epochs.getEpochIndexForTimestamp(msg.Timestamp)
 	msg.ioEvent:addField("epochIndex", epochIndex)
 
 	local previousStateSupplies = {
@@ -435,54 +466,6 @@ end, function(msg)
 		lastKnownTotalSupply = token.lastKnownTotalTokenSupply(),
 	}
 
-	msg.From = utils.formatAddress(msg.From)
-	msg.Timestamp = msg.Timestamp and tonumber(msg.Timestamp) or nil
-
-	local knownAddressTags = {
-		"Recipient",
-		"Initiator",
-		"Target",
-		"Source",
-		"Address",
-		"Vault-Id",
-		"Process-Id",
-		"Observer-Address",
-	}
-
-	for _, tagName in ipairs(knownAddressTags) do
-		-- Format all incoming addresses
-		msg.Tags[tagName] = msg.Tags[tagName] and utils.formatAddress(msg.Tags[tagName]) or nil
-	end
-
-	local knownNumberTags = {
-		"Quantity",
-		"Lock-Length",
-		"Operator-Stake",
-		"Delegated-Stake",
-		"Withdraw-Stake",
-		"Timestamp",
-		"Years",
-		"Min-Delegated-Stake",
-		"Port",
-		"Extend-Length",
-		"Delegate-Reward-Share-Ratio",
-		"Epoch-Index",
-		"Price-Interval-Ms",
-		"Block-Height",
-	}
-	for _, tagName in ipairs(knownNumberTags) do
-		-- Format all incoming numbers
-		msg.Tags[tagName] = msg.Tags[tagName] and tonumber(msg.Tags[tagName]) or nil
-	end
-
-	local knownBooleanTags = {
-		"Allow-Unsafe-Addresses",
-		"Force-Prune",
-	}
-	for _, tagName in ipairs(knownBooleanTags) do
-		msg.Tags[tagName] = utils.booleanOrBooleanStringToBoolean(msg.Tags[tagName])
-	end
-
 	if msg.Tags["Force-Prune"] then
 		gar.scheduleNextGatewaysPruning(0)
 		gar.scheduleNextRedelegationsPruning(0)
@@ -492,9 +475,8 @@ end, function(msg)
 		vaults.scheduleNextVaultsPruning(0)
 	end
 
-	local msgId = msg.Id
-	print("Pruning state at timestamp: " .. msgTimestamp)
-	local prunedStateResult = prune.pruneState(msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
+	print("Pruning state at timestamp: " .. msg.Timestamp)
+	local prunedStateResult = prune.pruneState(msg.Timestamp, msg.Id, LastGracePeriodEntryEndTimestamp)
 
 	if prunedStateResult then
 		local prunedRecordsCount = utils.lengthOfTable(prunedStateResult.prunedRecords or {})
@@ -573,7 +555,7 @@ end, function(msg)
 	end
 
 	return prunedStateResult
-end, CRITICAL)
+end, CRITICAL, false)
 
 -- Write handlers
 addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
@@ -983,12 +965,14 @@ function assertTokenCostTags(msg)
 	arns.assertValidArNSName(msg.Tags.Name)
 	-- if years is provided, assert it is a number and integer between 1 and 5
 	if msg.Tags.Years then
-		assert(utils.isInteger(msg.Tags.Years), "Invalid years. Must be integer between 1 and 5")
+		assert(utils.isInteger(msg.Tags.Years), "Invalid years. Must be integer")
+		assert(msg.Tags.Years > 0 and msg.Tags.Years < 6, "Invalid years. Must be between 1 and 5")
 	end
 
 	-- if quantity provided must be a number and integer greater than 0
 	if msg.Tags.Quantity then
-		assert(utils.isInteger(msg.Tags.Quantity), "Invalid quantity. Must be integer greater than 0")
+		assert(utils.isInteger(msg.Tags.Quantity), "Invalid quantity. Must be integer")
+		assert(msg.Tags.Quantity > 0, "Invalid quantity. Must be greater than 0")
 	end
 end
 
