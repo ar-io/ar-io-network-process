@@ -108,12 +108,12 @@ describe("epochs", function()
 					observerAddress = "observer-address-" .. i,
 				}
 				-- note - ordering of keys is not guaranteed when insert into maps
-				_G.GatewayRegistry["observers" .. i] = gateway
+				_G.GatewayRegistry["observer" .. i] = gateway
 			end
 
 			local expectation = {
-				["observer-address-1"] = "observers1",
-				["observer-address-3"] = "observers3",
+				["observer-address-1"] = "observer1",
+				["observer-address-3"] = "observer3",
 			}
 			local prescribedObserverMap = epochs.computePrescribedObserversForEpoch(0, testHashchain)
 			assert.are.same(expectation, prescribedObserverMap)
