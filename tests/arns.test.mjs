@@ -1,14 +1,18 @@
 import { assertNoResultError } from './utils.mjs';
-import { describe, it, before } from 'node:test';
+import { describe, it, before, beforeEach, afterEach } from 'node:test';
 import {
   handle,
   startMemory,
   transfer,
   joinNetwork,
   setUpStake,
-  baseLeasePrice,
+  baseLeasePriceFor9CharNameFor1Year,
   basePermabuyPrice,
   getBalance,
+  returnedNamesPeriod,
+  buyRecord,
+  baseLeasePriceFor9CharNameFor3Years,
+  totalTokenSupply,
 } from './helpers.mjs';
 import assert from 'node:assert';
 import {
@@ -20,18 +24,34 @@ import {
   STUB_OPERATOR_ADDRESS,
   STUB_TIMESTAMP,
 } from '../tools/constants.mjs';
+import { assertNoInvariants } from './invariants.mjs';
 
 // EIP55-formatted test address
 const testEthAddress = '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa';
 
 describe('ArNS', async () => {
+  let sharedMemory;
+  beforeEach(async () => {
+    const { Memory: totalTokenSupplyMemory } = await totalTokenSupply({
+      memory: startMemory,
+    });
+    sharedMemory = totalTokenSupplyMemory;
+  });
+
+  afterEach(async () => {
+    await assertNoInvariants({
+      timestamp: STUB_TIMESTAMP,
+      memory: sharedMemory,
+    });
+  });
+
   const runBuyRecord = async ({
     sender = STUB_ADDRESS,
     processId = ''.padEnd(43, 'a'),
     transferQty = 1_000_000_000_000,
     name = 'test-name',
     type = 'lease',
-    memory,
+    memory = sharedMemory,
   }) => {
     if (sender != PROCESS_OWNER) {
       // transfer from the owner to the sender
@@ -39,11 +59,12 @@ describe('ArNS', async () => {
         recipient: sender,
         quantity: transferQty,
         cast: true,
+        memory,
       });
     }
 
-    const buyRecordResult = await handle(
-      {
+    const buyRecordResult = await handle({
+      options: {
         From: sender,
         Owner: sender,
         Tags: [
@@ -53,9 +74,10 @@ describe('ArNS', async () => {
           { name: 'Process-Id', value: processId },
           { name: 'Years', value: '1' },
         ],
+        Timestamp: STUB_TIMESTAMP,
       },
       memory,
-    );
+    });
 
     const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
     const buyRecordEvent = JSON.parse(
@@ -108,8 +130,8 @@ describe('ArNS', async () => {
     // TODO: ASSERT THE EVENT DATA
 
     // fetch the record
-    const realRecord = await handle(
-      {
+    const realRecord = await handle({
+      options: {
         From: sender,
         Owner: sender,
         Tags: [
@@ -117,8 +139,8 @@ describe('ArNS', async () => {
           { name: 'Name', value: name },
         ],
       },
-      buyRecordResult.Memory,
-    );
+      memory: buyRecordResult.Memory,
+    });
 
     const record = JSON.parse(realRecord.Messages[0].Data);
     assert.deepEqual(record, {
@@ -147,25 +169,28 @@ describe('ArNS', async () => {
 
     it('should fail to buy a permanently registered record', async () => {
       const buyRecordResult = await handle({
-        Tags: [
-          { name: 'Action', value: 'Buy-Record' },
-          { name: 'Name', value: 'test-name' },
-          { name: 'Purchase-Type', value: 'permabuy' },
-          { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-        ],
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Purchase-Type', value: 'permabuy' },
+            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+          ],
+        },
+        memory: sharedMemory,
       });
       const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
 
       // fetch the record
-      const realRecord = await handle(
-        {
+      const realRecord = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Record' },
             { name: 'Name', value: 'test-name' },
           ],
         },
-        buyRecordResult.Memory,
-      );
+        memory: buyRecordResult.Memory,
+      });
 
       const record = JSON.parse(realRecord.Messages[0].Data);
       assert.deepEqual(record, {
@@ -176,8 +201,8 @@ describe('ArNS', async () => {
         undernameLimit: 10,
       });
 
-      const failedBuyRecordResult = await handle(
-        {
+      const failedBuyRecordResult = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Buy-Record' },
             { name: 'Name', value: 'test-name' },
@@ -186,8 +211,9 @@ describe('ArNS', async () => {
             { name: 'Process-Id', value: ''.padEnd(43, 'a') },
           ],
         },
-        buyRecordResult.Memory,
-      );
+        memory: buyRecordResult.Memory,
+        shouldAssertNoResultError: false,
+      });
 
       const failedBuyRecordError = failedBuyRecordResult.Messages[0].Tags.find(
         (t) => t.name === 'Error',
@@ -201,32 +227,35 @@ describe('ArNS', async () => {
 
     it('should buy a record and default the name to lower case', async () => {
       const buyRecordResult = await handle({
-        Tags: [
-          { name: 'Action', value: 'Buy-Record' },
-          { name: 'Name', value: 'Test-NAme' },
-          { name: 'Purchase-Type', value: 'lease' },
-          { name: 'Years', value: '1' },
-          { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-        ],
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Name', value: 'Test-NAme' },
+            { name: 'Purchase-Type', value: 'lease' },
+            { name: 'Years', value: '1' },
+            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+          ],
+        },
+        memory: sharedMemory,
       });
 
       const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
 
       // fetch the record
-      const realRecord = await handle(
-        {
+      const realRecord = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Record' },
             { name: 'Name', value: 'test-name' },
           ],
         },
-        buyRecordResult.Memory,
-      );
+        memory: buyRecordResult.Memory,
+      });
 
       const record = JSON.parse(realRecord.Messages[0].Data);
       assert.deepEqual(record, {
         processId: ''.padEnd(43, 'a'),
-        purchasePrice: baseLeasePrice,
+        purchasePrice: baseLeasePriceFor9CharNameFor1Year,
         startTimestamp: buyRecordData.startTimestamp,
         endTimestamp: buyRecordData.endTimestamp,
         type: 'lease',
@@ -238,24 +267,27 @@ describe('ArNS', async () => {
   describe('Increase-Undername-Limit', () => {
     it('should increase the undernames by spending from balance', async () => {
       const assertIncreaseUndername = async (sender) => {
-        let memory = startMemory;
+        let memory = sharedMemory;
 
         if (sender != PROCESS_OWNER) {
           const transferResult = await handle({
-            From: PROCESS_OWNER,
-            Owner: PROCESS_OWNER,
-            Tags: [
-              { name: 'Action', value: 'Transfer' },
-              { name: 'Recipient', value: sender },
-              { name: 'Quantity', value: 6000000000 },
-              { name: 'Cast', value: true },
-            ],
+            options: {
+              From: PROCESS_OWNER,
+              Owner: PROCESS_OWNER,
+              Tags: [
+                { name: 'Action', value: 'Transfer' },
+                { name: 'Recipient', value: sender },
+                { name: 'Quantity', value: 6000000000 },
+                { name: 'Cast', value: true },
+              ],
+            },
+            memory: sharedMemory,
           });
           memory = transferResult.Memory;
         }
 
-        const buyUndernameResult = await handle(
-          {
+        const buyUndernameResult = await handle({
+          options: {
             From: sender,
             Owner: sender,
             Tags: [
@@ -267,10 +299,10 @@ describe('ArNS', async () => {
             ],
           },
           memory,
-        );
+        });
 
-        const increaseUndernameResult = await handle(
-          {
+        const increaseUndernameResult = await handle({
+          options: {
             From: sender,
             Owner: sender,
             Tags: [
@@ -279,10 +311,10 @@ describe('ArNS', async () => {
               { name: 'Quantity', value: '1' },
             ],
           },
-          buyUndernameResult.Memory,
-        );
-        const result = await handle(
-          {
+          memory: buyUndernameResult.Memory,
+        });
+        const result = await handle({
+          options: {
             From: sender,
             Owner: sender,
             Tags: [
@@ -290,8 +322,8 @@ describe('ArNS', async () => {
               { name: 'Name', value: 'test-name' },
             ],
           },
-          increaseUndernameResult.Memory,
-        );
+          memory: increaseUndernameResult.Memory,
+        });
         const record = JSON.parse(result.Messages[0].Data);
         assert.equal(record.undernameLimit, 11);
       };
@@ -301,7 +333,7 @@ describe('ArNS', async () => {
 
     it('should increase the undernames by spending from stakes', async () => {
       const assertIncreaseUndername = async (sender) => {
-        let memory = startMemory;
+        let memory = sharedMemory;
 
         if (sender != PROCESS_OWNER) {
           // Send enough money to the user to delegate stake, buy record, and increase undername limit
@@ -319,8 +351,8 @@ describe('ArNS', async () => {
           });
           memory = joinNetworkResult.memory;
 
-          const stakeResult = await handle(
-            {
+          const stakeResult = await handle({
+            options: {
               From: sender,
               Owner: sender,
               Tags: [
@@ -330,12 +362,12 @@ describe('ArNS', async () => {
               ],
             },
             memory,
-          );
+          });
           memory = stakeResult.Memory;
         }
 
-        const buyUndernameResult = await handle(
-          {
+        const buyUndernameResult = await handle({
+          options: {
             From: sender,
             Owner: sender,
             Tags: [
@@ -348,11 +380,11 @@ describe('ArNS', async () => {
             ],
           },
           memory,
-        );
+        });
         memory = buyUndernameResult.Memory;
 
-        const increaseUndernameResult = await handle(
-          {
+        const increaseUndernameResult = await handle({
+          options: {
             From: sender,
             Owner: sender,
             Tags: [
@@ -363,13 +395,13 @@ describe('ArNS', async () => {
             ],
           },
           memory,
-        );
+        });
 
         // assert no error tag
         assertNoResultError(increaseUndernameResult);
 
-        const result = await handle(
-          {
+        const result = await handle({
+          options: {
             From: sender,
             Owner: sender,
             Tags: [
@@ -377,8 +409,8 @@ describe('ArNS', async () => {
               { name: 'Name', value: 'test-name' },
             ],
           },
-          increaseUndernameResult.Memory,
-        );
+          memory: increaseUndernameResult.Memory,
+        });
         const record = JSON.parse(result.Messages[0].Data);
         assert.equal(record.undernameLimit, 11);
       };
@@ -390,7 +422,10 @@ describe('ArNS', async () => {
   describe('Get-Registration-Fees', () => {
     it('should return the base registration fees for each name length', async () => {
       const priceListResult = await handle({
-        Tags: [{ name: 'Action', value: 'Get-Registration-Fees' }],
+        options: {
+          Tags: [{ name: 'Action', value: 'Get-Registration-Fees' }],
+        },
+        memory: sharedMemory,
       });
 
       const priceList = JSON.parse(priceListResult.Messages[0].Data);
@@ -412,10 +447,11 @@ describe('ArNS', async () => {
         recipient: STUB_ADDRESS,
         quantity: 400_000_000,
         cast: true,
+        memory: sharedMemory,
       });
 
-      const result = await handle(
-        {
+      const result = await handle({
+        options: {
           From: STUB_ADDRESS,
           Owner: STUB_ADDRESS,
           Tags: [
@@ -428,13 +464,13 @@ describe('ArNS', async () => {
             { name: 'Fund-From', value: 'balance' },
           ],
         },
-        transferMemory,
-      );
+        memory: transferMemory,
+      });
 
       const tokenCostResult = JSON.parse(result.Messages[0].Data);
       assert.deepEqual(tokenCostResult, {
         discounts: [],
-        tokenCost: baseLeasePrice,
+        tokenCost: baseLeasePriceFor9CharNameFor1Year,
         fundingPlan: {
           address: STUB_ADDRESS,
           balance: 400_000_000,
@@ -446,13 +482,16 @@ describe('ArNS', async () => {
 
     it('should return the correct cost of increasing an undername limit', async () => {
       const buyRecordResult = await handle({
-        Tags: [
-          { name: 'Action', value: 'Buy-Record' },
-          { name: 'Name', value: 'test-name' },
-          { name: 'Purchase-Type', value: 'lease' },
-          { name: 'Years', value: '1' },
-          { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-        ],
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Purchase-Type', value: 'lease' },
+            { name: 'Years', value: '1' },
+            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+          ],
+        },
+        memory: sharedMemory,
       });
 
       // assert no error tag
@@ -461,8 +500,8 @@ describe('ArNS', async () => {
       );
       assert.equal(buyRecordErrorTag, undefined);
 
-      const result = await handle(
-        {
+      const result = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Token-Cost' },
             { name: 'Intent', value: 'Increase-Undername-Limit' },
@@ -470,8 +509,8 @@ describe('ArNS', async () => {
             { name: 'Quantity', value: '1' },
           ],
         },
-        buyRecordResult.Memory,
-      );
+        memory: buyRecordResult.Memory,
+      });
       const tokenCost = JSON.parse(result.Messages[0].Data);
       const expectedPrice = 500000000 * 0.001 * 1 * 1;
       assert.equal(tokenCost, expectedPrice);
@@ -479,13 +518,16 @@ describe('ArNS', async () => {
 
     it('should return the correct cost of extending an existing leased record', async () => {
       const buyRecordResult = await handle({
-        Tags: [
-          { name: 'Action', value: 'Buy-Record' },
-          { name: 'Name', value: 'test-name' },
-          { name: 'Purchase-Type', value: 'lease' },
-          { name: 'Years', value: '1' },
-          { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-        ],
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Purchase-Type', value: 'lease' },
+            { name: 'Years', value: '1' },
+            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+          ],
+        },
+        memory: sharedMemory,
       });
 
       // assert no error tag
@@ -494,8 +536,8 @@ describe('ArNS', async () => {
       );
       assert.equal(buyRecordErrorTag, undefined);
 
-      const result = await handle(
-        {
+      const result = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Token-Cost' },
             { name: 'Intent', value: 'Extend-Lease' },
@@ -503,21 +545,24 @@ describe('ArNS', async () => {
             { name: 'Years', value: '2' },
           ],
         },
-        buyRecordResult.Memory,
-      );
+        memory: buyRecordResult.Memory,
+      });
       const tokenCost = JSON.parse(result.Messages[0].Data);
-      assert.equal(tokenCost, 200000000); // known cost for extending a 9 character name by 2 years (500 IO * 0.2 * 2)
+      assert.equal(tokenCost, 200000000); // known cost for extending a 9 character name by 2 years (500 ARIO * 0.2 * 2)
     });
 
     it('should get the cost of upgrading an existing leased record to permanently owned', async () => {
       const buyRecordResult = await handle({
-        Tags: [
-          { name: 'Action', value: 'Buy-Record' },
-          { name: 'Name', value: 'test-name' },
-          { name: 'Purchase-Type', value: 'lease' },
-          { name: 'Years', value: '1' },
-          { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-        ],
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Purchase-Type', value: 'lease' },
+            { name: 'Years', value: '1' },
+            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+          ],
+        },
+        memory: sharedMemory,
       });
 
       // assert no error tag
@@ -526,62 +571,109 @@ describe('ArNS', async () => {
       );
       assert.equal(buyRecordErrorTag, undefined);
 
-      const upgradeNameResult = await handle(
-        {
+      const upgradeNameResult = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Token-Cost' },
             { name: 'Intent', value: 'Upgrade-Name' },
             { name: 'Name', value: 'test-name' },
           ],
         },
-        buyRecordResult.Memory,
-      );
+        memory: buyRecordResult.Memory,
+      });
 
       const tokenCost = JSON.parse(upgradeNameResult.Messages[0].Data);
       assert.equal(tokenCost, basePermabuyPrice);
+    });
+
+    it('should return the correct cost of creating a primary name request', async () => {
+      const memory = await transfer({
+        quantity: 1000000000,
+        memory: sharedMemory,
+      });
+      const { memory: buyMemory } = await buyRecord({
+        from: STUB_ADDRESS,
+        memory,
+        name: 'test-name',
+        processId: ''.padEnd(43, 'a'),
+      });
+      const result = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Token-Cost' },
+            { name: 'Intent', value: 'Primary-Name-Request' },
+            { name: 'Name', value: 'test-name' },
+          ],
+          Timestamp: STUB_TIMESTAMP,
+        },
+
+        memory: buyMemory,
+      });
+      assertNoResultError(result);
+      const tokenCost = JSON.parse(result.Messages[0].Data);
+      assert.equal(tokenCost, 500000);
+
+      // assert is same as 1 undername
+      const undernameResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Token-Cost' },
+            { name: 'Intent', value: 'Increase-Undername-Limit' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Quantity', value: '1' },
+          ],
+          Timestamp: STUB_TIMESTAMP,
+        },
+        memory: buyMemory,
+      });
+      const undernameTokenCost = JSON.parse(undernameResult.Messages[0].Data);
+      assert.equal(undernameTokenCost, tokenCost);
     });
   });
 
   describe('Extend-Lease', () => {
     it('should properly handle extending a leased record', async () => {
       const buyUndernameResult = await handle({
-        Tags: [
-          { name: 'Action', value: 'Buy-Record' },
-          { name: 'Name', value: 'test-name' },
-          { name: 'Purchase-Type', value: 'lease' },
-          { name: 'Years', value: '1' },
-          { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-        ],
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Purchase-Type', value: 'lease' },
+            { name: 'Years', value: '1' },
+            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+          ],
+        },
+        memory: sharedMemory,
       });
-      const recordResultBefore = await handle(
-        {
+      const recordResultBefore = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Record' },
             { name: 'Name', value: 'test-name' },
           ],
         },
-        buyUndernameResult.Memory,
-      );
+        memory: buyUndernameResult.Memory,
+      });
       const recordBefore = JSON.parse(recordResultBefore.Messages[0].Data);
-      const extendResult = await handle(
-        {
+      const extendResult = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Extend-Lease' },
             { name: 'Name', value: 'test-name' },
             { name: 'Years', value: '1' },
           ],
         },
-        buyUndernameResult.Memory,
-      );
-      const recordResult = await handle(
-        {
+        memory: buyUndernameResult.Memory,
+      });
+      const recordResult = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Record' },
             { name: 'Name', value: 'test-name' },
           ],
         },
-        extendResult.Memory,
-      );
+        memory: extendResult.Memory,
+      });
       const record = JSON.parse(recordResult.Messages[0].Data);
       assert.equal(
         record.endTimestamp,
@@ -590,7 +682,7 @@ describe('ArNS', async () => {
     });
 
     it('should properly handle extending a leased record paying with balance and stakes', async () => {
-      let memory = startMemory;
+      let memory = sharedMemory;
       const stakeResult = await setUpStake({
         memory,
         transferQty: 700000000, // 600000000 for name purchase + 100000000 for extending the lease
@@ -600,8 +692,8 @@ describe('ArNS', async () => {
 
       memory = stakeResult.memory;
 
-      const buyRecordResult = await handle(
-        {
+      const buyRecordResult = await handle({
+        options: {
           From: STUB_ADDRESS,
           Owner: STUB_ADDRESS,
           Tags: [
@@ -614,11 +706,11 @@ describe('ArNS', async () => {
           ],
         },
         memory,
-      );
+      });
       memory = buyRecordResult.Memory;
 
-      const recordResultBefore = await handle(
-        {
+      const recordResultBefore = await handle({
+        options: {
           From: STUB_ADDRESS,
           Owner: STUB_ADDRESS,
           Tags: [
@@ -626,13 +718,13 @@ describe('ArNS', async () => {
             { name: 'Name', value: 'test-name' },
           ],
         },
-        buyRecordResult.Memory,
-      );
+        memory: buyRecordResult.Memory,
+      });
       const recordBefore = JSON.parse(recordResultBefore.Messages[0].Data);
 
-      // Last 100,000,000 mIO will be paid from exit vault 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm'
-      const extendResult = await handle(
-        {
+      // Last 100,000,000 mARIO will be paid from exit vault 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm'
+      const extendResult = await handle({
+        options: {
           From: STUB_ADDRESS,
           Owner: STUB_ADDRESS,
           Tags: [
@@ -642,18 +734,18 @@ describe('ArNS', async () => {
             { name: 'Fund-From', value: 'any' },
           ],
         },
-        buyRecordResult.Memory,
-      );
+        memory: buyRecordResult.Memory,
+      });
 
-      const recordResult = await handle(
-        {
+      const recordResult = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Record' },
             { name: 'Name', value: 'test-name' },
           ],
         },
-        extendResult.Memory,
-      );
+        memory: extendResult.Memory,
+      });
       const record = JSON.parse(recordResult.Messages[0].Data);
       assert.equal(
         recordBefore.endTimestamp + 60 * 1000 * 60 * 24 * 365,
@@ -666,14 +758,17 @@ describe('ArNS', async () => {
     it('should properly handle upgrading a name', async () => {
       const buyRecordTimestamp = STUB_TIMESTAMP + 1;
       const buyRecordResult = await handle({
-        Tags: [
-          { name: 'Action', value: 'Buy-Record' },
-          { name: 'Name', value: 'test-name' },
-          { name: 'Purchase-Type', value: 'lease' },
-          { name: 'Years', value: '1' },
-          { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-        ],
-        Timestamp: buyRecordTimestamp,
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Purchase-Type', value: 'lease' },
+            { name: 'Years', value: '1' },
+            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+          ],
+          Timestamp: buyRecordTimestamp,
+        },
+        memory: sharedMemory,
       });
 
       // assert no error tag
@@ -683,16 +778,16 @@ describe('ArNS', async () => {
       assert.equal(buyRecordErrorTag, undefined);
 
       // now upgrade the name
-      const upgradeNameResult = await handle(
-        {
+      const upgradeNameResult = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Upgrade-Name' },
             { name: 'Name', value: 'test-name' },
           ],
           Timestamp: buyRecordTimestamp + 1,
         },
-        buyRecordResult.Memory,
-      );
+        memory: buyRecordResult.Memory,
+      });
 
       // assert no error tag
       const upgradeNameErrorTag = upgradeNameResult.Messages?.[0]?.Tags?.find(
@@ -721,7 +816,7 @@ describe('ArNS', async () => {
     });
 
     it('should properly handle upgrading a name paying with balance and stakes', async () => {
-      let memory = startMemory;
+      let memory = sharedMemory;
       const stakeResult = await setUpStake({
         memory,
         transferQty: 3_100_000_000, // 60,000,0000 for name purchase + 2,500,000,000 for upgrading the name
@@ -732,8 +827,8 @@ describe('ArNS', async () => {
       memory = stakeResult.memory;
 
       const buyRecordTimestamp = STUB_TIMESTAMP + 1;
-      const buyRecordResult = await handle(
-        {
+      const buyRecordResult = await handle({
+        options: {
           From: STUB_ADDRESS,
           Owner: STUB_ADDRESS,
           Tags: [
@@ -747,12 +842,12 @@ describe('ArNS', async () => {
           Timestamp: buyRecordTimestamp,
         },
         memory,
-      );
+      });
       assertNoResultError(buyRecordResult);
 
       // now upgrade the name
-      const upgradeNameResult = await handle(
-        {
+      const upgradeNameResult = await handle({
+        options: {
           From: STUB_ADDRESS,
           Owner: STUB_ADDRESS,
           Tags: [
@@ -762,8 +857,8 @@ describe('ArNS', async () => {
           ],
           Timestamp: buyRecordTimestamp + 1,
         },
-        buyRecordResult.Memory,
-      );
+        memory: buyRecordResult.Memory,
+      });
       assertNoResultError(upgradeNameResult);
 
       // assert the message includes the upgrade name notice
@@ -798,7 +893,7 @@ describe('ArNS', async () => {
   });
 
   describe('Release-Name', () => {
-    it('should create an auction for an existing permabuy record owned by a process id, accept a bid and add the new record to the registry', async () => {
+    it('should create a released name for an existing permabuy record owned by a process id, accept a buy-record and add the new record to the registry', async () => {
       // buy the name first
       const processId = ''.padEnd(43, 'a');
       const initiator = 'ant-owner-'.padEnd(43, '0'); // owner of the ANT at the time of release
@@ -808,8 +903,8 @@ describe('ArNS', async () => {
         type: 'permabuy',
       });
 
-      const releaseNameResult = await handle(
-        {
+      const releaseNameResult = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Release-Name' },
             { name: 'Name', value: 'test-name' },
@@ -819,127 +914,86 @@ describe('ArNS', async () => {
           Owner: processId,
         },
         memory,
-      );
+      });
 
       // assert no error tag
       assertNoResultError(releaseNameResult);
 
       // fetch the auction
-      const auctionResult = await handle(
-        {
+      const returnedNameResult = await handle({
+        options: {
           Tags: [
-            { name: 'Action', value: 'Auction-Info' },
+            { name: 'Action', value: 'Returned-Name' },
             { name: 'Name', value: 'test-name' },
           ],
         },
-        releaseNameResult.Memory,
-      );
+        memory: releaseNameResult.Memory,
+      });
 
-      // assert no error tag
-      const auctionErrorTag = auctionResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
-
-      assert.equal(auctionErrorTag, undefined);
-      const auction = JSON.parse(auctionResult.Messages?.[0]?.Data);
-      const expectedStartPrice = 125000000000;
+      const returnedName = JSON.parse(returnedNameResult.Messages?.[0]?.Data);
       const expectedStartTimestamp = STUB_TIMESTAMP;
-      assert.deepEqual(auction, {
+      assert.deepEqual(returnedName, {
         name: 'test-name',
         initiator: initiator,
-        startTimestamp: auction.startTimestamp,
-        endTimestamp: expectedStartTimestamp + 60 * 60 * 1000 * 24 * 14,
-        baseFee: 500000000,
-        demandFactor: 1,
-        settings: {
-          decayRate: 0.02037911 / (1000 * 60 * 60 * 24 * 14),
-          scalingExponent: 190,
-          durationMs: 1209600000,
-          startPriceMultiplier: 50,
-        },
+        startTimestamp: returnedName.startTimestamp,
+        endTimestamp: expectedStartTimestamp + returnedNamesPeriod,
+        premiumMultiplier: 50,
       });
 
       // TRANSFER FROM THE OWNER TO A NEW STUB ADDRESS
-      const bidderAddress = 'auction-bidder-'.padEnd(43, '0');
-      const bidTimestamp = auction.startTimestamp + 60 * 1000; // same as the original interval but 1 minute after the auction has started
-      const decayRate = auction.settings.decayRate;
+      const newBuyerAddress = 'returned-name-buyer-'.padEnd(43, '0');
+
+      const timePassed = 60 * 1000; // 1 minute
+      const newBuyTimestamp = returnedName.startTimestamp + timePassed; // same as the original interval but 1 minute after the returnedName has started
+
+      const expectedPremiumMultiplier =
+        50 * (1 - timePassed / returnedNamesPeriod);
       const expectedPurchasePrice = Math.floor(
-        expectedStartPrice *
-          (1 - decayRate * (bidTimestamp - auction.startTimestamp)) **
-            auction.settings.scalingExponent,
+        basePermabuyPrice * expectedPremiumMultiplier,
       );
-      const transferResult = await handle(
-        {
-          From: PROCESS_OWNER,
-          Owner: PROCESS_OWNER,
-          Tags: [
-            { name: 'Action', value: 'Transfer' },
-            { name: 'Recipient', value: bidderAddress },
-            { name: 'Quantity', value: expectedPurchasePrice },
-            { name: 'Cast', value: true },
-          ],
-        },
-        releaseNameResult.Memory,
-      );
+      const transferMemory = await transfer({
+        recipient: newBuyerAddress,
+        quantity: expectedPurchasePrice,
+        memory: releaseNameResult.Memory,
+      });
 
-      // assert no error in the transfer
-      const transferErrorTag = transferResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
-
-      assert.equal(transferErrorTag, undefined);
-      const submitBidResult = await handle(
-        {
-          From: bidderAddress,
-          Owner: bidderAddress,
-          Tags: [
-            { name: 'Action', value: 'Auction-Bid' },
-            { name: 'Name', value: 'test-name' },
-            { name: 'Process-Id', value: processId },
-          ],
-          Timestamp: bidTimestamp,
-        },
-        transferResult.Memory,
-      );
-
-      // assert no error tag
-      const submitBidErrorTag = submitBidResult.Messages[0].Tags.find(
-        (tag) => tag.name === 'Error',
-      );
-      assert.equal(submitBidErrorTag, undefined);
+      const { result: newBuyResult } = await buyRecord({
+        from: newBuyerAddress,
+        name: 'test-name',
+        processId,
+        type: 'permabuy',
+        memory: transferMemory,
+        timestamp: newBuyTimestamp,
+      });
 
       // should send three messages including a Buy-Record-Notice and a Debit-Notice
-      assert.equal(submitBidResult.Messages.length, 2);
+      assert.equal(newBuyResult.Messages.length, 2);
 
       // should send a buy record notice
-      const buyRecordNoticeTag = submitBidResult.Messages?.[0]?.Tags?.find(
+      const buyRecordNoticeTag = newBuyResult.Messages?.[0]?.Tags?.find(
         (tag) => tag.name === 'Action' && tag.value === 'Buy-Record-Notice',
       );
 
       assert.ok(buyRecordNoticeTag);
 
       // expect the target tag to be the bidder
-      assert.equal(submitBidResult.Messages?.[0]?.Target, bidderAddress);
+      assert.equal(newBuyResult.Messages?.[0]?.Target, newBuyerAddress);
 
       const expectedRecord = {
         processId,
         purchasePrice: expectedPurchasePrice,
-        startTimestamp: bidTimestamp,
+        startTimestamp: newBuyTimestamp,
         undernameLimit: 10,
         type: 'permabuy',
-      };
-      const expectedFundingResults = {
-        fundingPlan: {
-          address: 'auction-bidder-0000000000000000000000000000',
-          balance: 124975994165,
-          shortfall: 0,
-          stakes: [],
+        baseRegistrationFee: 500000000,
+        returnedName: {
+          initiator: 'ant-owner-000000000000000000000000000000000',
+          rewardForInitiator: Math.floor(expectedPurchasePrice * 0.5),
+          rewardForProtocol: Math.ceil(expectedPurchasePrice * 0.5),
         },
-        fundingResult: {
-          newWithdrawVaults: [],
-          totalFunded: 124975994165,
-        },
+        remainingBalance: 0,
       };
+
       const expectedRewardForInitiator = Math.floor(
         expectedPurchasePrice * 0.5,
       );
@@ -947,64 +1001,66 @@ describe('ArNS', async () => {
         expectedPurchasePrice - expectedRewardForInitiator;
 
       // assert the data response contains the record
-      const buyRecordNoticeData = JSON.parse(
-        submitBidResult.Messages?.[0]?.Data,
-      );
+      const buyRecordNoticeData = JSON.parse(newBuyResult.Messages?.[0]?.Data);
       assert.deepEqual(buyRecordNoticeData, {
         name: 'test-name',
         ...expectedRecord,
-        ...expectedFundingResults,
       });
 
-      // should send a debit notice
-      const debitNoticeTag = submitBidResult.Messages?.[1]?.Tags?.find(
-        (tag) => tag.name === 'Action' && tag.value === 'Debit-Notice',
+      // should send a credit notice
+      const creditNoticeTag = newBuyResult.Messages?.[1]?.Tags?.find(
+        (tag) => tag.name === 'Action' && tag.value === 'Credit-Notice',
       );
-      assert.ok(debitNoticeTag);
+      assert.ok(creditNoticeTag);
 
       // expect the target to be to the initiator
-      assert.equal(submitBidResult.Messages?.[1]?.Target, initiator);
+      assert.equal(newBuyResult.Messages?.[1]?.Target, initiator);
 
       // assert the data response contains the record
-      const debitNoticeData = JSON.parse(submitBidResult.Messages?.[1]?.Data);
-      assert.deepEqual(debitNoticeData, {
-        record: expectedRecord,
-        bidder: bidderAddress,
-        bidAmount: expectedPurchasePrice,
+      const creditNoticeData = JSON.parse(newBuyResult.Messages?.[1]?.Data);
+      assert.deepEqual(creditNoticeData, {
+        record: {
+          processId,
+          purchasePrice: expectedPurchasePrice,
+          startTimestamp: newBuyTimestamp,
+          type: 'permabuy',
+          undernameLimit: 10,
+        },
+        buyer: newBuyerAddress,
         rewardForInitiator: expectedRewardForInitiator,
         rewardForProtocol: expectedRewardForProtocol,
         name: 'test-name',
       });
 
       // should add the record to the registry
-      const recordResult = await handle(
-        {
+      const recordResult = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Record' },
             { name: 'Name', value: 'test-name' },
           ],
-          Timestamp: bidTimestamp,
+          Timestamp: newBuyTimestamp,
         },
-        submitBidResult.Memory,
-      );
+        memory: newBuyResult.Memory,
+      });
 
       const record = JSON.parse(recordResult.Messages?.[0]?.Data);
       assert.deepEqual(record, {
         processId,
         purchasePrice: expectedPurchasePrice,
-        startTimestamp: bidTimestamp,
+        startTimestamp: newBuyTimestamp,
         undernameLimit: 10,
         type: 'permabuy',
       });
 
       // assert the balance of the initiator and the protocol where updated correctly
-      const balancesResult = await handle(
-        {
+      const balancesResult = await handle({
+        options: {
           Tags: [{ name: 'Action', value: 'Balances' }],
-          Timestamp: bidTimestamp,
+          Timestamp: newBuyTimestamp,
         },
-        submitBidResult.Memory,
-      );
+        memory: newBuyResult.Memory,
+      });
 
       const expectedProtocolBalance =
         INITIAL_PROTOCOL_BALANCE +
@@ -1014,104 +1070,97 @@ describe('ArNS', async () => {
 
       assert.equal(balances[initiator], expectedRewardForInitiator);
       assert.equal(balances[PROCESS_ID], expectedProtocolBalance);
-      assert.equal(balances[bidderAddress], 0);
+      assert.equal(balances[newBuyerAddress], 0);
     });
 
-    const runAuctionTest = async ({ fundFrom }) => {
+    const runReturnedNameTest = async ({ fundFrom }) => {
       const { record: initialRecord, memory } = await runBuyRecord({
         sender: STUB_ADDRESS,
         processId: ''.padEnd(43, 'a'),
         type: 'lease',
         years: 1,
         timestamp: STUB_TIMESTAMP,
+        memory: sharedMemory,
       });
 
       // tick the contract after the lease leaves its grace period
       const futureTimestamp =
         initialRecord.endTimestamp + 60 * 1000 * 60 * 24 * 14 + 1;
-      const tickResult = await handle(
-        {
+      const tickResult = await handle({
+        options: {
           Tags: [{ name: 'Action', value: 'Tick' }],
           Timestamp: futureTimestamp,
         },
         memory,
-      );
+      });
 
-      // fetch the auction
-      const auctionResult = await handle(
-        {
+      // fetch the returned name
+      const returnedNameResult = await handle({
+        options: {
           Tags: [
-            { name: 'Action', value: 'Auction-Info' },
+            { name: 'Action', value: 'Returned-Name' },
             { name: 'Name', value: 'test-name' },
           ],
           Timestamp: futureTimestamp,
         },
-        tickResult.Memory,
-      );
+        memory: tickResult.Memory,
+      });
       // assert no error tag
-      const auctionErrorTag = auctionResult.Messages?.[0]?.Tags?.find(
+      const returnedNameErrorTag = returnedNameResult.Messages?.[0]?.Tags?.find(
         (tag) => tag.name === 'Error',
       );
 
-      assert.equal(auctionErrorTag, undefined);
-      const auction = JSON.parse(auctionResult.Messages?.[0]?.Data);
-      assert.deepEqual(auction, {
+      assert.equal(returnedNameErrorTag, undefined);
+      const returnedName = JSON.parse(returnedNameResult.Messages?.[0]?.Data);
+      assert.deepEqual(returnedName, {
         name: 'test-name',
         initiator: PROCESS_ID,
         startTimestamp: futureTimestamp,
-        endTimestamp: futureTimestamp + 60 * 60 * 1000 * 24 * 14,
-        baseFee: 500000000,
-        demandFactor: 1,
-        settings: {
-          decayRate: 0.02037911 / (1000 * 60 * 60 * 24 * 14),
-          scalingExponent: 190,
-          durationMs: 1209600000,
-          startPriceMultiplier: 50,
-        },
+        endTimestamp: futureTimestamp + returnedNamesPeriod,
+        premiumMultiplier: 50,
       });
 
-      // // TRANSFER FROM THE OWNER TO A NEW STUB ADDRESS
-      const bidYears = 3;
-      const expectedFloorPrice = Math.floor(
-        auction.baseFee + auction.baseFee * bidYears * 0.2,
-      );
-      const expectedStartPrice = Math.floor(
-        expectedFloorPrice * auction.settings.startPriceMultiplier,
-      );
-      const bidderAddress = 'auction-bidder-'.padEnd(43, '0');
-      const bidTimestamp = futureTimestamp + 60 * 60 * 1000 * 24 * 7; // 7 days into the auction
-      const expectedPurchasePrice = Math.floor(
-        expectedStartPrice *
-          (1 - auction.settings.decayRate * (bidTimestamp - futureTimestamp)) **
-            auction.settings.scalingExponent,
-      );
-      const transferResult = await handle(
-        {
-          From: PROCESS_OWNER,
-          Owner: PROCESS_OWNER,
-          Tags: [
-            { name: 'Action', value: 'Transfer' },
-            { name: 'Recipient', value: bidderAddress },
-            { name: 'Quantity', value: `${expectedPurchasePrice}` },
-            { name: 'Cast', value: true },
-          ],
-          Timestamp: bidTimestamp,
+      // should list the name from returned-names
+      const returnedNamesResult = await handle({
+        options: {
+          Tags: [{ name: 'Action', value: 'Returned-Names' }],
+          Timestamp: futureTimestamp,
         },
-        tickResult.Memory,
+        memory: returnedNameResult.Memory,
+      });
+      const { items, hasMore, cursor, sortBy, sortOrder, totalItems } =
+        JSON.parse(returnedNamesResult.Messages[0].Data);
+      assert.ok(Array.isArray(items));
+      assert.ok(hasMore === false);
+      assert.ok(cursor === undefined);
+      assert.equal(sortBy, 'endTimestamp');
+      assert.equal(sortOrder, 'desc');
+      assert.equal(totalItems, 1);
+
+      // // TRANSFER FROM THE OWNER TO A NEW STUB ADDRESS
+      const years = 3;
+      const bidderAddress = 'returned-name-buyer-'.padEnd(43, '0');
+      const timeIntoReturnedNamePeriod = 60 * 60 * 1000 * 24 * 7; // 7 days into the period
+      const bidTimestamp = futureTimestamp + timeIntoReturnedNamePeriod;
+
+      const expectedPremiumMultiplier =
+        50 * (1 - timeIntoReturnedNamePeriod / returnedNamesPeriod);
+      const expectedPurchasePrice = Math.floor(
+        baseLeasePriceFor9CharNameFor3Years * expectedPremiumMultiplier,
       );
 
-      // assert no error in the transfer
-      const transferErrorTag = transferResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
+      const transferMemory = await transfer({
+        recipient: bidderAddress,
+        quantity: expectedPurchasePrice,
+        memory: tickResult.Memory,
+        timestamp: bidTimestamp,
+      });
 
-      assert.equal(transferErrorTag, undefined);
-
-      let memoryToUse = transferResult.Memory;
+      let memoryToUse = transferMemory;
       if (fundFrom === 'stakes') {
         // Stake the bidder's balance
         const stakeResult = await setUpStake({
-          memory: transferResult.Memory,
+          memory: memoryToUse,
           transferQty: 0,
           stakeQty: expectedPurchasePrice,
           stakerAddress: bidderAddress,
@@ -1121,41 +1170,43 @@ describe('ArNS', async () => {
       }
 
       const processId = 'new-name-owner-'.padEnd(43, '1');
-      const submitBidResult = await handle(
-        {
+      const buyReturnedNameResult = await handle({
+        options: {
           From: bidderAddress,
           Owner: bidderAddress,
           Tags: [
-            { name: 'Action', value: 'Auction-Bid' },
+            { name: 'Action', value: 'Buy-Record' },
             { name: 'Name', value: 'test-name' },
             { name: 'Process-Id', value: processId },
             { name: 'Purchase-Type', value: 'lease' },
-            { name: 'Years', value: bidYears },
+            { name: 'Years', value: years.toString() },
             ...(fundFrom ? [{ name: 'Fund-From', value: fundFrom }] : []),
           ],
           Timestamp: bidTimestamp,
         },
-        memoryToUse,
-      );
+        memory: memoryToUse,
+      });
 
       // assert no error tag
-      const submitBidErrorTag = submitBidResult.Messages[0].Tags.find(
-        (tag) => tag.name === 'Error',
-      );
-      assert.equal(submitBidErrorTag, undefined);
+      const buyReturnedNameErrorTag =
+        buyReturnedNameResult.Messages[0].Tags.find(
+          (tag) => tag.name === 'Error',
+        );
+      assert.equal(buyReturnedNameErrorTag, undefined);
 
       // should send three messages including a Buy-Record-Notice and a Debit-Notice
-      assert.equal(submitBidResult.Messages.length, 2);
+      assert.equal(buyReturnedNameResult.Messages.length, 2);
 
       // should send a buy record notice
-      const buyRecordNoticeTag = submitBidResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Action' && tag.value === 'Buy-Record-Notice',
-      );
+      const buyRecordNoticeTag =
+        buyReturnedNameResult.Messages?.[0]?.Tags?.find(
+          (tag) => tag.name === 'Action' && tag.value === 'Buy-Record-Notice',
+        );
 
       assert.ok(buyRecordNoticeTag);
 
       // expect the target tag to be the bidder
-      assert.equal(submitBidResult.Messages?.[0]?.Target, bidderAddress);
+      assert.equal(buyReturnedNameResult.Messages?.[0]?.Target, bidderAddress);
 
       const expectedRecord = {
         processId,
@@ -1167,14 +1218,14 @@ describe('ArNS', async () => {
       };
       const expectedFundingResults = {
         fundingPlan: {
-          address: 'auction-bidder-0000000000000000000000000000',
-          balance: fundFrom === 'stakes' ? 0 : 5714077782,
+          address: bidderAddress,
+          balance: fundFrom === 'stakes' ? 0 : expectedPurchasePrice,
           shortfall: 0,
           stakes:
             fundFrom === 'stakes'
               ? {
                   [STUB_OPERATOR_ADDRESS]: {
-                    delegatedStake: 5714077782,
+                    delegatedStake: expectedPurchasePrice,
                     vaults: [],
                   },
                 }
@@ -1182,7 +1233,7 @@ describe('ArNS', async () => {
         },
         fundingResult: {
           newWithdrawVaults: [],
-          totalFunded: 5714077782,
+          totalFunded: expectedPurchasePrice,
         },
       };
       // the protocol gets the entire bid amount
@@ -1190,57 +1241,67 @@ describe('ArNS', async () => {
 
       // assert the data response contains the record
       const buyRecordNoticeData = JSON.parse(
-        submitBidResult.Messages?.[0]?.Data,
+        buyReturnedNameResult.Messages?.[0]?.Data,
       );
       assert.deepEqual(buyRecordNoticeData, {
-        name: 'test-name',
         ...expectedRecord,
-        ...expectedFundingResults,
+        ...(fundFrom === 'stakes' ? expectedFundingResults : {}),
+        ...{
+          name: 'test-name',
+          returnedName: {
+            initiator: PROCESS_ID,
+            rewardForInitiator: 0,
+            rewardForProtocol: expectedPurchasePrice,
+          },
+          remainingBalance: 0,
+          baseRegistrationFee: 500000000,
+        },
       });
 
-      // should send a debit notice
-      const debitNoticeTag = submitBidResult.Messages?.[1]?.Tags?.find(
-        (tag) => tag.name === 'Action' && tag.value === 'Debit-Notice',
+      // should send a credit notice
+      const creditNoticeTag = buyReturnedNameResult.Messages?.[1]?.Tags?.find(
+        (tag) => tag.name === 'Action' && tag.value === 'Credit-Notice',
       );
-      assert.ok(debitNoticeTag);
+      assert.ok(creditNoticeTag);
 
       // expect the target to be to the protocol balance
-      assert.equal(submitBidResult.Messages?.[1]?.Target, PROCESS_ID);
+      assert.equal(buyReturnedNameResult.Messages?.[1]?.Target, PROCESS_ID);
 
       // assert the data response contains the record
-      const debitNoticeData = JSON.parse(submitBidResult.Messages?.[1]?.Data);
-      assert.deepEqual(debitNoticeData, {
+      const creditNoticeData = JSON.parse(
+        buyReturnedNameResult.Messages?.[1]?.Data,
+      );
+      assert.deepEqual(creditNoticeData, {
         record: expectedRecord,
-        bidder: bidderAddress,
-        bidAmount: expectedPurchasePrice,
+        buyer: bidderAddress,
         rewardForInitiator: 0,
         rewardForProtocol: expectedRewardForProtocol,
         name: 'test-name',
       });
 
       // should add the record to the registry
-      const recordResult = await handle(
-        {
+      const recordResult = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Record' },
             { name: 'Name', value: 'test-name' },
           ],
           Timestamp: bidTimestamp,
         },
-        submitBidResult.Memory,
-      );
+        memory: buyReturnedNameResult.Memory,
+      });
 
       const record = JSON.parse(recordResult.Messages?.[0]?.Data);
-      assert.deepEqual(record, expectedRecord);
+      assert.deepEqual(record, { ...expectedRecord, type: 'lease' });
 
       // assert the balance of the initiator and the protocol where updated correctly
-      const balancesResult = await handle(
-        {
+      const balancesResult = await handle({
+        options: {
           Tags: [{ name: 'Action', value: 'Balances' }],
           Timestamp: bidTimestamp,
         },
-        submitBidResult.Memory,
-      );
+        memory: buyReturnedNameResult.Memory,
+      });
 
       const expectedProtocolBalance =
         INITIAL_PROTOCOL_BALANCE +
@@ -1251,17 +1312,17 @@ describe('ArNS', async () => {
       assert.equal(balances[bidderAddress], 0);
     };
 
-    it('should create a lease expiration initiated auction and accept a bid', async () => {
-      await runAuctionTest({});
+    it('should create a lease expiration initiated returned name and accept buy records for it', async () => {
+      await runReturnedNameTest({});
     });
 
-    it('should create a lease expiration initiated auction and accept a bid funded by stakes', async () => {
-      await runAuctionTest({ fundFrom: 'stakes' });
+    it('should create a lease expiration initiated returned name and accept a buy record funded by stakes', async () => {
+      await runReturnedNameTest({ fundFrom: 'stakes' });
     });
   });
 
-  describe('Auction-Prices', () => {
-    it('should compute the prices of an auction at a specific interval', async () => {
+  describe('Returned Name Premium', () => {
+    it('should compute the correct premiums of returned names at a specific intervals', async () => {
       // buy the name first
       const processId = ''.padEnd(43, 'a');
       const initiator = 'ant-owner-'.padEnd(43, '0'); // owner of the ANT at the time of release
@@ -1271,8 +1332,10 @@ describe('ArNS', async () => {
         type: 'permabuy',
       });
 
-      const releaseNameResult = await handle(
-        {
+      const releasedTimestamp = STUB_TIMESTAMP;
+
+      const releaseNameResult = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Release-Name' },
             { name: 'Name', value: 'test-name' },
@@ -1280,9 +1343,10 @@ describe('ArNS', async () => {
           ],
           From: processId,
           Owner: processId,
+          Timestamp: releasedTimestamp,
         },
         memory,
-      );
+      });
 
       // assert no error tag
       const releaseNameErrorTag = releaseNameResult.Messages?.[0]?.Tags?.find(
@@ -1290,94 +1354,89 @@ describe('ArNS', async () => {
       );
       assert.equal(releaseNameErrorTag, undefined);
 
-      // fetch the auction
-      const auctionResult = await handle(
-        {
+      // fetch the returnedName
+      const returnedNameResult = await handle({
+        options: {
           Tags: [
-            { name: 'Action', value: 'Auction-Info' },
+            { name: 'Action', value: 'Returned-Name' },
             { name: 'Name', value: 'test-name' },
           ],
         },
-        releaseNameResult.Memory,
-      );
-      // assert no error tag
-      const auctionErrorTag = auctionResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
+        memory: releaseNameResult.Memory,
+      });
 
-      assert.equal(auctionErrorTag, undefined);
-      const auctionPrices = await handle(
-        {
+      const tokenCostForReturnedName = await handle({
+        options: {
           Tags: [
-            { name: 'Action', value: 'Auction-Prices' },
+            { name: 'Action', value: 'Token-Cost' },
+            { name: 'Intent', value: 'Buy-Record' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
+            { name: 'Years', value: '1' },
           ],
+          Timestamp: releasedTimestamp,
         },
-        releaseNameResult.Memory,
-      );
-
-      // assert no error tag for auction prices
-      const auctionPricesErrorTag = auctionPrices.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
-      assert.equal(auctionPricesErrorTag, undefined);
-      // parse the auction prices data
-      const auctionPricesData = JSON.parse(auctionPrices.Messages?.[0]?.Data);
-
-      // expectations
-      const expectedStartPrice = 30000000000; // price for a 1 year lease
-      const expectedFloorPrice = Math.floor(expectedStartPrice / 50);
-
-      // validate the response structure
-      assert.ok(auctionPricesData.name, 'Auction prices should include a name');
-      assert.ok(auctionPricesData.type, 'Auction prices should include a type');
-      assert.ok(
-        auctionPricesData.prices,
-        'Auction prices should include prices',
-      );
-      assert.ok(
-        auctionPricesData.currentPrice,
-        'Auction prices should include a current price',
-      );
-
-      // validate the prices
-      assert.ok(
-        Object.keys(auctionPricesData.prices).length > 0,
-        'Prices should not be empty',
-      );
-      Object.entries(auctionPricesData.prices).forEach(([timestamp, price]) => {
-        assert.ok(
-          Number.isInteger(Number(timestamp)),
-          'Timestamp should be a number',
-        );
-        assert.ok(Number.isInteger(price), 'Price should be an integer');
-        assert.ok(price > 0, 'Price should be positive');
+        memory: releaseNameResult.Memory,
       });
-      // assert the first price is the start price
-      assert.equal(
-        auctionPricesData.prices[STUB_TIMESTAMP],
-        expectedStartPrice,
+
+      const returnedNamePricesErrorTag =
+        tokenCostForReturnedName.Messages?.[0]?.Tags?.find(
+          (tag) => tag.name === 'Error',
+        );
+      assert.equal(returnedNamePricesErrorTag, undefined);
+      const returnedNameTokenCost = JSON.parse(
+        tokenCostForReturnedName.Messages?.[0]?.Data,
       );
 
-      // assert the last price is the floor price
-      const lastPriceTimestamp = Math.max(
-        ...Object.keys(auctionPricesData.prices).map(Number),
+      const expectedStartPrice = Math.floor(
+        baseLeasePriceFor9CharNameFor1Year * 50,
+      );
+      assert.equal(returnedNameTokenCost, expectedStartPrice);
+
+      const tokenCostResultForReturnedNameHalfwayThroughPeriod = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Token-Cost' },
+            { name: 'Intent', value: 'Buy-Record' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Purchase-Type', value: 'lease' },
+            { name: 'Years', value: '1' },
+          ],
+          Timestamp: releasedTimestamp + returnedNamesPeriod / 2,
+        },
+        memory: releaseNameResult.Memory,
+      });
+
+      const tokenCostForReturnedNameHalfwayThroughPeriod = JSON.parse(
+        tokenCostResultForReturnedNameHalfwayThroughPeriod.Messages?.[0]?.Data,
+      );
+      const expectedHalfwayPrice = Math.floor(
+        baseLeasePriceFor9CharNameFor1Year * 25,
       );
       assert.equal(
-        auctionPricesData.prices[lastPriceTimestamp],
-        expectedFloorPrice,
+        tokenCostForReturnedNameHalfwayThroughPeriod,
+        expectedHalfwayPrice,
       );
 
-      // validate the current price
-      assert.ok(
-        Number.isInteger(auctionPricesData.currentPrice),
-        'Current price should be an integer',
+      const tokenCostResultForReturnedNameAfterThePeriod = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Token-Cost' },
+            { name: 'Intent', value: 'Buy-Record' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Purchase-Type', value: 'lease' },
+            { name: 'Years', value: '1' },
+          ],
+          Timestamp: releasedTimestamp + returnedNamesPeriod + 1,
+        },
+        memory: releaseNameResult.Memory,
+      });
+
+      const tokenCostForReturnedNameAfterThePeriod = JSON.parse(
+        tokenCostResultForReturnedNameAfterThePeriod.Messages?.[0]?.Data,
       );
-      assert.ok(
-        auctionPricesData.currentPrice > 0,
-        'Current price should be positive',
-      );
+      const expectedFloorPrice = baseLeasePriceFor9CharNameFor1Year;
+      assert.equal(tokenCostForReturnedNameAfterThePeriod, expectedFloorPrice);
     });
   });
 
@@ -1391,8 +1450,8 @@ describe('ArNS', async () => {
         type: 'permabuy',
       });
 
-      const reassignNameResult = await handle(
-        {
+      const reassignNameResult = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Reassign-Name' },
             { name: 'Name', value: 'test-name' },
@@ -1402,7 +1461,7 @@ describe('ArNS', async () => {
           Owner: processId,
         },
         memory,
-      );
+      });
 
       // assert no error tag
       const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
@@ -1421,8 +1480,8 @@ describe('ArNS', async () => {
         type: 'permabuy',
       });
 
-      const reassignNameResult = await handle(
-        {
+      const reassignNameResult = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Reassign-Name' },
             { name: 'Name', value: 'test-name' },
@@ -1433,7 +1492,7 @@ describe('ArNS', async () => {
           Owner: processId,
         },
         memory,
-      );
+      });
 
       // assert no error tag
       const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
@@ -1453,8 +1512,8 @@ describe('ArNS', async () => {
         type: 'permabuy',
       });
 
-      const reassignNameResult = await handle(
-        {
+      const reassignNameResult = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Reassign-Name' },
             { name: 'Name', value: 'test-name' },
@@ -1464,7 +1523,8 @@ describe('ArNS', async () => {
           Owner: STUB_ADDRESS,
         },
         memory,
-      );
+        shouldAssertNoResultError: false,
+      });
 
       // assert error
       const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
@@ -1482,8 +1542,8 @@ describe('ArNS', async () => {
         type: 'permabuy',
       });
 
-      const reassignNameResult = await handle(
-        {
+      const reassignNameResult = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Reassign-Name' },
             { name: 'Name', value: 'test-name' },
@@ -1493,7 +1553,8 @@ describe('ArNS', async () => {
           Owner: processId,
         },
         memory,
-      );
+        shouldAssertNoResultError: false,
+      });
 
       // assert error
       const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
@@ -1506,12 +1567,12 @@ describe('ArNS', async () => {
   describe('Paginated-Records', () => {
     it('should paginate records correctly', async () => {
       // buy 3 records
-      let buyRecordsMemory; // updated after each purchase
       let lastTimestamp = STUB_TIMESTAMP;
+      let buyRecordsMemory = sharedMemory; // updated after each purchase
       const recordsCount = 3;
       for (let i = 0; i < recordsCount; i++) {
-        const buyRecordsResult = await handle(
-          {
+        const buyRecordsResult = await handle({
+          options: {
             Tags: [
               { name: 'Action', value: 'Buy-Record' },
               { name: 'Name', value: `test-name-${i}` },
@@ -1519,8 +1580,8 @@ describe('ArNS', async () => {
             ],
             Timestamp: lastTimestamp + i * 1000, // order of names is based on timestamp
           },
-          buyRecordsMemory,
-        );
+          memory: buyRecordsMemory,
+        });
         buyRecordsMemory = buyRecordsResult.Memory;
         lastTimestamp = lastTimestamp + i * 1000;
       }
@@ -1529,8 +1590,8 @@ describe('ArNS', async () => {
       let paginatedRecords = [];
       let cursor = undefined;
       while (true) {
-        const result = await handle(
-          {
+        const result = await handle({
+          options: {
             Tags: [
               { name: 'Action', value: 'Paginated-Records' },
               { name: 'Cursor', value: cursor },
@@ -1538,8 +1599,8 @@ describe('ArNS', async () => {
             ],
             Timestamp: lastTimestamp,
           },
-          buyRecordsMemory,
-        );
+          memory: buyRecordsMemory,
+        });
         // assert no error tag
         const errorTag = result.Messages?.[0]?.Tags?.find(
           (tag) => tag.name === 'Error',
@@ -1590,30 +1651,31 @@ describe('ArNS', async () => {
     before(async () => {
       // add a gateway and distribute to increment stats
       const { memory: join1Memory } = await joinNetwork({
+        memory: sharedMemory,
         address: joinedGateway,
         quantity: 300_000_000_000,
         timestamp: firstEpochTimestamp - 1000 * 60 * 60 * 24 * 365, // 365 days before the first epoch
       });
 
-      const firstTickAndDistribution = await handle(
-        {
+      const firstTickAndDistribution = await handle({
+        options: {
           Tags: [{ name: 'Action', value: 'Tick' }],
           Timestamp: afterDistributionTimestamp,
         },
-        join1Memory,
-      );
+        memory: join1Memory,
+      });
 
       // assert our gateway has weights making it eligible for ArNS discount
-      const gateway = await handle(
-        {
+      const gateway = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Gateway' },
             { name: 'Address', value: joinedGateway },
           ],
           Timestamp: afterDistributionTimestamp,
         },
-        firstTickAndDistribution.Memory,
-      );
+        memory: firstTickAndDistribution.Memory,
+      });
       // ensure the gateway is joined and has weights making it eligible for ArNS discount
       const gatewayData = JSON.parse(gateway.Messages[0].Data);
       assert.equal(gatewayData.status, 'joined');
@@ -1637,8 +1699,8 @@ describe('ArNS', async () => {
     });
 
     it('should return discounted cost for a buy record by an eligible gateway', async () => {
-      const result = await handle(
-        {
+      const result = await handle({
+        options: {
           Tags: [
             { name: 'Action', value: 'Get-Cost-Details-For-Action' },
             { name: 'Intent', value: 'Buy-Record' },
@@ -1651,14 +1713,14 @@ describe('ArNS', async () => {
           Owner: joinedGateway,
           Timestamp: afterDistributionTimestamp,
         },
-        arnsDiscountMemory,
-      );
+        memory: arnsDiscountMemory,
+      });
 
       const { tokenCost, discounts } = JSON.parse(result.Messages[0].Data);
-      assert.equal(tokenCost, baseLeasePrice * 0.8);
+      assert.equal(tokenCost, baseLeasePriceFor9CharNameFor1Year * 0.8);
       assert.deepEqual(discounts, [
         {
-          discountTotal: baseLeasePrice * 0.2,
+          discountTotal: baseLeasePriceFor9CharNameFor1Year * 0.2,
           multiplier: 0.2,
           name: 'ArNS Discount',
         },
@@ -1666,8 +1728,8 @@ describe('ArNS', async () => {
     });
 
     it('should return the correct cost for a buy record by a non-eligible gateway', async () => {
-      const result = await handle(
-        {
+      const result = await handle({
+        options: {
           From: nonEligibleAddress,
           Owner: nonEligibleAddress,
           Tags: [
@@ -1677,11 +1739,11 @@ describe('ArNS', async () => {
           ],
           Timestamp: afterDistributionTimestamp,
         },
-        arnsDiscountMemory,
-      );
+        memory: arnsDiscountMemory,
+      });
       assertNoResultError(result);
       const costDetails = JSON.parse(result.Messages[0].Data);
-      assert.equal(costDetails.tokenCost, baseLeasePrice);
+      assert.equal(costDetails.tokenCost, baseLeasePriceFor9CharNameFor1Year);
       assert.deepEqual(costDetails.discounts, []);
     });
 
@@ -1691,8 +1753,8 @@ describe('ArNS', async () => {
       const baseFeeForName = 500000000; // base fee for a 10 character name
       const buyRecordTimestamp = afterDistributionTimestamp;
       before(async () => {
-        buyRecordResult = await handle(
-          {
+        buyRecordResult = await handle({
+          options: {
             From: joinedGateway,
             Owner: joinedGateway,
             Tags: [
@@ -1704,10 +1766,10 @@ describe('ArNS', async () => {
             ],
             Timestamp: buyRecordTimestamp,
           },
-          arnsDiscountMemory,
-        );
-        nonEligibleBuyRecordResult = await handle(
-          {
+          memory: arnsDiscountMemory,
+        });
+        nonEligibleBuyRecordResult = await handle({
+          options: {
             From: nonEligibleAddress,
             Owner: nonEligibleAddress,
             Tags: [
@@ -1719,8 +1781,8 @@ describe('ArNS', async () => {
             ],
             Timestamp: buyRecordTimestamp,
           },
-          arnsDiscountMemory,
-        );
+          memory: arnsDiscountMemory,
+        });
         assertNoResultError(buyRecordResult);
       });
 
@@ -1743,15 +1805,15 @@ describe('ArNS', async () => {
         const baseLeaseOneYearExtensionPrice = baseFeeForName * 0.2; // 1 year extension at 20% for the year
 
         it('should apply the discount to extending the lease for an eligible gateway', async () => {
-          const result = await handle(
-            {
+          const result = await handle({
+            options: {
               From: joinedGateway,
               Owner: joinedGateway,
               Tags: extendLeaseCostDetailsTags,
               Timestamp: extendLeaseTimestamp,
             },
-            buyRecordResult.Memory,
-          );
+            memory: buyRecordResult.Memory,
+          });
           const { tokenCost, discounts } = JSON.parse(result.Messages[0].Data);
           assert.equal(tokenCost, baseLeaseOneYearExtensionPrice * 0.8);
           assert.deepEqual(discounts, [
@@ -1764,15 +1826,15 @@ describe('ArNS', async () => {
         });
 
         it('should not apply the discount to extending the lease for a non-eligible gateway', async () => {
-          const result = await handle(
-            {
+          const result = await handle({
+            options: {
               From: nonEligibleAddress,
               Owner: nonEligibleAddress,
               Tags: extendLeaseCostDetailsTags,
               Timestamp: extendLeaseTimestamp,
             },
-            buyRecordResult.Memory,
-          );
+            memory: buyRecordResult.Memory,
+          });
           const { tokenCost, discounts } = JSON.parse(result.Messages[0].Data);
           assert.equal(tokenCost, baseLeaseOneYearExtensionPrice);
           assert.deepEqual(discounts, []);
@@ -1790,24 +1852,24 @@ describe('ArNS', async () => {
             address: nonEligibleAddress,
           });
 
-          const eligibleGatewayResult = await handle(
-            {
+          const eligibleGatewayResult = await handle({
+            options: {
               From: joinedGateway,
               Owner: joinedGateway,
               Tags: extendLeaseActionTags,
               Timestamp: extendLeaseTimestamp,
             },
-            buyRecordResult.Memory,
-          );
-          const nonEligibleGatewayResult = await handle(
-            {
+            memory: buyRecordResult.Memory,
+          });
+          const nonEligibleGatewayResult = await handle({
+            options: {
               From: nonEligibleAddress,
               Owner: nonEligibleAddress,
               Tags: extendLeaseActionTags,
               Timestamp: extendLeaseTimestamp,
             },
-            nonEligibleBuyRecordResult.Memory,
-          );
+            memory: nonEligibleBuyRecordResult.Memory,
+          });
 
           const eligibleBalanceAfter = await getBalance({
             memory: eligibleGatewayResult.Memory,
@@ -1841,15 +1903,15 @@ describe('ArNS', async () => {
           const basePermabuyPrice = baseFeeForName + baseFeeForName * 0.2 * 20; // 20 years of annual renewal fees
 
           it('should apply the discount to upgrading the lease to a permabuy for an eligible gateway', async () => {
-            const result = await handle(
-              {
+            const result = await handle({
+              options: {
                 From: joinedGateway,
                 Owner: joinedGateway,
                 Tags: upgradeToPermabuyTags,
                 Timestamp: upgradeToPermabuyTimestamp,
               },
-              buyRecordResult.Memory,
-            );
+              memory: buyRecordResult.Memory,
+            });
             const { tokenCost, discounts } = JSON.parse(
               result.Messages[0].Data,
             );
@@ -1864,15 +1926,15 @@ describe('ArNS', async () => {
           });
 
           it('should not apply the discount to increasing the undername limit for a non-eligible gateway', async () => {
-            const result = await handle(
-              {
+            const result = await handle({
+              options: {
                 From: nonEligibleAddress,
                 Owner: nonEligibleAddress,
                 Tags: upgradeToPermabuyTags,
                 Timestamp: upgradeToPermabuyTimestamp,
               },
-              buyRecordResult.Memory,
-            );
+              memory: buyRecordResult.Memory,
+            });
             const { tokenCost, discounts } = JSON.parse(
               result.Messages[0].Data,
             );
@@ -1893,15 +1955,15 @@ describe('ArNS', async () => {
           ];
 
           it('should apply the discount to increasing the undername limit for an eligible gateway', async () => {
-            const result = await handle(
-              {
+            const result = await handle({
+              options: {
                 From: joinedGateway,
                 Owner: joinedGateway,
                 Tags: increaseUndernameLimitTags,
                 Timestamp: afterDistributionTimestamp, // timestamp dependent
               },
-              buyRecordResult.Memory,
-            );
+              memory: buyRecordResult.Memory,
+            });
             const { tokenCost, discounts } = JSON.parse(
               result.Messages[0].Data,
             );
@@ -1916,129 +1978,21 @@ describe('ArNS', async () => {
           });
 
           it('should not apply the discount to increasing the undername limit for a non-eligible gateway', async () => {
-            const result = await handle(
-              {
+            const result = await handle({
+              options: {
                 From: nonEligibleAddress,
                 Owner: nonEligibleAddress,
                 Tags: increaseUndernameLimitTags,
                 Timestamp: afterDistributionTimestamp, // timestamp dependent
               },
-              buyRecordResult.Memory,
-            );
+              memory: buyRecordResult.Memory,
+            });
             assertNoResultError(result);
             const { tokenCost, discounts } = JSON.parse(
               result.Messages[0].Data,
             );
             assert.equal(tokenCost, undernameCostsForOneYear);
             assert.deepEqual(discounts, []);
-          });
-        });
-
-        describe('when the record is in auction', () => {
-          let expiredRecordMemory;
-          const expiredRecordTimestamp =
-            buyRecordTimestamp + 1000 * 60 * 60 * 24 * 379 + 1; // 379 days after the record has expired
-          const baseAuctionPrice = 30_000_000_000;
-          const auctionTags = [
-            { name: 'Action', value: 'Auction-Prices' },
-            { name: 'Name', value: 'great-name' },
-            { name: 'Purchase-Type', value: 'lease' },
-          ];
-          before(async () => {
-            const tickResult = await handle(
-              {
-                Tags: [{ name: 'Action', value: 'Tick' }],
-                Timestamp: expiredRecordTimestamp,
-              },
-              buyRecordResult.Memory,
-            );
-            expiredRecordMemory = tickResult.Memory;
-          });
-
-          it('should return discounts for eligible gateways', async () => {
-            const result = await handle(
-              {
-                From: joinedGateway,
-                Owner: joinedGateway,
-                Tags: auctionTags,
-                Timestamp: expiredRecordTimestamp,
-              },
-              expiredRecordMemory,
-            );
-            const { currentPrice, discounts } = JSON.parse(
-              result.Messages[0].Data,
-            );
-            assert.equal(currentPrice, baseAuctionPrice);
-            assert.deepEqual(discounts, [
-              {
-                name: 'ArNS Discount',
-                multiplier: 0.2,
-              },
-            ]);
-          });
-
-          it('should not apply the discount to auction prices for a non-eligible gateway', async () => {
-            const result = await handle(
-              {
-                From: nonEligibleAddress,
-                Owner: nonEligibleAddress,
-                Tags: auctionTags,
-                Timestamp: expiredRecordTimestamp,
-              },
-              expiredRecordMemory,
-            );
-            const { currentPrice, discounts } = JSON.parse(
-              result.Messages[0].Data,
-            );
-            assert.equal(currentPrice, baseAuctionPrice);
-            assert.deepEqual(discounts, []);
-          });
-
-          const submitBidTags = [
-            { name: 'Action', value: 'Auction-Bid' },
-            { name: 'Name', value: 'great-name' },
-            { name: 'Process-Id', value: ''.padEnd(43, 'b') },
-            { name: 'Purchase-Type', value: 'lease' },
-          ];
-          const submitBidTimestamp = expiredRecordTimestamp;
-
-          it('should apply the discount on submit bid for an eligible gateway', async () => {
-            const result = await handle(
-              {
-                From: joinedGateway,
-                Owner: joinedGateway,
-                Tags: submitBidTags,
-                Timestamp: submitBidTimestamp,
-              },
-              expiredRecordMemory,
-            );
-            const { purchasePrice } = JSON.parse(result.Messages[0].Data);
-            assert.equal(purchasePrice, baseAuctionPrice * 0.8);
-          });
-
-          it('should not apply the discount on submit bid for a non-eligible gateway', async () => {
-            const balanceBefore = await getBalance({
-              memory: expiredRecordMemory,
-              timestamp: submitBidTimestamp,
-              address: nonEligibleAddress,
-            });
-            const result = await handle(
-              {
-                From: nonEligibleAddress,
-                Owner: nonEligibleAddress,
-                Tags: submitBidTags,
-                Timestamp: submitBidTimestamp,
-              },
-              expiredRecordMemory,
-            );
-            const { purchasePrice } = JSON.parse(result.Messages[0].Data);
-            assert.equal(purchasePrice, baseAuctionPrice);
-            const balanceAfter = await getBalance({
-              memory: result.Memory,
-              timestamp: submitBidTimestamp + 1,
-              address: nonEligibleAddress,
-            });
-            assert.equal(balanceBefore - baseAuctionPrice, balanceAfter);
           });
         });
       });
@@ -2048,7 +2002,9 @@ describe('ArNS', async () => {
   describe('Reserved-Names', () => {
     it('should paginate reserved names', async () => {
       const result = await handle({
-        Tags: [{ name: 'Action', value: 'Reserved-Names' }],
+        options: {
+          Tags: [{ name: 'Action', value: 'Reserved-Names' }],
+        },
       });
       const { items, hasMore, cursor, sortBy, sortOrder, totalItems } =
         JSON.parse(result.Messages[0].Data);

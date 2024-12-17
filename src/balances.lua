@@ -5,16 +5,19 @@ Balances = Balances or {}
 local balances = {}
 local utils = require("utils")
 
---- @alias mIO number
+--- @alias mARIO number
 
 --- Transfers tokens from one address to another
 ---@param recipient string The address to receive tokens
 ---@param from string The address sending tokens
 ---@param qty number The amount of tokens to transfer (must be integer)
+---@param allowUnsafeAddresses boolean Whether to allow unsafe addresses
 ---@return table Updated balances for sender and recipient addresses
-function balances.transfer(recipient, from, qty)
+function balances.transfer(recipient, from, qty, allowUnsafeAddresses)
 	assert(type(recipient) == "string", "Recipient is required!")
 	assert(type(from) == "string", "From is required!")
+	assert(from ~= recipient, "Cannot transfer to self")
+	assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
 	assert(type(qty) == "number", "Quantity is required and must be a number!")
 	assert(recipient ~= from, "Cannot transfer to self")
 	assert(utils.isInteger(qty), "Quantity must be an integer: " .. qty)

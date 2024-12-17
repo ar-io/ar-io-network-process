@@ -1,6 +1,7 @@
 local base64 = require("base64")
 local crypto = require("crypto.init")
 local json = require("json")
+local constants = require("constants")
 local utils = {}
 
 function utils.hasMatchingTag(tag, value)
@@ -250,7 +251,7 @@ end
 
 --- Checks if an address is a valid Arweave address
 --- @param address string The address to check
---- @return boolean isValidArweaveAddress - whether the address is a valid Arweave address
+--- @return boolean # whether the address is a valid Arweave address
 function utils.isValidArweaveAddress(address)
 	return type(address) == "string" and #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
 end
@@ -269,11 +270,29 @@ function utils.isValidEthAddress(address)
 	return utils.isValidUnformattedEthAddress(address) and address == utils.formatEIP55Address(address)
 end
 
+function utils.isValidUnsafeAddress(address)
+	if not address then
+		return false
+	end
+	local match = string.match(address, "^[%w_-]+$")
+	return match ~= nil
+		and #address >= constants.MIN_UNSAFE_ADDRESS_LENGTH
+		and #address <= constants.MAX_UNSAFE_ADDRESS_LENGTH
+end
+
 --- Checks if an address is a valid AO address
---- @param url string|nil The address to check
---- @return boolean isValidAOAddress - whether the address is a valid AO address
-function utils.isValidAOAddress(url)
-	return url and (utils.isValidArweaveAddress(url) or utils.isValidEthAddress(url)) or false
+--- @param address string|nil The address to check
+--- @param allowUnsafe boolean|nil Whether to allow unsafe addresses, defaults to false
+--- @return boolean # whether the address is valid, depending on the allowUnsafe flag
+function utils.isValidAddress(address, allowUnsafe)
+	allowUnsafe = allowUnsafe or false -- default to false, only allow unsafe addresses if explicitly set
+	if not address then
+		return false
+	end
+	if allowUnsafe then
+		return utils.isValidUnsafeAddress(address)
+	end
+	return utils.isValidArweaveAddress(address) or utils.isValidEthAddress(address)
 end
 
 --- Converts an address to EIP-55 checksum format
@@ -354,6 +373,20 @@ function utils.deepCopy(original, excludedFields)
 		return original
 	end
 
+	-- Fast path: If no excluded fields, copy directly
+	if not excludedFields or #excludedFields == 0 then
+		local copy = {}
+		for key, value in pairs(original) do
+			if type(value) == "table" then
+				copy[key] = utils.deepCopy(value) -- Recursive copy for nested tables
+			else
+				copy[key] = value
+			end
+		end
+		return copy
+	end
+
+	-- If excludes are provided, create a lookup table for excluded fields
 	local excluded = utils.createLookupTable(excludedFields)
 
 	-- Helper function to check if a key path is excluded
@@ -373,29 +406,46 @@ function utils.deepCopy(original, excludedFields)
 		end
 
 		local result = {}
-		local isArray = #orig > 0
+		local isArray = true
 
-		for key, value in pairs(orig) do
-			local keyPath = path and (path .. "." .. key) or key
-			if not isExcluded(keyPath) then
-				result[key] = deepCopyHelper(value, keyPath)
+		-- Check if all keys are numeric and sequential
+		for key in pairs(orig) do
+			if type(key) ~= "number" or key % 1 ~= 0 then
+				isArray = false
+				break
 			end
 		end
 
-		-- Preserve array order if the original table is an array
 		if isArray then
-			local orderedResult = {}
-			for i = 1, #orig do
-				if result[i] ~= nil then
-					table.insert(orderedResult, result[i])
+			-- Collect numeric keys in sorted order for sequential reindexing
+			local numericKeys = {}
+			for key in pairs(orig) do
+				table.insert(numericKeys, key)
+			end
+			table.sort(numericKeys)
+
+			local index = 1
+			for _, key in ipairs(numericKeys) do
+				local keyPath = path and (path .. "." .. key) or tostring(key)
+				if not isExcluded(keyPath) then
+					result[index] = deepCopyHelper(orig[key], keyPath) -- Sequentially reindex
+					index = index + 1
 				end
 			end
-			return orderedResult
+		else
+			-- Handle non-array tables (dictionaries)
+			for key, value in pairs(orig) do
+				local keyPath = path and (path .. "." .. key) or key
+				if not isExcluded(keyPath) then
+					result[key] = deepCopyHelper(value, keyPath)
+				end
+			end
 		end
 
 		return result
 	end
 
+	-- Use the exclusion-aware deep copy helper
 	return deepCopyHelper(original, nil)
 end
 
@@ -631,7 +681,26 @@ function utils.validateAndSanitizeInputs(table)
 		-- Format all incoming numbers
 		sanitizedTable[tagName] = sanitizedTable[tagName] and tonumber(sanitizedTable[tagName]) or nil
 	end
+
+	local knownBooleanTags = {
+		"Allow-Unsafe-Addresses",
+		"Force-Prune",
+	}
+	for _, tagName in ipairs(knownBooleanTags) do
+		sanitizedTable[tagName] = sanitizedTable[tagName]
+				and utils.booleanOrBooleanStringToBoolean(sanitizedTable[tagName])
+			or nil
+	end
 	return sanitizedTable
+end
+
+--- @param value string|boolean
+--- @return boolean
+function utils.booleanOrBooleanStringToBoolean(value)
+	if type(value) == "boolean" then
+		return value
+	end
+	return type(value) == "string" and string.lower(value) == "true"
 end
 
 return utils

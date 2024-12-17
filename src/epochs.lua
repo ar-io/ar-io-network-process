@@ -3,6 +3,7 @@ local crypto = require("crypto.init")
 local utils = require("utils")
 local balances = require("balances")
 local arns = require("arns")
+local constants = require("constants")
 local epochs = {}
 
 --- @class Epoch
@@ -66,14 +67,23 @@ EpochSettings = EpochSettings
 		rewardPercentage = 0.0005, -- 0.05%
 		maxObservers = 50,
 		epochZeroStartTimestamp = 1719900000000, -- July 9th, 00:00:00 UTC
-		durationMs = 60 * 1000 * 60 * 24, -- 24 hours
+		durationMs = constants.defaultEpochDurationMs, -- 24 hours
 		distributionDelayMs = 60 * 1000 * 40, -- 40 minutes (~ 20 arweave blocks)
 	}
 
---- Gets all the epochs
---- @return table<number, Epoch> The epochs indexed by their epoch index
+--- @type Timestamp|nil
+NextEpochsPruneTimestamp = NextEpochsPruneTimestamp or 0
+
+--- Gets a deep copy of all the epochs
+--- @return table<number, Epoch> # A deep copy of the epochs indexed by their epoch index
 function epochs.getEpochs()
 	return utils.deepCopy(Epochs) or {}
+end
+
+--- Gets all the epochs
+--- @return table<number, Epoch> # The epochs indexed by their epoch index
+function epochs.getEpochsUnsafe()
+	return Epochs or {}
 end
 
 --- Gets an epoch by index
@@ -391,6 +401,10 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 			gar.updateGatewayWeights(weightedGateway)
 		end
 	end
+
+	-- Force schedule a pruning JIC
+	NextEpochsPruneTimestamp = NextEpochsPruneTimestamp or 0
+
 	return epoch
 end
 
@@ -401,14 +415,12 @@ end
 --- @param timestamp number The timestamp
 --- @return Observations # The updated observations for the epoch
 function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddresses, timestamp)
-	-- assert report tx id is valid arweave address
-	assert(utils.isValidArweaveAddress(reportTxId), "Report transaction ID is not a valid Arweave address")
-	-- assert observer address is valid arweave address
-	assert(utils.isValidArweaveAddress(observerAddress), "Observer address is not a valid Arweave address")
+	-- Note: one of the only places we use arweave addresses, as the protocol requires the report to be stored on arweave. This would be a significant change to OIP if changed.
+	assert(utils.isValidArweaveAddress(reportTxId), "Report transaction ID is not a valid address")
+	assert(utils.isValidAddress(observerAddress, true), "Observer address is not a valid address") -- allow unsafe addresses for observer address
 	assert(type(failedGatewayAddresses) == "table", "Failed gateway addresses is required")
-	-- assert each address in failedGatewayAddresses is a valid arweave address
 	for _, address in ipairs(failedGatewayAddresses) do
-		assert(utils.isValidArweaveAddress(address), "Failed gateway address is not a valid Arweave address")
+		assert(utils.isValidAddress(address, true), "Failed gateway address is not a valid address") -- allow unsafe addresses for failed gateway addresses
 	end
 	assert(type(timestamp) == "number", "Timestamp is required")
 
@@ -496,7 +508,9 @@ end
 function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
 	local epochStartTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 	local activeGatewayAddresses = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
-	local totalEligibleRewards = math.floor(balances.getBalance(ao.id) * epochs.getSettings().rewardPercentage)
+	local protocolBalance = balances.getBalance(ao.id)
+	local rewardRate = epochs.getRewardRateForEpoch(epochIndex)
+	local totalEligibleRewards = math.floor(protocolBalance * rewardRate)
 	local eligibleGatewayReward = math.floor(totalEligibleRewards * 0.90 / #activeGatewayAddresses) -- TODO: make these setting variables
 	local eligibleObserverReward = math.floor(totalEligibleRewards * 0.10 / #prescribedObservers) -- TODO: make these setting variables
 	local prescribedObserversLookup = utils.reduce(prescribedObservers, function(acc, _, observer)
@@ -589,12 +603,12 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	-- get the eligible rewards for the epoch
 	local totalEligibleObserverReward = epoch.distributions.totalEligibleObserverReward
 	local totalEligibleGatewayReward = epoch.distributions.totalEligibleGatewayReward
+	--- @type table<string, number>
 	local distributed = {}
-	local totalDistributed = 0
 	for gatewayAddress, totalEligibleRewardsForGateway in pairs(eligibleGatewaysForEpoch) do
 		local gateway = gar.getGateway(gatewayAddress)
-		-- only operate if the gateway is found (it should be )
-		if gateway and totalEligibleRewardsForGateway then
+		-- only distribute rewards if the gateway is found and not leaving
+		if gateway and totalEligibleRewardsForGateway and gateway.status ~= "leaving" then
 			-- check the observations to see if gateway passed, if 50% or more of the observers marked the gateway as failed, it is considered failed
 			local observersMarkedFailed = epoch.observations.failureSummaries
 					and epoch.observations.failureSummaries[gatewayAddress]
@@ -660,54 +674,53 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 					/ totalEligibleRewardsForGatewayAndDelegates -- percent of what was earned vs what was eligible
 				-- optimally this is 1, but if the gateway did not do what it was supposed to do, it will be less than 1 and thus all payouts will be less
 				local totalDistributedToDelegates = 0
+				local totalRewardsForMissingDelegates = 0
 				-- distribute all the predetermined rewards to the delegates
 				for delegateAddress, eligibleDelegateReward in pairs(totalEligibleRewardsForGateway.delegateRewards) do
 					local actualDelegateReward = math.floor(eligibleDelegateReward * percentOfEligibleEarned)
-					-- distribute the rewards to the delegate if greater than 0
+					-- distribute the rewards to the delegate if greater than 0 and the delegate still exists on the gateway and has a stake greater than 0
 					if actualDelegateReward > 0 then
-						-- increase the stake and decrease the protocol balance, returns the updated gateway
-						gateway = gar.increaseExistingDelegateStake(
-							gatewayAddress,
-							gateway,
-							delegateAddress,
-							actualDelegateReward
-						)
-						if actualDelegateReward > 0 then
+						if gar.isDelegateEligibleForDistributions(gateway, delegateAddress) then
+							-- increase the stake and decrease the protocol balance, returns the updated gateway
+							gateway = gar.increaseExistingDelegateStake(
+								gatewayAddress,
+								gateway,
+								delegateAddress,
+								actualDelegateReward
+							)
 							balances.reduceBalance(ao.id, actualDelegateReward)
+							-- update the distributed rewards for the delegate
+							distributed[delegateAddress] = (distributed[delegateAddress] or 0) + actualDelegateReward
+							totalDistributedToDelegates = totalDistributedToDelegates + actualDelegateReward
+						else
+							totalRewardsForMissingDelegates = totalRewardsForMissingDelegates + actualDelegateReward
 						end
 					end
-					-- increment the total distributed
-					totalDistributed = math.floor(totalDistributed + actualDelegateReward)
-					-- update the distributed rewards for the delegate
-					distributed[delegateAddress] = (distributed[delegateAddress] or 0) + actualDelegateReward
-					-- increment the total distributed for the epoch
-					totalDistributedToDelegates = totalDistributedToDelegates + actualDelegateReward
 				end
 				-- transfer the remaining rewards to the gateway
-				local actualOperatorReward =
-					math.floor(earnedRewardForGatewayAndDelegates - totalDistributedToDelegates)
+				local actualOperatorReward = math.floor(
+					earnedRewardForGatewayAndDelegates - totalDistributedToDelegates - totalRewardsForMissingDelegates
+				)
 				if actualOperatorReward > 0 then
 					-- distribute the rewards to the gateway
 					balances.transfer(gatewayAddress, ao.id, actualOperatorReward)
 					-- move that balance to the gateway if auto-staking is on
-					if gateway.settings.autoStake and gateway.status == "joined" then
-						-- only increase stake if the gateway is joined, otherwise it is leaving and cannot accept additional stake so distributed rewards to the operator directly
+					if gateway.settings.autoStake then
+						-- only increase stake if the gateway is joined, otherwise it is leaving and cannot accept additional stake so distribute rewards to the operator directly
 						gar.increaseOperatorStake(gatewayAddress, actualOperatorReward)
 					end
 				end
 				-- update the distributed rewards for the gateway
 				distributed[gatewayAddress] = (distributed[gatewayAddress] or 0) + actualOperatorReward
-				-- increment the total distributed for the epoch
-				totalDistributed = math.floor(totalDistributed + actualOperatorReward)
-			else
-				-- if the gateway did not earn any of it's own rewards, we still need to update the distributed rewards with it's current value or add it
-				distributed[gatewayAddress] = distributed[gatewayAddress] or 0
 			end
 		end
 	end
 
+	-- get the total distributed rewards for the epoch
+	local totalDistributedForEpoch = utils.sumTableValues(distributed)
+
 	-- set the distributions for the epoch
-	epoch.distributions.totalDistributedRewards = totalDistributed
+	epoch.distributions.totalDistributedRewards = totalDistributedForEpoch
 	epoch.distributions.distributedTimestamp = currentTimestamp
 	epoch.distributions.rewards = epoch.distributions.rewards or {
 		eligible = {},
@@ -723,16 +736,51 @@ end
 --- @param timestamp number The timestamp to prune epochs older than
 --- @return Epoch[] # The pruned epochs
 function epochs.pruneEpochs(timestamp)
-	local prunedEpochs = {}
+	local prunedEpochIndexes = {}
+	if not NextEpochsPruneTimestamp or timestamp < NextEpochsPruneTimestamp then
+		-- No known pruning work to do
+		return prunedEpochIndexes
+	end
+
+	--- Reset the next pruning timestamp
+	NextEpochsPruneTimestamp = nil
 	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)
 	local cutoffEpochIndex = currentEpochIndex - epochs.getSettings().pruneEpochsCount
-	for epochIndex = 0, cutoffEpochIndex do
-		if Epochs[epochIndex] ~= nil then
-			table.insert(prunedEpochs, epochIndex)
+	local unsafeEpochs = epochs.getEpochsUnsafe()
+	local nextEpochIndex = next(unsafeEpochs)
+	while nextEpochIndex do
+		if nextEpochIndex <= cutoffEpochIndex then
+			table.insert(prunedEpochIndexes, nextEpochIndex)
+			-- Safe to assign to nil during next() iteration
+			Epochs[nextEpochIndex] = nil
+		else
+			local _, endTimestamp = epochs.getEpochTimestampsForIndex(nextEpochIndex)
+			if endTimestamp >= timestamp then
+				NextEpochsPruneTimestamp = math.min(NextEpochsPruneTimestamp or endTimestamp, endTimestamp)
+			end
 		end
-		Epochs[epochIndex] = nil
+		nextEpochIndex = next(unsafeEpochs, nextEpochIndex)
 	end
-	return prunedEpochs
+	return prunedEpochIndexes
+end
+
+function epochs.nextEpochsPruneTimestamp()
+	return NextEpochsPruneTimestamp
+end
+
+---@param epochIndex number
+---@returns number
+function epochs.getRewardRateForEpoch(epochIndex)
+	if epochIndex <= constants.rewardDecayStartEpoch then
+		return constants.minimumRewardRate
+	elseif epochIndex <= constants.rewardDecayLastEpoch then
+		local totalDecayPeriod = (constants.rewardDecayLastEpoch - constants.rewardDecayStartEpoch) + 1
+		local epochsAlreadyDecayed = (epochIndex - constants.rewardDecayStartEpoch)
+		local decayRatePerEpoch = (constants.maximumRewardRate - constants.minimumRewardRate) / totalDecayPeriod
+		return constants.maximumRewardRate - (decayRatePerEpoch * epochsAlreadyDecayed)
+	else
+		return constants.minimumRewardRate
+	end
 end
 
 return epochs
