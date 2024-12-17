@@ -612,7 +612,6 @@ describe('ArNS', async () => {
             { name: 'Process-Id', value: ''.padEnd(43, 'a') },
             { name: 'Fund-From', value: 'any' },
           ],
-          Timestamp: STUB_TIMESTAMP + 1,
         },
         memory,
       );
@@ -626,7 +625,6 @@ describe('ArNS', async () => {
             { name: 'Action', value: 'Record' },
             { name: 'Name', value: 'test-name' },
           ],
-          Timestamp: STUB_TIMESTAMP + 1,
         },
         buyRecordResult.Memory,
       );
@@ -643,7 +641,6 @@ describe('ArNS', async () => {
             { name: 'Years', value: '1' },
             { name: 'Fund-From', value: 'any' },
           ],
-          Timestamp: STUB_TIMESTAMP + 1,
         },
         buyRecordResult.Memory,
       );
@@ -654,7 +651,6 @@ describe('ArNS', async () => {
             { name: 'Action', value: 'Record' },
             { name: 'Name', value: 'test-name' },
           ],
-          Timestamp: STUB_TIMESTAMP + 1,
         },
         extendResult.Memory,
       );
