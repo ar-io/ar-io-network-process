@@ -1939,34 +1939,9 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", ActionMap.PrescribedObservers),
 	function(msg)
 		-- check if the epoch number is provided, if not get the epoch number from the timestamp
-		local providedEpochIndex = msg.Tags["Epoch-Index"]
-		local timestamp = msg.Timestamp
-
-		assert(providedEpochIndex or timestamp, "Epoch index or timestamp is required")
-
-		local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
-		local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
-		-- Iterate over prescribed observers and add gateway details
-		local prescribedObserversWithWeights = {}
-		for _, gatewayAddress in ipairs(prescribedObservers) do
-			local gateway = gar.getGateway(gatewayAddress)
-			if gateway then
-				table.insert(prescribedObserversWithWeights, {
-					observerAddress = gateway.observerAddress,
-					gatewayAddress = gatewayAddress,
-					normalizedCompositeWeight = gateway.weights.normalizedCompositeWeight,
-					stakeWeight = gateway.weights.stakeWeight,
-					tenureWeight = gateway.weights.tenureWeight,
-					gatewayRewardRatioWeight = gateway.weights.gatewayRewardRatioWeight,
-					observerRewardRatioWeight = gateway.weights.observerRewardRatioWeight,
-					compositeWeight = gateway.weights.compositeWeight,
-				})
-			end
-		end
-		-- sort by normalizedCompositeWeight
-		table.sort(prescribedObserversWithWeights, function(a, b)
-			return a.normalizedCompositeWeight > b.normalizedCompositeWeight
-		end)
+		local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
+			or epochs.getEpochIndexForTimestamp(msg.Timestamp or msg.Tags.Timestamp)
+		local prescribedObserversWithWeights = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 		Send(msg, {
 			Target = msg.From,
 			Action = "Prescribed-Observers-Notice",
@@ -1976,12 +1951,8 @@ addEventingHandler(
 )
 
 addEventingHandler(ActionMap.Observations, utils.hasMatchingTag("Action", ActionMap.Observations), function(msg)
-	local providedEpochIndex = msg.Tags["Epoch-Index"]
-	local timestamp = msg.Timestamp
-
-	assert(providedEpochIndex or timestamp, "Epoch index or timestamp is required")
-
-	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
+	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
+		or epochs.getEpochIndexForTimestamp(msg.Timestamp or msg.Tags.Timestamp)
 	local observations = epochs.getObservationsForEpoch(epochIndex)
 	Send(msg, {
 		Target = msg.From,
@@ -1993,12 +1964,8 @@ end)
 
 addEventingHandler(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", ActionMap.PrescribedNames), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
-	local providedEpochIndex = msg.Tags["Epoch-Index"]
-	local timestamp = msg.Timestamp
-
-	assert(providedEpochIndex or timestamp, "Epoch index or timestamp is required")
-
-	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
+	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
+		or epochs.getEpochIndexForTimestamp(msg.Timestamp or msg.Tags.Timestamp)
 	local prescribedNames = epochs.getPrescribedNamesForEpoch(epochIndex)
 	Send(msg, {
 		Target = msg.From,
@@ -2009,12 +1976,8 @@ end)
 
 addEventingHandler(ActionMap.Distributions, utils.hasMatchingTag("Action", ActionMap.Distributions), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
-	local providedEpochIndex = msg.Tags["Epoch-Index"]
-	local timestamp = msg.Timestamp
-
-	assert(providedEpochIndex or timestamp, "Epoch index or timestamp is required")
-
-	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
+	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
+		or epochs.getEpochIndexForTimestamp(msg.Timestamp)
 	local distributions = epochs.getDistributionsForEpoch(epochIndex)
 	Send(msg, {
 		Target = msg.From,

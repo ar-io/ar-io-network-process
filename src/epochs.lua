@@ -113,6 +113,35 @@ function epochs.getPrescribedObserversForEpoch(epochIndex)
 	return epochs.getEpoch(epochIndex).prescribedObservers or {}
 end
 
+--- Get prescribed observers with weights for epoch
+--- @param epochIndex number The epoch index
+--- @return WeightedGateway[] # The prescribed observers with weights for the epoch
+function epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
+	local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
+	-- Iterate over prescribed observers and add gateway details
+	local prescribedObserversWithWeights = {}
+	for _, gatewayAddress in ipairs(prescribedObservers) do
+		local gateway = gar.getGateway(gatewayAddress)
+		if gateway then
+			table.insert(prescribedObserversWithWeights, {
+				observerAddress = gateway.observerAddress,
+				gatewayAddress = gatewayAddress,
+				normalizedCompositeWeight = gateway.weights.normalizedCompositeWeight,
+				stakeWeight = gateway.weights.stakeWeight,
+				tenureWeight = gateway.weights.tenureWeight,
+				gatewayRewardRatioWeight = gateway.weights.gatewayRewardRatioWeight,
+				observerRewardRatioWeight = gateway.weights.observerRewardRatioWeight,
+				compositeWeight = gateway.weights.compositeWeight,
+			})
+		end
+	end
+	-- sort by normalizedCompositeWeight
+	table.sort(prescribedObserversWithWeights, function(a, b)
+		return a.normalizedCompositeWeight > b.normalizedCompositeWeight
+	end)
+	return prescribedObserversWithWeights
+end
+
 --- Gets the eligible rewards for an epoch
 --- @param epochIndex number The epoch index
 --- @return Rewards # T	he eligible rewards for the epoch
