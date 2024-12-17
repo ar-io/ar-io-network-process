@@ -21,7 +21,6 @@ Vaults = Vaults or {}
 GatewayRegistry = GatewayRegistry or {}
 NameRegistry = NameRegistry or {}
 Epochs = Epochs or {}
-LastTickedEpochIndex = LastTickedEpochIndex or -1
 
 local utils = require("utils")
 local json = require("json")
@@ -120,6 +119,9 @@ LastKnownStakedSupply = LastKnownStakedSupply or 0 -- total operator stake acros
 LastKnownDelegatedSupply = LastKnownDelegatedSupply or 0 -- total delegated stake across all gateways
 LastKnownWithdrawSupply = LastKnownWithdrawSupply or 0 -- total withdraw supply across all gateways (gateways and delegates)
 LastKnownPnpRequestSupply = LastKnownPnpRequestSupply or 0 -- total supply stashed in outstanding Primary Name Protocol requests
+LastTickedEpochIndex = LastTickedEpochIndex or -1
+LastKnownMessageTimestamp = LastKnownMessageTimestamp or 0
+LastKnownMessageId = LastKnownMessageId or ""
 local function lastKnownTotalTokenSupply()
 	return LastKnownCirculatingSupply
 		+ LastKnownLockedSupply
@@ -331,58 +333,22 @@ local function assertValidFundFrom(fundFrom)
 	assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stake")
 end
 
-local function addEventingHandler(handlerName, pattern, handleFn, critical)
-	critical = critical or false
-	Handlers.add(handlerName, pattern, function(msg)
-		-- add an IOEvent to the message if it doesn't exist
-		msg.ioEvent = msg.ioEvent or IOEvent(msg)
-		-- global handler for all eventing errors, so we can log them and send a notice to the sender for non critical errors and discard the memory on critical errors
-		local status, resultOrError = eventingPcall(msg.ioEvent, function(error)
-			--- non critical errors will send an invalid notice back to the caller with the error information, memory is not discarded
-			ao.send({
-				Target = msg.From,
-				Action = "Invalid-" .. handlerName .. "-Notice",
-				Error = tostring(error),
-				Data = tostring(error),
-			})
-		end, handleFn, msg)
-		if not status and critical then
-			local errorEvent = IOEvent(msg)
-			-- For critical handlers we want to make sure the event data gets sent to the CU for processing, but that the memory is discarded on failures
-			-- These handlers (distribute, prune) severely modify global state, and partial updates are dangerous.
-			-- So we json encode the error and the event data and then throw, so the CU will discard the memory and still process the event data.
-			-- An alternative approach is to modify the implementation of ao.result - to also return the Output on error.
-			-- Reference: https://github.com/permaweb/ao/blob/76a618722b201430a372894b3e2753ac01e63d3d/dev-cli/src/starters/lua/ao.lua#L284-L287
-			local errorWithEvent = tostring(resultOrError) .. "\n" .. errorEvent:toJSON()
-			error(errorWithEvent, 0) -- 0 ensures not to include this line number in the error message
-		end
-		msg.ioEvent:printEvent()
-	end)
-end
+-- Sanitize inputs before every interaction
+local function assertAndSanitizeInputs(msg)
+	assert(
+		msg.Timestamp and msg.Timestamp >= LastKnownMessageTimestamp,
+		"Timestamp must be greater than or equal to the last known message timestamp of "
+			.. LastKnownMessageTimestamp
+			.. " but was "
+			.. msg.Timestamp
+	)
+	assert(msg.From, "From is required")
+	assert(msg.Id, "Id is required")
+	assert(msg.Tags and type(msg.Tags) == "table", "Tags are required")
 
--- prune state before every interaction
--- NOTE: THIS IS A CRITICAL HANDLER AND WILL DISCARD THE MEMORY ON ERROR
-addEventingHandler("prune", function()
-	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
-end, function(msg)
-	local msgTimestamp = tonumber(msg.Timestamp or msg.Tags.Timestamp)
-	assert(msgTimestamp, "Timestamp is required for a tick interaction")
-	local epochIndex = epochs.getEpochIndexForTimestamp(msgTimestamp)
-	msg.ioEvent:addField("epochIndex", epochIndex)
-
-	local previousStateSupplies = {
-		protocolBalance = Balances[Protocol],
-		lastKnownCirculatingSupply = LastKnownCirculatingSupply,
-		lastKnownLockedSupply = LastKnownLockedSupply,
-		lastKnownStakedSupply = LastKnownStakedSupply,
-		lastKnownDelegatedSupply = LastKnownDelegatedSupply,
-		lastKnownWithdrawSupply = LastKnownWithdrawSupply,
-		lastKnownRequestSupply = LastKnownPnpRequestSupply,
-		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
-	}
-
+	msg.Tags = utils.validateAndSanitizeInputs(msg.Tags)
 	msg.From = utils.formatAddress(msg.From)
-	msg.Timestamp = msg.Timestamp and tonumber(msg.Timestamp) or nil
+	msg.Timestamp = msg.Timestamp and tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp) or nil
 
 	local knownAddressTags = {
 		"Recipient",
@@ -420,10 +386,73 @@ end, function(msg)
 		-- Format all incoming numbers
 		msg.Tags[tagName] = msg.Tags[tagName] and tonumber(msg.Tags[tagName]) or nil
 	end
+end
 
-	local msgId = msg.Id
-	print("Pruning state at timestamp: " .. msgTimestamp)
-	local prunedStateResult = prune.pruneState(msgTimestamp, msgId, LastGracePeriodEntryEndTimestamp)
+local function updateLastKnownMessage(msg)
+	if msg.Timestamp >= LastKnownMessageTimestamp then
+		LastKnownMessageTimestamp = msg.Timestamp
+		LastKnownMessageId = msg.Id
+	end
+end
+
+local function addEventingHandler(handlerName, pattern, handleFn, critical, printEvent)
+	critical = critical or false
+	printEvent = printEvent == nil and true or printEvent
+	Handlers.add(handlerName, pattern, function(msg)
+		-- add an IOEvent to the message if it doesn't exist
+		msg.ioEvent = msg.ioEvent or IOEvent(msg)
+		-- global handler for all eventing errors, so we can log them and send a notice to the sender for non critical errors and discard the memory on critical errors
+		local status, resultOrError = eventingPcall(msg.ioEvent, function(error)
+			--- non critical errors will send an invalid notice back to the caller with the error information, memory is not discarded
+			ao.send({
+				Target = msg.From,
+				Action = "Invalid-" .. handlerName .. "-Notice",
+				Error = tostring(error),
+				Data = tostring(error),
+			})
+		end, handleFn, msg)
+		if not status and critical then
+			local errorEvent = IOEvent(msg)
+			-- For critical handlers we want to make sure the event data gets sent to the CU for processing, but that the memory is discarded on failures
+			-- These handlers (distribute, prune) severely modify global state, and partial updates are dangerous.
+			-- So we json encode the error and the event data and then throw, so the CU will discard the memory and still process the event data.
+			-- An alternative approach is to modify the implementation of ao.result - to also return the Output on error.
+			-- Reference: https://github.com/permaweb/ao/blob/76a618722b201430a372894b3e2753ac01e63d3d/dev-cli/src/starters/lua/ao.lua#L284-L287
+			local errorWithEvent = tostring(resultOrError) .. "\n" .. errorEvent:toJSON()
+			error(errorWithEvent, 0) -- 0 ensures not to include this line number in the error message
+		end
+		if printEvent then
+			msg.ioEvent:printEvent()
+		end
+	end)
+end
+
+addEventingHandler("sanitize", function()
+	return "continue"
+end, function(msg)
+	assertAndSanitizeInputs(msg)
+	updateLastKnownMessage(msg)
+end, CRITICAL, false)
+
+-- NOTE: THIS IS A CRITICAL HANDLER AND WILL DISCARD THE MEMORY ON ERROR
+addEventingHandler("prune", function()
+	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
+end, function(msg)
+	local epochIndex = epochs.getEpochIndexForTimestamp(msg.Timestamp)
+	msg.ioEvent:addField("epochIndex", epochIndex)
+
+	local previousStateSupplies = {
+		protocolBalance = Balances[Protocol],
+		lastKnownCirculatingSupply = LastKnownCirculatingSupply,
+		lastKnownLockedSupply = LastKnownLockedSupply,
+		lastKnownStakedSupply = LastKnownStakedSupply,
+		lastKnownDelegatedSupply = LastKnownDelegatedSupply,
+		lastKnownWithdrawSupply = LastKnownWithdrawSupply,
+		lastKnownRequestSupply = LastKnownPnpRequestSupply,
+		lastKnownTotalSupply = lastKnownTotalTokenSupply(),
+	}
+	print("Pruning state at timestamp: " .. msg.Timestamp)
+	local prunedStateResult = prune.pruneState(msg.Timestamp, msg.Id, LastGracePeriodEntryEndTimestamp)
 
 	if prunedStateResult then
 		local prunedRecordsCount = utils.lengthOfTable(prunedStateResult.prunedRecords or {})
@@ -501,7 +530,7 @@ end, function(msg)
 	end
 
 	return prunedStateResult
-end, CRITICAL)
+end, CRITICAL, false)
 
 -- Write handlers
 addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)

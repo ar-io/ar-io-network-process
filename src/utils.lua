@@ -568,4 +568,31 @@ function utils.filterDictionary(tbl, predicate)
 	return filtered
 end
 
+--- Sanitizes inputs to ensure they are valid strings
+--- @param table table The table to sanitize
+--- @return table sanitizedTable - the sanitized table
+function utils.validateAndSanitizeInputs(table)
+	assert(type(table) == "table", "Table must be a table")
+	for key, value in pairs(table) do
+		assert(type(key) == "string", "Key must be a string")
+		assert(
+			type(value) == "string" or type(value) == "number" or type(value) == "boolean",
+			"Value must be a string, integer, or boolean"
+		)
+		if type(value) == "string" then
+			assert(#key > 0, "Key cannot be empty")
+			assert(#value > 0, "Value cannot be empty")
+			assert(not string.match(key, "^%s+$"), "Key cannot be only whitespace")
+			assert(not string.match(value, "^%s+$"), "Value cannot be only whitespace")
+		end
+		if type(value) == "boolean" then
+			assert(value == true or value == false, "Boolean value must be true or false")
+		end
+		if type(value) == "number" then
+			assert(utils.isInteger(value), "Number must be an integer")
+		end
+	end
+	return table
+end
+
 return utils
