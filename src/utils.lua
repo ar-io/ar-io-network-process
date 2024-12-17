@@ -573,6 +573,7 @@ end
 --- @return table sanitizedTable - the sanitized table
 function utils.validateAndSanitizeInputs(table)
 	assert(type(table) == "table", "Table must be a table")
+	local sanitizedTable = {}
 	for key, value in pairs(table) do
 		assert(type(key) == "string", "Key must be a string")
 		assert(
@@ -591,8 +592,46 @@ function utils.validateAndSanitizeInputs(table)
 		if type(value) == "number" then
 			assert(utils.isInteger(value), "Number must be an integer")
 		end
+		sanitizedTable[key] = value
 	end
-	return table
+
+	local knownAddressTags = {
+		"Recipient",
+		"Initiator",
+		"Target",
+		"Source",
+		"Address",
+		"Vault-Id",
+		"Process-Id",
+		"Observer-Address",
+	}
+
+	for _, tagName in ipairs(knownAddressTags) do
+		-- Format all incoming addresses
+		sanitizedTable[tagName] = sanitizedTable[tagName] and utils.formatAddress(sanitizedTable[tagName]) or nil
+	end
+
+	local knownNumberTags = {
+		"Quantity",
+		"Lock-Length",
+		"Operator-Stake",
+		"Delegated-Stake",
+		"Withdraw-Stake",
+		"Timestamp",
+		"Years",
+		"Min-Delegated-Stake",
+		"Port",
+		"Extend-Length",
+		"Delegate-Reward-Share-Ratio",
+		"Epoch-Index",
+		"Price-Interval-Ms",
+		"Block-Height",
+	}
+	for _, tagName in ipairs(knownNumberTags) do
+		-- Format all incoming numbers
+		sanitizedTable[tagName] = sanitizedTable[tagName] and tonumber(sanitizedTable[tagName]) or nil
+	end
+	return sanitizedTable
 end
 
 return utils

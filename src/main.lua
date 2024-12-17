@@ -349,43 +349,6 @@ local function assertAndSanitizeInputs(msg)
 	msg.Tags = utils.validateAndSanitizeInputs(msg.Tags)
 	msg.From = utils.formatAddress(msg.From)
 	msg.Timestamp = msg.Timestamp and tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp) or nil
-
-	local knownAddressTags = {
-		"Recipient",
-		"Initiator",
-		"Target",
-		"Source",
-		"Address",
-		"Vault-Id",
-		"Process-Id",
-		"Observer-Address",
-	}
-
-	for _, tagName in ipairs(knownAddressTags) do
-		-- Format all incoming addresses
-		msg.Tags[tagName] = msg.Tags[tagName] and utils.formatAddress(msg.Tags[tagName]) or nil
-	end
-
-	local knownNumberTags = {
-		"Quantity",
-		"Lock-Length",
-		"Operator-Stake",
-		"Delegated-Stake",
-		"Withdraw-Stake",
-		"Timestamp",
-		"Years",
-		"Min-Delegated-Stake",
-		"Port",
-		"Extend-Length",
-		"Delegate-Reward-Share-Ratio",
-		"Epoch-Index",
-		"Price-Interval-Ms",
-		"Block-Height",
-	}
-	for _, tagName in ipairs(knownNumberTags) do
-		-- Format all incoming numbers
-		msg.Tags[tagName] = msg.Tags[tagName] and tonumber(msg.Tags[tagName]) or nil
-	end
 end
 
 local function updateLastKnownMessage(msg)
