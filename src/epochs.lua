@@ -108,7 +108,7 @@ end
 
 --- Gets the prescribed observers for an epoch
 --- @param epochIndex number The epoch index
---- @return WeightedGateway[] # The prescribed observers for the epoch
+--- @return table<WalletAddress, WalletAddress> # The prescribed observers for the epoch
 function epochs.getPrescribedObserversForEpoch(epochIndex)
 	return epochs.getEpoch(epochIndex).prescribedObservers or {}
 end
@@ -228,7 +228,7 @@ end
 --- Computes the prescribed observers for an epoch
 --- @param epochIndex number The epoch index
 --- @param hashchain string The hashchain
---- @return WeightedGateway[], WeightedGateway[] # The prescribed observers for the epoch, and all the gateways with weights
+--- @return table<WalletAddress, WalletAddress>, WeightedGateway[] # The prescribed observers for the epoch, and all the gateways with weights
 function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	assert(epochIndex >= 0, "Epoch index must be greater than or equal to 0")
 	assert(type(hashchain) == "string", "Hashchain must be a string")
@@ -239,6 +239,7 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 
 	-- Filter out any observers that could have a normalized composite weight of 0
 	local filteredObservers = {}
+	local prescribedObserversLookup = {}
 	-- use ipairs as weightedObservers in array
 	for _, observer in ipairs(weightedGateways) do
 		if observer.normalizedCompositeWeight > 0 then
@@ -246,7 +247,11 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 		end
 	end
 	if #filteredObservers <= epochs.getSettings().maxObservers then
-		return filteredObservers, weightedGateways
+		-- Create lookup table mapping observer addresses to gateway addresses
+		for _, observer in ipairs(filteredObservers) do
+			prescribedObserversLookup[observer.observerAddress] = observer.gatewayAddress
+		end
+		return prescribedObserversLookup, weightedGateways
 	end
 
 	-- the hash we will use to create entropy for prescribed observers
@@ -263,22 +268,20 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 
 	-- get our prescribed observers, using the hashchain as entropy
 	local hash = epochHash
-	local prescribedObserversAddressesLookup = {}
-	while utils.lengthOfTable(prescribedObserversAddressesLookup) < epochs.getSettings().maxObservers do
+	while utils.lengthOfTable(prescribedObserversLookup) < epochs.getSettings().maxObservers do
 		local hashString = crypto.utils.array.toString(hash)
 		local random = crypto.random(nil, nil, hashString) / 0xffffffff
 		local cumulativeNormalizedCompositeWeight = 0
 		for _, observer in ipairs(filteredObservers) do
-			local alreadyPrescribed = prescribedObserversAddressesLookup[observer.gatewayAddress]
-
+			local alreadyPrescribed = prescribedObserversLookup[observer.observerAddress]
 			-- add only if observer has not already been prescribed
-			if not alreadyPrescribed then
+			if alreadyPrescribed == nil then
 				-- add the observers normalized composite weight to the cumulative weight
 				cumulativeNormalizedCompositeWeight = cumulativeNormalizedCompositeWeight
 					+ observer.normalizedCompositeWeight
 				-- if the random value is less than the cumulative weight, we have found our observer
 				if random <= cumulativeNormalizedCompositeWeight then
-					prescribedObserversAddressesLookup[observer.gatewayAddress] = true
+					prescribedObserversLookup[observer.observerAddress] = observer.gatewayAddress
 					break
 				end
 			end
@@ -287,22 +290,8 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 		local newHash = crypto.utils.stream.fromArray(hash)
 		hash = crypto.digest.sha2_256(newHash).asBytes()
 	end
-	local prescribedObservers = {}
-	local filteredObserversAddressMap = utils.reduce(filteredObservers, function(acc, _, observer)
-		acc[observer.gatewayAddress] = observer
-		return acc
-	end, {})
-	for address, _ in pairs(prescribedObserversAddressesLookup) do
-		table.insert(prescribedObservers, filteredObserversAddressMap[address])
-	end
-
-	-- sort them in place
-	table.sort(prescribedObservers, function(a, b)
-		return a.normalizedCompositeWeight > b.normalizedCompositeWeight -- sort by descending weight
-	end)
-
 	-- return the prescribed observers and the weighted observers
-	return prescribedObservers, weightedGateways
+	return prescribedObserversLookup, weightedGateways
 end
 
 --- Gets the epoch timestamps for an epoch index
@@ -434,16 +423,12 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	)
 
 	local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
-	assert(#prescribedObservers > 0, "No prescribed observers for the current epoch.")
+	assert(utils.lengthOfTable(prescribedObservers) > 0, "No prescribed observers for the current epoch.")
 
-	local observerIndex = utils.findInArray(prescribedObservers, function(prescribedObserver)
-		return prescribedObserver.observerAddress == observerAddress
-	end)
+	local gatewayAddressForObserver = prescribedObservers[observerAddress]
+	assert(gatewayAddressForObserver, "Caller is not a prescribed observer for the current epoch.")
 
-	local observer = prescribedObservers[observerIndex]
-	assert(observer, "Caller is not a prescribed observer for the current epoch.")
-
-	local observingGateway = gar.getGateway(observer.gatewayAddress)
+	local observingGateway = gar.getGateway(gatewayAddressForObserver)
 	assert(observingGateway, "The associated gateway not found in the registry.")
 
 	local epoch = epochs.getEpoch(epochIndex)
@@ -503,7 +488,7 @@ end
 
 --- Computes the total eligible rewards for an epoch based on the protocol balance and the reward percentage and prescribed observers
 --- @param epochIndex number The epoch index
---- @param prescribedObservers WeightedGateway[] The prescribed observers for the epoch
+--- @param prescribedObservers table<WalletAddress, WalletAddress> The prescribed observers for the epoch
 --- @return ComputedRewards # The total eligible rewards
 function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
 	local epochStartTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
@@ -513,10 +498,6 @@ function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObserv
 	local totalEligibleRewards = math.floor(protocolBalance * rewardRate)
 	local eligibleGatewayReward = math.floor(totalEligibleRewards * 0.90 / #activeGatewayAddresses) -- TODO: make these setting variables
 	local eligibleObserverReward = math.floor(totalEligibleRewards * 0.10 / #prescribedObservers) -- TODO: make these setting variables
-	local prescribedObserversLookup = utils.reduce(prescribedObservers, function(acc, _, observer)
-		acc[observer.observerAddress] = true
-		return acc
-	end, {})
 	-- compute for each gateway what their potential rewards are and for their delegates
 	local potentialRewards = {}
 	-- use ipairs as activeGatewayAddresses is an array
@@ -525,7 +506,7 @@ function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObserv
 		if gateway ~= nil then
 			local potentialReward = eligibleGatewayReward -- start with the gateway reward
 			-- it it is a prescribed observer for the epoch, it is eligible for the observer reward
-			if prescribedObserversLookup[gateway.observerAddress] then
+			if prescribedObservers[gateway.observerAddress] then
 				potentialReward = potentialReward + eligibleObserverReward -- add observer reward if it is a prescribed observer
 			end
 			-- if any delegates are present, distribute the rewards to the delegates
@@ -590,14 +571,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	end
 
 	local eligibleGatewaysForEpoch = epochs.getEligibleRewardsForEpoch(epochIndex)
-	local prescribedObserversLookup = utils.reduce(
-		epochs.getPrescribedObserversForEpoch(epochIndex),
-		function(acc, _, observer)
-			acc[observer.observerAddress] = true
-			return acc
-		end,
-		{}
-	)
+	local prescribedObserversLookup = epochs.getPrescribedObserversForEpoch(epochIndex)
 	local totalObservationsSubmitted = utils.lengthOfTable(epoch.observations.reports) or 0
 
 	-- get the eligible rewards for the epoch

@@ -73,27 +73,15 @@ describe("epochs", function()
 				observerAddress = "observerAddress",
 			}
 			local expectation = {
-				{
-					gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
-					observerAddress = "observerAddress",
-					stake = gar.getSettings().operators.minStake,
-					startTimestamp = startTimestamp,
-					stakeWeight = 1,
-					tenureWeight = 1 / gar.getSettings().observers.tenureWeightPeriod,
-					gatewayRewardRatioWeight = 1,
-					observerRewardRatioWeight = 1,
-					compositeWeight = 1 / gar.getSettings().observers.tenureWeightPeriod,
-					normalizedCompositeWeight = 1,
-				},
+				["observerAddress"] = "test-this-is-valid-arweave-wallet-address-1",
 			}
-			local status, result = pcall(epochs.computePrescribedObserversForEpoch, 0, hashchain)
-			assert.is_true(status)
-			assert.are.equal(1, #result)
-			assert.are.same(expectation, result)
+			local prescribedObserverMap = epochs.computePrescribedObserversForEpoch(0, hashchain)
+			assert.are.same(expectation, prescribedObserverMap)
 		end)
 
 		it("should return the maximum number of gateways if more are enrolled in network", function()
 			local testHashchain = "c29tZSBzYW1wbGUgaGFzaA==" -- base64 of "some sample hash"
+			print("testHashchain: " .. testHashchain)
 			_G.EpochSettings = {
 				maxObservers = 2, -- limit to 2 observers
 				epochZeroStartTimestamp = startTimestamp,
@@ -118,52 +106,25 @@ describe("epochs", function()
 					},
 					settings = testSettings,
 					status = "joined",
-					observerAddress = "observerAddress",
+					observerAddress = "observer-address-" .. i,
 				}
 				-- note - ordering of keys is not guaranteed when insert into maps
-				_G.GatewayRegistry["observer" .. i] = gateway
+				_G.GatewayRegistry["gateway-address-" .. i] = gateway
 			end
 
 			local expectation = {
-				{
-					gatewayAddress = "observer1",
-					observerAddress = "observerAddress",
-					stake = gar.getSettings().operators.minStake,
-					startTimestamp = startTimestamp,
-					stakeWeight = 1,
-					tenureWeight = 1 / gar.getSettings().observers.tenureWeightPeriod,
-					gatewayRewardRatioWeight = 1,
-					observerRewardRatioWeight = 1,
-					compositeWeight = 1 / gar.getSettings().observers.tenureWeightPeriod,
-					normalizedCompositeWeight = 1 / 3,
-				},
-				{
-					gatewayAddress = "observer3",
-					observerAddress = "observerAddress",
-					stake = gar.getSettings().operators.minStake,
-					startTimestamp = startTimestamp,
-					stakeWeight = 1,
-					tenureWeight = 1 / gar.getSettings().observers.tenureWeightPeriod,
-					gatewayRewardRatioWeight = 1,
-					observerRewardRatioWeight = 1,
-					compositeWeight = 1 / gar.getSettings().observers.tenureWeightPeriod,
-					normalizedCompositeWeight = 1 / 3,
-				},
+				["observer-address-1"] = "gateway-address-1",
+				["observer-address-3"] = "gateway-address-3",
 			}
-			local status, result = pcall(epochs.computePrescribedObserversForEpoch, 0, testHashchain)
-			assert.is_true(status)
-			assert.are.equal(2, #result)
-			table.sort(result, function(a, b)
-				return a.gatewayAddress < b.gatewayAddress
-			end)
-			assert.are.same(expectation, result)
+			local prescribedObserverMap = epochs.computePrescribedObserversForEpoch(0, testHashchain)
+			assert.are.same(expectation, prescribedObserverMap)
 		end)
 	end)
 
 	describe("computePrescribedNamesForEpoch", function()
 		-- NOTE: Record names in the tests below use spelled out numbers because without that
 		-- there's insufficient base64url information encoded in the final encoded block to
-		-- disambiguate the decoded vallues.
+		-- disambiguate the decoded values.
 		it("should return all eligible names if fewer than the maximum in name registry", function()
 			_G.NameRegistry.records = {
 				["arns-name-one"] = {
@@ -513,18 +474,7 @@ describe("epochs", function()
 						reports = {},
 					},
 					prescribedObservers = {
-						{
-							compositeWeight = 4.0,
-							gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
-							gatewayRewardRatioWeight = 1.0,
-							normalizedCompositeWeight = 1.0,
-							observerAddress = "test-this-is-valid-arweave-wallet-address-1",
-							observerRewardRatioWeight = 1.0,
-							stake = gar.getSettings().operators.minStake,
-							stakeWeight = 1.0,
-							startTimestamp = 0,
-							tenureWeight = 4,
-						},
+						["test-this-is-valid-arweave-wallet-address-1"] = "test-this-is-valid-arweave-wallet-address-1",
 					},
 					prescribedNames = {},
 					distributions = {
@@ -634,21 +584,11 @@ describe("epochs", function()
 				},
 				prescribedNames = {},
 				prescribedObservers = {
-					{
-						observerAddress = "test-this-very-valid-observer-wallet-addr-1",
-					},
-					{
-						observerAddress = "test-this-very-valid-observer-wallet-addr-2",
-					},
-					{
-						observerAddress = "test-this-very-valid-observer-wallet-addr-3",
-					},
-					{
-						observerAddress = "test-this-very-valid-observer-wallet-addr-4",
-					},
-					{
-						observerAddress = "test-this-very-valid-observer-wallet-addr-5",
-					},
+					["test-this-very-valid-observer-wallet-addr-1"] = true,
+					["test-this-very-valid-observer-wallet-addr-2"] = true,
+					["test-this-very-valid-observer-wallet-addr-3"] = true,
+					["test-this-very-valid-observer-wallet-addr-4"] = true,
+					["test-this-very-valid-observer-wallet-addr-5"] = true,
 				},
 			}
 
