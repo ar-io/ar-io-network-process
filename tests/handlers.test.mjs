@@ -28,7 +28,7 @@ describe('handlers', async () => {
     const defaultIndex = handlersList.indexOf('_default');
     const sanitizeIndex = handlersList.indexOf('sanitize');
     const pruneIndex = handlersList.indexOf('prune');
-    const expectedHandlerCount = 71; // TODO: update this if more handlers are added
+    const expectedHandlerCount = 72; // TODO: update this if more handlers are added
     assert.ok(evalIndex === 0);
     assert.ok(defaultIndex === 1);
     assert.ok(sanitizeIndex === 2);

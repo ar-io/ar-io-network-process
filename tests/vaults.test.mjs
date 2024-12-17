@@ -493,7 +493,6 @@ describe('Vaults', async () => {
           sortBy: 'balance',
           sortOrder: 'asc',
         });
-        console.log(JSON.stringify(paginatedVaultsResult, null, 2));
 
         // parse items, nextCursor
         const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =

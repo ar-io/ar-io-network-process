@@ -91,7 +91,7 @@ describe('primary names', function () {
     };
   };
 
-  const getPrimaryNameRequest = async ({ initiator, memory }) => {
+  const getPrimaryNameRequest = async ({ initiator, memory, timestamp }) => {
     const getPrimaryNameRequestResult = await handle({
       options: {
         Tags: [
@@ -100,6 +100,7 @@ describe('primary names', function () {
         ],
       },
       memory,
+      timestamp,
     });
     return {
       result: getPrimaryNameRequestResult,
@@ -205,7 +206,7 @@ describe('primary names', function () {
     const processId = ''.padEnd(43, 'a');
     const recipient = ''.padEnd(43, 'b');
     const requestTimestamp = 1234567890;
-    const { memory: buyRecordMemory } = await buyRecord({
+    const { memory: buyRecordMemory, result } = await buyRecord({
       name: 'test-name',
       processId,
       timestamp: requestTimestamp,
@@ -254,6 +255,7 @@ describe('primary names', function () {
       {
         initiator: recipient,
         memory: requestPrimaryNameResult.Memory,
+        timestamp: requestTimestamp,
       },
     );
 
@@ -535,7 +537,7 @@ describe('primary names', function () {
       Action: 'Remove-Primary-Names',
       Cast: false,
       Cron: false,
-      'Epoch-Index': -19657,
+      'Epoch-Index': -5618,
       From: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       'From-Formatted': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       'Message-Id': 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
@@ -543,7 +545,7 @@ describe('primary names', function () {
       'Num-Removed-Primary-Names': 1,
       'Removed-Primary-Names': ['test-name'],
       'Removed-Primary-Name-Owners': [recipient],
-      Timestamp: 21600000,
+      Timestamp: requestTimestamp,
       'Total-Primary-Name-Requests': 0,
       'Total-Primary-Names': 0,
     });

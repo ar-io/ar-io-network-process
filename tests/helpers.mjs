@@ -99,11 +99,10 @@ export const getBalances = async ({ memory, timestamp = STUB_TIMESTAMP }) => {
   const result = await handle({
     options: {
       Tags: [{ name: 'Action', value: 'Balances' }],
-      Timestamp: timestamp,
     },
+    timestamp,
     memory,
   });
-  console.log('getBalances', JSON.stringify(result, null, 2));
 
   const balances = JSON.parse(result.Messages?.[0]?.Data);
   return balances;
@@ -291,7 +290,7 @@ export const getDelegatesItems = async ({
   return JSON.parse(result.Messages?.[0]?.Data).items;
 };
 
-export const getDelegations = async ({ memory, address }) => {
+export const getDelegations = async ({ memory, address, timestamp }) => {
   const result = await handle({
     options: {
       Tags: [
@@ -300,6 +299,7 @@ export const getDelegations = async ({ memory, address }) => {
       ],
     },
     memory,
+    timestamp,
   });
   return JSON.parse(result.Messages?.[0]?.Data);
 };
@@ -325,7 +325,6 @@ export const getVaults = async ({
     },
     memory,
   });
-  console.log('getVaults', JSON.stringify(rest, null, 2));
   return {
     result: rest,
     memory: Memory,
@@ -441,6 +440,7 @@ export const delegateStake = async ({
     recipient: delegatorAddress,
     quantity,
     memory,
+    timestamp,
   });
 
   const delegateResult = await handle({
@@ -474,8 +474,8 @@ export const getGateway = async ({
         { name: 'Action', value: 'Gateway' },
         { name: 'Address', value: address },
       ],
-      Timestamp: timestamp,
     },
+    timestamp,
     memory,
   });
   const gateway = JSON.parse(gatewayResult.Messages?.[0]?.Data);
@@ -724,8 +724,8 @@ export const buyRecord = async ({
         { name: 'Process-Id', value: processId },
         { name: 'Years', value: `${years}` },
       ],
-      Timestamp: timestamp,
     },
+    timestamp,
     memory,
   });
   return {

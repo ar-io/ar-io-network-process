@@ -45,6 +45,7 @@ describe('GatewayRegistry', async () => {
   const STUB_ADDRESS_9 = ''.padEnd(43, '9');
 
   let sharedMemory = startMemory; // memory we'll use across unique tests;
+  let lastTimestamp = STUB_TIMESTAMP;
 
   beforeEach(async () => {
     const { Memory: totalTokenSupplyMemory } = await totalTokenSupply({
@@ -56,11 +57,12 @@ describe('GatewayRegistry', async () => {
     });
     // NOTE: all tests will start with this gateway joined to the network - use `sharedMemory` for the first interaction for each test to avoid having to join the network again
     sharedMemory = joinNetworkMemory;
+    lastTimestamp = STUB_TIMESTAMP + 1000 * 60; // Default 60s after the stubbed timestamp, some tests will override this
   });
 
   afterEach(async () => {
     await assertNoInvariants({
-      timestamp: STUB_TIMESTAMP,
+      timestamp: lastTimestamp,
       memory: sharedMemory,
     });
   });
@@ -363,6 +365,7 @@ describe('GatewayRegistry', async () => {
       );
 
       sharedMemory = leaveNetworkMemory;
+      lastTimestamp = leavingTimestamp;
     });
   });
 
@@ -375,11 +378,13 @@ describe('GatewayRegistry', async () => {
       expectedDelegates,
       expectedAllowedDelegates,
       inputMemory = sharedMemory,
+      timestamp = STUB_TIMESTAMP,
     }) {
       // gateway before
       const gateway = await getGateway({
         address: STUB_ADDRESS,
         memory: inputMemory,
+        timestamp,
       });
 
       const { memory: updatedSettingsMemory } = await updateGatewaySettings({
@@ -389,12 +394,14 @@ describe('GatewayRegistry', async () => {
           { name: 'Action', value: 'Update-Gateway-Settings' },
           ...settingsTags,
         ],
+        timestamp,
       });
 
       // check the gateway record from contract
       const updatedGateway = await getGateway({
         address: STUB_ADDRESS,
         memory: updatedSettingsMemory,
+        timestamp,
       });
 
       // should match old gateway, with new settings
@@ -415,6 +422,7 @@ describe('GatewayRegistry', async () => {
             delegatorAddress: delegateAddress,
             quantity: 10_000_000,
             gatewayAddress: STUB_ADDRESS,
+            timestamp,
           }).catch(() => {});
           if (maybeDelegateResult?.memory) {
             nextMemory = maybeDelegateResult.memory;
@@ -423,6 +431,7 @@ describe('GatewayRegistry', async () => {
         const updatedGatewayDelegates = await getDelegatesItems({
           memory: nextMemory,
           gatewayAddress: STUB_ADDRESS,
+          timestamp,
         });
         assert.deepStrictEqual(
           updatedGatewayDelegates
@@ -434,7 +443,7 @@ describe('GatewayRegistry', async () => {
           await getAllowedDelegates({
             memory: nextMemory,
             from: STUB_ADDRESS,
-            timestamp: STUB_TIMESTAMP,
+            timestamp,
             gatewayAddress: STUB_ADDRESS,
           });
         const updatedAllowedDelegates = JSON.parse(
@@ -537,6 +546,7 @@ describe('GatewayRegistry', async () => {
         gatewayAddress: STUB_ADDRESS,
       });
       const updatedMemory = await updateGatewaySettingsTest({
+        timestamp: STUB_TIMESTAMP + 1,
         inputMemory: stakedMemory,
         settingsTags: [
           { name: 'Allow-Delegated-Staking', value: 'allowlist' },
@@ -568,25 +578,26 @@ describe('GatewayRegistry', async () => {
           ],
         },
         memory: updatedMemory,
+        timestamp: STUB_TIMESTAMP + 5,
       });
       assertNoResultError(delegationsResult);
       assert.deepStrictEqual(
         [
+          {
+            type: 'vault',
+            gatewayAddress: STUB_ADDRESS,
+            delegationId: `${STUB_ADDRESS}_${STUB_TIMESTAMP + 1}`,
+            vaultId: 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
+            balance: 10_000_000,
+            endTimestamp: 90 * 24 * 60 * 60 * 1000 + STUB_TIMESTAMP + 1,
+            startTimestamp: STUB_TIMESTAMP + 1,
+          },
           {
             // Kicked out due to not being in allowlist
             type: 'stake',
             gatewayAddress: STUB_ADDRESS,
             delegationId: `${STUB_ADDRESS}_${STUB_TIMESTAMP}`,
             balance: 0,
-            startTimestamp: STUB_TIMESTAMP,
-          },
-          {
-            type: 'vault',
-            gatewayAddress: STUB_ADDRESS,
-            delegationId: `${STUB_ADDRESS}_${STUB_TIMESTAMP}`,
-            vaultId: 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
-            balance: 10_000_000,
-            endTimestamp: 90 * 24 * 60 * 60 * 1000 + STUB_TIMESTAMP,
             startTimestamp: STUB_TIMESTAMP,
           },
         ],
@@ -605,6 +616,7 @@ describe('GatewayRegistry', async () => {
         delegateAddresses: [STUB_ADDRESS_6], // not allowed to delegate
         expectedDelegates: [STUB_ADDRESS_7, STUB_ADDRESS_8, STUB_ADDRESS_9], // Leftover from previous test and being forced to exit
         expectedAllowedDelegates: [],
+        timestamp: STUB_TIMESTAMP + 3,
       });
     });
 
@@ -627,11 +639,13 @@ describe('GatewayRegistry', async () => {
         delegateAddresses: [STUB_ADDRESS_9], // no one is allowed yet
         expectedDelegates: [STUB_ADDRESS_8], // 8 is exiting
         expectedAllowedDelegates: [],
+        timestamp: STUB_TIMESTAMP + 1,
       });
 
       const delegateItems = await getDelegatesItems({
         memory: updatedMemory,
         gatewayAddress: STUB_ADDRESS,
+        timestamp: STUB_TIMESTAMP + 1,
       });
       assert.deepStrictEqual(
         [
@@ -647,7 +661,7 @@ describe('GatewayRegistry', async () => {
       const { result: getAllowedDelegatesResult } = await getAllowedDelegates({
         memory: updatedMemory,
         from: STUB_ADDRESS,
-        timestamp: STUB_TIMESTAMP,
+        timestamp: STUB_TIMESTAMP + 1,
         gatewayAddress: STUB_ADDRESS,
       });
       assert.deepStrictEqual(
@@ -963,6 +977,7 @@ describe('GatewayRegistry', async () => {
       const delegationsForDelegator = await getDelegations({
         memory: decreaseStakeMemory,
         address: delegatorAddress,
+        timestamp: decreaseStakeTimestamp,
       });
       assert.deepStrictEqual(delegationsForDelegator.items, [
         {
@@ -983,6 +998,7 @@ describe('GatewayRegistry', async () => {
         },
       ]);
       sharedMemory = decreaseStakeMemory;
+      lastTimestamp = decreaseStakeTimestamp;
     });
 
     it('should fail to withdraw a delegated stake if below the minimum withdrawal limitation', async () => {
@@ -1032,6 +1048,7 @@ describe('GatewayRegistry', async () => {
       });
       assert.deepStrictEqual(gatewayAfter, gatewayBefore);
       sharedMemory = decreaseStakeMemory;
+      lastTimestamp = decreaseStakeTimestamp;
     });
   });
 
@@ -1078,7 +1095,9 @@ describe('GatewayRegistry', async () => {
       // no changes to the gateway after a withdrawal is cancelled
       assert.deepStrictEqual(gatewayAfter, gatewayBefore);
       sharedMemory = cancelWithdrawalMemory;
+      lastTimestamp = decreaseStakeTimestamp;
     });
+
     it('should allow cancelling an operator withdrawal', async () => {
       const decreaseStakeTimestamp = STUB_TIMESTAMP + 1000 * 60 * 15; // 15 minutes after stubbedTimestamp
       const stakeQty = INITIAL_OPERATOR_STAKE;
@@ -1125,6 +1144,7 @@ describe('GatewayRegistry', async () => {
         operatorStake: INITIAL_OPERATOR_STAKE + decreaseQty, // the decrease was cancelled and returned to the operator
       });
       sharedMemory = cancelWithdrawalMemory;
+      lastTimestamp = decreaseStakeTimestamp;
     });
   });
 

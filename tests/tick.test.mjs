@@ -50,6 +50,7 @@ describe('Tick', async () => {
     recipient = STUB_ADDRESS,
     quantity = 100_000_000_000,
     memory = sharedMemory,
+    timestamp = STUB_TIMESTAMP,
   } = {}) => {
     const transferResult = await handle({
       options: {
@@ -63,6 +64,7 @@ describe('Tick', async () => {
         ],
       },
       memory,
+      timestamp,
     });
 
     // assert no error tag
@@ -209,7 +211,7 @@ describe('Tick', async () => {
     // TODO: check delegates and operator stake are vaulted
 
     // expedite the timestamp to the future
-    const futureTimestamp = leavingGatewayData.endTimestamp + 1;
+    const futureTimestamp = leavingGateway.endTimestamp + 1;
     const futureTick = await handle({
       options: {
         Tags: [{ name: 'Action', value: 'Tick' }],
@@ -574,6 +576,7 @@ describe('Tick', async () => {
     const gateway = await getGateway({
       memory: distributionTick.Memory,
       address: STUB_ADDRESS,
+      timestamp: distributionTimestamp,
     });
     assert.deepStrictEqual(gateway, {
       status: 'joined',
@@ -650,7 +653,7 @@ describe('Tick', async () => {
     const processId = 'process-id-'.padEnd(43, '1');
     const transferMemory = await transfer({
       recipient: fundedUser,
-      quantity: 100_000_000_000_000,
+      quantity: 900_000_000_000_000,
       memory: genesisEpochTick.Memory,
       timestamp: genesisEpochStart,
     });

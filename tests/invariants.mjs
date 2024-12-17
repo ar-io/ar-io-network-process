@@ -45,6 +45,7 @@ async function assertNoBalanceVaultInvariants({ timestamp, memory }) {
   const { result } = await getVaults({
     memory,
     limit: 1_000_000, // egregiously large limit to make sure we get them all
+    timestamp,
   });
 
   for (const vault of JSON.parse(result.Messages?.[0]?.Data).items) {
