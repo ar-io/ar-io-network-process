@@ -12,6 +12,9 @@ end
 --- @param value any The value to check
 --- @return boolean isInteger - whether the value is an integer
 function utils.isInteger(value)
+	if value == nil then
+		return false
+	end
 	if type(value) == "string" then
 		value = tonumber(value)
 	end
