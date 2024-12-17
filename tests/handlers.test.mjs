@@ -1,10 +1,6 @@
 import { handle } from './helpers.mjs';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import {
-  AO_LOADER_HANDLER_ENV,
-  DEFAULT_HANDLE_OPTIONS,
-} from '../tools/constants.mjs';
 
 describe('handlers', async () => {
   it('should maintain order of handlers, with _eval and _default first, followed by prune', async () => {

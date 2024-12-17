@@ -1315,10 +1315,11 @@ describe('GatewayRegistry', async () => {
       // Assert prescribed observers
       const prescribedObservers = JSON.parse(futureTick.Messages[0].Data)
         .maybeNewEpoch.prescribedObservers;
-      assert.equal(prescribedObservers.length, 2);
-      const prescribedObserverAddresses = prescribedObservers.map(
-        (o) => o.observerAddress,
-      );
+      assert.deepEqual(prescribedObservers, {
+        [STUB_ADDRESS]: STUB_ADDRESS,
+        [observerAddress]: gatewayAddress,
+      });
+      const prescribedObserverAddresses = Object.keys(prescribedObservers);
       assert.ok(prescribedObserverAddresses.includes(STUB_ADDRESS));
       assert.ok(prescribedObserverAddresses.includes(observerAddress));
       gatewayMemory = futureTick.Memory;

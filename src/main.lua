@@ -579,6 +579,12 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 		msg.ioEvent:addField("RecipientNewBalance", recipientNewBalance)
 	end
 
+	-- if the sender is the protocol, then we need to update the circulating supply as tokens are now in circulation
+	if msg.From == ao.id then
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply + quantity
+		addSupplyData(msg.ioEvent)
+	end
+
 	-- Casting implies that the sender does not want a response - Reference: https://elixirforum.com/t/what-is-the-etymology-of-genserver-cast/33610/3
 	if not msg.Cast then
 		-- Debit-Notice message template, that is sent to the Sender of the transfer
@@ -1887,12 +1893,8 @@ end)
 
 addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
-	local providedEpochIndex = msg.Tags["Epoch-Index"]
-	local timestamp = msg.Timestamp
-
-	assert(providedEpochIndex or timestamp, "Epoch index or timestamp is required")
-
-	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
+	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
+		or epochs.getEpochIndexForTimestamp(msg.Timestamp or msg.Tags.Timestamp)
 	local epoch = epochs.getEpoch(epochIndex)
 	Send(msg, { Target = msg.From, Action = "Epoch-Notice", Data = json.encode(epoch) })
 end)
@@ -1922,29 +1924,20 @@ addEventingHandler(
 	ActionMap.PrescribedObservers,
 	utils.hasMatchingTag("Action", ActionMap.PrescribedObservers),
 	function(msg)
-		-- check if the epoch number is provided, if not get the epoch number from the timestamp
-		local providedEpochIndex = msg.Tags["Epoch-Index"]
-		local timestamp = msg.Timestamp
-
-		assert(providedEpochIndex or timestamp, "Epoch index or timestamp is required")
-
-		local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
-		local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
+		local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
+			or epochs.getEpochIndexForTimestamp(msg.Timestamp or msg.Tags.Timestamp)
+		local prescribedObserversWithWeights = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 		Send(msg, {
 			Target = msg.From,
 			Action = "Prescribed-Observers-Notice",
-			Data = json.encode(prescribedObservers),
+			Data = json.encode(prescribedObserversWithWeights),
 		})
 	end
 )
 
 addEventingHandler(ActionMap.Observations, utils.hasMatchingTag("Action", ActionMap.Observations), function(msg)
-	local providedEpochIndex = msg.Tags["Epoch-Index"]
-	local timestamp = msg.Timestamp
-
-	assert(providedEpochIndex or timestamp, "Epoch index or timestamp is required")
-
-	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
+	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
+		or epochs.getEpochIndexForTimestamp(msg.Timestamp or msg.Tags.Timestamp)
 	local observations = epochs.getObservationsForEpoch(epochIndex)
 	Send(msg, {
 		Target = msg.From,
@@ -1956,12 +1949,8 @@ end)
 
 addEventingHandler(ActionMap.PrescribedNames, utils.hasMatchingTag("Action", ActionMap.PrescribedNames), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
-	local providedEpochIndex = msg.Tags["Epoch-Index"]
-	local timestamp = msg.Timestamp
-
-	assert(providedEpochIndex or timestamp, "Epoch index or timestamp is required")
-
-	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
+	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
+		or epochs.getEpochIndexForTimestamp(msg.Timestamp or msg.Tags.Timestamp)
 	local prescribedNames = epochs.getPrescribedNamesForEpoch(epochIndex)
 	Send(msg, {
 		Target = msg.From,
@@ -1972,12 +1961,8 @@ end)
 
 addEventingHandler(ActionMap.Distributions, utils.hasMatchingTag("Action", ActionMap.Distributions), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
-	local providedEpochIndex = msg.Tags["Epoch-Index"]
-	local timestamp = msg.Timestamp
-
-	assert(providedEpochIndex or timestamp, "Epoch index or timestamp is required")
-
-	local epochIndex = providedEpochIndex or epochs.getEpochIndexForTimestamp(timestamp)
+	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
+		or epochs.getEpochIndexForTimestamp(msg.Timestamp)
 	local distributions = epochs.getDistributionsForEpoch(epochIndex)
 	Send(msg, {
 		Target = msg.From,
