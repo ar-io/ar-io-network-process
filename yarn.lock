@@ -2,18 +2,20 @@
 # yarn lockfile v1
 
 
-"@ar.io/sdk@alpha":
-  version "2.5.3-alpha.1"
-  resolved "https://registry.yarnpkg.com/@ar.io/sdk/-/sdk-2.5.3-alpha.1.tgz#f8ecbfd592dbe73850ee3bcd04fb33a16c3cf156"
-  integrity sha512-xPSBYJ+N/qQCwyH3UmTiPmhuTFAJwp8os7qnLARdwy4X1b3SlstNp6YVORBQlQVBmFPYpGD98PCReuHbId5xjA==
+"@ar.io/sdk@^3.1.0-alpha.4":
+  version "3.1.0-alpha.4"
+  resolved "https://registry.yarnpkg.com/@ar.io/sdk/-/sdk-3.1.0-alpha.4.tgz#c1db0b4477890621fb7aadcd1d21e4462c4522b2"
+  integrity sha512-yYDFOosf3IUGbGCPJlniDPyjRTUOJoYweD4tRMa7BgQ1YuBVLlZmVzqmF+7eNHT3ileM2Zx9ewbsFO/cS3dAvQ==
   dependencies:
     "@dha-team/arbundles" "^1.0.1"
     "@permaweb/aoconnect" "^0.0.57"
     arweave "1.14.4"
-    axios "1.7.7"
+    axios "1.7.9"
     axios-retry "^4.3.0"
+    commander "^12.1.0"
     eventemitter3 "^5.0.1"
     plimit-lit "^3.0.1"
+    prompts "^2.4.2"
     winston "^3.13.0"
     zod "^3.23.8"
 
@@ -650,10 +652,10 @@ axios-retry@^4.3.0:
   dependencies:
     is-retry-allowed "^2.2.0"
 
-axios@1.7.7:
-  version "1.7.7"
-  resolved "https://registry.yarnpkg.com/axios/-/axios-1.7.7.tgz#2f554296f9892a72ac8d8e4c5b79c14a91d0a47f"
-  integrity sha512-S4kL7XrjgBmvdGut0sN3yJxqYzrDOnivkBiN0OFs6hLiUam3UPvswUo0kqGyhqUZGEOytHyumEdXsAkgCOUf3Q==
+axios@1.7.9:
+  version "1.7.9"
+  resolved "https://registry.yarnpkg.com/axios/-/axios-1.7.9.tgz#d7d071380c132a24accda1b2cfc1535b79ec650a"
+  integrity sha512-LhLcE7Hbiryz8oMDdDptSrWowmB4Bl6RCt6sIJKpRB4XtVf0iEgewX3au/pJqm+Py1kCASkb/FFKjxQaLtxJvw==
   dependencies:
     follow-redirects "^1.15.6"
     form-data "^4.0.0"
@@ -897,7 +899,7 @@ combined-stream@^1.0.8:
   dependencies:
     delayed-stream "~1.0.0"
 
-commander@~12.1.0:
+commander@^12.1.0, commander@~12.1.0:
   version "12.1.0"
   resolved "https://registry.yarnpkg.com/commander/-/commander-12.1.0.tgz#01423b36f501259fdaac4d0e4d60c96c991585d3"
   integrity sha512-Vw8qHK3bZM9y/P10u3Vib8o/DdkvA2OtPtZvD871QKjy74Wj1WSKFILMPRPSdUSx5RFK1arlJzEtA4PkFgnbuA==
@@ -1311,6 +1313,11 @@ keccak@^3.0.2:
     node-gyp-build "^4.2.0"
     readable-stream "^3.6.0"
 
+kleur@^3.0.3:
+  version "3.0.3"
+  resolved "https://registry.yarnpkg.com/kleur/-/kleur-3.0.3.tgz#a79c9ecc86ee1ce3fa6206d1216c501f147fc07e"
+  integrity sha512-eTIzlVOSUR+JxdDFepEYcBMtZ9Qqdef+rnzWdRZuMbOywu5tO2w2N7rqjoANZ5k9vywhL6Br1VRjUIgTQx4E8w==
+
 kuler@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/kuler/-/kuler-2.0.0.tgz#e2c570a3800388fb44407e851531c1d670b061b3"
@@ -1610,6 +1617,14 @@ process@^0.11.10:
   resolved "https://registry.yarnpkg.com/process/-/process-0.11.10.tgz#7332300e840161bda3e69a1d1d91a7d4bc16f182"
   integrity sha512-cdGef/drWFoydD1JsMzuFf8100nZl+GT+yacc2bEced5f9Rjk4z+WtFUTBu9PhOi9j/jfmBPu0mMEY4wIdAF8A==
 
+prompts@^2.4.2:
+  version "2.4.2"
+  resolved "https://registry.yarnpkg.com/prompts/-/prompts-2.4.2.tgz#7b57e73b3a48029ad10ebd44f74b01722a4cb069"
+  integrity sha512-NxNv/kLguCA7p3jE8oL2aEBsrJWgAakBpgmgK6lpPWV+WuOmY6r2/zbAVnP+T8bQlA0nzHXSJSJW0Hq7ylaD2Q==
+  dependencies:
+    kleur "^3.0.3"
+    sisteransi "^1.0.5"
+
 proper-lockfile@^4.1.2:
   version "4.1.2"
   resolved "https://registry.yarnpkg.com/proper-lockfile/-/proper-lockfile-4.1.2.tgz#c8b9de2af6b2f1601067f98e01ac66baa223141f"
@@ -1774,6 +1789,11 @@ simple-swizzle@^0.2.2:
   integrity sha512-JA//kQgZtbuY83m+xT+tXJkmJncGMTFT+C+g2h2R9uxkYIrE2yy9sgmcLhCnw57/WSD+Eh3J97FPEDFnbXnDUg==
   dependencies:
     is-arrayish "^0.3.1"
+
+sisteransi@^1.0.5:
+  version "1.0.5"
+  resolved "https://registry.yarnpkg.com/sisteransi/-/sisteransi-1.0.5.tgz#134d681297756437cc05ca01370d3a7a571075ed"
+  integrity sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==
 
 slice-ansi@^5.0.0:
   version "5.0.0"
