@@ -116,8 +116,6 @@ local ActionMap = {
 	PrimaryName = "Primary-Name",
 }
 
--- Low fidelity trackers
-
 --- @alias Message table<string, any> -- an AO message TODO - update this type with the actual Message type
 --- @param msg Message
 --- @param response any
