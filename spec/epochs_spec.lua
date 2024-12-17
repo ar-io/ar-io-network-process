@@ -106,6 +106,14 @@ describe("epochs", function()
 					settings = testSettings,
 					status = "joined",
 					observerAddress = "observer-address-" .. i,
+					weights = {
+						stakeWeight = 1,
+						tenureWeight = 1,
+						gatewayRewardRatioWeight = 1,
+						observerRewardRatioWeight = 1,
+						compositeWeight = 1,
+						normalizedCompositeWeight = 1,
+					},
 				}
 				-- note - ordering of keys is not guaranteed when insert into maps
 				_G.GatewayRegistry["gateway-address-" .. i] = gateway
@@ -212,7 +220,7 @@ describe("epochs", function()
 			assert.match("Observations for the current epoch cannot be submitted before", error)
 		end)
 		it("should throw an error if the caller is not prescribed", function()
-			local observer = "test-this-is-valid-arweave-wallet-address-2"
+			local observer = "test-this-is-valid-arweave-observer-address-2"
 			local reportTxId = "test-this-very-valid-observations-report-tx"
 			local settings = epochs.getSettings()
 			local timestamp = settings.epochZeroStartTimestamp + settings.distributionDelayMs + 1
@@ -220,18 +228,7 @@ describe("epochs", function()
 				"test-this-is-valid-arweave-wallet-address-1",
 			}
 			_G.Epochs[0].prescribedObservers = {
-				{
-					gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
-					observerAddress = "test-this-is-valid-arweave-wallet-address-1",
-					stake = gar.getSettings().operators.minStake,
-					startTimestamp = startTimestamp,
-					stakeWeight = 1,
-					tenureWeight = 1 / gar.getSettings().observers.tenureWeightPeriod,
-					gatewayRewardRatioWeight = 1,
-					observerRewardRatioWeight = 1,
-					compositeWeight = 1 / gar.getSettings().observers.tenureWeightPeriod,
-					normalizedCompositeWeight = 1,
-				},
+				["test-this-is-valid-arweave-observer-address-1"] = "test-this-is-valid-arweave-gateway-address-1",
 			}
 			local status, error = pcall(epochs.saveObservations, observer, reportTxId, failedGateways, timestamp)
 			assert.is_false(status)
@@ -240,7 +237,7 @@ describe("epochs", function()
 		it(
 			"should save observation when the timestamp is after the distribution delay and only mark gateways around during the full epoch as failed",
 			function()
-				local observer = "test-this-is-valid-arweave-wallet-address-2"
+				local observer = "test-this-is-valid-arweave-observer-address-2"
 				local reportTxId = "test-this-very-valid-observations-report-tx"
 				local settings = epochs.getSettings()
 				local timestamp = settings.epochZeroStartTimestamp + settings.distributionDelayMs + 1
@@ -262,7 +259,7 @@ describe("epochs", function()
 						},
 						settings = testSettings,
 						status = "joined",
-						observerAddress = "test-this-is-valid-arweave-wallet-address-1",
+						observerAddress = "test-this-is-valid-arweave-observer-address-1",
 					},
 					["test-this-is-valid-arweave-wallet-address-2"] = {
 						operatorStake = gar.getSettings().operators.minStake,
@@ -281,7 +278,7 @@ describe("epochs", function()
 						},
 						settings = testSettings,
 						status = "joined",
-						observerAddress = "test-this-is-valid-arweave-wallet-address-2",
+						observerAddress = "test-this-is-valid-arweave-observer-address-2",
 					},
 					["test-this-is-valid-arweave-wallet-address-3"] = {
 						operatorStake = gar.getSettings().operators.minStake,
@@ -300,7 +297,7 @@ describe("epochs", function()
 						},
 						settings = testSettings,
 						status = "joined",
-						observerAddress = "test-this-is-valid-arweave-wallet-address-3",
+						observerAddress = "test-this-is-valid-arweave-observer-address-3",
 					},
 					["test-this-is-valid-arweave-wallet-address-4"] = {
 						operatorStake = gar.getSettings().operators.minStake,
@@ -320,22 +317,11 @@ describe("epochs", function()
 						},
 						settings = testSettings,
 						status = "leaving", -- leaving, so it is not eligible to receive stats from this epoch
-						observerAddress = "test-this-is-valid-arweave-wallet-address-4",
+						observerAddress = "test-this-is-valid-arweave-observer-address-4",
 					},
 				}
 				_G.Epochs[0].prescribedObservers = {
-					{
-						gatewayAddress = "test-this-is-valid-arweave-wallet-address-2",
-						observerAddress = "test-this-is-valid-arweave-wallet-address-2",
-						stake = gar.getSettings().operators.minStake,
-						startTimestamp = startTimestamp,
-						stakeWeight = 1,
-						tenureWeight = 1 / gar.getSettings().observers.tenureWeightPeriod,
-						gatewayRewardRatioWeight = 1,
-						observerRewardRatioWeight = 1,
-						compositeWeight = 1 / gar.getSettings().observers.tenureWeightPeriod,
-						normalizedCompositeWeight = 1,
-					},
+					["test-this-is-valid-arweave-observer-address-2"] = "test-this-is-valid-arweave-wallet-address-2",
 				}
 				local failedGateways = {
 					"test-this-is-valid-arweave-wallet-address-1",

@@ -454,21 +454,9 @@ describe('Tick', async () => {
         failureSummaries: [],
         reports: [],
       },
-      prescribedObservers: [
-        {
-          // TODO: we could just return the addresses here
-          observerAddress: STUB_ADDRESS,
-          observerRewardRatioWeight: 1,
-          normalizedCompositeWeight: 1,
-          gatewayRewardRatioWeight: 1,
-          gatewayAddress: STUB_ADDRESS,
-          stake: INITIAL_OPERATOR_STAKE * 3,
-          tenureWeight: 4,
-          compositeWeight: 12,
-          startTimestamp: 21600000,
-          stakeWeight: 3,
-        },
-      ], // the only gateway in the network
+      prescribedObservers: {
+        [STUB_ADDRESS]: STUB_ADDRESS,
+      },
       prescribedNames: [], // no names in the network
       distributions: {
         totalEligibleGateways: 1,
