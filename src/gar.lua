@@ -697,8 +697,8 @@ function gar.getGatewayWeightsAtTimestamp(gatewayAddresses, timestamp)
 	local totalCompositeWeight = 0
 
 	-- Iterate over gateways to calculate weights
-	for _, address in pairs(gatewayAddresses) do
-		local gateway = gar.getGateway(address)
+	for _, gatewayAddress in pairs(gatewayAddresses) do
+		local gateway = gar.getGateway(gatewayAddress)
 		if gateway then
 			local totalStake = gateway.operatorStake + gateway.totalDelegatedStake -- 100 - no cap to this
 			local stakeWeightRatio = totalStake / gar.getSettings().operators.minStake -- this is always greater than 1 as the minOperatorStake is always less than the stake
@@ -728,7 +728,7 @@ function gar.getGatewayWeightsAtTimestamp(gatewayAddresses, timestamp)
 				* observerRewardRatioWeight
 
 			table.insert(weightedObservers, {
-				gatewayAddress = address,
+				gatewayAddress = gatewayAddress,
 				observerAddress = gateway.observerAddress,
 				stake = totalStake,
 				startTimestamp = gateway.startTimestamp,

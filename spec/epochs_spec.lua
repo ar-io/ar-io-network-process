@@ -106,22 +106,14 @@ describe("epochs", function()
 					settings = testSettings,
 					status = "joined",
 					observerAddress = "observer-address-" .. i,
-					weights = {
-						stakeWeight = 1,
-						tenureWeight = 1,
-						gatewayRewardRatioWeight = 1,
-						observerRewardRatioWeight = 1,
-						compositeWeight = 1,
-						normalizedCompositeWeight = 1,
-					},
 				}
 				-- note - ordering of keys is not guaranteed when insert into maps
-				_G.GatewayRegistry["gateway-address-" .. i] = gateway
+				_G.GatewayRegistry["observers" .. i] = gateway
 			end
 
 			local expectation = {
-				["observer-address-1"] = "gateway-address-1",
-				["observer-address-3"] = "gateway-address-3",
+				["observer-address-1"] = "observers1",
+				["observer-address-3"] = "observers3",
 			}
 			local prescribedObserverMap = epochs.computePrescribedObserversForEpoch(0, testHashchain)
 			assert.are.same(expectation, prescribedObserverMap)
