@@ -134,6 +134,7 @@ function epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 			})
 		end
 	end
+
 	-- sort by normalizedCompositeWeight
 	table.sort(prescribedObserversWithWeights, function(a, b)
 		return a.normalizedCompositeWeight > b.normalizedCompositeWeight

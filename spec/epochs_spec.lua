@@ -81,13 +81,13 @@ describe("epochs", function()
 				},
 			}
 			_G.Epochs[0].prescribedObservers = {
-				["test-this-is-valid-arweave-wallet-address-1"] = "test-this-is-valid-arweave-gateway-address-1",
+				["observerAddress"] = "test-this-is-valid-arweave-wallet-address-1",
 			}
 			local epochIndex = 0
 			local expectation = {
 				{
 					observerAddress = "observerAddress",
-					gatewayAddress = "test-this-is-valid-arweave-gateway-address-1",
+					gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
 					normalizedCompositeWeight = 1,
 					stakeWeight = 1,
 					tenureWeight = 1,
@@ -97,7 +97,7 @@ describe("epochs", function()
 				},
 			}
 			local result = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
-			assert.are.same(result, expectation)
+			assert.are.same(expectation, result)
 		end)
 	end)
 
