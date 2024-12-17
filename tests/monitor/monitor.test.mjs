@@ -1,11 +1,20 @@
-import { AOProcess, IO, IO_TESTNET_PROCESS_ID } from '@ar.io/sdk';
+import {
+  AOProcess,
+  ARIO,
+  ARIO_DEVNET_PROCESS_ID,
+  ARIO_TESTNET_PROCESS_ID,
+  Logger,
+} from '@ar.io/sdk';
 import { connect } from '@permaweb/aoconnect';
 import { strict as assert } from 'node:assert';
 import { describe, it, before, after } from 'node:test';
 import { DockerComposeEnvironment, Wait } from 'testcontainers';
 
-const processId = process.env.IO_PROCESS_ID || IO_TESTNET_PROCESS_ID;
-const io = IO.init({
+// set debug level logs for to get detailed messages
+Logger.default.setLogLevel('info');
+
+const processId = process.env.IO_PROCESS_ID || ARIO_DEVNET_PROCESS_ID;
+const io = ARIO.init({
   process: new AOProcess({
     processId,
     ao: connect({
@@ -68,10 +77,10 @@ describe('setup', () => {
       const sanitizeIndex = handlersList.indexOf('sanitize');
       const pruneIndex = handlersList.indexOf('prune');
       assert(
-        pruneIndex > sanitizeIndex &&
-          sanitizeIndex > evalIndex &&
-          pruneIndex === defaultIndex + 1,
-        `Prune index (${pruneIndex}) and sanitize index (${sanitizeIndex}) are not the first and second handlers after _default (${defaultIndex + 1})`,
+        pruneIndex === sanitizeIndex + 1 &&
+          sanitizeIndex === defaultIndex + 1 &&
+          defaultIndex === evalIndex + 1,
+        `Prune index (${pruneIndex}) and sanitize index (${sanitizeIndex}) are not the first and second handlers after _default (${handlersList})`,
       );
     });
   });
@@ -356,7 +365,7 @@ describe('setup', () => {
         (Date.now() - epochZeroStartTimestamp) / durationMs,
       );
 
-      let cursor = '';
+      let cursor = undefined;
       let totalGateways = 0;
       const uniqueGateways = new Set();
       do {
@@ -535,7 +544,7 @@ describe('setup', () => {
       );
 
       const testLogicPromise = (async () => {
-        let cursor = '';
+        let cursor = undefined;
         let totalArns = 0;
         const uniqueNames = new Set();
         do {
