@@ -50,6 +50,7 @@ describe('Tick', async () => {
     recipient = STUB_ADDRESS,
     quantity = 100_000_000_000,
     memory = sharedMemory,
+    timestamp = STUB_TIMESTAMP,
   } = {}) => {
     const transferResult = await handle({
       options: {
@@ -63,6 +64,7 @@ describe('Tick', async () => {
         ],
       },
       memory,
+      timestamp,
     });
 
     // assert no error tag
@@ -112,10 +114,8 @@ describe('Tick', async () => {
       buyRecordData.endTimestamp + 1000 * 60 * 60 * 24 * 14 + 1;
     const futureTickResult = await handle({
       options: {
-        Tags: [
-          { name: 'Action', value: 'Tick' },
-          { name: 'Timestamp', value: futureTimestamp.toString() },
-        ],
+        Tags: [{ name: 'Action', value: 'Tick' }],
+        Timestamp: futureTimestamp,
       },
       memory: buyRecordResult.Memory,
     });
@@ -136,6 +136,7 @@ describe('Tick', async () => {
           { name: 'Action', value: 'Record' },
           { name: 'Name', value: 'test-name' },
         ],
+        Timestamp: futureTimestamp,
       },
       memory: futureTickResult.Memory,
     });
@@ -213,10 +214,8 @@ describe('Tick', async () => {
     const futureTimestamp = leavingGateway.endTimestamp + 1;
     const futureTick = await handle({
       options: {
-        Tags: [
-          { name: 'Action', value: 'Tick' },
-          { name: 'Timestamp', value: futureTimestamp.toString() },
-        ],
+        Tags: [{ name: 'Action', value: 'Tick' }],
+        Timestamp: futureTimestamp,
       },
       memory: leaveNetworkResult.Memory,
     });
@@ -225,6 +224,7 @@ describe('Tick', async () => {
     const prunedGateway = await getGateway({
       memory: futureTick.Memory,
       address: STUB_ADDRESS,
+      timestamp: futureTimestamp,
     });
 
     assert.deepEqual(undefined, prunedGateway);
@@ -327,6 +327,7 @@ describe('Tick', async () => {
     const prunedVault = await handle({
       options: {
         Tags: [{ name: 'Action', value: 'Vault' }],
+        Timestamp: futureTimestamp,
       },
       memory: futureTick.Memory,
       shouldAssertNoResultError: false,
@@ -344,6 +345,7 @@ describe('Tick', async () => {
           { name: 'Action', value: 'Balance' },
           { name: 'Target', value: DEFAULT_HANDLE_OPTIONS.Owner },
         ],
+        Timestamp: futureTimestamp,
       },
       memory: futureTick.Memory,
     });
@@ -574,6 +576,7 @@ describe('Tick', async () => {
     const gateway = await getGateway({
       memory: distributionTick.Memory,
       address: STUB_ADDRESS,
+      timestamp: distributionTimestamp,
     });
     assert.deepStrictEqual(gateway, {
       status: 'joined',
@@ -615,6 +618,7 @@ describe('Tick', async () => {
     const delegateItems = await getDelegatesItems({
       memory: distributionTick.Memory,
       gatewayAddress: STUB_ADDRESS,
+      timestamp: distributionTimestamp,
     });
     assert.deepEqual(delegateItems, [
       {
@@ -651,6 +655,7 @@ describe('Tick', async () => {
       recipient: fundedUser,
       quantity: 100_000_000_000_000,
       memory: genesisEpochTick.Memory,
+      timestamp: genesisEpochStart,
     });
 
     // Buy records in this epoch
@@ -662,6 +667,7 @@ describe('Tick', async () => {
         name: `test-name-${i}`,
         purchaseType: 'permabuy',
         processId: processId,
+        timestamp: genesisEpochStart,
       });
       buyRecordMemory = buyRecordResult.Memory;
     }
@@ -733,10 +739,7 @@ describe('Tick', async () => {
       const epochTimestamp = genesisEpochStart + (epochDurationMs + 1) * i;
       const { Memory } = await handle({
         options: {
-          Tags: [
-            { name: 'Action', value: 'Tick' },
-            { name: 'Timestamp', value: epochTimestamp.toString() },
-          ],
+          Tags: [{ name: 'Action', value: 'Tick' }],
           Timestamp: epochTimestamp,
         },
         memory: tickMemory,
