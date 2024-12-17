@@ -181,7 +181,7 @@ function epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
 		return nameAString < nameBString
 	end)
 
-	if #activeArNSNames < epochs.getSettings().prescribedNameCount then
+	if #activeArNSNames <= epochs.getSettings().prescribedNameCount then
 		return activeArNSNames
 	end
 
@@ -284,9 +284,6 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	end, {})
 	for address, _ in pairs(prescribedObserversAddressesLookup) do
 		table.insert(prescribedObservers, filteredObserversAddressMap[address])
-		table.sort(prescribedObservers, function(a, b)
-			return a.normalizedCompositeWeight > b.normalizedCompositeWeight
-		end)
 	end
 
 	-- sort them in place
@@ -675,7 +672,9 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 							delegateAddress,
 							actualDelegateReward
 						)
-						balances.reduceBalance(ao.id, actualDelegateReward)
+						if actualDelegateReward > 0 then
+							balances.reduceBalance(ao.id, actualDelegateReward)
+						end
 					end
 					-- increment the total distributed
 					totalDistributed = math.floor(totalDistributed + actualDelegateReward)

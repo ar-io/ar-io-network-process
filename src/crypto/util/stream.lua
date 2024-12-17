@@ -3,6 +3,7 @@ local Queue = require(".crypto.util.queue")
 local Stream = {}
 
 Stream.fromString = function(string)
+	assert(type(string) == "string", "expected string, got " .. type(string))
 	local i = 0
 	return function()
 		i = i + 1
@@ -25,6 +26,7 @@ Stream.toString = function(stream)
 end
 
 Stream.fromArray = function(array)
+	assert(type(array) == "table", "expected table, got " .. type(array))
 	local queue = Queue()
 	local i = 1
 
@@ -59,6 +61,8 @@ for i = 0, 255 do
 end
 
 Stream.fromHex = function(hex)
+	assert(type(hex) == "string", "expected string, got " .. type(hex))
+	assert(string.len(hex) % 2 == 0, "expected even-length string")
 	local queue = Queue()
 
 	for i = 1, string.len(hex) / 2 do

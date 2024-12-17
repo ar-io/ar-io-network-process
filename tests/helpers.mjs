@@ -63,6 +63,7 @@ export const transfer = async ({
   quantity = initialOperatorStake,
   memory = startMemory,
   cast = false,
+  timestamp = STUB_TIMESTAMP,
 } = {}) => {
   if (quantity === 0) {
     // Nothing to do
@@ -79,6 +80,7 @@ export const transfer = async ({
         { name: 'Quantity', value: quantity },
         { name: 'Cast', value: cast },
       ],
+      Timestamp: timestamp,
     },
     memory,
   );
@@ -93,11 +95,11 @@ export const joinNetwork = async ({
   tags = validGatewayTags,
   quantity = 100_000_000_000,
 }) => {
-  // give them the join network token amount
   const transferMemory = await transfer({
     recipient: address,
     quantity,
     memory,
+    timestamp,
   });
   const joinNetworkResult = await handle(
     {
@@ -131,6 +133,7 @@ export const setUpStake = async ({
     quantity: transferQty,
     memory,
     cast: true,
+    timestamp,
   });
 
   // Stake a gateway for the user to delegate to
@@ -138,7 +141,7 @@ export const setUpStake = async ({
     memory,
     address: gatewayAddress,
     tags: gatewayTags,
-    timestamp: timestamp - 1,
+    timestamp: timestamp,
   });
   assertNoResultError(joinNetworkResult);
   memory = joinNetworkResult.memory;
@@ -219,11 +222,15 @@ export const getDelegates = async ({
   };
 };
 
-export const getDelegatesItems = async ({ memory, gatewayAddress }) => {
+export const getDelegatesItems = async ({
+  memory,
+  gatewayAddress,
+  timestamp = STUB_TIMESTAMP,
+}) => {
   const { result } = await getDelegates({
     memory,
     from: STUB_ADDRESS,
-    timestamp: STUB_TIMESTAMP,
+    timestamp,
     gatewayAddress,
   });
   return JSON.parse(result.Messages?.[0]?.Data).items;
@@ -254,13 +261,18 @@ export const getVaults = async ({
   };
 };
 
-export const getGatewayVaultsItems = async ({ memory, gatewayAddress }) => {
+export const getGatewayVaultsItems = async ({
+  memory,
+  gatewayAddress,
+  timestamp = STUB_TIMESTAMP,
+}) => {
   const gatewayVaultsResult = await handle(
     {
       Tags: [
         { name: 'Action', value: 'Paginated-Gateway-Vaults' },
         { name: 'Address', value: gatewayAddress },
       ],
+      Timestamp: timestamp,
     },
     memory,
   );

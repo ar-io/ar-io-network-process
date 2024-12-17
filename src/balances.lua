@@ -16,7 +16,9 @@ function balances.transfer(recipient, from, qty)
 	assert(type(recipient) == "string", "Recipient is required!")
 	assert(type(from) == "string", "From is required!")
 	assert(type(qty) == "number", "Quantity is required and must be a number!")
+	assert(recipient ~= from, "Cannot transfer to self")
 	assert(utils.isInteger(qty), "Quantity must be an integer: " .. qty)
+	assert(qty > 0, "Quantity must be greater than 0")
 
 	balances.reduceBalance(from, qty)
 	balances.increaseBalance(recipient, qty)
@@ -46,6 +48,8 @@ end
 ---@throws error If target has insufficient balance
 function balances.reduceBalance(target, qty)
 	assert(balances.walletHasSufficientBalance(target, qty), "Insufficient balance")
+	assert(qty > 0, "Quantity must be greater than 0")
+
 	local prevBalance = balances.getBalance(target)
 	Balances[target] = prevBalance - qty
 end

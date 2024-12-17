@@ -11,10 +11,13 @@ end
 --- @param value any The value to check
 --- @return boolean isInteger - whether the value is an integer
 function utils.isInteger(value)
+	if value == nil then
+		return false
+	end
 	if type(value) == "string" then
 		value = tonumber(value)
 	end
-	return value % 1 == 0
+	return type(value) == "number" and value % 1 == 0
 end
 
 --- Rounds a number to a given precision
@@ -31,6 +34,7 @@ end
 function utils.sumTableValues(tbl)
 	local sum = 0
 	for _, value in pairs(tbl) do
+		assert(type(value) == "number", "Table values must be numbers. Found: " .. type(value))
 		sum = sum + value
 	end
 	return sum
@@ -251,11 +255,18 @@ function utils.isValidArweaveAddress(address)
 	return type(address) == "string" and #address == 43 and string.match(address, "^[%w-_]+$") ~= nil
 end
 
---- Checks if an address is a valid Ethereum address
+--- Checks if an address looks like an unformatted Ethereum address
+--- @param address string The address to check
+--- @return boolean isValidUnformattedEthAddress - whether the address is a valid unformatted Ethereum address
+function utils.isValidUnformattedEthAddress(address)
+	return type(address) == "string" and #address == 42 and string.match(address, "^0x[%x]+$") ~= nil
+end
+
+--- Checks if an address is a valid Ethereum address and is in EIP-55 checksum format
 --- @param address string The address to check
 --- @return boolean isValidEthAddress - whether the address is a valid Ethereum address
 function utils.isValidEthAddress(address)
-	return type(address) == "string" and #address == 42 and string.match(address, "^0x[%x]+$") ~= nil
+	return utils.isValidUnformattedEthAddress(address) and address == utils.formatEIP55Address(address)
 end
 
 --- Checks if an address is a valid AO address
@@ -295,7 +306,7 @@ end
 --- @param address string The address to format
 --- @return string formattedAddress - the EIP-55 checksum formatted address
 function utils.formatAddress(address)
-	if utils.isValidEthAddress(address) then
+	if utils.isValidUnformattedEthAddress(address) then
 		return utils.formatEIP55Address(address)
 	end
 	return address
@@ -410,12 +421,20 @@ function utils.getHashFromBase64URL(str)
 	return crypto.digest.sha2_256(hashStream).asBytes()
 end
 
+--- Escapes Lua pattern characters in a string
+--- @param str string The string to escape
+--- @return string # The escaped string
+local function escapePattern(str)
+	return (str:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1"))
+end
+
 --- Splits a string by a delimiter
 --- @param input string The string to split
---- @param delimiter string The delimiter to split by
---- @return table The split string
+--- @param delimiter string|nil The delimiter to split by
+--- @return table # The split string
 function utils.splitString(input, delimiter)
 	delimiter = delimiter or ","
+	delimiter = escapePattern(delimiter)
 	local result = {}
 	for token in (input or ""):gmatch(string.format("([^%s]+)", delimiter)) do
 		table.insert(result, token)
@@ -547,6 +566,72 @@ function utils.filterDictionary(tbl, predicate)
 		end
 	end
 	return filtered
+end
+
+--- Sanitizes inputs to ensure they are valid strings
+--- @param table table The table to sanitize
+--- @return table sanitizedTable - the sanitized table
+function utils.validateAndSanitizeInputs(table)
+	assert(type(table) == "table", "Table must be a table")
+	local sanitizedTable = {}
+	for key, value in pairs(table) do
+		assert(type(key) == "string", "Key must be a string")
+		assert(
+			type(value) == "string" or type(value) == "number" or type(value) == "boolean",
+			"Value must be a string, integer, or boolean"
+		)
+		if type(value) == "string" then
+			assert(#key > 0, "Key cannot be empty")
+			assert(#value > 0, "Value cannot be empty")
+			assert(not string.match(key, "^%s+$"), "Key cannot be only whitespace")
+			assert(not string.match(value, "^%s+$"), "Value cannot be only whitespace")
+		end
+		if type(value) == "boolean" then
+			assert(value == true or value == false, "Boolean value must be true or false")
+		end
+		if type(value) == "number" then
+			assert(utils.isInteger(value), "Number must be an integer")
+		end
+		sanitizedTable[key] = value
+	end
+
+	local knownAddressTags = {
+		"Recipient",
+		"Initiator",
+		"Target",
+		"Source",
+		"Address",
+		"Vault-Id",
+		"Process-Id",
+		"Observer-Address",
+	}
+
+	for _, tagName in ipairs(knownAddressTags) do
+		-- Format all incoming addresses
+		sanitizedTable[tagName] = sanitizedTable[tagName] and utils.formatAddress(sanitizedTable[tagName]) or nil
+	end
+
+	local knownNumberTags = {
+		"Quantity",
+		"Lock-Length",
+		"Operator-Stake",
+		"Delegated-Stake",
+		"Withdraw-Stake",
+		"Timestamp",
+		"Years",
+		"Min-Delegated-Stake",
+		"Port",
+		"Extend-Length",
+		"Delegate-Reward-Share-Ratio",
+		"Epoch-Index",
+		"Price-Interval-Ms",
+		"Block-Height",
+	}
+	for _, tagName in ipairs(knownNumberTags) do
+		-- Format all incoming numbers
+		sanitizedTable[tagName] = sanitizedTable[tagName] and tonumber(sanitizedTable[tagName]) or nil
+	end
+	return sanitizedTable
 end
 
 return utils

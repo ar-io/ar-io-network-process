@@ -21,6 +21,7 @@ local constants = require("constants")
 --- @param vaultId string The vault id
 --- @return Vault The created vault
 function vaults.createVault(from, qty, lockLengthMs, currentTimestamp, vaultId)
+	assert(qty > 0, "Quantity must be greater than 0")
 	assert(not vaults.getVault(from, vaultId), "Vault with id " .. vaultId .. " already exists")
 	assert(balances.walletHasSufficientBalance(from, qty), "Insufficient balance")
 	assert(
@@ -50,6 +51,8 @@ end
 --- @param vaultId string The vault id
 --- @return Vault The created vault
 function vaults.vaultedTransfer(from, recipient, qty, lockLengthMs, currentTimestamp, vaultId)
+	assert(qty > 0, "Quantity must be greater than 0")
+	assert(recipient ~= from, "Cannot transfer to self")
 	assert(balances.walletHasSufficientBalance(from, qty), "Insufficient balance")
 	assert(not vaults.getVault(recipient, vaultId), "Vault with id " .. vaultId .. " already exists")
 	assert(
@@ -101,6 +104,7 @@ end
 --- @param currentTimestamp number The current timestamp
 --- @return Vault The increased vault
 function vaults.increaseVault(from, qty, vaultId, currentTimestamp)
+	assert(qty > 0, "Quantity must be greater than 0")
 	assert(balances.walletHasSufficientBalance(from, qty), "Insufficient balance")
 
 	local vault = vaults.getVault(from, vaultId)
