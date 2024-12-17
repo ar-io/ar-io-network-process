@@ -24,6 +24,8 @@ NameRegistry = NameRegistry or {}
 Epochs = Epochs or {}
 LastTickedEpochIndex = LastTickedEpochIndex or -1
 LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
+LastKnownMessageTimestamp = LastKnownMessageTimestamp or 0
+LastKnownMessageId = LastKnownMessageId or ""
 
 local utils = require("utils")
 local json = require("json")
@@ -115,15 +117,6 @@ local ActionMap = {
 }
 
 -- Low fidelity trackers
-LastKnownCirculatingSupply = LastKnownCirculatingSupply or 0 -- total circulating supply (e.g. balances - protocol balance)
-LastKnownLockedSupply = LastKnownLockedSupply or 0 -- total vault balance across all vaults
-LastKnownStakedSupply = LastKnownStakedSupply or 0 -- total operator stake across all gateways
-LastKnownDelegatedSupply = LastKnownDelegatedSupply or 0 -- total delegated stake across all gateways
-LastKnownWithdrawSupply = LastKnownWithdrawSupply or 0 -- total withdraw supply across all gateways (gateways and delegates)
-LastKnownPnpRequestSupply = LastKnownPnpRequestSupply or 0 -- total supply stashed in outstanding Primary Name Protocol requests
-LastTickedEpochIndex = LastTickedEpochIndex or -1
-LastKnownMessageTimestamp = LastKnownMessageTimestamp or 0
-LastKnownMessageId = LastKnownMessageId or ""
 
 --- @alias Message table<string, any> -- an AO message TODO - update this type with the actual Message type
 --- @param msg Message
@@ -410,15 +403,6 @@ local function assertAndSanitizeInputs(msg)
 	msg.Tags = utils.validateAndSanitizeInputs(msg.Tags)
 	msg.From = utils.formatAddress(msg.From)
 	msg.Timestamp = msg.Timestamp and tonumber(msg.Timestamp) or tonumber(msg.Tags.Timestamp) or nil
-
-	if msg.Tags["Force-Prune"] then
-		gar.scheduleNextGatewaysPruning(0)
-		gar.scheduleNextRedelegationsPruning(0)
-		arns.scheduleNextReturnedNamesPrune(0)
-		arns.scheduleNextRecordsPrune(0)
-		primaryNames.scheduleNextPrimaryNamesPruning(0)
-		vaults.scheduleNextVaultsPruning(0)
-	end
 end
 
 local function updateLastKnownMessage(msg)
@@ -483,6 +467,15 @@ end, function(msg)
 		lastKnownWithdrawSupply = LastKnownWithdrawSupply,
 		lastKnownTotalSupply = token.lastKnownTotalTokenSupply(),
 	}
+
+	if msg.Tags["Force-Prune"] then
+		gar.scheduleNextGatewaysPruning(0)
+		gar.scheduleNextRedelegationsPruning(0)
+		arns.scheduleNextReturnedNamesPrune(0)
+		arns.scheduleNextRecordsPrune(0)
+		primaryNames.scheduleNextPrimaryNamesPruning(0)
+		vaults.scheduleNextVaultsPruning(0)
+	end
 
 	print("Pruning state at timestamp: " .. msg.Timestamp)
 	local prunedStateResult = prune.pruneState(msg.Timestamp, msg.Id, LastGracePeriodEntryEndTimestamp)

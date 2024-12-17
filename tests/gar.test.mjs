@@ -573,7 +573,7 @@ describe('GatewayRegistry', async () => {
           Tags: [
             { name: 'Action', value: 'Paginated-Delegations' },
             { name: 'Limit', value: '100' },
-            { name: 'Sort-Order', value: 'desc' },
+            { name: 'Sort-Order', value: 'asc' },
             { name: 'Sort-By', value: 'startTimestamp' },
           ],
         },
@@ -584,6 +584,14 @@ describe('GatewayRegistry', async () => {
       assert.deepStrictEqual(
         [
           {
+            // Kicked out due to not being in allowlist
+            type: 'stake',
+            gatewayAddress: STUB_ADDRESS,
+            delegationId: `${STUB_ADDRESS}_${STUB_TIMESTAMP}`,
+            balance: 0,
+            startTimestamp: STUB_TIMESTAMP,
+          },
+          {
             type: 'vault',
             gatewayAddress: STUB_ADDRESS,
             delegationId: `${STUB_ADDRESS}_${STUB_TIMESTAMP + 1}`,
@@ -591,14 +599,6 @@ describe('GatewayRegistry', async () => {
             balance: 10_000_000,
             endTimestamp: 90 * 24 * 60 * 60 * 1000 + STUB_TIMESTAMP + 1,
             startTimestamp: STUB_TIMESTAMP + 1,
-          },
-          {
-            // Kicked out due to not being in allowlist
-            type: 'stake',
-            gatewayAddress: STUB_ADDRESS,
-            delegationId: `${STUB_ADDRESS}_${STUB_TIMESTAMP}`,
-            balance: 0,
-            startTimestamp: STUB_TIMESTAMP,
           },
         ],
         JSON.parse(delegationsResult.Messages[0].Data).items,

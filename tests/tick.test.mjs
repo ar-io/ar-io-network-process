@@ -653,7 +653,7 @@ describe('Tick', async () => {
     const processId = 'process-id-'.padEnd(43, '1');
     const transferMemory = await transfer({
       recipient: fundedUser,
-      quantity: 900_000_000_000_000,
+      quantity: 100_000_000_000_000,
       memory: genesisEpochTick.Memory,
       timestamp: genesisEpochStart,
     });
