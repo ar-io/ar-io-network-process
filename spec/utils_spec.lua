@@ -23,6 +23,20 @@ describe("utils", function()
 		end)
 	end)
 
+	describe("isValidUnformattedEthAddress", function()
+		it("should return true on a valid unformatted ETH address", function()
+			assert.is_true(utils.isValidUnformattedEthAddress(testEthAddress))
+		end)
+
+		it("should return false on a non-string value", function()
+			assert.is_false(utils.isValidUnformattedEthAddress(3))
+		end)
+
+		it("should return false on an invalid unformatted ETH address", function()
+			assert.is_false(utils.isValidUnformattedEthAddress("ZxFCAd0B19bB29D4674531d6f115237E16AfCE377C"))
+		end)
+	end)
+
 	describe("formatAddress", function()
 		it("should format ETH address to lowercase", function()
 			assert.is.equal(testEthAddress, utils.formatAddress(testEthAddress))
