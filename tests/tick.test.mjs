@@ -361,6 +361,7 @@ describe('Tick', async () => {
     // fast forward to the start of the first epoch
     const epochSettings = await getEpochSettings({
       memory: newDelegateResult.Memory,
+      timestamp: delegateTimestamp,
     });
     const genesisEpochTimestamp = epochSettings.epochZeroStartTimestamp;
     // now tick to create the first epoch after the epoch start timestamp
