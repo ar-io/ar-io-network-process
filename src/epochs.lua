@@ -275,7 +275,7 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 		for _, observer in ipairs(filteredObservers) do
 			local alreadyPrescribed = prescribedObserversLookup[observer.observerAddress]
 			-- add only if observer has not already been prescribed
-			if alreadyPrescribed == nil then
+			if not alreadyPrescribed then
 				-- add the observers normalized composite weight to the cumulative weight
 				cumulativeNormalizedCompositeWeight = cumulativeNormalizedCompositeWeight
 					+ observer.normalizedCompositeWeight

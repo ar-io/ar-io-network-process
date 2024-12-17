@@ -81,7 +81,6 @@ describe("epochs", function()
 
 		it("should return the maximum number of gateways if more are enrolled in network", function()
 			local testHashchain = "c29tZSBzYW1wbGUgaGFzaA==" -- base64 of "some sample hash"
-			print("testHashchain: " .. testHashchain)
 			_G.EpochSettings = {
 				maxObservers = 2, -- limit to 2 observers
 				epochZeroStartTimestamp = startTimestamp,
