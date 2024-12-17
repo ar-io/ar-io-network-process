@@ -64,7 +64,6 @@ EpochSettings = EpochSettings
 	or {
 		pruneEpochsCount = 14, -- prune epochs older than 14 days
 		prescribedNameCount = 2,
-		rewardPercentage = 0.0005, -- 0.05%
 		maxObservers = 50,
 		epochZeroStartTimestamp = 1719900000000, -- July 9th, 00:00:00 UTC
 		durationMs = constants.defaultEpochDurationMs, -- 24 hours
@@ -120,7 +119,7 @@ function epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 	local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
 	-- Iterate over prescribed observers and add gateway details
 	local prescribedObserversWithWeights = {}
-	for _, gatewayAddress in ipairs(prescribedObservers) do
+	for _, gatewayAddress in pairs(prescribedObservers) do
 		local gateway = gar.getGateway(gatewayAddress)
 		if gateway then
 			table.insert(prescribedObserversWithWeights, {

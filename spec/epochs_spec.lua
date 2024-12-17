@@ -51,6 +51,56 @@ describe("epochs", function()
 		}
 	end)
 
+	describe("getPrescribedObserversWithWeightsForEpoch", function()
+		it("should return the prescribed observers with weights for the epoch", function()
+			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {
+				operatorStake = gar.getSettings().operators.minStake,
+				totalDelegatedStake = 0,
+				vaults = {},
+				delegates = {},
+				startTimestamp = startTimestamp,
+				stats = {
+					prescribedEpochCount = 0,
+					observedEpochCount = 0,
+					totalEpochCount = 0,
+					passedEpochCount = 0,
+					failedEpochCount = 0,
+					failedConsecutiveEpochs = 0,
+					passedConsecutiveEpochs = 0,
+				},
+				settings = testSettings,
+				status = "joined",
+				observerAddress = "observerAddress",
+				weights = {
+					normalizedCompositeWeight = 1,
+					stakeWeight = 1,
+					tenureWeight = 1,
+					gatewayRewardRatioWeight = 1,
+					observerRewardRatioWeight = 1,
+					compositeWeight = 1,
+				},
+			}
+			_G.Epochs[0].prescribedObservers = {
+				["test-this-is-valid-arweave-wallet-address-1"] = "test-this-is-valid-arweave-gateway-address-1",
+			}
+			local epochIndex = 0
+			local expectation = {
+				{
+					observerAddress = "observerAddress",
+					gatewayAddress = "test-this-is-valid-arweave-gateway-address-1",
+					normalizedCompositeWeight = 1,
+					stakeWeight = 1,
+					tenureWeight = 1,
+					gatewayRewardRatioWeight = 1,
+					observerRewardRatioWeight = 1,
+					compositeWeight = 1,
+				},
+			}
+			local result = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
+			assert.are.same(result, expectation)
+		end)
+	end)
+
 	describe("computePrescribedObserversForEpoch", function()
 		it("should return all eligible gateways if fewer than the maximum in network", function()
 			_G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"] = {

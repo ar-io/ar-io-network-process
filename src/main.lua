@@ -597,6 +597,12 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 		msg.ioEvent:addField("RecipientNewBalance", recipientNewBalance)
 	end
 
+	-- if the sender is the protocol, then we need to update the circulating supply as tokens are now in circulation
+	if msg.From == ao.id then
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply + quantity
+		addSupplyData(msg.ioEvent)
+	end
+
 	-- Casting implies that the sender does not want a response - Reference: https://elixirforum.com/t/what-is-the-etymology-of-genserver-cast/33610/3
 	if not msg.Cast then
 		-- Debit-Notice message template, that is sent to the Sender of the transfer
@@ -1938,7 +1944,6 @@ addEventingHandler(
 	ActionMap.PrescribedObservers,
 	utils.hasMatchingTag("Action", ActionMap.PrescribedObservers),
 	function(msg)
-		-- check if the epoch number is provided, if not get the epoch number from the timestamp
 		local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
 			or epochs.getEpochIndexForTimestamp(msg.Timestamp or msg.Tags.Timestamp)
 		local prescribedObserversWithWeights = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)

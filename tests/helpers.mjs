@@ -9,6 +9,7 @@ import {
   STUB_TIMESTAMP,
   STUB_MESSAGE_ID,
   validGatewayTags,
+  STUB_PROCESS_ID,
 } from '../tools/constants.mjs';
 
 const initialOperatorStake = 100_000_000_000;
@@ -138,6 +139,7 @@ export const transfer = async ({
     },
     memory,
   });
+  assertNoResultError(transferResult);
   return transferResult.Memory;
 };
 
@@ -164,6 +166,7 @@ export const joinNetwork = async ({
     },
     memory: transferMemory,
   });
+  assertNoResultError(joinNetworkResult);
   return {
     memory: joinNetworkResult.Memory,
     result: joinNetworkResult,
@@ -689,7 +692,7 @@ export const buyRecord = async ({
   memory,
   from,
   name,
-  processId,
+  processId = STUB_PROCESS_ID,
   type = 'lease',
   years = 1,
   timestamp = STUB_TIMESTAMP,
@@ -709,6 +712,7 @@ export const buyRecord = async ({
     },
     memory,
   });
+  assertNoResultError(buyRecordResult);
   return {
     result: buyRecordResult,
     memory: buyRecordResult.Memory,
@@ -756,4 +760,90 @@ export const totalTokenSupply = async ({ memory, timestamp = 0 }) => {
     },
     memory,
   });
+};
+
+export const tick = async ({ memory, timestamp = STUB_TIMESTAMP }) => {
+  const tickResult = await handle({
+    options: {
+      Tags: [{ name: 'Action', value: 'Tick' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  return {
+    memory: tickResult.Memory,
+    result: tickResult,
+  };
+};
+
+export const getEpoch = async ({
+  memory,
+  timestamp = STUB_TIMESTAMP,
+  epochIndex,
+}) => {
+  const epochResult = await handle({
+    options: {
+      Tags: [
+        { name: 'Action', value: 'Epoch' },
+        ...(epochIndex ? [{ name: 'Epoch-Index', value: epochIndex }] : []),
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  assertNoResultError(epochResult);
+  return JSON.parse(epochResult.Messages[0].Data);
+};
+
+export const getPrescribedObservers = async ({
+  memory,
+  timestamp = STUB_TIMESTAMP,
+  epochIndex,
+}) => {
+  const prescribedObserversResult = await handle({
+    options: {
+      Tags: [
+        { name: 'Action', value: 'Epoch-Prescribed-Observers' },
+        ...(epochIndex ? [{ name: 'Epoch-Index', value: epochIndex }] : []),
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  assertNoResultError(prescribedObserversResult);
+  return JSON.parse(prescribedObserversResult.Messages[0].Data);
+};
+
+export const getPrescribedNames = async ({
+  memory,
+  timestamp = STUB_TIMESTAMP,
+  epochIndex,
+}) => {
+  const prescribedNamesResult = await handle({
+    options: {
+      Tags: [
+        { name: 'Action', value: 'Epoch-Prescribed-Names' },
+        ...(epochIndex ? [{ name: 'Epoch-Index', value: epochIndex }] : []),
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  assertNoResultError(prescribedNamesResult);
+  return JSON.parse(prescribedNamesResult.Messages[0].Data);
+};
+
+export const getEpochSettings = async ({
+  memory,
+  timestamp = STUB_TIMESTAMP,
+}) => {
+  const epochSettingsResult = await handle({
+    options: {
+      Tags: [{ name: 'Action', value: 'Epoch-Settings' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  assertNoResultError(epochSettingsResult);
+  return JSON.parse(epochSettingsResult.Messages[0].Data);
 };

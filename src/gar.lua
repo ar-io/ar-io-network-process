@@ -27,7 +27,7 @@ local gar = {}
 --- @field services GatewayServices | nil
 --- @field status "joined"|"leaving"
 --- @field observerAddress WalletAddress
---- @field weights GatewayWeights | nil
+--- @field weights GatewayWeights | nil // TODO: make this required and update tests to match the type
 --- @field slashings table<Timestamp, mARIO> | nil
 
 --- @class Gateway : CompactGateway
