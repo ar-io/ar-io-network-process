@@ -48,7 +48,6 @@ describe('epochs', () => {
         memory: sharedMemory,
         timestamp: firstEpochStartTimestamp,
       });
-      assert.ok(epoch);
       assert.deepStrictEqual(epoch, {
         epochIndex: 0,
         startTimestamp: firstEpochStartTimestamp,
@@ -79,6 +78,8 @@ describe('epochs', () => {
           },
         },
       });
+
+      // TODO (PE-7321): add a test for an empty epoch before names and gateways have been prescribed
     });
   });
 
@@ -88,7 +89,6 @@ describe('epochs', () => {
         memory: sharedMemory,
         timestamp: firstEpochStartTimestamp,
       });
-      assert.ok(prescribedObservers);
       assert.deepStrictEqual(prescribedObservers, [
         {
           compositeWeight: 4,
@@ -110,7 +110,6 @@ describe('epochs', () => {
         memory: sharedMemory,
         timestamp: firstEpochStartTimestamp,
       });
-      assert.ok(prescribedNames);
       assert.deepStrictEqual(prescribedNames, ['prescribed-name']);
     });
   });
@@ -121,7 +120,6 @@ describe('epochs', () => {
         memory: sharedMemory,
         timestamp: firstEpochStartTimestamp,
       });
-      assert.ok(epochSettings);
       assert.deepStrictEqual(epochSettings, {
         maxObservers: 50,
         epochZeroStartTimestamp: firstEpochStartTimestamp,
