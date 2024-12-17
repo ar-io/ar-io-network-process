@@ -611,11 +611,11 @@ describe("epochs", function()
 				},
 				prescribedNames = {},
 				prescribedObservers = {
-					["test-this-very-valid-observer-wallet-addr-1"] = true,
-					["test-this-very-valid-observer-wallet-addr-2"] = true,
-					["test-this-very-valid-observer-wallet-addr-3"] = true,
-					["test-this-very-valid-observer-wallet-addr-4"] = true,
-					["test-this-very-valid-observer-wallet-addr-5"] = true,
+					["test-this-very-valid-observer-wallet-addr-1"] = "test-this-very-valid-arweave-wallet-addr-1",
+					["test-this-very-valid-observer-wallet-addr-2"] = "test-this-very-valid-arweave-wallet-addr-2",
+					["test-this-very-valid-observer-wallet-addr-3"] = "test-this-very-valid-arweave-wallet-addr-3",
+					["test-this-very-valid-observer-wallet-addr-4"] = "test-this-very-valid-arweave-wallet-addr-4",
+					["test-this-very-valid-observer-wallet-addr-5"] = "test-this-very-valid-arweave-wallet-addr-5",
 				},
 			}
 
