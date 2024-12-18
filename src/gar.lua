@@ -2067,7 +2067,9 @@ function unlockGatewayDelegateVault(gateway, delegateAddress, vaultId)
 	assert(vault, "Vault not found")
 
 	balances.increaseBalance(delegateAddress, vault.balance)
-	decreaseDelegateStakeAtGateway(delegateAddress, gateway, vault.balance)
+	-- delete the delegate's vault
+	gateway.delegates[delegateAddress].vaults[vaultId] = nil
+	gar.pruneDelegateFromGatewayIfNecessary(delegateAddress, gateway)
 end
 
 --- @param gateway Gateway
