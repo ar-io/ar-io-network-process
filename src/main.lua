@@ -336,7 +336,7 @@ end
 -- Sanitize inputs before every interaction
 local function assertAndSanitizeInputs(msg)
 	assert(
-		msg.Timestamp and msg.Timestamp >= LastKnownMessageTimestamp,
+		msg.Timestamp and tonumber(msg.Timestamp) >= LastKnownMessageTimestamp,
 		"Timestamp must be greater than or equal to the last known message timestamp of "
 			.. LastKnownMessageTimestamp
 			.. " but was "
