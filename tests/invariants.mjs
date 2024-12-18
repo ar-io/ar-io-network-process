@@ -25,7 +25,7 @@ function assertValidTimestampsAtTimestamp({
   );
   assert(
     endTimestamp === null || endTimestamp > startTimestamp,
-    `Invariant violated: endTimestamp of ${endTimestamp} for vault ${address}`,
+    `Invariant violated: endTimestamp of ${endTimestamp} is not greater than startTimestamp ${startTimestamp}`,
   );
 }
 
