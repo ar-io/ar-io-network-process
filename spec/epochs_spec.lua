@@ -94,6 +94,8 @@ describe("epochs", function()
 					gatewayRewardRatioWeight = 1,
 					observerRewardRatioWeight = 1,
 					compositeWeight = 1,
+					stake = gar.getSettings().operators.minStake,
+					startTimestamp = startTimestamp,
 				},
 			}
 			local result = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)

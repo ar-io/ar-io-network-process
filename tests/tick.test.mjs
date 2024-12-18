@@ -411,6 +411,8 @@ describe('Tick', async () => {
           compositeWeight: 12,
           normalizedCompositeWeight: 1,
           tenureWeight: 4,
+          stake: INITIAL_OPERATOR_STAKE,
+          startTimestamp: STUB_TIMESTAMP,
         },
       ],
       prescribedNames: [], // no names in the network
@@ -485,6 +487,7 @@ describe('Tick', async () => {
       prescribedObservers: [
         {
           ...epochData.prescribedObservers[0],
+          stake: INITIAL_OPERATOR_STAKE + expectedGatewayOperatorReward,
           compositeWeight: 22,
           stakeWeight: 5.5,
         },

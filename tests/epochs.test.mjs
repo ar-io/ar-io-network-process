@@ -11,7 +11,12 @@ import {
 } from './helpers.mjs';
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
-import { STUB_ADDRESS, STUB_OPERATOR_ADDRESS } from '../tools/constants.mjs';
+import {
+  INITIAL_OPERATOR_STAKE,
+  STUB_ADDRESS,
+  STUB_OPERATOR_ADDRESS,
+  STUB_TIMESTAMP,
+} from '../tools/constants.mjs';
 
 const firstEpochStartTimestamp = 1719900000000;
 const epochLength = 1000 * 60 * 60 * 24; // 24 hours
@@ -65,6 +70,8 @@ describe('epochs', () => {
             compositeWeight: 4,
             normalizedCompositeWeight: 1,
             tenureWeight: 4,
+            stake: INITIAL_OPERATOR_STAKE,
+            startTimestamp: STUB_TIMESTAMP,
           },
         ],
         prescribedNames: ['prescribed-name'],
@@ -107,6 +114,8 @@ describe('epochs', () => {
           observerAddress: STUB_ADDRESS,
           observerRewardRatioWeight: 1,
           stakeWeight: 1,
+          stake: INITIAL_OPERATOR_STAKE,
+          startTimestamp: STUB_TIMESTAMP,
           tenureWeight: 4,
         },
       ]);

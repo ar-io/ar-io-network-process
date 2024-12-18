@@ -131,6 +131,8 @@ function epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 				gatewayRewardRatioWeight = gateway.weights.gatewayRewardRatioWeight,
 				observerRewardRatioWeight = gateway.weights.observerRewardRatioWeight,
 				compositeWeight = gateway.weights.compositeWeight,
+				stake = gateway.operatorStake,
+				startTimestamp = gateway.startTimestamp,
 			})
 		end
 	end
