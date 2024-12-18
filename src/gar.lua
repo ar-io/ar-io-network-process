@@ -479,6 +479,12 @@ end
 --- @param gateway Gateway
 --- @param quantity mARIO
 function increaseDelegateStakeAtGateway(delegate, gateway, quantity)
+	assert(delegate, "Delegate is required")
+	assert(gateway, "Gateway is required")
+	assert(
+		quantity and utils.isInteger(quantity) and quantity > 0,
+		"Quantity is required and must be an integer greater than 0"
+	)
 	delegate.delegatedStake = delegate.delegatedStake + quantity
 	gateway.totalDelegatedStake = gateway.totalDelegatedStake + quantity
 end
@@ -489,8 +495,14 @@ end
 --- @param ban boolean|nil do not add the delegate back to the gateway allowlist if their delegation is over
 function decreaseDelegateStakeAtGateway(delegateAddress, gateway, quantity, ban)
 	local delegate = gateway.delegates[delegateAddress]
-	-- use this in an inverse way
-	increaseDelegateStakeAtGateway(delegate, gateway, -quantity)
+	assert(delegate, "Delegate is required")
+	assert(
+		quantity and utils.isInteger(quantity) and quantity > 0,
+		"Quantity is required and must be an integer greater than 0: " .. quantity
+	)
+	assert(gateway, "Gateway is required")
+	delegate.delegatedStake = delegate.delegatedStake - quantity
+	gateway.totalDelegatedStake = gateway.totalDelegatedStake - quantity
 	gar.pruneDelegateFromGatewayIfNecessary(delegateAddress, gateway)
 	if ban and gateway.settings.allowedDelegatesLookup then
 		gateway.settings.allowedDelegatesLookup[delegateAddress] = nil
@@ -2055,7 +2067,6 @@ function unlockGatewayDelegateVault(gateway, delegateAddress, vaultId)
 	assert(vault, "Vault not found")
 
 	balances.increaseBalance(delegateAddress, vault.balance)
-	gateway.delegates[delegateAddress] = nil
 	decreaseDelegateStakeAtGateway(delegateAddress, gateway, vault.balance)
 end
 

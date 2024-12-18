@@ -395,7 +395,6 @@ local function assertAndSanitizeInputs(msg)
 			.. msg.Timestamp
 	)
 	assert(msg.From, "From is required")
-	assert(msg.Id, "Id is required")
 	assert(msg.Tags and type(msg.Tags) == "table", "Tags are required")
 
 	msg.Tags = utils.validateAndSanitizeInputs(msg.Tags)
