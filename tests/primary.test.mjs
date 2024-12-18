@@ -14,6 +14,7 @@ import { assertNoInvariants } from './invariants.mjs';
 
 describe('primary names', function () {
   let sharedMemory;
+  let endingMemory;
   beforeEach(async () => {
     const { Memory: totalTokenSupplyMemory } = await totalTokenSupply({
       memory: startMemory,
@@ -23,8 +24,8 @@ describe('primary names', function () {
 
   afterEach(async () => {
     await assertNoInvariants({
-      timestamp: STUB_TIMESTAMP,
-      memory: sharedMemory,
+      timestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 365,
+      memory: endingMemory,
     });
   });
 
@@ -348,17 +349,19 @@ describe('primary names', function () {
     });
 
     // reverse lookup the owner of the primary name
-    const { result: ownerOfPrimaryNameResult } = await getOwnerOfPrimaryName({
-      name: 'test-name',
-      memory: approvePrimaryNameRequestResult.Memory,
-      timestamp: approvedTimestamp,
-    });
+    const { result: ownerOfPrimaryNameResult, memory } =
+      await getOwnerOfPrimaryName({
+        name: 'test-name',
+        memory: approvePrimaryNameRequestResult.Memory,
+        timestamp: approvedTimestamp,
+      });
 
     const ownerResult = JSON.parse(ownerOfPrimaryNameResult.Messages[0].Data);
     assert.deepStrictEqual(ownerResult, {
       ...expectedNewPrimaryName,
       processId,
     });
+    endingMemory = memory;
   });
 
   it('should immediately approve a primary name for an existing base name when the caller of the request is the base name owner', async function () {
@@ -458,17 +461,19 @@ describe('primary names', function () {
     });
 
     // reverse lookup the owner of the primary name
-    const { result: ownerOfPrimaryNameResult } = await getOwnerOfPrimaryName({
-      name: 'test-name',
-      memory: requestPrimaryNameResult.Memory,
-      timestamp: approvalTimestamp,
-    });
+    const { result: ownerOfPrimaryNameResult, memory } =
+      await getOwnerOfPrimaryName({
+        name: 'test-name',
+        memory: requestPrimaryNameResult.Memory,
+        timestamp: approvalTimestamp,
+      });
 
     const ownerResult = JSON.parse(ownerOfPrimaryNameResult.Messages[0].Data);
     assert.deepStrictEqual(ownerResult, {
       ...expectedNewPrimaryName,
       processId,
     });
+    endingMemory = memory;
   });
 
   it('should allow removing a primary named by the owner or the owner of the base record', async function () {
@@ -550,7 +555,7 @@ describe('primary names', function () {
       'Total-Primary-Names': 0,
     });
     // assert the primary name is no longer set
-    const { result: primaryNameForAddressResult } =
+    const { result: primaryNameForAddressResult, memory } =
       await getPrimaryNameForAddress({
         address: recipient,
         memory: removePrimaryNameResult.Memory,
@@ -562,6 +567,7 @@ describe('primary names', function () {
       (tag) => tag.name === 'Error',
     ).value;
     assert.ok(errorTag, 'Expected an error tag');
+    endingMemory = memory;
   });
 
   describe('getPaginatedPrimaryNames', function () {
@@ -588,6 +594,7 @@ describe('primary names', function () {
         sortBy: 'owner',
         sortOrder: 'asc',
       });
+      endingMemory = getPaginatedPrimaryNamesResult.Memory;
     });
   });
 
@@ -615,6 +622,7 @@ describe('primary names', function () {
         sortBy: 'startTimestamp',
         sortOrder: 'asc',
       });
+      endingMemory = getPaginatedPrimaryNameRequestsResult.Memory;
     });
   });
 });
