@@ -1840,17 +1840,17 @@ addEventingHandler(ActionMap.Balances, Handlers.utils.hasMatchingTag("Action", A
 end)
 
 addEventingHandler(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", ActionMap.Balance), function(msg)
-	local target = msg.Tags.Target or msg.Tags.Address or msg.From
+	local target = msg.Tags.Target or msg.Tags.Address or msg.Tags.Recipient or msg.From
 	local balance = balances.getBalance(target)
 
 	-- must adhere to token.lua spec for arconnect compatibility
 	Send(msg, {
 		Target = msg.From,
 		Action = "Balance-Notice",
+		Account = msg.Tags.Address or msg.Tags.Recipient or msg.From,
 		Data = balance,
 		Balance = tostring(balance),
 		Ticker = Ticker,
-		Address = target,
 	})
 end)
 
