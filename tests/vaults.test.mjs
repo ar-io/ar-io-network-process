@@ -18,6 +18,7 @@ import { assertNoInvariants } from './invariants.mjs';
 
 describe('Vaults', async () => {
   let sharedMemory = startMemory;
+  let endingMemory;
   beforeEach(async () => {
     const { Memory: totalTokenSupplyMemory } = await totalTokenSupply({
       memory: startMemory,
@@ -28,7 +29,7 @@ describe('Vaults', async () => {
   afterEach(async () => {
     await assertNoInvariants({
       timestamp: STUB_TIMESTAMP,
-      memory: sharedMemory,
+      memory: endingMemory,
     });
   });
 
@@ -111,6 +112,7 @@ describe('Vaults', async () => {
         createVaultResultData.endTimestamp,
         createVaultResult.startTimestamp + lockLengthMs,
       );
+      endingMemory = createVaultResult.Memory;
     });
 
     it('should throw an error if vault size is too small', async () => {
@@ -154,6 +156,7 @@ describe('Vaults', async () => {
         balanceAfterVault.Messages[0].Data,
       );
       assert.deepEqual(balanceAfterVaultData, balanceBeforeData);
+      endingMemory = balanceAfterVault.Memory;
     });
   });
 
@@ -212,6 +215,7 @@ describe('Vaults', async () => {
         createVaultResultData.balance,
         quantity,
       );
+      endingMemory = extendVaultResult.Memory;
     });
   });
 
@@ -273,6 +277,7 @@ describe('Vaults', async () => {
         increaseVaultBalanceResultData.balance,
         createVaultResultData.balance + quantity,
       );
+      endingMemory = increaseVaultBalanceResult.Memory;
     });
   });
 
@@ -330,6 +335,7 @@ describe('Vaults', async () => {
         createdVaultData.endTimestamp,
         STUB_TIMESTAMP + lockLengthMs,
       );
+      endingMemory = createVaultedTransferResult.Memory;
     });
 
     it('should fail if the vault size is too small', async () => {
@@ -353,6 +359,7 @@ describe('Vaults', async () => {
           'Invalid quantity. Must be integer greater than or equal to 100000000 mARIO',
         ),
       );
+      endingMemory = createVaultedTransferResult.Memory;
     });
 
     it('should fail if the recipient address is invalid and Allow-Unsafe-Addresses is not provided', async () => {
@@ -373,6 +380,7 @@ describe('Vaults', async () => {
       );
       assert.ok(errorTag);
       assert(errorTag.value.includes('Invalid recipient'));
+      endingMemory = createVaultedTransferResult.Memory;
     });
 
     it('should create a vault for the recipient with an invalid address and Allow-Unsafe-Addresses is provided', async () => {
@@ -401,6 +409,7 @@ describe('Vaults', async () => {
         createdVaultData.endTimestamp,
         STUB_TIMESTAMP + lockLengthMs,
       );
+      endingMemory = createVaultedTransferResult.Memory;
     });
   });
 
@@ -444,7 +453,7 @@ describe('Vaults', async () => {
       let cursor = '';
       let fetchedVaults = [];
       while (true) {
-        const { result: paginatedVaultsResult } = await getVaults({
+        const { result: paginatedVaultsResult, memory } = await getVaults({
           memory: paginatedVaultMemory,
           cursor,
           limit: 1,
@@ -461,6 +470,7 @@ describe('Vaults', async () => {
         assert.equal(hasMore, !!nextCursor);
         cursor = nextCursor;
         fetchedVaults.push(...items);
+        endingMemory = memory;
         if (!cursor) break;
       }
 
@@ -486,7 +496,7 @@ describe('Vaults', async () => {
       let cursor = '';
       let fetchedVaults = [];
       while (true) {
-        const { result: paginatedVaultsResult } = await getVaults({
+        const { result: paginatedVaultsResult, memory } = await getVaults({
           memory: paginatedVaultMemory,
           cursor,
           limit: 1,
@@ -505,6 +515,7 @@ describe('Vaults', async () => {
         assert.equal(hasMore, !!nextCursor);
         cursor = nextCursor;
         fetchedVaults.push(...items);
+        endingMemory = memory;
         if (!cursor) break;
       }
 

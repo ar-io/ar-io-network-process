@@ -4,8 +4,6 @@ import assert from 'node:assert';
 import {
   DEFAULT_HANDLE_OPTIONS,
   STUB_ADDRESS,
-  validGatewayTags,
-  PROCESS_OWNER,
   PROCESS_ID,
   STUB_TIMESTAMP,
   INITIAL_OPERATOR_STAKE,
@@ -47,7 +45,7 @@ describe('Tick', async () => {
 
   afterEach(async () => {
     await assertNoInvariants({
-      timestamp: STUB_TIMESTAMP,
+      timestamp: genesisEpochStart + 1000 * 60 * 60 * 24 * 365,
       memory: sharedMemory,
     });
   });
@@ -137,6 +135,7 @@ describe('Tick', async () => {
       initiator: PROCESS_ID,
       premiumMultiplier: 50,
     });
+    sharedMemory = returnedNameData.Memory;
   });
 
   it('should prune gateways that are expired', async () => {
@@ -186,6 +185,7 @@ describe('Tick', async () => {
     });
 
     assert.deepEqual(undefined, prunedGateway);
+    sharedMemory = futureTick.memory;
   });
 
   // vaulting is not working as expected, need to fix before enabling this test
@@ -306,6 +306,7 @@ describe('Tick', async () => {
     });
     const balanceData = JSON.parse(ownerBalance.Messages[0].Data);
     assert.equal(balanceData, balanceBeforeData);
+    sharedMemory = ownerBalance.Memory;
   });
 
   /**
@@ -555,6 +556,7 @@ describe('Tick', async () => {
         address: delegateAddress,
       },
     ]);
+    sharedMemory = distributionTick.memory;
   });
 
   it('should not increase demandFactor and baseRegistrationFee when records are bought until the end of the epoch', async () => {
@@ -643,6 +645,7 @@ describe('Tick', async () => {
       timestamp: firstEpochEndTimestamp + 1,
     });
     assert.equal(firstEpochEndDemandFactorResult, 1.0500000000000000444);
+    sharedMemory = firstEpochEndTick.Memory;
   });
 
   it('should reset to baseRegistrationFee when demandFactor is 0.5 for consecutive epochs', async () => {
@@ -701,5 +704,6 @@ describe('Tick', async () => {
 
     assert.equal(demandFactorAfterFeeAdjustment, 1);
     assert.equal(baseFeeAfterConsecutiveTicksWithNoPurchases, 300_000_000);
+    sharedMemory = tickMemory;
   });
 });

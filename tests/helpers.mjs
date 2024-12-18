@@ -97,6 +97,7 @@ export function assertValidSupplyEventData(result) {
 }
 
 export const getBalances = async ({ memory, timestamp = STUB_TIMESTAMP }) => {
+  assert(memory, 'Memory is required');
   const result = await handle({
     options: {
       Tags: [{ name: 'Action', value: 'Balances' }],
@@ -105,6 +106,11 @@ export const getBalances = async ({ memory, timestamp = STUB_TIMESTAMP }) => {
     memory,
   });
 
+  const balancesData = result.Messages?.[0]?.Data;
+  if (!balancesData) {
+    const { Memory, ...rest } = result;
+    assert(false, `Something went wrong: ${JSON.stringify(rest, null, 2)}`);
+  }
   const balances = JSON.parse(result.Messages?.[0]?.Data);
   return balances;
 };

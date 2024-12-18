@@ -1,9 +1,19 @@
 import { handle, startMemory } from './helpers.mjs';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert';
-import { STUB_ADDRESS, PROCESS_OWNER } from '../tools/constants.mjs';
+import {
+  STUB_ADDRESS,
+  PROCESS_OWNER,
+  STUB_TIMESTAMP,
+} from '../tools/constants.mjs';
+import { assertNoInvariants } from './invariants.mjs';
 
 describe('Transfers', async () => {
+  let endingMemory;
+  afterEach(() => {
+    assertNoInvariants({ memory: endingMemory, timestamp: STUB_TIMESTAMP });
+  });
+
   it('should transfer tokens to another wallet', async () => {
     const checkTransfer = async (recipient, sender, quantity) => {
       let mem = startMemory;
@@ -59,6 +69,7 @@ describe('Transfers', async () => {
       const balances = JSON.parse(result.Messages[0].Data);
       assert.equal(balances[recipient], quantity);
       assert.equal(balances[sender], senderBalanceData - quantity);
+      return result.Memory;
     };
 
     const arweave1 = STUB_ADDRESS;
@@ -69,7 +80,7 @@ describe('Transfers', async () => {
 
     await checkTransfer(arweave1, arweave2, 100000000);
     await checkTransfer(eth1, arweave2, 100000000);
-    await checkTransfer(eth2, eth1, 100000000);
+    endingMemory = await checkTransfer(eth2, eth1, 100000000);
   });
 
   it('should not transfer tokens to another wallet if the sender does not have enough tokens', async () => {
@@ -107,6 +118,7 @@ describe('Transfers', async () => {
     // the new balance won't be defined
     assert.equal(balances[recipient] || 0, 0);
     assert.equal(balances[sender], senderBalanceData);
+    endingMemory = result.Memory;
   });
 
   for (const allowUnsafeAddresses of [false, undefined]) {
@@ -151,6 +163,7 @@ describe('Transfers', async () => {
       const balances = JSON.parse(result.Messages[0].Data);
       assert.equal(balances[recipient] || 0, 0);
       assert.equal(balances[sender], senderBalanceData);
+      endingMemory = result.Memory;
     });
   }
 
@@ -196,6 +209,7 @@ describe('Transfers', async () => {
     const balances = JSON.parse(result.Messages[0].Data);
     assert.equal(balances[recipient] || 0, 100000000);
     assert.equal(balances[sender], senderBalanceData - 100000000);
+    endingMemory = result.Memory;
   });
 
   it('should not transfer when an invalid quantity is provided', async () => {
@@ -232,5 +246,6 @@ describe('Transfers', async () => {
     const balances = JSON.parse(result.Messages[0].Data);
     assert.equal(balances[recipient] || 0, 0);
     assert.equal(balances[sender], senderBalanceData);
+    endingMemory = result.Memory;
   });
 });
