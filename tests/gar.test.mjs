@@ -1229,6 +1229,7 @@ describe('GatewayRegistry', async () => {
       const { memory: addGatewayMemory2 } = await joinNetwork({
         address: secondGatewayAddress,
         memory: sharedMemory,
+        timestamp: STUB_TIMESTAMP + 1, // join the network 1ms after the first gateway
       });
       let cursor;
       let fetchedGateways = [];
@@ -1239,9 +1240,12 @@ describe('GatewayRegistry', async () => {
               { name: 'Action', value: 'Paginated-Gateways' },
               { name: 'Cursor', value: cursor },
               { name: 'Limit', value: '1' },
+              { name: 'Sort-By', value: 'startTimestamp' },
+              { name: 'Sort-Order', value: 'asc' },
             ],
           },
           memory: addGatewayMemory2,
+          timestamp: STUB_TIMESTAMP + 1,
         });
         // parse items, nextCursor
         const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
@@ -1249,7 +1253,7 @@ describe('GatewayRegistry', async () => {
         assert.equal(totalItems, 2);
         assert.equal(items.length, 1);
         assert.equal(sortBy, 'startTimestamp');
-        assert.equal(sortOrder, 'desc');
+        assert.equal(sortOrder, 'asc'); // older gateways are first
         assert.equal(hasMore, !!nextCursor);
         cursor = nextCursor;
         fetchedGateways.push(...items);

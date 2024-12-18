@@ -1896,8 +1896,11 @@ addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epo
 	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
 		or epochs.getEpochIndexForTimestamp(msg.Timestamp or msg.Tags.Timestamp)
 	local epoch = epochs.getEpoch(epochIndex)
+	-- TODO: this check can be removed after 14 days of release once old epochs are pruned
+	if not epoch.prescribedObservers or not next(epoch.prescribedObservers).gatewayAddress then
+		epoch.prescribedObservers = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
+	end
 	-- populate the prescribed observers with weights
-	epoch.prescribedObservers = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 	Send(msg, { Target = msg.From, Action = "Epoch-Notice", Data = json.encode(epoch) })
 end)
 
