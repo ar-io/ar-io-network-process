@@ -1042,7 +1042,7 @@ function arns.pruneReservedNames(currentTimestamp)
 end
 
 --- Asserts that a name can be reassigned
---- @param record StoredRecord The record to check
+--- @param record StoredRecord | nil The record to check
 --- @param currentTimestamp number The current timestamp
 --- @param from string The address of the sender
 --- @param newProcessId string The new process id
@@ -1055,11 +1055,11 @@ function arns.assertValidReassignName(record, currentTimestamp, from, newProcess
 	assert(record.processId == from, "Not authorized to reassign this name")
 
 	if record.endTimestamp then
-		local isWithinGracePeriod = record.endTimestamp < currentTimestamp
-			and record.endTimestamp + constants.gracePeriodMs > currentTimestamp
-		local isExpired = record.endTimestamp + constants.gracePeriodMs < currentTimestamp
-		assert(not isWithinGracePeriod, "Name must be extended before it can be reassigned")
-		assert(not isExpired, "Name is expired")
+		assert(
+			not arns.recordInGracePeriod(record, currentTimestamp),
+			"Name must be extended before it can be reassigned"
+		)
+		assert(not arns.recordExpired(record, currentTimestamp), "Name is expired")
 	end
 
 	return true
@@ -1075,7 +1075,6 @@ end
 function arns.reassignName(name, from, currentTimestamp, newProcessId, allowUnsafeProcessId)
 	allowUnsafeProcessId = allowUnsafeProcessId or false
 	local record = arns.getRecord(name)
-	assert(record, "Name is not registered")
 	arns.assertValidReassignName(record, currentTimestamp, from, newProcessId, allowUnsafeProcessId)
 	local updatedRecord = arns.modifyProcessId(name, newProcessId)
 	return updatedRecord
