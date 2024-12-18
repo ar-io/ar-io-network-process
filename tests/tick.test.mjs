@@ -401,9 +401,18 @@ describe('Tick', async () => {
         failureSummaries: [],
         reports: [],
       },
-      prescribedObservers: {
-        [STUB_ADDRESS]: STUB_ADDRESS,
-      },
+      prescribedObservers: [
+        {
+          observerAddress: STUB_ADDRESS,
+          gatewayAddress: STUB_ADDRESS,
+          stakeWeight: 3,
+          gatewayRewardRatioWeight: 1,
+          observerRewardRatioWeight: 1,
+          compositeWeight: 12,
+          normalizedCompositeWeight: 1,
+          tenureWeight: 4,
+        },
+      ],
       prescribedNames: [], // no names in the network
       distributions: {
         totalEligibleGateways: 1,
@@ -446,7 +455,7 @@ describe('Tick', async () => {
     // assert no error tag
     assertNoResultError(distributionTick);
 
-    // check the rewards were distributed correctly
+    // check the rewards were distributed correctly and weights are updated
     const distributedEpochData = await getEpoch({
       memory: distributionTick.memory,
       timestamp: distributionTimestamp,
@@ -473,6 +482,13 @@ describe('Tick', async () => {
           [STUB_ADDRESS]: reportTxId,
         },
       },
+      prescribedObservers: [
+        {
+          ...epochData.prescribedObservers[0],
+          compositeWeight: 22,
+          stakeWeight: 5.5,
+        },
+      ],
     });
     // assert the new epoch was created
     const newEpoch = await getEpoch({

@@ -55,9 +55,18 @@ describe('epochs', () => {
         startHeight: 1,
         distributionTimestamp:
           firstEpochStartTimestamp + epochLength + distributionDelay,
-        prescribedObservers: {
-          [STUB_ADDRESS]: STUB_OPERATOR_ADDRESS,
-        },
+        prescribedObservers: [
+          {
+            observerAddress: STUB_ADDRESS,
+            gatewayAddress: STUB_OPERATOR_ADDRESS,
+            stakeWeight: 1,
+            gatewayRewardRatioWeight: 1,
+            observerRewardRatioWeight: 1,
+            compositeWeight: 4,
+            normalizedCompositeWeight: 1,
+            tenureWeight: 4,
+          },
+        ],
         prescribedNames: ['prescribed-name'],
         observations: {
           failureSummaries: [],
