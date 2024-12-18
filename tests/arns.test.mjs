@@ -40,7 +40,7 @@ describe('ArNS', async () => {
 
   afterEach(async () => {
     await assertNoInvariants({
-      timestamp: STUB_TIMESTAMP,
+      timestamp: 1719988800001, // after latest known timestamp from a test
       memory: sharedMemory,
     });
   });
@@ -160,11 +160,11 @@ describe('ArNS', async () => {
 
   describe('Buy-Record', () => {
     it('should buy a record with an Arweave address', async () => {
-      await runBuyRecord({ sender: STUB_ADDRESS });
+      sharedMemory = (await runBuyRecord({ sender: STUB_ADDRESS })).memory;
     });
 
     it('should buy a record with an Ethereum address', async () => {
-      await runBuyRecord({ sender: testEthAddress });
+      sharedMemory = await runBuyRecord({ sender: testEthAddress });
     });
 
     it('should fail to buy a permanently registered record', async () => {
@@ -223,6 +223,7 @@ describe('ArNS', async () => {
         'Name is already registered',
       );
       assert(alreadyRegistered);
+      sharedMemory = failedBuyRecordResult.Memory;
     });
 
     it('should buy a record and default the name to lower case', async () => {
@@ -261,6 +262,7 @@ describe('ArNS', async () => {
         type: 'lease',
         undernameLimit: 10,
       });
+      sharedMemory = realRecord.Memory;
     });
   });
 
@@ -326,9 +328,10 @@ describe('ArNS', async () => {
         });
         const record = JSON.parse(result.Messages[0].Data);
         assert.equal(record.undernameLimit, 11);
+        return increaseUndernameResult.Memory;
       };
       await assertIncreaseUndername(STUB_ADDRESS);
-      await assertIncreaseUndername(testEthAddress);
+      sharedMemory = await assertIncreaseUndername(testEthAddress);
     });
 
     it('should increase the undernames by spending from stakes', async () => {
@@ -413,9 +416,10 @@ describe('ArNS', async () => {
         });
         const record = JSON.parse(result.Messages[0].Data);
         assert.equal(record.undernameLimit, 11);
+        return increaseUndernameResult.Memory;
       };
       await assertIncreaseUndername(STUB_ADDRESS);
-      await assertIncreaseUndername(testEthAddress);
+      sharedMemory = await assertIncreaseUndername(testEthAddress);
     });
   });
 
@@ -436,6 +440,7 @@ describe('ArNS', async () => {
         assert(priceList[key].permabuy);
         assert(Object.keys(priceList[key].lease).length == 5);
       });
+      sharedMemory = priceListResult.Memory;
     });
   });
 
@@ -478,6 +483,7 @@ describe('ArNS', async () => {
           stakes: [],
         },
       });
+      sharedMemory = result.Memory;
     });
 
     it('should return the correct cost of increasing an undername limit', async () => {
@@ -514,6 +520,7 @@ describe('ArNS', async () => {
       const tokenCost = JSON.parse(result.Messages[0].Data);
       const expectedPrice = 500000000 * 0.001 * 1 * 1;
       assert.equal(tokenCost, expectedPrice);
+      sharedMemory = result.Memory;
     });
 
     it('should return the correct cost of extending an existing leased record', async () => {
@@ -549,6 +556,7 @@ describe('ArNS', async () => {
       });
       const tokenCost = JSON.parse(result.Messages[0].Data);
       assert.equal(tokenCost, 200000000); // known cost for extending a 9 character name by 2 years (500 ARIO * 0.2 * 2)
+      sharedMemory = result.Memory;
     });
 
     it('should get the cost of upgrading an existing leased record to permanently owned', async () => {
@@ -584,6 +592,7 @@ describe('ArNS', async () => {
 
       const tokenCost = JSON.parse(upgradeNameResult.Messages[0].Data);
       assert.equal(tokenCost, basePermabuyPrice);
+      sharedMemory = upgradeNameResult.Memory;
     });
 
     it('should return the correct cost of creating a primary name request', async () => {
@@ -628,6 +637,7 @@ describe('ArNS', async () => {
       });
       const undernameTokenCost = JSON.parse(undernameResult.Messages[0].Data);
       assert.equal(undernameTokenCost, tokenCost);
+      sharedMemory = undernameResult.Memory;
     });
   });
 
@@ -679,6 +689,7 @@ describe('ArNS', async () => {
         record.endTimestamp,
         recordBefore.endTimestamp + 60 * 1000 * 60 * 24 * 365,
       );
+      sharedMemory = recordResult.Memory;
     });
 
     it('should properly handle extending a leased record paying with balance and stakes', async () => {
@@ -751,6 +762,7 @@ describe('ArNS', async () => {
         recordBefore.endTimestamp + 60 * 1000 * 60 * 24 * 365,
         record.endTimestamp,
       );
+      sharedMemory = recordResult.Memory;
     });
   });
 
@@ -813,6 +825,7 @@ describe('ArNS', async () => {
         undernameLimit: 10,
         purchasePrice: basePermabuyPrice, // expected price for a permanent 9 character name
       });
+      sharedMemory = upgradeNameResult.Memory;
     });
 
     it('should properly handle upgrading a name paying with balance and stakes', async () => {
@@ -889,6 +902,7 @@ describe('ArNS', async () => {
           purchasePrice: 2500000000, // expected price for a permanent 9 character name
         },
       );
+      sharedMemory = upgradeNameResult.Memory;
     });
   });
 
@@ -1071,6 +1085,7 @@ describe('ArNS', async () => {
       assert.equal(balances[initiator], expectedRewardForInitiator);
       assert.equal(balances[PROCESS_ID], expectedProtocolBalance);
       assert.equal(balances[newBuyerAddress], 0);
+      sharedMemory = balancesResult.Memory;
     });
 
     const runReturnedNameTest = async ({ fundFrom }) => {
@@ -1310,14 +1325,15 @@ describe('ArNS', async () => {
       const balances = JSON.parse(balancesResult.Messages[0].Data);
       assert.equal(balances[PROCESS_ID], expectedProtocolBalance);
       assert.equal(balances[bidderAddress], 0);
+      return balancesResult.Memory;
     };
 
     it('should create a lease expiration initiated returned name and accept buy records for it', async () => {
-      await runReturnedNameTest({});
+      sharedMemory = await runReturnedNameTest({});
     });
 
     it('should create a lease expiration initiated returned name and accept a buy record funded by stakes', async () => {
-      await runReturnedNameTest({ fundFrom: 'stakes' });
+      sharedMemory = await runReturnedNameTest({ fundFrom: 'stakes' });
     });
   });
 
@@ -1437,6 +1453,7 @@ describe('ArNS', async () => {
       );
       const expectedFloorPrice = baseLeasePriceFor9CharNameFor1Year;
       assert.equal(tokenCostForReturnedNameAfterThePeriod, expectedFloorPrice);
+      sharedMemory = tokenCostResultForReturnedNameAfterThePeriod.Memory;
     });
   });
 
@@ -1469,6 +1486,7 @@ describe('ArNS', async () => {
       );
       assert.equal(releaseNameErrorTag, undefined);
       assert.equal(reassignNameResult.Messages?.[0]?.Target, processId);
+      sharedMemory = reassignNameResult.Memory;
     });
 
     it('should reassign an arns name to a new process id with initiator', async () => {
@@ -1501,6 +1519,7 @@ describe('ArNS', async () => {
       assert.equal(releaseNameErrorTag, undefined);
       assert.equal(reassignNameResult.Messages?.[0]?.Target, processId);
       assert.equal(reassignNameResult.Messages?.[1]?.Target, STUB_MESSAGE_ID); // Check for the message sent to the initiator
+      sharedMemory = reassignNameResult.Memory;
     });
 
     it('should not reassign an arns name with invalid ownership', async () => {
@@ -1531,6 +1550,7 @@ describe('ArNS', async () => {
         (tag) => tag.name === 'Error',
       );
       assert.ok(releaseNameErrorTag, 'Error tag should be present');
+      sharedMemory = reassignNameResult.Memory;
     });
 
     it('should not reassign an arns name with invalid new process id', async () => {
@@ -1561,6 +1581,7 @@ describe('ArNS', async () => {
         (tag) => tag.name === 'Error',
       );
       assert.ok(releaseNameErrorTag, 'Error tag should be present');
+      sharedMemory = reassignNameResult.Memory;
     });
   });
 
@@ -1636,6 +1657,7 @@ describe('ArNS', async () => {
         paginatedRecords.map((record) => record.name),
         expectedNames,
       );
+      sharedMemory = buyRecordsMemory;
     });
   });
 
@@ -1725,6 +1747,7 @@ describe('ArNS', async () => {
           name: 'ArNS Discount',
         },
       ]);
+      sharedMemory = result.Memory;
     });
 
     it('should return the correct cost for a buy record by a non-eligible gateway', async () => {
@@ -1745,6 +1768,7 @@ describe('ArNS', async () => {
       const costDetails = JSON.parse(result.Messages[0].Data);
       assert.equal(costDetails.tokenCost, baseLeasePriceFor9CharNameFor1Year);
       assert.deepEqual(costDetails.discounts, []);
+      sharedMemory = result.Memory;
     });
 
     describe('for an existing record', () => {
@@ -1823,6 +1847,7 @@ describe('ArNS', async () => {
               name: 'ArNS Discount',
             },
           ]);
+          sharedMemory = result.Memory;
         });
 
         it('should not apply the discount to extending the lease for a non-eligible gateway', async () => {
@@ -1838,6 +1863,7 @@ describe('ArNS', async () => {
           const { tokenCost, discounts } = JSON.parse(result.Messages[0].Data);
           assert.equal(tokenCost, baseLeaseOneYearExtensionPrice);
           assert.deepEqual(discounts, []);
+          sharedMemory = result.Memory;
         });
 
         it('balances should be updated when the extend lease action is performed', async () => {
@@ -1891,6 +1917,7 @@ describe('ArNS', async () => {
             nonEligibleGatewayBalanceBefore - baseLeaseOneYearExtensionPrice,
             nonEligibleBalanceAfter,
           );
+          sharedMemory = nonEligibleGatewayResult.Memory;
         });
 
         describe('upgrading the lease to a permabuy', () => {
@@ -1923,6 +1950,7 @@ describe('ArNS', async () => {
                 name: 'ArNS Discount',
               },
             ]);
+            sharedMemory = result.Memory;
           });
 
           it('should not apply the discount to increasing the undername limit for a non-eligible gateway', async () => {
@@ -1940,6 +1968,7 @@ describe('ArNS', async () => {
             );
             assert.equal(tokenCost, basePermabuyPrice);
             assert.deepEqual(discounts, []);
+            sharedMemory = result.Memory;
           });
         });
 
@@ -1975,6 +2004,7 @@ describe('ArNS', async () => {
                 name: 'ArNS Discount',
               },
             ]);
+            sharedMemory = result.Memory;
           });
 
           it('should not apply the discount to increasing the undername limit for a non-eligible gateway', async () => {
@@ -1993,6 +2023,7 @@ describe('ArNS', async () => {
             );
             assert.equal(tokenCost, undernameCostsForOneYear);
             assert.deepEqual(discounts, []);
+            sharedMemory = result.Memory;
           });
         });
       });
@@ -2014,6 +2045,7 @@ describe('ArNS', async () => {
       assert.equal(sortBy, 'name');
       assert.equal(sortOrder, 'desc');
       assert.equal(totalItems, 0);
+      sharedMemory = result.Memory;
     });
   });
 });
