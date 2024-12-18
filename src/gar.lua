@@ -481,9 +481,10 @@ end
 function increaseDelegateStakeAtGateway(delegate, gateway, quantity)
 	assert(delegate, "Delegate is required")
 	assert(gateway, "Gateway is required")
+	-- zero is allowed as it is a no-op
 	assert(
-		quantity and utils.isInteger(quantity) and quantity > 0,
-		"Quantity is required and must be an integer greater than 0"
+		quantity and utils.isInteger(quantity) and quantity >= 0,
+		"Quantity is required and must be an integer greater than or equal to 0: " .. quantity
 	)
 	delegate.delegatedStake = delegate.delegatedStake + quantity
 	gateway.totalDelegatedStake = gateway.totalDelegatedStake + quantity
@@ -496,9 +497,10 @@ end
 function decreaseDelegateStakeAtGateway(delegateAddress, gateway, quantity, ban)
 	local delegate = gateway.delegates[delegateAddress]
 	assert(delegate, "Delegate is required")
+	-- zero is allowed as it is a no-op
 	assert(
-		quantity and utils.isInteger(quantity) and quantity > 0,
-		"Quantity is required and must be an integer greater than 0: " .. quantity
+		quantity and utils.isInteger(quantity) and quantity >= 0,
+		"Quantity is required and must be an integer greater than or equal to 0: " .. quantity
 	)
 	assert(gateway, "Gateway is required")
 	delegate.delegatedStake = delegate.delegatedStake - quantity
@@ -2067,7 +2069,7 @@ function unlockGatewayDelegateVault(gateway, delegateAddress, vaultId)
 	assert(vault, "Vault not found")
 
 	balances.increaseBalance(delegateAddress, vault.balance)
-	-- delete the delegate's vault
+	-- delete the delegate's vault and prune the delegate if necessary
 	gateway.delegates[delegateAddress].vaults[vaultId] = nil
 	gar.pruneDelegateFromGatewayIfNecessary(delegateAddress, gateway)
 end
