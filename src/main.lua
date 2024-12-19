@@ -568,8 +568,6 @@ end, function(msg)
 	then
 		addSupplyData(msg.ioEvent)
 	end
-
-	-- return prunedStateResult -- TODO: need to return?
 end, CRITICAL, false)
 
 -- Write handlers
