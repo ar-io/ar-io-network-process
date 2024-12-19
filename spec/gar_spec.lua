@@ -3048,6 +3048,7 @@ describe("gar", function()
 	local testRedelegatorAddress = "test-re-delegator-1234567890123456789012345"
 	local testSourceAddress = "unique-source-address-123456789012345678901"
 	local testTargetAddress = "unique-target-address-123456789012345678901"
+
 	describe("redelegateStake", function()
 		local timestamp = 12345
 		local testRedelgationGateway = utils.deepCopy({
@@ -3166,6 +3167,56 @@ describe("gar", function()
 			assert.are.same(sourceGateway, _G.GatewayRegistry[testRedelegatorAddress])
 			assert.are.same(targetGateway, _G.GatewayRegistry[testTargetAddress])
 		end)
+
+		it(
+			"should allow operators to redelegate to its own stake when that stake is below the minimum delegated stake value",
+			function()
+				local sourceGateway = utils.deepCopy(testRedelgationGateway)
+				local targetGateway = utils.deepCopy(testRedelgationGateway)
+
+				sourceGateway.delegates = {
+					[testRedelegatorAddress] = {
+						delegatedStake = minDelegatedStake + 1,
+						startTimestamp = 0,
+						vaults = {},
+					},
+				}
+				_G.GatewayRegistry = {
+					[testRedelegatorAddress] = targetGateway,
+					[testSourceAddress] = sourceGateway,
+				}
+
+				local result = gar.redelegateStake({
+					delegateAddress = testRedelegatorAddress,
+					sourceAddress = testSourceAddress,
+					targetAddress = testRedelegatorAddress,
+					qty = 1, -- Move 1 mARIO to the operator gateway
+					currentTimestamp = timestamp,
+				})
+
+				assert.are.same({
+					sourceAddress = testSourceAddress,
+					targetAddress = testRedelegatorAddress,
+					redelegationFee = 0,
+					feeResetTimestamp = timestamp + sevenDays,
+					redelegationsSinceFeeReset = 1,
+				}, result)
+
+				assert.are.same({
+					timestamp = timestamp,
+					redelegations = 1,
+				}, _G.Redelegations[testRedelegatorAddress])
+
+				-- setup expectations on gateway tables
+				sourceGateway.delegates[testRedelegatorAddress] = {
+					delegatedStake = minDelegatedStake,
+					startTimestamp = 0,
+					vaults = {},
+				}
+				sourceGateway.totalDelegatedStake = minDelegatedStake - 1
+				targetGateway.operatorStake = minOperatorStake + 1
+			end
+		)
 
 		it(
 			"should redelegate stake for a fee if the delegator has already done redelegations in the last seven epochs",
@@ -4404,6 +4455,7 @@ describe("gar", function()
 					error:find("Allow listing only possible when allowDelegatedStaking is set to 'allowlist'") ~= nil
 				)
 			end)
+
 			it(
 				"should disallow delegates if allowDelegatedStaking is true and the allowedDelegatesLookup is not nil",
 				function()

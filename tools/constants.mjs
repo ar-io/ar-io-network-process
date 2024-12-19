@@ -14,6 +14,7 @@ export const INITIAL_OPERATOR_STAKE = 10_000_000_000; // 10K ARIO
 export const INITIAL_DELEGATE_STAKE = 10_000_000; // 10K ARIO
 export const INITIAL_OWNER_BALANCE = 950_000_000_000_000; // 950M ARIO
 export const STUB_TIMESTAMP = 21600000; // 01-01-1970 00:00:00
+export const STUB_PROCESS_ID = 'process-id-stub-'.padEnd(43, '0');
 export const STUB_MESSAGE_ID = ''.padEnd(43, 'm');
 export const STUB_HASH_CHAIN = 'NGU1fq_ssL9m6kRbRU1bqiIDBht79ckvAwRMGElkSOg';
 /* ao READ-ONLY Env Variables */

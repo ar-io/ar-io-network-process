@@ -92,6 +92,26 @@ describe("Primary Names", function()
 			)
 		end)
 
+		it("should fail if the arns record is in its grace period", function()
+			_G.NameRegistry.records = {
+				["test"] = {
+					processId = "base-name-owner",
+					type = "lease",
+					endTimestamp = 1234567890,
+				},
+			}
+			local status, err = pcall(
+				primaryNames.createPrimaryNameRequest,
+				"test",
+				"user-requesting-primary-name",
+				-- Just after grace period starts
+				1234567890 + 1,
+				"test-msg-id"
+			)
+			assert.is_false(status)
+			assert.match("ArNS record 'test' is not active", err)
+		end)
+
 		it(
 			"should create a primary name request and transfer the cost from the initiator to the protocol balance",
 			function()

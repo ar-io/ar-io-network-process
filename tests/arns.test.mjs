@@ -40,7 +40,7 @@ describe('ArNS', async () => {
 
   afterEach(async () => {
     await assertNoInvariants({
-      timestamp: STUB_TIMESTAMP,
+      timestamp: 1719988800001, // after latest known timestamp from a test
       memory: sharedMemory,
     });
   });
@@ -74,6 +74,7 @@ describe('ArNS', async () => {
           { name: 'Process-Id', value: processId },
           { name: 'Years', value: '1' },
         ],
+        Timestamp: STUB_TIMESTAMP,
       },
       memory,
     });
@@ -159,11 +160,11 @@ describe('ArNS', async () => {
 
   describe('Buy-Record', () => {
     it('should buy a record with an Arweave address', async () => {
-      await runBuyRecord({ sender: STUB_ADDRESS });
+      sharedMemory = (await runBuyRecord({ sender: STUB_ADDRESS })).memory;
     });
 
     it('should buy a record with an Ethereum address', async () => {
-      await runBuyRecord({ sender: testEthAddress });
+      sharedMemory = await runBuyRecord({ sender: testEthAddress });
     });
 
     it('should fail to buy a permanently registered record', async () => {
@@ -222,6 +223,7 @@ describe('ArNS', async () => {
         'Name is already registered',
       );
       assert(alreadyRegistered);
+      sharedMemory = failedBuyRecordResult.Memory;
     });
 
     it('should buy a record and default the name to lower case', async () => {
@@ -260,6 +262,7 @@ describe('ArNS', async () => {
         type: 'lease',
         undernameLimit: 10,
       });
+      sharedMemory = realRecord.Memory;
     });
   });
 
@@ -325,9 +328,10 @@ describe('ArNS', async () => {
         });
         const record = JSON.parse(result.Messages[0].Data);
         assert.equal(record.undernameLimit, 11);
+        return increaseUndernameResult.Memory;
       };
       await assertIncreaseUndername(STUB_ADDRESS);
-      await assertIncreaseUndername(testEthAddress);
+      sharedMemory = await assertIncreaseUndername(testEthAddress);
     });
 
     it('should increase the undernames by spending from stakes', async () => {
@@ -359,7 +363,6 @@ describe('ArNS', async () => {
                 { name: 'Quantity', value: `${650000000}` }, // delegate all of their balance
                 { name: 'Address', value: STUB_OPERATOR_ADDRESS }, // our gateway address
               ],
-              Timestamp: STUB_TIMESTAMP + 1,
             },
             memory,
           });
@@ -413,9 +416,10 @@ describe('ArNS', async () => {
         });
         const record = JSON.parse(result.Messages[0].Data);
         assert.equal(record.undernameLimit, 11);
+        return increaseUndernameResult.Memory;
       };
       await assertIncreaseUndername(STUB_ADDRESS);
-      await assertIncreaseUndername(testEthAddress);
+      sharedMemory = await assertIncreaseUndername(testEthAddress);
     });
   });
 
@@ -436,6 +440,7 @@ describe('ArNS', async () => {
         assert(priceList[key].permabuy);
         assert(Object.keys(priceList[key].lease).length == 5);
       });
+      sharedMemory = priceListResult.Memory;
     });
   });
 
@@ -478,6 +483,7 @@ describe('ArNS', async () => {
           stakes: [],
         },
       });
+      sharedMemory = result.Memory;
     });
 
     it('should return the correct cost of increasing an undername limit', async () => {
@@ -514,6 +520,7 @@ describe('ArNS', async () => {
       const tokenCost = JSON.parse(result.Messages[0].Data);
       const expectedPrice = 500000000 * 0.001 * 1 * 1;
       assert.equal(tokenCost, expectedPrice);
+      sharedMemory = result.Memory;
     });
 
     it('should return the correct cost of extending an existing leased record', async () => {
@@ -549,6 +556,7 @@ describe('ArNS', async () => {
       });
       const tokenCost = JSON.parse(result.Messages[0].Data);
       assert.equal(tokenCost, 200000000); // known cost for extending a 9 character name by 2 years (500 ARIO * 0.2 * 2)
+      sharedMemory = result.Memory;
     });
 
     it('should get the cost of upgrading an existing leased record to permanently owned', async () => {
@@ -584,6 +592,7 @@ describe('ArNS', async () => {
 
       const tokenCost = JSON.parse(upgradeNameResult.Messages[0].Data);
       assert.equal(tokenCost, basePermabuyPrice);
+      sharedMemory = upgradeNameResult.Memory;
     });
 
     it('should return the correct cost of creating a primary name request', async () => {
@@ -628,6 +637,7 @@ describe('ArNS', async () => {
       });
       const undernameTokenCost = JSON.parse(undernameResult.Messages[0].Data);
       assert.equal(undernameTokenCost, tokenCost);
+      sharedMemory = undernameResult.Memory;
     });
   });
 
@@ -679,6 +689,7 @@ describe('ArNS', async () => {
         record.endTimestamp,
         recordBefore.endTimestamp + 60 * 1000 * 60 * 24 * 365,
       );
+      sharedMemory = recordResult.Memory;
     });
 
     it('should properly handle extending a leased record paying with balance and stakes', async () => {
@@ -687,6 +698,7 @@ describe('ArNS', async () => {
         memory,
         transferQty: 700000000, // 600000000 for name purchase + 100000000 for extending the lease
         stakeQty: 650000000, // delegate most of their balance so that name purchase uses balance and stakes
+        timestamp: STUB_TIMESTAMP,
       });
 
       memory = stakeResult.memory;
@@ -750,6 +762,7 @@ describe('ArNS', async () => {
         recordBefore.endTimestamp + 60 * 1000 * 60 * 24 * 365,
         record.endTimestamp,
       );
+      sharedMemory = recordResult.Memory;
     });
   });
 
@@ -812,6 +825,7 @@ describe('ArNS', async () => {
         undernameLimit: 10,
         purchasePrice: basePermabuyPrice, // expected price for a permanent 9 character name
       });
+      sharedMemory = upgradeNameResult.Memory;
     });
 
     it('should properly handle upgrading a name paying with balance and stakes', async () => {
@@ -821,6 +835,7 @@ describe('ArNS', async () => {
         transferQty: 3_100_000_000, // 60,000,0000 for name purchase + 2,500,000,000 for upgrading the name
         stakeQty: 3_100_000_000 - 50_000_000, // delegate most of their balance so that name purchase uses balance and stakes
         stakerAddress: STUB_ADDRESS,
+        timestamp: STUB_TIMESTAMP,
       });
       memory = stakeResult.memory;
 
@@ -887,6 +902,7 @@ describe('ArNS', async () => {
           purchasePrice: 2500000000, // expected price for a permanent 9 character name
         },
       );
+      sharedMemory = upgradeNameResult.Memory;
     });
   });
 
@@ -1055,6 +1071,7 @@ describe('ArNS', async () => {
       const balancesResult = await handle({
         options: {
           Tags: [{ name: 'Action', value: 'Balances' }],
+          Timestamp: newBuyTimestamp,
         },
         memory: newBuyResult.Memory,
       });
@@ -1064,9 +1081,11 @@ describe('ArNS', async () => {
         initialRecord.purchasePrice +
         expectedRewardForProtocol;
       const balances = JSON.parse(balancesResult.Messages[0].Data);
+
       assert.equal(balances[initiator], expectedRewardForInitiator);
       assert.equal(balances[PROCESS_ID], expectedProtocolBalance);
       assert.equal(balances[newBuyerAddress], 0);
+      sharedMemory = balancesResult.Memory;
     });
 
     const runReturnedNameTest = async ({ fundFrom }) => {
@@ -1075,6 +1094,7 @@ describe('ArNS', async () => {
         processId: ''.padEnd(43, 'a'),
         type: 'lease',
         years: 1,
+        timestamp: STUB_TIMESTAMP,
         memory: sharedMemory,
       });
 
@@ -1148,6 +1168,7 @@ describe('ArNS', async () => {
         recipient: bidderAddress,
         quantity: expectedPurchasePrice,
         memory: tickResult.Memory,
+        timestamp: bidTimestamp,
       });
 
       let memoryToUse = transferMemory;
@@ -1158,6 +1179,7 @@ describe('ArNS', async () => {
           transferQty: 0,
           stakeQty: expectedPurchasePrice,
           stakerAddress: bidderAddress,
+          timestamp: bidTimestamp,
         });
         memoryToUse = stakeResult.memory;
       }
@@ -1291,6 +1313,7 @@ describe('ArNS', async () => {
       const balancesResult = await handle({
         options: {
           Tags: [{ name: 'Action', value: 'Balances' }],
+          Timestamp: bidTimestamp,
         },
         memory: buyReturnedNameResult.Memory,
       });
@@ -1302,14 +1325,15 @@ describe('ArNS', async () => {
       const balances = JSON.parse(balancesResult.Messages[0].Data);
       assert.equal(balances[PROCESS_ID], expectedProtocolBalance);
       assert.equal(balances[bidderAddress], 0);
+      return balancesResult.Memory;
     };
 
     it('should create a lease expiration initiated returned name and accept buy records for it', async () => {
-      await runReturnedNameTest({});
+      sharedMemory = await runReturnedNameTest({});
     });
 
     it('should create a lease expiration initiated returned name and accept a buy record funded by stakes', async () => {
-      await runReturnedNameTest({ fundFrom: 'stakes' });
+      sharedMemory = await runReturnedNameTest({ fundFrom: 'stakes' });
     });
   });
 
@@ -1429,6 +1453,7 @@ describe('ArNS', async () => {
       );
       const expectedFloorPrice = baseLeasePriceFor9CharNameFor1Year;
       assert.equal(tokenCostForReturnedNameAfterThePeriod, expectedFloorPrice);
+      sharedMemory = tokenCostResultForReturnedNameAfterThePeriod.Memory;
     });
   });
 
@@ -1461,6 +1486,7 @@ describe('ArNS', async () => {
       );
       assert.equal(releaseNameErrorTag, undefined);
       assert.equal(reassignNameResult.Messages?.[0]?.Target, processId);
+      sharedMemory = reassignNameResult.Memory;
     });
 
     it('should reassign an arns name to a new process id with initiator', async () => {
@@ -1493,6 +1519,7 @@ describe('ArNS', async () => {
       assert.equal(releaseNameErrorTag, undefined);
       assert.equal(reassignNameResult.Messages?.[0]?.Target, processId);
       assert.equal(reassignNameResult.Messages?.[1]?.Target, STUB_MESSAGE_ID); // Check for the message sent to the initiator
+      sharedMemory = reassignNameResult.Memory;
     });
 
     it('should not reassign an arns name with invalid ownership', async () => {
@@ -1523,6 +1550,7 @@ describe('ArNS', async () => {
         (tag) => tag.name === 'Error',
       );
       assert.ok(releaseNameErrorTag, 'Error tag should be present');
+      sharedMemory = reassignNameResult.Memory;
     });
 
     it('should not reassign an arns name with invalid new process id', async () => {
@@ -1553,12 +1581,14 @@ describe('ArNS', async () => {
         (tag) => tag.name === 'Error',
       );
       assert.ok(releaseNameErrorTag, 'Error tag should be present');
+      sharedMemory = reassignNameResult.Memory;
     });
   });
 
   describe('Paginated-Records', () => {
     it('should paginate records correctly', async () => {
       // buy 3 records
+      let lastTimestamp = STUB_TIMESTAMP;
       let buyRecordsMemory = sharedMemory; // updated after each purchase
       const recordsCount = 3;
       for (let i = 0; i < recordsCount; i++) {
@@ -1569,11 +1599,12 @@ describe('ArNS', async () => {
               { name: 'Name', value: `test-name-${i}` },
               { name: 'Process-Id', value: ''.padEnd(43, `${i}`) },
             ],
-            Timestamp: STUB_TIMESTAMP + i * 1000, // order of names is based on timestamp
+            Timestamp: lastTimestamp + i * 1000, // order of names is based on timestamp
           },
           memory: buyRecordsMemory,
         });
         buyRecordsMemory = buyRecordsResult.Memory;
+        lastTimestamp = lastTimestamp + i * 1000;
       }
 
       // call the paginated records handler repeatedly until all records are fetched
@@ -1587,6 +1618,7 @@ describe('ArNS', async () => {
               { name: 'Cursor', value: cursor },
               { name: 'Limit', value: 1 },
             ],
+            Timestamp: lastTimestamp,
           },
           memory: buyRecordsMemory,
         });
@@ -1625,6 +1657,7 @@ describe('ArNS', async () => {
         paginatedRecords.map((record) => record.name),
         expectedNames,
       );
+      sharedMemory = buyRecordsMemory;
     });
   });
 
@@ -1661,6 +1694,7 @@ describe('ArNS', async () => {
             { name: 'Action', value: 'Gateway' },
             { name: 'Address', value: joinedGateway },
           ],
+          Timestamp: afterDistributionTimestamp,
         },
         memory: firstTickAndDistribution.Memory,
       });
@@ -1680,7 +1714,7 @@ describe('ArNS', async () => {
       const transferMemory = await transfer({
         recipient: nonEligibleAddress,
         quantity: 200_000_000_000,
-        timestamp: afterDistributionTimestamp - 1,
+        timestamp: afterDistributionTimestamp,
         memory: firstTickAndDistribution.Memory,
       });
       arnsDiscountMemory = transferMemory;
@@ -1713,6 +1747,7 @@ describe('ArNS', async () => {
           name: 'ArNS Discount',
         },
       ]);
+      sharedMemory = result.Memory;
     });
 
     it('should return the correct cost for a buy record by a non-eligible gateway', async () => {
@@ -1725,6 +1760,7 @@ describe('ArNS', async () => {
             { name: 'Intent', value: 'Buy-Record' },
             { name: 'Name', value: 'test-name' },
           ],
+          Timestamp: afterDistributionTimestamp,
         },
         memory: arnsDiscountMemory,
       });
@@ -1732,6 +1768,7 @@ describe('ArNS', async () => {
       const costDetails = JSON.parse(result.Messages[0].Data);
       assert.equal(costDetails.tokenCost, baseLeasePriceFor9CharNameFor1Year);
       assert.deepEqual(costDetails.discounts, []);
+      sharedMemory = result.Memory;
     });
 
     describe('for an existing record', () => {
@@ -1810,6 +1847,7 @@ describe('ArNS', async () => {
               name: 'ArNS Discount',
             },
           ]);
+          sharedMemory = result.Memory;
         });
 
         it('should not apply the discount to extending the lease for a non-eligible gateway', async () => {
@@ -1825,6 +1863,7 @@ describe('ArNS', async () => {
           const { tokenCost, discounts } = JSON.parse(result.Messages[0].Data);
           assert.equal(tokenCost, baseLeaseOneYearExtensionPrice);
           assert.deepEqual(discounts, []);
+          sharedMemory = result.Memory;
         });
 
         it('balances should be updated when the extend lease action is performed', async () => {
@@ -1878,6 +1917,7 @@ describe('ArNS', async () => {
             nonEligibleGatewayBalanceBefore - baseLeaseOneYearExtensionPrice,
             nonEligibleBalanceAfter,
           );
+          sharedMemory = nonEligibleGatewayResult.Memory;
         });
 
         describe('upgrading the lease to a permabuy', () => {
@@ -1910,6 +1950,7 @@ describe('ArNS', async () => {
                 name: 'ArNS Discount',
               },
             ]);
+            sharedMemory = result.Memory;
           });
 
           it('should not apply the discount to increasing the undername limit for a non-eligible gateway', async () => {
@@ -1918,6 +1959,7 @@ describe('ArNS', async () => {
                 From: nonEligibleAddress,
                 Owner: nonEligibleAddress,
                 Tags: upgradeToPermabuyTags,
+                Timestamp: upgradeToPermabuyTimestamp,
               },
               memory: buyRecordResult.Memory,
             });
@@ -1926,6 +1968,7 @@ describe('ArNS', async () => {
             );
             assert.equal(tokenCost, basePermabuyPrice);
             assert.deepEqual(discounts, []);
+            sharedMemory = result.Memory;
           });
         });
 
@@ -1961,6 +2004,7 @@ describe('ArNS', async () => {
                 name: 'ArNS Discount',
               },
             ]);
+            sharedMemory = result.Memory;
           });
 
           it('should not apply the discount to increasing the undername limit for a non-eligible gateway', async () => {
@@ -1979,6 +2023,7 @@ describe('ArNS', async () => {
             );
             assert.equal(tokenCost, undernameCostsForOneYear);
             assert.deepEqual(discounts, []);
+            sharedMemory = result.Memory;
           });
         });
       });
@@ -2000,6 +2045,7 @@ describe('ArNS', async () => {
       assert.equal(sortBy, 'name');
       assert.equal(sortOrder, 'desc');
       assert.equal(totalItems, 0);
+      sharedMemory = result.Memory;
     });
   });
 });

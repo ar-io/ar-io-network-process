@@ -64,7 +64,6 @@ EpochSettings = EpochSettings
 	or {
 		pruneEpochsCount = 14, -- prune epochs older than 14 days
 		prescribedNameCount = 2,
-		rewardPercentage = 0.0005, -- 0.05%
 		maxObservers = 50,
 		epochZeroStartTimestamp = 1719900000000, -- July 9th, 00:00:00 UTC
 		durationMs = constants.defaultEpochDurationMs, -- 24 hours
@@ -108,9 +107,41 @@ end
 
 --- Gets the prescribed observers for an epoch
 --- @param epochIndex number The epoch index
---- @return WeightedGateway[] # The prescribed observers for the epoch
+--- @return table<WalletAddress, WalletAddress> # The prescribed observers for the epoch
 function epochs.getPrescribedObserversForEpoch(epochIndex)
 	return epochs.getEpoch(epochIndex).prescribedObservers or {}
+end
+
+--- Get prescribed observers with weights for epoch
+--- @param epochIndex number The epoch index
+--- @return WeightedGateway[] # The prescribed observers with weights for the epoch
+function epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
+	local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
+	-- Iterate over prescribed observers and add gateway details
+	local prescribedObserversWithWeights = {}
+	for _, gatewayAddress in pairs(prescribedObservers) do
+		local gateway = gar.getGateway(gatewayAddress)
+		if gateway then
+			table.insert(prescribedObserversWithWeights, {
+				observerAddress = gateway.observerAddress,
+				gatewayAddress = gatewayAddress,
+				normalizedCompositeWeight = gateway.weights.normalizedCompositeWeight,
+				stakeWeight = gateway.weights.stakeWeight,
+				tenureWeight = gateway.weights.tenureWeight,
+				gatewayRewardRatioWeight = gateway.weights.gatewayRewardRatioWeight,
+				observerRewardRatioWeight = gateway.weights.observerRewardRatioWeight,
+				compositeWeight = gateway.weights.compositeWeight,
+				stake = gateway.operatorStake,
+				startTimestamp = gateway.startTimestamp,
+			})
+		end
+	end
+
+	-- sort by normalizedCompositeWeight
+	table.sort(prescribedObserversWithWeights, function(a, b)
+		return a.normalizedCompositeWeight > b.normalizedCompositeWeight
+	end)
+	return prescribedObserversWithWeights
 end
 
 --- Gets the eligible rewards for an epoch
@@ -228,7 +259,7 @@ end
 --- Computes the prescribed observers for an epoch
 --- @param epochIndex number The epoch index
 --- @param hashchain string The hashchain
---- @return WeightedGateway[], WeightedGateway[] # The prescribed observers for the epoch, and all the gateways with weights
+--- @return table<WalletAddress, WalletAddress>, WeightedGateway[] # The prescribed observers for the epoch, and all the gateways with weights
 function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	assert(epochIndex >= 0, "Epoch index must be greater than or equal to 0")
 	assert(type(hashchain) == "string", "Hashchain must be a string")
@@ -239,6 +270,7 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 
 	-- Filter out any observers that could have a normalized composite weight of 0
 	local filteredObservers = {}
+	local prescribedObserversLookup = {}
 	-- use ipairs as weightedObservers in array
 	for _, observer in ipairs(weightedGateways) do
 		if observer.normalizedCompositeWeight > 0 then
@@ -246,7 +278,10 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 		end
 	end
 	if #filteredObservers <= epochs.getSettings().maxObservers then
-		return filteredObservers, weightedGateways
+		for _, observer in ipairs(filteredObservers) do
+			prescribedObserversLookup[observer.observerAddress] = observer.gatewayAddress
+		end
+		return prescribedObserversLookup, weightedGateways
 	end
 
 	-- the hash we will use to create entropy for prescribed observers
@@ -263,14 +298,12 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 
 	-- get our prescribed observers, using the hashchain as entropy
 	local hash = epochHash
-	local prescribedObserversAddressesLookup = {}
-	while utils.lengthOfTable(prescribedObserversAddressesLookup) < epochs.getSettings().maxObservers do
+	while utils.lengthOfTable(prescribedObserversLookup) < epochs.getSettings().maxObservers do
 		local hashString = crypto.utils.array.toString(hash)
 		local random = crypto.random(nil, nil, hashString) / 0xffffffff
 		local cumulativeNormalizedCompositeWeight = 0
 		for _, observer in ipairs(filteredObservers) do
-			local alreadyPrescribed = prescribedObserversAddressesLookup[observer.gatewayAddress]
-
+			local alreadyPrescribed = prescribedObserversLookup[observer.observerAddress]
 			-- add only if observer has not already been prescribed
 			if not alreadyPrescribed then
 				-- add the observers normalized composite weight to the cumulative weight
@@ -278,7 +311,7 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 					+ observer.normalizedCompositeWeight
 				-- if the random value is less than the cumulative weight, we have found our observer
 				if random <= cumulativeNormalizedCompositeWeight then
-					prescribedObserversAddressesLookup[observer.gatewayAddress] = true
+					prescribedObserversLookup[observer.observerAddress] = observer.gatewayAddress
 					break
 				end
 			end
@@ -287,22 +320,8 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 		local newHash = crypto.utils.stream.fromArray(hash)
 		hash = crypto.digest.sha2_256(newHash).asBytes()
 	end
-	local prescribedObservers = {}
-	local filteredObserversAddressMap = utils.reduce(filteredObservers, function(acc, _, observer)
-		acc[observer.gatewayAddress] = observer
-		return acc
-	end, {})
-	for address, _ in pairs(prescribedObserversAddressesLookup) do
-		table.insert(prescribedObservers, filteredObserversAddressMap[address])
-	end
-
-	-- sort them in place
-	table.sort(prescribedObservers, function(a, b)
-		return a.normalizedCompositeWeight > b.normalizedCompositeWeight -- sort by descending weight
-	end)
-
 	-- return the prescribed observers and the weighted observers
-	return prescribedObservers, weightedGateways
+	return prescribedObserversLookup, weightedGateways
 end
 
 --- Gets the epoch timestamps for an epoch index
@@ -433,17 +452,13 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 		"Observations for the current epoch cannot be submitted before: " .. epochDistributionTimestamp
 	)
 
-	local prescribedObservers = epochs.getPrescribedObserversForEpoch(epochIndex)
-	assert(#prescribedObservers > 0, "No prescribed observers for the current epoch.")
+	local prescribedObserversLookup = epochs.getPrescribedObserversForEpoch(epochIndex)
+	assert(utils.lengthOfTable(prescribedObserversLookup) > 0, "No prescribed observers for the current epoch.")
 
-	local observerIndex = utils.findInArray(prescribedObservers, function(prescribedObserver)
-		return prescribedObserver.observerAddress == observerAddress
-	end)
+	local gatewayAddressForObserver = prescribedObserversLookup[observerAddress]
+	assert(gatewayAddressForObserver, "Caller is not a prescribed observer for the current epoch.")
 
-	local observer = prescribedObservers[observerIndex]
-	assert(observer, "Caller is not a prescribed observer for the current epoch.")
-
-	local observingGateway = gar.getGateway(observer.gatewayAddress)
+	local observingGateway = gar.getGateway(gatewayAddressForObserver)
 	assert(observingGateway, "The associated gateway not found in the registry.")
 
 	local epoch = epochs.getEpoch(epochIndex)
@@ -503,20 +518,17 @@ end
 
 --- Computes the total eligible rewards for an epoch based on the protocol balance and the reward percentage and prescribed observers
 --- @param epochIndex number The epoch index
---- @param prescribedObservers WeightedGateway[] The prescribed observers for the epoch
+--- @param prescribedObserversLookup table<WalletAddress, WalletAddress> The prescribed observers for the epoch
 --- @return ComputedRewards # The total eligible rewards
-function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
+function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObserversLookup)
 	local epochStartTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 	local activeGatewayAddresses = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
 	local protocolBalance = balances.getBalance(ao.id)
 	local rewardRate = epochs.getRewardRateForEpoch(epochIndex)
 	local totalEligibleRewards = math.floor(protocolBalance * rewardRate)
 	local eligibleGatewayReward = math.floor(totalEligibleRewards * 0.90 / #activeGatewayAddresses) -- TODO: make these setting variables
-	local eligibleObserverReward = math.floor(totalEligibleRewards * 0.10 / #prescribedObservers) -- TODO: make these setting variables
-	local prescribedObserversLookup = utils.reduce(prescribedObservers, function(acc, _, observer)
-		acc[observer.observerAddress] = true
-		return acc
-	end, {})
+	local eligibleObserverReward =
+		math.floor(totalEligibleRewards * 0.10 / utils.lengthOfTable(prescribedObserversLookup)) -- TODO: make these setting variables
 	-- compute for each gateway what their potential rewards are and for their delegates
 	local potentialRewards = {}
 	-- use ipairs as activeGatewayAddresses is an array
@@ -590,14 +602,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	end
 
 	local eligibleGatewaysForEpoch = epochs.getEligibleRewardsForEpoch(epochIndex)
-	local prescribedObserversLookup = utils.reduce(
-		epochs.getPrescribedObserversForEpoch(epochIndex),
-		function(acc, _, observer)
-			acc[observer.observerAddress] = true
-			return acc
-		end,
-		{}
-	)
+	local prescribedObserversLookup = epochs.getPrescribedObserversForEpoch(epochIndex)
 	local totalObservationsSubmitted = utils.lengthOfTable(epoch.observations.reports) or 0
 
 	-- get the eligible rewards for the epoch

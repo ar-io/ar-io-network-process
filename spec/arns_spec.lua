@@ -767,6 +767,35 @@ describe("arns", function()
 				assert.is_false(status)
 				assert.match("Name must be extended before it can be reassigned", error)
 			end)
+
+			it("should not allow reassigning names during the grace period", function()
+				-- Setup record in grace period
+				_G.NameRegistry.records["test-name"] = {
+					endTimestamp = 123456789,
+					processId = testProcessId,
+					purchasePrice = 600000000,
+					startTimestamp = 0,
+					type = "lease",
+					undernameLimit = 10,
+				}
+
+				-- Attempt to reassign
+				local newProcessId = "test-this-is-valid-arweave-wallet-address-2"
+				local status, error = pcall(
+					arns.reassignName,
+					"test-name",
+					testProcessId,
+					-- Just before the grace period ends
+					123456789
+						+ constants.gracePeriodMs
+						- 1,
+					newProcessId
+				)
+
+				-- Assertions
+				assert.is_false(status)
+				assert.match("Name must be extended before it can be reassigned", error)
+			end)
 		end)
 	end
 
