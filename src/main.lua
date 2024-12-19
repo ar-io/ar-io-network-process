@@ -116,7 +116,7 @@ local ActionMap = {
 	PrimaryName = "Primary-Name",
 }
 
---- @param msg Message
+--- @param msg ParsedMessage
 --- @param response any
 local function Send(msg, response)
 	if msg.reply then
@@ -158,8 +158,8 @@ local function adjustSuppliesForFundingPlan(fundingPlan, rewardForInitiator)
 	LastKnownCirculatingSupply = LastKnownCirculatingSupply - fundingPlan.balance + rewardForInitiator
 end
 
---- @param ioEvent table
---- @param result BuyRecordResult|RecordInteractionResult
+--- @param ioEvent IOEvent
+--- @param result BuyRecordResult|RecordInteractionResult|CreatePrimaryNameResult|PrimaryNameRequestApproval
 local function addResultFundingPlanFields(ioEvent, result)
 	ioEvent:addFieldsWithPrefixIfExist(result.fundingPlan, "FP-", { "balance" })
 	local fundingPlanVaultsCount = 0
@@ -200,7 +200,7 @@ local function addResultFundingPlanFields(ioEvent, result)
 	adjustSuppliesForFundingPlan(result.fundingPlan, result.returnedName and result.returnedName.rewardForInitiator)
 end
 
---- @param ioEvent table
+--- @param ioEvent IOEvent
 ---@param result RecordInteractionResult|BuyRecordResult
 local function addRecordResultFields(ioEvent, result)
 	ioEvent:addFieldsIfExist(result, {
@@ -323,7 +323,7 @@ local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
 	end
 end
 
---- @param ioEvent table
+--- @param ioEvent IOEvent
 local function addNextPruneTimestampsData(ioEvent)
 	ioEvent:addField("Next-Returned-Names-Prune-Timestamp", arns.nextReturnedNamesPruneTimestamp())
 	ioEvent:addField("Next-Epochs-Prune-Timestamp", epochs.nextEpochsPruneTimestamp())
@@ -334,7 +334,7 @@ local function addNextPruneTimestampsData(ioEvent)
 	ioEvent:addField("Next-Primary-Names-Prune-Timestamp", primaryNames.nextPrimaryNamesPruneTimestamp())
 end
 
---- @param ioEvent table
+--- @param ioEvent IOEvent
 --- @param prunedStateResult PruneStateResult
 local function addNextPruneTimestampsResults(ioEvent, prunedStateResult)
 	--- @type PrunedGatewaysResult
@@ -368,13 +368,13 @@ local function assertValidFundFrom(fundFrom)
 	assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stakes")
 end
 
---- @param ioEvent table
+--- @param ioEvent IOEvent
 local function addPrimaryNameCounts(ioEvent)
 	ioEvent:addField("Total-Primary-Names", utils.lengthOfTable(primaryNames.getUnsafePrimaryNames()))
 	ioEvent:addField("Total-Primary-Name-Requests", utils.lengthOfTable(primaryNames.getUnsafePrimaryNameRequests()))
 end
 
---- @param ioEvent table
+--- @param ioEvent IOEvent
 --- @param primaryNameResult CreatePrimaryNameResult|PrimaryNameRequestApproval
 local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
 	ioEvent:addFieldsIfExist(primaryNameResult, { "baseNameOwner" })
@@ -408,14 +408,20 @@ local function updateLastKnownMessage(msg)
 	end
 end
 
+--- @alias IOEvent table -- TODO: Type this
+
 --- @class ParsedMessage
 --- @field Id string
+--- @field Action string
 --- @field From string
---- @field Timestamp number
+--- @field Timestamp Timestamp
 --- @field Tags table<string, any>
+--- @field ioEvent IOEvent
+--- @field Cast boolean?
+--- @field reply? fun(response: any)
 
 --- @param handlerName string
---- @param pattern fun():string
+--- @param pattern fun(msg: ParsedMessage):'continue'|boolean
 --- @param handleFn fun(msg: ParsedMessage)
 --- @param critical boolean?
 --- @param printEvent boolean?
@@ -563,7 +569,7 @@ end, function(msg)
 		addSupplyData(msg.ioEvent)
 	end
 
-	return prunedStateResult
+	-- return prunedStateResult -- TODO: need to return?
 end, CRITICAL, false)
 
 -- Write handlers
