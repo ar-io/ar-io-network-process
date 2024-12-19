@@ -1823,7 +1823,6 @@ function gar.redelegateStake(params)
 		"This Gateway does not allow this delegate to stake."
 	)
 
-	local previousRedelegations = gar.getRedelegation(delegateAddress)
 	local redelegationFeeRate = gar.getRedelegationFee(delegateAddress).redelegationFeeRate
 	local redelegationFee = math.ceil(stakeToTakeFromSource * (redelegationFeeRate / 100))
 	local stakeToDelegate = stakeToTakeFromSource - redelegationFee
@@ -1889,27 +1888,27 @@ function gar.redelegateStake(params)
 		end
 	end
 
-	local existingTargetDelegate = targetGateway.delegates[delegateAddress]
-	local minimumStakeForGatewayAndDelegate
-	if existingTargetDelegate and existingTargetDelegate.delegatedStake ~= 0 then
-		-- It already has a stake that is not zero
-		minimumStakeForGatewayAndDelegate = 1 -- Delegate must provide at least one additional mARIO
-	else
-		-- Consider if the operator increases the minimum amount after you've already staked
-		minimumStakeForGatewayAndDelegate = targetGateway.settings.minDelegatedStake
-	end
-
-	-- Check if the delegate has enough stake to redelegate
-	assert(
-		stakeToDelegate >= minimumStakeForGatewayAndDelegate,
-		"Quantity must be greater than the minimum delegated stake amount."
-	)
-
 	-- The stake can now be applied to the targetGateway
 	if targetAddress == delegateAddress then
 		-- move the stake to the operator's stake
 		targetGateway.operatorStake = targetGateway.operatorStake + stakeToDelegate
 	else
+		local existingTargetDelegate = targetGateway.delegates[delegateAddress]
+		local minimumStakeForGatewayAndDelegate
+		if existingTargetDelegate and existingTargetDelegate.delegatedStake ~= 0 then
+			-- It already has a stake that is not zero
+			minimumStakeForGatewayAndDelegate = 1 -- Delegate must provide at least one additional mARIO
+		else
+			-- Consider if the operator increases the minimum amount after you've already staked
+			minimumStakeForGatewayAndDelegate = targetGateway.settings.minDelegatedStake
+		end
+
+		-- Check if the delegate has enough stake to redelegate
+		assert(
+			stakeToDelegate >= minimumStakeForGatewayAndDelegate,
+			"Quantity must be greater than the minimum delegated stake amount."
+		)
+
 		targetGateway.delegates[delegateAddress] = targetGateway.delegates[delegateAddress]
 			or gar.createDelegateAtGateway(currentTimestamp, targetGateway, delegateAddress)
 		increaseDelegateStakeAtGateway(targetGateway.delegates[delegateAddress], targetGateway, stakeToDelegate)
@@ -1918,6 +1917,7 @@ function gar.redelegateStake(params)
 	-- Move redelegation fee to protocol balance
 	balances.increaseBalance(ao.id, redelegationFee)
 
+	local previousRedelegations = gar.getRedelegation(delegateAddress)
 	local redelegationsSinceFeeReset = (previousRedelegations and previousRedelegations.redelegations or 0) + 1
 
 	-- update the source and target gateways, and the delegator's redelegation fee data
