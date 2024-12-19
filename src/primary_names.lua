@@ -81,6 +81,7 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 
 	local record = arns.getRecord(baseName)
 	assert(record, "ArNS record '" .. baseName .. "' does not exist")
+	assert(arns.recordIsActive(record, timestamp), "ArNS record '" .. baseName .. "' is not active")
 
 	local requestCost = arns.getTokenCost({
 		intent = "Primary-Name-Request",

@@ -1,10 +1,6 @@
 import { handle } from './helpers.mjs';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import {
-  AO_LOADER_HANDLER_ENV,
-  DEFAULT_HANDLE_OPTIONS,
-} from '../tools/constants.mjs';
 
 describe('handlers', async () => {
   it('should maintain order of handlers, with _eval and _default first, followed by prune', async () => {
@@ -21,15 +17,18 @@ describe('handlers', async () => {
     const { Handlers: handlersList } = JSON.parse(handlers.Messages[0].Data);
     assert.ok(handlersList.includes('_eval'));
     assert.ok(handlersList.includes('_default'));
+    assert.ok(handlersList.includes('sanitize'));
     assert.ok(handlersList.includes('prune'));
 
     const evalIndex = handlersList.indexOf('_eval');
     const defaultIndex = handlersList.indexOf('_default');
+    const sanitizeIndex = handlersList.indexOf('sanitize');
     const pruneIndex = handlersList.indexOf('prune');
-    const expectedHandlerCount = 71; // TODO: update this if more handlers are added
+    const expectedHandlerCount = 72; // TODO: update this if more handlers are added
     assert.ok(evalIndex === 0);
     assert.ok(defaultIndex === 1);
-    assert.ok(pruneIndex === 2);
+    assert.ok(sanitizeIndex === 2);
+    assert.ok(pruneIndex === 3);
     assert.ok(
       handlersList.length === expectedHandlerCount,
       'should have ' +
