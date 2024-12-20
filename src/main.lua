@@ -387,7 +387,8 @@ end
 -- Sanitize inputs before every interaction
 local function assertAndSanitizeInputs(msg)
 	assert(
-		msg.Timestamp and tonumber(msg.Timestamp) >= LastKnownMessageTimestamp,
+		-- TODO: replace this with LastKnownMessageTimestamp after node release 23.0.0
+		msg.Timestamp and tonumber(msg.Timestamp) >= 0,
 		"Timestamp must be greater than or equal to the last known message timestamp of "
 			.. LastKnownMessageTimestamp
 			.. " but was "
