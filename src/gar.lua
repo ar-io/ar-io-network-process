@@ -1599,7 +1599,6 @@ function planMinimumStakesDrawdown(fundingPlan, stakingProfile)
 	end
 end
 
--- TODO: return event-worthy data
 --- Reduces all balances and creates withdraw stakes as prescribed by the funding plan
 --- @param fundingPlan table The funding plan to apply
 --- @param msgId string The current message ID

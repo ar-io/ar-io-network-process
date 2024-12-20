@@ -514,34 +514,6 @@ function utils.splitAndTrimString(input, delimiter)
 	return tokens
 end
 
---- Checks if a timestamp is an integer and converts it to milliseconds if it is in seconds
---- @param timestamp number The timestamp to check and convert
---- @return number timestampInMs - the timestamp in milliseconds
-function utils.checkAndConvertTimestampToMs(timestamp)
-	-- Check if the timestamp is an integer
-	assert(type(timestamp) == "number", "Timestamp must be a number")
-	assert(utils.isInteger(timestamp), "Timestamp must be an integer")
-
-	-- Define the plausible range for Unix timestamps in seconds
-	local min_timestamp = 0
-	local max_timestamp = 4102444800 -- Corresponds to 2100-01-01
-
-	if timestamp >= min_timestamp and timestamp <= max_timestamp then
-		-- The timestamp is already in seconds, convert it to milliseconds
-		return timestamp * 1000
-	end
-
-	-- If the timestamp is outside the range for seconds, check for milliseconds
-	local min_timestamp_ms = min_timestamp * 1000
-	local max_timestamp_ms = max_timestamp * 1000
-
-	if timestamp >= min_timestamp_ms and timestamp <= max_timestamp_ms then
-		return timestamp
-	end
-
-	error("Timestamp is out of range")
-end
-
 function utils.reduce(tbl, fn, init)
 	local acc = init
 	local i = 1

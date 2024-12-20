@@ -89,8 +89,9 @@ local ActionMap = {
 	--- ArNS
 	Record = "Record",
 	Records = "Records",
-	BuyRecord = "Buy-Record", -- TODO: standardize these as `Buy-Name` or `Upgrade-Record`
-	UpgradeName = "Upgrade-Name", -- TODO: may be more aligned to `Upgrade-Record`
+	BuyRecord = "Buy-Record", -- TODO: standardize these as `Buy-Name`
+	BuyName = "Buy-Name", -- TODO: standardize these as `Buy-Name`
+	UpgradeName = "Upgrade-Name",
 	ExtendLease = "Extend-Lease",
 	IncreaseUndernameLimit = "Increase-Undername-Limit",
 	ReassignName = "Reassign-Name",
@@ -157,7 +158,7 @@ local function adjustSuppliesForFundingPlan(fundingPlan, rewardForInitiator)
 	LastKnownCirculatingSupply = LastKnownCirculatingSupply - fundingPlan.balance + rewardForInitiator
 end
 
---- @param ioEvent IOEvent
+--- @param ioEvent ARIOEvent
 --- @param result BuyRecordResult|RecordInteractionResult|CreatePrimaryNameResult|PrimaryNameRequestApproval
 local function addResultFundingPlanFields(ioEvent, result)
 	ioEvent:addFieldsWithPrefixIfExist(result.fundingPlan, "FP-", { "balance" })
@@ -199,7 +200,7 @@ local function addResultFundingPlanFields(ioEvent, result)
 	adjustSuppliesForFundingPlan(result.fundingPlan, result.returnedName and result.returnedName.rewardForInitiator)
 end
 
---- @param ioEvent IOEvent
+--- @param ioEvent ARIOEvent
 ---@param result RecordInteractionResult|BuyRecordResult
 local function addRecordResultFields(ioEvent, result)
 	ioEvent:addFieldsIfExist(result, {
@@ -322,7 +323,7 @@ local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
 	end
 end
 
---- @param ioEvent IOEvent
+--- @param ioEvent ARIOEvent
 local function addNextPruneTimestampsData(ioEvent)
 	ioEvent:addField("Next-Returned-Names-Prune-Timestamp", arns.nextReturnedNamesPruneTimestamp())
 	ioEvent:addField("Next-Epochs-Prune-Timestamp", epochs.nextEpochsPruneTimestamp())
@@ -333,7 +334,7 @@ local function addNextPruneTimestampsData(ioEvent)
 	ioEvent:addField("Next-Primary-Names-Prune-Timestamp", primaryNames.nextPrimaryNamesPruneTimestamp())
 end
 
---- @param ioEvent IOEvent
+--- @param ioEvent ARIOEvent
 --- @param prunedStateResult PruneStateResult
 local function addNextPruneTimestampsResults(ioEvent, prunedStateResult)
 	--- @type PrunedGatewaysResult
@@ -367,13 +368,13 @@ local function assertValidFundFrom(fundFrom)
 	assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stakes")
 end
 
---- @param ioEvent IOEvent
+--- @param ioEvent ARIOEvent
 local function addPrimaryNameCounts(ioEvent)
 	ioEvent:addField("Total-Primary-Names", utils.lengthOfTable(primaryNames.getUnsafePrimaryNames()))
 	ioEvent:addField("Total-Primary-Name-Requests", utils.lengthOfTable(primaryNames.getUnsafePrimaryNameRequests()))
 end
 
---- @param ioEvent IOEvent
+--- @param ioEvent ARIOEvent
 --- @param primaryNameResult CreatePrimaryNameResult|PrimaryNameRequestApproval
 local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
 	ioEvent:addFieldsIfExist(primaryNameResult, { "baseNameOwner" })
@@ -408,15 +409,13 @@ local function updateLastKnownMessage(msg)
 	end
 end
 
---- @alias IOEvent table -- TODO: Type this
-
 --- @class ParsedMessage
 --- @field Id string
 --- @field Action string
 --- @field From string
 --- @field Timestamp Timestamp
 --- @field Tags table<string, any>
---- @field ioEvent IOEvent
+--- @field ioEvent ARIOEvent
 --- @field Cast boolean?
 --- @field reply? fun(response: any)
 
@@ -429,7 +428,7 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 	critical = critical or false
 	printEvent = printEvent == nil and true or printEvent
 	Handlers.add(handlerName, pattern, function(msg)
-		-- add an IOEvent to the message if it doesn't exist
+		-- add an ARIOEvent to the message if it doesn't exist
 		msg.ioEvent = msg.ioEvent or ARIOEvent(msg)
 		-- global handler for all eventing errors, so we can log them and send a notice to the sender for non critical errors and discard the memory on critical errors
 		local status, resultOrError = eventingPcall(msg.ioEvent, function(error)
@@ -785,7 +784,7 @@ addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", Actio
 	})
 end)
 
-addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRecord), function(msg)
+local function buyName(msg)
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
 	local purchaseType = msg.Tags["Purchase-Type"] and string.lower(msg.Tags["Purchase-Type"]) or "lease"
 	local years = msg.Tags.Years or nil
@@ -856,7 +855,10 @@ addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap
 			}),
 		})
 	end
-end)
+end
+
+addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRecord), buyName)
+addEventingHandler("buyName", utils.hasMatchingTag("Action", ActionMap.BuyName), buyName)
 
 addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.UpgradeName), function(msg)
 	local fundFrom = msg.Tags["Fund-From"]
@@ -1048,8 +1050,6 @@ addEventingHandler(
 )
 
 addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.JoinNetwork), function(msg)
-	-- TODO: add assertions on all the provided input, although the joinNetwork function will throw an error if the input is invalid
-
 	local updatedSettings = {
 		label = msg.Tags.Label,
 		note = msg.Tags.Note,
@@ -1440,7 +1440,6 @@ addEventingHandler(
 	end
 )
 
--- TODO: Update the UpdateGatewaySettings handler to consider replacing the allowedDelegates list
 addEventingHandler(
 	ActionMap.UpdateGatewaySettings,
 	utils.hasMatchingTag("Action", ActionMap.UpdateGatewaySettings),
@@ -1486,7 +1485,6 @@ addEventingHandler(
 				or msg.Tags["Auto-Stake"] == "true",
 		}
 
-		-- TODO: we could standardize this on our prepended handler to inject and ensure formatted addresses and converted values
 		local observerAddress = msg.Tags["Observer-Address"] or unsafeGateway.observerAddress
 		local result = gar.updateGatewaySettings(
 			msg.From,
@@ -1728,7 +1726,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 		msg.ioEvent:addField("Prescribed-Observers", prescribedObserverAddresses)
 	end
 	if #newDemandFactors > 0 then
-		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors, ";")
+		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors)
 	end
 	if #newPruneGatewaysResults > 0 then
 		-- Reduce the prune gateways results and then track changes
@@ -2085,7 +2083,6 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	assert(record, "Record not found")
 	assert(record.type == "permabuy", "Only permabuy names can be released")
 	assert(record.processId == processId, "Process-Id mismatch")
-	-- TODO: throw an error here instead of allowing release and force removal of primary names? I tend to favor the protection for primary name owners.
 	assert(
 		#primaryNames.getPrimaryNamesForBaseName(name) == 0,
 		"Primary names are associated with this name. They must be removed before releasing the name."
