@@ -85,6 +85,13 @@ jobs:
   monitor:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'yarn'
+
+      - run: yarn --frozen-lockfile
       - run: yarn test:monitor
         env:
           IO_PROCESS_ID: ${{ vars.IO_NETWORK_PROCESS_ID }}
