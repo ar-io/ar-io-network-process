@@ -92,7 +92,7 @@ jobs:
           cache: 'yarn'
 
       - run: yarn --frozen-lockfile
-      - run: yarn test:monitor
+      - run: yarn monitor
         env:
           IO_PROCESS_ID: ${{ vars.IO_NETWORK_PROCESS_ID }}
 
