@@ -2,10 +2,8 @@ local arns = require("arns")
 local balances = require("balances")
 local utils = require("utils")
 local gar = require("gar")
+local constants = require("constants")
 local primaryNames = {}
-
--- TODO: Figure out how to modulate this according to market conditions since it's actual spending
-local ONE_WEEK_IN_MS = 604800000
 
 --- @alias WalletAddress string
 --- @alias ArNSName string
@@ -101,7 +99,7 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 	local request = {
 		name = name,
 		startTimestamp = timestamp,
-		endTimestamp = timestamp + ONE_WEEK_IN_MS,
+		endTimestamp = timestamp + constants.oneWeekMs,
 	}
 
 	--- if the initiator is base name owner, then just set the primary name and return

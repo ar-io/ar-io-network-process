@@ -1,8 +1,12 @@
 local AOEvent = require("ao_event")
 local utils = require("utils")
 
--- TODO: RENAME TO ARIOEvent
--- Convenience factory function for prepopulating analytic and msg fields into AOEvents
+--- @alias ARIOEvent AOEvent
+
+--- Convenience factory function for pre populating analytic and msg fields into AOEvents
+--- @param msg table
+--- @param initialData table<string, any> Optional initial data to populate the event with.
+--- @returns ARIOEvent
 local function ARIOEvent(msg, initialData)
 	local event = AOEvent({
 		Cron = msg.Cron or false,
