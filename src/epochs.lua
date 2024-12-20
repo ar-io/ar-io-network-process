@@ -339,9 +339,10 @@ end
 --- @param timestamp number The timestamp
 --- @return number # 	The epoch index
 function epochs.getEpochIndexForTimestamp(timestamp)
+	local timestampInMS = utils.checkAndConvertTimestampToMs(timestamp)
 	local epochZeroStartTimestamp = epochs.getSettings().epochZeroStartTimestamp
 	local epochLengthMs = epochs.getSettings().durationMs
-	local epochIndex = math.floor((timestamp - epochZeroStartTimestamp) / epochLengthMs)
+	local epochIndex = math.floor((timestampInMS - epochZeroStartTimestamp) / epochLengthMs)
 	return epochIndex
 end
 
