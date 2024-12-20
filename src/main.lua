@@ -1928,7 +1928,7 @@ addEventingHandler(
 			or epochs.getEpochIndexForTimestamp(msg.Timestamp)
 		local epoch = epochs.getEpoch(epochIndex)
 		local prescribedObserversWithWeights
-		-- TODO: this is to support old epochs that have full array of prescribedObservers, we can remove after 14 epochs
+		-- TODO: this is to support old epochs that have full array of prescribedObservers, we can remove after the new epochs are created
 		if
 			epoch.prescribedObservers
 			and epoch.prescribedObservers[1]
