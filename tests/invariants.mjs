@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { getBalances, getVaults, handle } from './helpers.mjs';
+import { ARIOToMARIO, getBalances, getVaults, handle } from './helpers.mjs';
 
 function assertValidBalance(balance, expectedMin = 1) {
   assert(
@@ -85,7 +85,7 @@ async function assertNoTotalSupplyInvariants({ timestamp, memory }) {
   const supplyData = JSON.parse(supplyResult.Messages?.[0]?.Data);
 
   assert.ok(
-    supplyData.total === 1000000000 * 1000000,
+    supplyData.total === ARIOToMARIO(1000000000),
     'total supply should be 1,000,000,000,000,000 mARIO but was ' +
       supplyData.total,
   );

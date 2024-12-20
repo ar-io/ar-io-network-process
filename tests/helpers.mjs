@@ -24,6 +24,9 @@ export const genesisEpochTimestamp = 1719900000000; // Tuesday, July 2, 2024, 06
 export const epochLength = 1000 * 60 * 60 * 24; // 24 hours
 export const distributionDelay = 1000 * 60 * 40; // 40 minutes
 
+export const mARIOPerARIO = 1_000_000;
+export const ARIOToMARIO = (amount) => amount * mARIOPerARIO;
+
 const { handle: originalHandle, memory } = await createAosLoader();
 export const startMemory = memory;
 

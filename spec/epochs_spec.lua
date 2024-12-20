@@ -13,7 +13,7 @@ local testSettings = {
 	delegateRewardShareRatio = 0,
 }
 local startTimestamp = 1704092400000
-local protocolBalance = 500000000 * 1000000
+local protocolBalance = constants.ARIOToMARIO(500000000)
 local hashchain = "NGU1fq_ssL9m6kRbRU1bqiIDBht79ckvAwRMGElkSOg" -- base64 of "some sample hash"
 
 describe("epochs", function()

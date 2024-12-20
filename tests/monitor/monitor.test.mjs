@@ -1,14 +1,9 @@
-import {
-  AOProcess,
-  ARIO,
-  ARIO_DEVNET_PROCESS_ID,
-  ARIO_TESTNET_PROCESS_ID,
-  Logger,
-} from '@ar.io/sdk';
+import { AOProcess, ARIO, ARIO_DEVNET_PROCESS_ID, Logger } from '@ar.io/sdk';
 import { connect } from '@permaweb/aoconnect';
 import { strict as assert } from 'node:assert';
 import { describe, it, before, after } from 'node:test';
 import { DockerComposeEnvironment, Wait } from 'testcontainers';
+import { ARIOToMARIO } from '../helpers.mjs';
 
 // set debug level logs for to get detailed messages
 Logger.default.setLogLevel('info');
@@ -144,7 +139,7 @@ describe('setup', () => {
     it('should always be 1 billion ARIO', async () => {
       const supplyData = await io.getTokenSupply();
       assert(
-        supplyData.total === 1000000000 * 1000000,
+        supplyData.total === ARIOToMARIO(1000000000),
         `Total supply is not 1 billion ARIO: ${supplyData.total}`,
       );
       assert(
@@ -230,7 +225,7 @@ describe('setup', () => {
         supplyData.protocolBalance;
       assert(
         supplyData.total === computedTotal &&
-          computedTotal === 1000000000 * 1000000,
+          computedTotal === ARIOToMARIO(1000000000),
         `Computed total supply (${computedTotal}) is not equal to the sum of protocol balance, circulating, locked, staked, and delegated and withdrawn provided by the contract (${supplyData.total}) and does not match the expected total of 1 billion ARIO`,
       );
 
