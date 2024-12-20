@@ -228,11 +228,8 @@ end
 
 local function addReturnedNameResultFields(ioEvent, result)
 	ioEvent:addFieldsIfExist(result, {
-		"bidAmount",
 		"rewardForInitiator",
 		"rewardForProtocol",
-		"startPrice",
-		"floorPrice",
 		"type",
 		"years",
 	})
