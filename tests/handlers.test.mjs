@@ -1,4 +1,4 @@
-import { handle } from './helpers.mjs';
+import { ARIOToMARIO, handle } from './helpers.mjs';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 
@@ -54,7 +54,7 @@ describe('handlers', async () => {
         const tokenSupplyData = JSON.parse(
           tokenSupplyResult.Messages?.[0]?.Data,
         );
-        assert.ok(tokenSupplyData === 1000000000 * 1000000);
+        assert.ok(tokenSupplyData === ARIOToMARIO(1000000000));
       });
     });
 
@@ -83,11 +83,11 @@ describe('handlers', async () => {
         const supplyData = JSON.parse(supplyResult.Messages?.[0]?.Data);
 
         assert.ok(
-          supplyData.total === 1000000000 * 1000000,
+          supplyData.total === ARIOToMARIO(1000000000),
           'total supply should be 1 billion ARIO but was ' + supplyData.total,
         );
         assert.ok(
-          supplyData.circulating === 1000000000 * 1000000 - 50000000000000,
+          supplyData.circulating === ARIOToMARIO(1000000000) - 50000000000000,
           'circulating supply should be 0.95 billion ARIO but was ' +
             supplyData.circulating,
         );

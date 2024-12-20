@@ -9,6 +9,14 @@ constants.oneWeekMs = constants.oneDayMs * 7
 constants.twoWeeksMs = constants.oneWeekMs * 2
 constants.oneYearMs = 31536000 * 1000
 
+constants.mARIOPerARIO = 1000000
+
+--- @param ARIO number
+--- @return mARIO
+function constants.ARIOToMARIO(ARIO)
+	return ARIO * constants.mARIOPerARIO
+end
+
 -- EPOCHS
 constants.defaultEpochDurationMs = constants.oneDayMs
 constants.maximumRewardRate = 0.001
@@ -19,10 +27,9 @@ constants.rewardDecayLastEpoch = 547
 -- GAR
 constants.DEFAULT_UNDERNAME_COUNT = 10
 constants.DEADLINE_DURATION_MS = constants.oneHourMs
-constants.totalTokenSupply = 1000000000 * 1000000 -- 1 billion tokens
+constants.totalTokenSupply = constants.ARIOToMARIO(1000000000) -- 1 billion tokens
 constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.10 -- the minimum penalty rate for an expedited withdrawal (10% of the amount being withdrawn)
 constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.50 -- the maximum penalty rate for an expedited withdrawal (50% of the amount being withdrawn)
-constants.mARIOPerARIO = 1000000
 constants.minimumWithdrawalAmount = constants.mARIOPerARIO -- the minimum amount that can be withdrawn from the GAR
 constants.redelegationFeeResetIntervalMs = constants.defaultEpochDurationMs * 7 -- 7 epochs
 constants.maxDelegateRewardShareRatio = 95 -- 95% of rewards can be shared with delegates
@@ -43,7 +50,7 @@ constants.ANNUAL_PERCENTAGE_FEE = 0.2 -- 20%
 constants.ARNS_NAME_DOES_NOT_EXIST_MESSAGE = "Name not found in the ArNS Registry!"
 constants.UNDERNAME_LEASE_FEE_PERCENTAGE = 0.001
 constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE = 0.005
-constants.PRIMARY_NAME_REQUEST_COST = 10000000 -- 10 ARIO
+constants.PRIMARY_NAME_REQUEST_COST = constants.ARIOToMARIO(10) -- 10 ARIO
 constants.gracePeriodMs = constants.defaultEpochDurationMs * 14 -- 14 epochs
 constants.maxLeaseLengthYears = 5
 constants.returnedNamePeriod = constants.defaultEpochDurationMs * 14 -- 14 epochs
@@ -67,63 +74,63 @@ constants.demandSettings = {
 }
 
 -- VAULTS
-constants.MIN_VAULT_SIZE = 100000000 -- 100 ARIO
+constants.MIN_VAULT_SIZE = constants.ARIOToMARIO(100) -- 100 ARIO
 constants.MAX_TOKEN_LOCK_TIME_MS = 12 * 365 * 24 * 60 * 60 * 1000 -- The maximum amount of blocks tokens can be locked in a vault (12 years of blocks)
 constants.MIN_TOKEN_LOCK_TIME_MS = 14 * 24 * 60 * 60 * 1000 -- The minimum amount of blocks tokens can be locked in a vault (14 days of blocks)
 
 -- ARNS FEES
 constants.genesisFees = {
-	[1] = 2000000000000,
-	[2] = 200000000000,
-	[3] = 40000000000,
-	[4] = 10000000000,
-	[5] = 4000000000,
-	[6] = 2000000000,
-	[7] = 1000000000,
-	[8] = 600000000,
-	[9] = 500000000,
-	[10] = 500000000,
-	[11] = 500000000,
-	[12] = 500000000,
-	[13] = 400000000,
-	[14] = 400000000,
-	[15] = 400000000,
-	[16] = 400000000,
-	[17] = 400000000,
-	[18] = 400000000,
-	[19] = 400000000,
-	[20] = 400000000,
-	[21] = 400000000,
-	[22] = 400000000,
-	[23] = 400000000,
-	[24] = 400000000,
-	[25] = 400000000,
-	[26] = 400000000,
-	[27] = 400000000,
-	[28] = 400000000,
-	[29] = 400000000,
-	[30] = 400000000,
-	[31] = 400000000,
-	[32] = 400000000,
-	[33] = 400000000,
-	[34] = 400000000,
-	[35] = 400000000,
-	[36] = 400000000,
-	[37] = 400000000,
-	[38] = 400000000,
-	[39] = 400000000,
-	[40] = 400000000,
-	[41] = 400000000,
-	[42] = 400000000,
-	[43] = 400000000,
-	[44] = 400000000,
-	[45] = 400000000,
-	[46] = 400000000,
-	[47] = 400000000,
-	[48] = 400000000,
-	[49] = 400000000,
-	[50] = 400000000,
-	[51] = 400000000,
+	[1] = constants.ARIOToMARIO(2000000),
+	[2] = constants.ARIOToMARIO(200000),
+	[3] = constants.ARIOToMARIO(40000),
+	[4] = constants.ARIOToMARIO(10000),
+	[5] = constants.ARIOToMARIO(4000),
+	[6] = constants.ARIOToMARIO(2000),
+	[7] = constants.ARIOToMARIO(1000),
+	[8] = constants.ARIOToMARIO(600),
+	[9] = constants.ARIOToMARIO(500),
+	[10] = constants.ARIOToMARIO(500),
+	[11] = constants.ARIOToMARIO(500),
+	[12] = constants.ARIOToMARIO(500),
+	[13] = constants.ARIOToMARIO(400),
+	[14] = constants.ARIOToMARIO(400),
+	[15] = constants.ARIOToMARIO(400),
+	[16] = constants.ARIOToMARIO(400),
+	[17] = constants.ARIOToMARIO(400),
+	[18] = constants.ARIOToMARIO(400),
+	[19] = constants.ARIOToMARIO(400),
+	[20] = constants.ARIOToMARIO(400),
+	[21] = constants.ARIOToMARIO(400),
+	[22] = constants.ARIOToMARIO(400),
+	[23] = constants.ARIOToMARIO(400),
+	[24] = constants.ARIOToMARIO(400),
+	[25] = constants.ARIOToMARIO(400),
+	[26] = constants.ARIOToMARIO(400),
+	[27] = constants.ARIOToMARIO(400),
+	[28] = constants.ARIOToMARIO(400),
+	[29] = constants.ARIOToMARIO(400),
+	[30] = constants.ARIOToMARIO(400),
+	[31] = constants.ARIOToMARIO(400),
+	[32] = constants.ARIOToMARIO(400),
+	[33] = constants.ARIOToMARIO(400),
+	[34] = constants.ARIOToMARIO(400),
+	[35] = constants.ARIOToMARIO(400),
+	[36] = constants.ARIOToMARIO(400),
+	[37] = constants.ARIOToMARIO(400),
+	[38] = constants.ARIOToMARIO(400),
+	[39] = constants.ARIOToMARIO(400),
+	[40] = constants.ARIOToMARIO(400),
+	[41] = constants.ARIOToMARIO(400),
+	[42] = constants.ARIOToMARIO(400),
+	[43] = constants.ARIOToMARIO(400),
+	[44] = constants.ARIOToMARIO(400),
+	[45] = constants.ARIOToMARIO(400),
+	[46] = constants.ARIOToMARIO(400),
+	[47] = constants.ARIOToMARIO(400),
+	[48] = constants.ARIOToMARIO(400),
+	[49] = constants.ARIOToMARIO(400),
+	[50] = constants.ARIOToMARIO(400),
+	[51] = constants.ARIOToMARIO(400),
 }
 
 -- General

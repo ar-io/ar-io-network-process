@@ -104,14 +104,14 @@ GatewayRegistrySettings = {
 		maxTenureWeight = 4,
 	},
 	operators = {
-		minStake = 10000 * 1000000, -- 10,000 ARIO
+		minStake = constants.ARIOToMARIO(10000), -- 10,000 ARIO
 		withdrawLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days to lower operator stake
 		leaveLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days that balance will be vaulted
 		failedEpochCountMax = 30, -- number of epochs failed before marked as leaving
 		failedEpochSlashRate = 0.2, -- 20% of stake is returned to protocol balance
 	},
 	delegates = {
-		minStake = 10 * 1000000, -- 10 ARIO
+		minStake = constants.ARIOToMARIO(10), -- 10 ARIO
 		withdrawLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days
 	},
 }

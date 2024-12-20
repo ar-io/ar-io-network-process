@@ -14,8 +14,8 @@ Protocol = Protocol or ao.env.Process.Id
 Balances = Balances or {}
 if not Balances[Protocol] then -- initialize the balance for the process id
 	Balances = {
-		[Protocol] = math.floor(50000000 * 1000000), -- 50M ARIO
-		[Owner] = math.floor(constants.totalTokenSupply - (50000000 * 1000000)), -- 950M ARIO
+		[Protocol] = math.floor(constants.ARIOToMARIO(50000000)), -- 50M ARIO
+		[Owner] = math.floor(constants.totalTokenSupply - (constants.ARIOToMARIO(50000000))), -- 950M ARIO
 	}
 end
 Vaults = Vaults or {}
