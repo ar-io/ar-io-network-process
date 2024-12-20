@@ -3,10 +3,12 @@ import { connect } from '@permaweb/aoconnect';
 import { strict as assert } from 'node:assert';
 import { describe, it, before, after } from 'node:test';
 import { DockerComposeEnvironment, Wait } from 'testcontainers';
-import { ARIOToMARIO } from '../helpers.mjs';
 
 // set debug level logs for to get detailed messages
 Logger.default.setLogLevel('info');
+
+export const mARIOPerARIO = 1_000_000;
+export const ARIOToMARIO = (amount) => amount * mARIOPerARIO;
 
 const processId = process.env.IO_PROCESS_ID || ARIO_DEVNET_PROCESS_ID;
 const io = ARIO.init({

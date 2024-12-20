@@ -82,6 +82,13 @@ jobs:
           IO_PROCESS_ID: ${{ vars.IO_NETWORK_PROCESS_ID }}
           AO_CU_URL: ${{ vars.AO_CU_URL }}
 
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - run: yarn test:monitor
+        env:
+          IO_PROCESS_ID: ${{ vars.IO_NETWORK_PROCESS_ID }}
+
   evolve:
     runs-on: ubuntu-latest
     needs: [integration, unit, sdk, lint]
