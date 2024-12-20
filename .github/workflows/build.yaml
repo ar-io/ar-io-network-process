@@ -79,7 +79,7 @@ jobs:
       - run: yarn test:esm # full e2e integration tests
         working-directory: ./ar-io-sdk
         env:
-          IO_PROCESS_ID: ${{ vars.IO_NETWORK_PROCESS_ID }}
+          ARIO_NETWORK_PROCESS_ID: ${{ vars.ARIO_NETWORK_PROCESS_ID }}
           AO_CU_URL: ${{ vars.AO_CU_URL }}
 
   monitor:
@@ -94,7 +94,7 @@ jobs:
       - run: yarn --frozen-lockfile
       - run: yarn monitor
         env:
-          IO_PROCESS_ID: ${{ vars.IO_NETWORK_PROCESS_ID }}
+          ARIO_NETWORK_PROCESS_ID: ${{ vars.ARIO_NETWORK_PROCESS_ID }}
 
   evolve:
     runs-on: ubuntu-latest
@@ -111,7 +111,7 @@ jobs:
       - run: yarn evolve
         env:
           WALLET: ${{ secrets.WALLET }}
-          IO_NETWORK_PROCESS_ID: ${{ vars.IO_NETWORK_PROCESS_ID }}
+          ARIO_NETWORK_PROCESS_ID: ${{ vars.ARIO_NETWORK_PROCESS_ID }}
           AO_CU_URL: ${{ vars.AO_CU_URL }}
       - name: Notify Success
         if: success()
@@ -134,12 +134,12 @@ jobs:
                 },
                 {
                   "title": "Process ID",
-                  "value": "${{ vars.IO_NETWORK_PROCESS_ID }}",
+                  "value": "${{ vars.ARIO_NETWORK_PROCESS_ID }}",
                   "short": true
                 },
                 {
                   "title": "View on ao.link",
-                  "value": "https://www.ao.link/#/entity/${{ vars.IO_NETWORK_PROCESS_ID }}?tab=source-code",
+                  "value": "https://www.ao.link/#/entity/${{ vars.ARIO_NETWORK_PROCESS_ID }}?tab=source-code",
                   "short": false
                 }
                 ,
@@ -165,7 +165,7 @@ jobs:
                 "fallback": "Failed to update IO Process!",
                 "color": "danger",
                 "title": "Details",
-                "text": 'The IO "${{ github.ref_name == 'main' && 'testnet' || 'devnet' }} Process ( ${{ vars.IO_NETWORK_PROCESS_ID }}) FAILED to update!',
+                "text": 'The IO "${{ github.ref_name == 'main' && 'testnet' || 'devnet' }} Process ( ${{ vars.ARIO_NETWORK_PROCESS_ID }}) FAILED to update!',
                 "fields": [{
                   "title": "Network",
                   "value": "${{ github.ref_name == 'main' && 'testnet' || 'devnet' }}",
@@ -173,7 +173,7 @@ jobs:
                 },
                 {
                   "title": "Process ID",
-                  "value": "${{ vars.IO_NETWORK_PROCESS_ID }}",
+                  "value": "${{ vars.ARIO_NETWORK_PROCESS_ID }}",
                   "short": true
                 },
                 {

@@ -10,7 +10,7 @@ Logger.default.setLogLevel('info');
 export const mARIOPerARIO = 1_000_000;
 export const ARIOToMARIO = (amount) => amount * mARIOPerARIO;
 
-const processId = process.env.IO_PROCESS_ID || ARIO_DEVNET_PROCESS_ID;
+const processId = process.env.ARIO_NETWORK_PROCESS_ID || ARIO_DEVNET_PROCESS_ID;
 const io = ARIO.init({
   process: new AOProcess({
     processId,
