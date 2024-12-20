@@ -1926,7 +1926,18 @@ addEventingHandler(
 	function(msg)
 		local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
 			or epochs.getEpochIndexForTimestamp(msg.Timestamp)
-		local prescribedObserversWithWeights = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
+		local epoch = epochs.getEpoch(epochIndex)
+		local prescribedObserversWithWeights
+		-- TODO: this is to support old epochs that have full array of prescribedObservers, we can remove after the new epochs are created
+		if
+			epoch.prescribedObservers
+			and epoch.prescribedObservers[1]
+			and epoch.prescribedObservers[1].gatewayAddress
+		then
+			prescribedObserversWithWeights = epoch.prescribedObservers
+		else
+			prescribedObserversWithWeights = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
+		end
 		Send(msg, {
 			Target = msg.From,
 			Action = "Prescribed-Observers-Notice",
