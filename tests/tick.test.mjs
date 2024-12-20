@@ -4,8 +4,6 @@ import assert from 'node:assert';
 import {
   DEFAULT_HANDLE_OPTIONS,
   STUB_ADDRESS,
-  validGatewayTags,
-  PROCESS_OWNER,
   PROCESS_ID,
   STUB_TIMESTAMP,
   INITIAL_OPERATOR_STAKE,
@@ -20,9 +18,15 @@ import {
   joinNetwork,
   buyRecord,
   handle,
+  transfer,
   startMemory,
   returnedNamesPeriod,
   totalTokenSupply,
+  getEpoch,
+  tick,
+  saveObservations,
+  getEpochSettings,
+  leaveNetwork,
 } from './helpers.mjs';
 import { assertNoInvariants } from './invariants.mjs';
 
@@ -41,52 +45,23 @@ describe('Tick', async () => {
 
   afterEach(async () => {
     await assertNoInvariants({
-      timestamp: STUB_TIMESTAMP,
+      timestamp: genesisEpochStart + 1000 * 60 * 60 * 24 * 365,
       memory: sharedMemory,
     });
   });
 
-  const transfer = async ({
-    recipient = STUB_ADDRESS,
-    quantity = 100_000_000_000,
-    memory = sharedMemory,
-  } = {}) => {
-    const transferResult = await handle({
-      options: {
-        From: PROCESS_OWNER,
-        Owner: PROCESS_OWNER,
-        Tags: [
-          { name: 'Action', value: 'Transfer' },
-          { name: 'Recipient', value: recipient },
-          { name: 'Quantity', value: quantity },
-          { name: 'Cast', value: false },
-        ],
-      },
-      memory,
-    });
-
-    // assert no error tag
-    const errorTag = transferResult.Messages?.[0]?.Tags?.find(
-      (tag) => tag.Name === 'Error',
-    );
-    assert.strictEqual(errorTag, undefined);
-
-    return transferResult.Memory;
-  };
-
   it('should prune record that are expired and after the grace period and create returned names for them', async () => {
-    let memory = sharedMemory;
-    const buyRecordResult = await handle({
-      options: {
-        Tags: [
-          { name: 'Action', value: 'Buy-Record' },
-          { name: 'Name', value: 'test-name' },
-          { name: 'Purchase-Type', value: 'lease' },
-          { name: 'Years', value: '1' },
-          { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-        ],
-      },
+    const memory = await transfer({
+      recipient: STUB_ADDRESS,
+      quantity: 100_000_000_000,
+      memory: sharedMemory,
+    });
+    const buyRecordResult = await buyRecord({
       memory,
+      name: 'test-name',
+      type: 'lease',
+      from: STUB_ADDRESS,
+      processId: ''.padEnd(43, 'a'),
     });
     const realRecord = await handle({
       options: {
@@ -95,7 +70,7 @@ describe('Tick', async () => {
           { name: 'Name', value: 'test-name' },
         ],
       },
-      memory: buyRecordResult.Memory,
+      memory: buyRecordResult.memory,
     });
     const buyRecordData = JSON.parse(realRecord.Messages[0].Data);
     assert.deepEqual(buyRecordData, {
@@ -110,14 +85,9 @@ describe('Tick', async () => {
     // mock the passage of time and tick with a future timestamp
     const futureTimestamp =
       buyRecordData.endTimestamp + 1000 * 60 * 60 * 24 * 14 + 1;
-    const futureTickResult = await handle({
-      options: {
-        Tags: [
-          { name: 'Action', value: 'Tick' },
-          { name: 'Timestamp', value: futureTimestamp.toString() },
-        ],
-      },
-      memory: buyRecordResult.Memory,
+    const { result: futureTickResult } = await tick({
+      memory: buyRecordResult.memory,
+      timestamp: futureTimestamp,
     });
 
     const tickEvent = JSON.parse(
@@ -136,6 +106,7 @@ describe('Tick', async () => {
           { name: 'Action', value: 'Record' },
           { name: 'Name', value: 'test-name' },
         ],
+        Timestamp: futureTimestamp,
       },
       memory: futureTickResult.Memory,
     });
@@ -164,46 +135,36 @@ describe('Tick', async () => {
       initiator: PROCESS_ID,
       premiumMultiplier: 50,
     });
+    sharedMemory = returnedNameData.Memory;
   });
 
   it('should prune gateways that are expired', async () => {
     const memory = await transfer({
       recipient: STUB_ADDRESS,
       quantity: 100_000_000_000,
+      memory: sharedMemory,
     });
-
-    const joinNetworkResult = await handle({
-      options: {
-        Tags: validGatewayTags(),
-        From: STUB_ADDRESS,
-        Owner: STUB_ADDRESS,
-      },
+    const joinNetworkResult = await joinNetwork({
       memory,
+      address: STUB_ADDRESS,
     });
-
-    // assert no error tag
-    assertNoResultError(joinNetworkResult);
 
     // check the gateway record from contract
     const gateway = await getGateway({
-      memory: joinNetworkResult.Memory,
+      memory: joinNetworkResult.memory,
       address: STUB_ADDRESS,
     });
     assert.deepEqual(gateway.status, 'joined');
 
     // leave the network
-    const leaveNetworkResult = await handle({
-      options: {
-        From: STUB_ADDRESS,
-        Owner: STUB_ADDRESS,
-        Tags: [{ name: 'Action', value: 'Leave-Network' }],
-      },
-      memory: joinNetworkResult.Memory,
+    const leaveNetworkResult = await leaveNetwork({
+      memory: joinNetworkResult.memory,
+      address: STUB_ADDRESS,
     });
 
     // check the gateways status is leaving
     const leavingGateway = await getGateway({
-      memory: leaveNetworkResult.Memory,
+      memory: leaveNetworkResult.memory,
       address: STUB_ADDRESS,
     });
     assert.deepEqual(leavingGateway.status, 'leaving');
@@ -211,23 +172,20 @@ describe('Tick', async () => {
 
     // expedite the timestamp to the future
     const futureTimestamp = leavingGateway.endTimestamp + 1;
-    const futureTick = await handle({
-      options: {
-        Tags: [
-          { name: 'Action', value: 'Tick' },
-          { name: 'Timestamp', value: futureTimestamp.toString() },
-        ],
-      },
-      memory: leaveNetworkResult.Memory,
+    const futureTick = await tick({
+      memory: leaveNetworkResult.memory,
+      timestamp: futureTimestamp,
     });
 
     // check the gateway is pruned
     const prunedGateway = await getGateway({
-      memory: futureTick.Memory,
+      memory: futureTick.memory,
       address: STUB_ADDRESS,
+      timestamp: futureTimestamp,
     });
 
     assert.deepEqual(undefined, prunedGateway);
+    sharedMemory = futureTick.memory;
   });
 
   // vaulting is not working as expected, need to fix before enabling this test
@@ -315,18 +273,16 @@ describe('Tick', async () => {
     );
     // mock the passage of time and tick with a future timestamp
     const futureTimestamp = vaultData.endTimestamp + 1;
-    const futureTick = await handle({
-      options: {
-        Tags: [{ name: 'Action', value: 'Tick' }],
-        Timestamp: futureTimestamp,
-      },
+    const futureTick = await tick({
       memory: createVaultResult.Memory,
+      timestamp: futureTimestamp,
     });
 
     // check the vault is pruned
     const prunedVault = await handle({
       options: {
         Tags: [{ name: 'Action', value: 'Vault' }],
+        Timestamp: futureTimestamp,
       },
       memory: futureTick.Memory,
       shouldAssertNoResultError: false,
@@ -344,11 +300,13 @@ describe('Tick', async () => {
           { name: 'Action', value: 'Balance' },
           { name: 'Target', value: DEFAULT_HANDLE_OPTIONS.Owner },
         ],
+        Timestamp: futureTimestamp,
       },
       memory: futureTick.Memory,
     });
     const balanceData = JSON.parse(ownerBalance.Messages[0].Data);
     assert.equal(balanceData, balanceBeforeData);
+    sharedMemory = ownerBalance.Memory;
   });
 
   /**
@@ -368,6 +326,7 @@ describe('Tick', async () => {
     const initialMemory = await transfer({
       recipient: STUB_ADDRESS,
       quantity: 100_000_000_000,
+      memory: sharedMemory,
     });
 
     const delegateAddress = 'delegate-address-'.padEnd(43, '1');
@@ -401,36 +360,26 @@ describe('Tick', async () => {
     assertNoResultError(newDelegateResult);
 
     // fast forward to the start of the first epoch
-    const epochSettings = await handle({
-      options: {
-        Tags: [{ name: 'Action', value: 'Epoch-Settings' }],
-      },
+    const epochSettings = await getEpochSettings({
+      memory: newDelegateResult.Memory,
+      timestamp: delegateTimestamp,
     });
-    const epochSettingsData = JSON.parse(epochSettings.Messages?.[0]?.Data);
-    const genesisEpochTimestamp = epochSettingsData.epochZeroStartTimestamp;
+    const genesisEpochTimestamp = epochSettings.epochZeroStartTimestamp;
     // now tick to create the first epoch after the epoch start timestamp
     const createEpochTimestamp = genesisEpochTimestamp + 1;
-    const newEpochTick = await handle({
-      options: {
-        Timestamp: createEpochTimestamp, // one millisecond after the epoch start timestamp, should create the epoch and set the prescribed observers and names
-        Tags: [
-          { name: 'Action', value: 'Tick' },
-          { name: 'Force-Prune', value: 'true' }, // simply exercise this though it's not critical to the test
-        ],
-      },
+    const newEpochTick = await tick({
       memory: newDelegateResult.Memory,
+      timestamp: createEpochTimestamp,
+      forcePrune: true,
     });
 
     // assert no error tag
     assertNoResultError(newEpochTick);
 
     // assert the new epoch is created
-    const epoch = await handle({
-      options: {
-        Timestamp: createEpochTimestamp, // one millisecond after the epoch start timestamp
-        Tags: [{ name: 'Action', value: 'Epoch' }],
-      },
-      memory: newEpochTick.Memory,
+    const epochData = await getEpoch({
+      memory: newEpochTick.memory,
+      timestamp: createEpochTimestamp,
     });
 
     // get the epoch timestamp and assert it is in 24 hours
@@ -442,7 +391,6 @@ describe('Tick', async () => {
       (totalGatewayRewards + totalObserverRewards) / 1; // only one gateway in the network
     const expectedGatewayOperatorReward = totalEligibleGatewayRewards * 0.75; // 75% of the eligible rewards go to the operator
     const expectedGatewayDelegateReward = totalEligibleGatewayRewards * 0.25; // 25% of the eligible rewards go to the delegates
-    const epochData = JSON.parse(epoch.Messages[0].Data);
     assert.deepStrictEqual(epochData, {
       epochIndex: 0,
       startHeight: 1,
@@ -456,19 +404,18 @@ describe('Tick', async () => {
       },
       prescribedObservers: [
         {
-          // TODO: we could just return the addresses here
           observerAddress: STUB_ADDRESS,
-          observerRewardRatioWeight: 1,
-          normalizedCompositeWeight: 1,
-          gatewayRewardRatioWeight: 1,
           gatewayAddress: STUB_ADDRESS,
-          stake: INITIAL_OPERATOR_STAKE * 3,
-          tenureWeight: 4,
-          compositeWeight: 12,
-          startTimestamp: 21600000,
           stakeWeight: 3,
+          gatewayRewardRatioWeight: 1,
+          observerRewardRatioWeight: 1,
+          compositeWeight: 12,
+          normalizedCompositeWeight: 1,
+          tenureWeight: 4,
+          stake: INITIAL_OPERATOR_STAKE,
+          startTimestamp: STUB_TIMESTAMP,
         },
-      ], // the only gateway in the network
+      ],
       prescribedNames: [], // no names in the network
       distributions: {
         totalEligibleGateways: 1,
@@ -491,20 +438,11 @@ describe('Tick', async () => {
     // have the gateway submit an observation
     const reportTxId = 'report-tx-id-'.padEnd(43, '1');
     const observationTimestamp = createEpochTimestamp + 7 * 1000 * 60 * 60; // 7 hours after the epoch start timestamp
-    const observation = await handle({
-      options: {
-        From: STUB_ADDRESS,
-        Owner: STUB_ADDRESS,
-        Timestamp: observationTimestamp,
-        Tags: [
-          { name: 'Action', value: 'Save-Observations' },
-          {
-            name: 'Report-Tx-Id',
-            value: reportTxId,
-          },
-        ],
-      },
-      memory: epoch.Memory,
+    const observation = await saveObservations({
+      memory: newEpochTick.memory,
+      timestamp: observationTimestamp,
+      from: STUB_ADDRESS,
+      reportTxId,
     });
 
     // assert no error tag
@@ -512,33 +450,21 @@ describe('Tick', async () => {
 
     // now jump ahead to the epoch distribution timestamp
     const distributionTimestamp = epochData.distributionTimestamp;
-    const distributionTick = await handle({
-      options: {
-        Tags: [{ name: 'Action', value: 'Tick' }],
-        Timestamp: distributionTimestamp,
-      },
-      memory: observation.Memory,
+    const distributionTick = await tick({
+      memory: observation.memory,
+      timestamp: distributionTimestamp,
     });
 
     // assert no error tag
     assertNoResultError(distributionTick);
 
-    // check the rewards were distributed correctly
-    const rewards = await handle({
-      options: {
-        Timestamp: distributionTimestamp,
-        Tags: [
-          { name: 'Action', value: 'Epoch' },
-          {
-            name: 'Epoch-Index',
-            value: '0',
-          },
-        ],
-      },
-      memory: distributionTick.Memory,
+    // check the rewards were distributed correctly and weights are updated
+    const distributedEpochData = await getEpoch({
+      memory: distributionTick.memory,
+      timestamp: distributionTimestamp,
+      epochIndex: 0,
     });
 
-    const distributedEpochData = JSON.parse(rewards.Messages[0].Data);
     assert.deepStrictEqual(distributedEpochData, {
       ...epochData,
       distributions: {
@@ -559,21 +485,27 @@ describe('Tick', async () => {
           [STUB_ADDRESS]: reportTxId,
         },
       },
+      prescribedObservers: [
+        {
+          ...epochData.prescribedObservers[0],
+          stake: INITIAL_OPERATOR_STAKE + expectedGatewayOperatorReward,
+          compositeWeight: 22,
+          stakeWeight: 5.5,
+        },
+      ],
     });
     // assert the new epoch was created
-    const newEpoch = await handle({
-      options: {
-        Tags: [{ name: 'Action', value: 'Epoch' }],
-        Timestamp: distributionTimestamp,
-      },
-      memory: distributionTick.Memory,
+    const newEpoch = await getEpoch({
+      memory: distributionTick.memory,
+      timestamp: distributionTimestamp,
+      epochIndex: 1,
     });
-    const newEpochData = JSON.parse(newEpoch.Messages[0].Data);
-    assert.equal(newEpochData.epochIndex, 1);
+    assert.equal(newEpoch.epochIndex, 1);
     // assert the gateway stakes were updated and match the distributed rewards
     const gateway = await getGateway({
-      memory: distributionTick.Memory,
+      memory: distributionTick.memory,
       address: STUB_ADDRESS,
+      timestamp: distributionTimestamp,
     });
     assert.deepStrictEqual(gateway, {
       status: 'joined',
@@ -613,8 +545,9 @@ describe('Tick', async () => {
     });
 
     const delegateItems = await getDelegatesItems({
-      memory: distributionTick.Memory,
+      memory: distributionTick.memory,
       gatewayAddress: STUB_ADDRESS,
+      timestamp: distributionTimestamp,
     });
     assert.deepEqual(delegateItems, [
       {
@@ -623,6 +556,7 @@ describe('Tick', async () => {
         address: delegateAddress,
       },
     ]);
+    sharedMemory = distributionTick.memory;
   });
 
   it('should not increase demandFactor and baseRegistrationFee when records are bought until the end of the epoch', async () => {
@@ -651,6 +585,7 @@ describe('Tick', async () => {
       recipient: fundedUser,
       quantity: 100_000_000_000_000,
       memory: genesisEpochTick.Memory,
+      timestamp: genesisEpochStart,
     });
 
     // Buy records in this epoch
@@ -662,6 +597,7 @@ describe('Tick', async () => {
         name: `test-name-${i}`,
         purchaseType: 'permabuy',
         processId: processId,
+        timestamp: genesisEpochStart,
       });
       buyRecordMemory = buyRecordResult.Memory;
     }
@@ -709,6 +645,7 @@ describe('Tick', async () => {
       timestamp: firstEpochEndTimestamp + 1,
     });
     assert.equal(firstEpochEndDemandFactorResult, 1.0500000000000000444);
+    sharedMemory = firstEpochEndTick.Memory;
   });
 
   it('should reset to baseRegistrationFee when demandFactor is 0.5 for consecutive epochs', async () => {
@@ -731,17 +668,11 @@ describe('Tick', async () => {
     // Tick to the epoch where demandFactor is 0.5
     for (let i = 0; i <= 49; i++) {
       const epochTimestamp = genesisEpochStart + (epochDurationMs + 1) * i;
-      const { Memory } = await handle({
-        options: {
-          Tags: [
-            { name: 'Action', value: 'Tick' },
-            { name: 'Timestamp', value: epochTimestamp.toString() },
-          ],
-          Timestamp: epochTimestamp,
-        },
+      const { result: tickResult } = await tick({
         memory: tickMemory,
+        timestamp: epochTimestamp,
       });
-      tickMemory = Memory;
+      tickMemory = tickResult.Memory;
 
       if (i === 45) {
         const demandFactor = await getDemandFactor({
@@ -773,5 +704,6 @@ describe('Tick', async () => {
 
     assert.equal(demandFactorAfterFeeAdjustment, 1);
     assert.equal(baseFeeAfterConsecutiveTicksWithNoPurchases, 300_000_000);
+    sharedMemory = tickMemory;
   });
 });

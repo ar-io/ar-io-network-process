@@ -1,11 +1,17 @@
-import { AOProcess, IO, IO_TESTNET_PROCESS_ID } from '@ar.io/sdk';
+import { AOProcess, ARIO, ARIO_DEVNET_PROCESS_ID, Logger } from '@ar.io/sdk';
 import { connect } from '@permaweb/aoconnect';
 import { strict as assert } from 'node:assert';
 import { describe, it, before, after } from 'node:test';
 import { DockerComposeEnvironment, Wait } from 'testcontainers';
 
-const processId = process.env.IO_PROCESS_ID || IO_TESTNET_PROCESS_ID;
-const io = IO.init({
+// set debug level logs for to get detailed messages
+Logger.default.setLogLevel('info');
+
+export const mARIOPerARIO = 1_000_000;
+export const ARIOToMARIO = (amount) => amount * mARIOPerARIO;
+
+const processId = process.env.ARIO_NETWORK_PROCESS_ID || ARIO_DEVNET_PROCESS_ID;
+const io = ARIO.init({
   process: new AOProcess({
     processId,
     ao: connect({
@@ -65,10 +71,13 @@ describe('setup', () => {
       );
       const evalIndex = handlersList.indexOf('_eval');
       const defaultIndex = handlersList.indexOf('_default');
+      const sanitizeIndex = handlersList.indexOf('sanitize');
       const pruneIndex = handlersList.indexOf('prune');
       assert(
-        pruneIndex > evalIndex && pruneIndex === defaultIndex + 1,
-        `Prune index (${pruneIndex}) is not the first handler after _default (${defaultIndex + 1})`,
+        pruneIndex === sanitizeIndex + 1 &&
+          sanitizeIndex === defaultIndex + 1 &&
+          defaultIndex === evalIndex + 1,
+        `Prune index (${pruneIndex}) and sanitize index (${sanitizeIndex}) are not the first and second handlers after _default (${handlersList})`,
       );
     });
   });
@@ -132,7 +141,7 @@ describe('setup', () => {
     it('should always be 1 billion ARIO', async () => {
       const supplyData = await io.getTokenSupply();
       assert(
-        supplyData.total === 1000000000 * 1000000,
+        supplyData.total === ARIOToMARIO(1000000000),
         `Total supply is not 1 billion ARIO: ${supplyData.total}`,
       );
       assert(
@@ -218,7 +227,7 @@ describe('setup', () => {
         supplyData.protocolBalance;
       assert(
         supplyData.total === computedTotal &&
-          computedTotal === 1000000000 * 1000000,
+          computedTotal === ARIOToMARIO(1000000000),
         `Computed total supply (${computedTotal}) is not equal to the sum of protocol balance, circulating, locked, staked, and delegated and withdrawn provided by the contract (${supplyData.total}) and does not match the expected total of 1 billion ARIO`,
       );
 
@@ -353,7 +362,7 @@ describe('setup', () => {
         (Date.now() - epochZeroStartTimestamp) / durationMs,
       );
 
-      let cursor = '';
+      let cursor = undefined;
       let totalGateways = 0;
       const uniqueGateways = new Set();
       do {
@@ -532,7 +541,7 @@ describe('setup', () => {
       );
 
       const testLogicPromise = (async () => {
-        let cursor = '';
+        let cursor = undefined;
         let totalArns = 0;
         const uniqueNames = new Set();
         do {

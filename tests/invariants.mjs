@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { getBalances, getVaults, handle } from './helpers.mjs';
+import { ARIOToMARIO, getBalances, getVaults, handle } from './helpers.mjs';
 
 function assertValidBalance(balance, expectedMin = 1) {
   assert(
@@ -25,7 +25,7 @@ function assertValidTimestampsAtTimestamp({
   );
   assert(
     endTimestamp === null || endTimestamp > startTimestamp,
-    `Invariant violated: endTimestamp of ${endTimestamp} for vault ${address}`,
+    `Invariant violated: endTimestamp of ${endTimestamp} is not greater than startTimestamp ${startTimestamp}`,
   );
 }
 
@@ -45,6 +45,7 @@ async function assertNoBalanceVaultInvariants({ timestamp, memory }) {
   const { result } = await getVaults({
     memory,
     limit: 1_000_000, // egregiously large limit to make sure we get them all
+    timestamp,
   });
 
   for (const vault of JSON.parse(result.Messages?.[0]?.Data).items) {
@@ -84,8 +85,8 @@ async function assertNoTotalSupplyInvariants({ timestamp, memory }) {
   const supplyData = JSON.parse(supplyResult.Messages?.[0]?.Data);
 
   assert.ok(
-    supplyData.total === 1000000000 * 1000000,
-    'total supply should be 1,000,000,000,000,000 mIO but was ' +
+    supplyData.total === ARIOToMARIO(1000000000),
+    'total supply should be 1,000,000,000,000,000 mARIO but was ' +
       supplyData.total,
   );
   assertValidBalance(supplyData.circulating, 0);

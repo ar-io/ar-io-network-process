@@ -9,6 +9,7 @@ import {
   STUB_TIMESTAMP,
   STUB_MESSAGE_ID,
   validGatewayTags,
+  STUB_PROCESS_ID,
 } from '../tools/constants.mjs';
 
 const initialOperatorStake = 100_000_000_000;
@@ -22,6 +23,9 @@ export const returnedNamesPeriod = 1000 * 60 * 60 * 24 * 14; // 14 days
 export const genesisEpochTimestamp = 1719900000000; // Tuesday, July 2, 2024, 06:00:00 AM UTC
 export const epochLength = 1000 * 60 * 60 * 24; // 24 hours
 export const distributionDelay = 1000 * 60 * 40; // 40 minutes
+
+export const mARIOPerARIO = 1_000_000;
+export const ARIOToMARIO = (amount) => amount * mARIOPerARIO;
 
 const { handle: originalHandle, memory } = await createAosLoader();
 export const startMemory = memory;
@@ -39,7 +43,10 @@ export async function handle({
   options = {},
   memory = startMemory,
   shouldAssertNoResultError = true,
+  timestamp = STUB_TIMESTAMP,
 }) {
+  options.Timestamp ??= timestamp;
+
   const result = await originalHandle(
     memory,
     {
@@ -93,14 +100,20 @@ export function assertValidSupplyEventData(result) {
 }
 
 export const getBalances = async ({ memory, timestamp = STUB_TIMESTAMP }) => {
+  assert(memory, 'Memory is required');
   const result = await handle({
     options: {
       Tags: [{ name: 'Action', value: 'Balances' }],
-      Timestamp: timestamp,
     },
+    timestamp,
     memory,
   });
 
+  const balancesData = result.Messages?.[0]?.Data;
+  if (!balancesData) {
+    const { Memory, ...rest } = result;
+    assert(false, `Something went wrong: ${JSON.stringify(rest, null, 2)}`);
+  }
   const balances = JSON.parse(result.Messages?.[0]?.Data);
   return balances;
 };
@@ -119,6 +132,7 @@ export const transfer = async ({
   quantity = initialOperatorStake,
   memory = startMemory,
   cast = false,
+  timestamp = STUB_TIMESTAMP,
 } = {}) => {
   if (quantity === 0) {
     // Nothing to do
@@ -135,9 +149,11 @@ export const transfer = async ({
         { name: 'Quantity', value: quantity },
         { name: 'Cast', value: cast },
       ],
+      Timestamp: timestamp,
     },
     memory,
   });
+  assertNoResultError(transferResult);
   return transferResult.Memory;
 };
 
@@ -149,11 +165,11 @@ export const joinNetwork = async ({
   tags = validGatewayTags({ observerAddress }),
   quantity = 100_000_000_000,
 }) => {
-  // give them the join network token amount
   const transferMemory = await transfer({
     recipient: address,
     quantity,
     memory,
+    timestamp,
   });
   const joinNetworkResult = await handle({
     options: {
@@ -164,6 +180,7 @@ export const joinNetwork = async ({
     },
     memory: transferMemory,
   });
+  assertNoResultError(joinNetworkResult);
   return {
     memory: joinNetworkResult.Memory,
     result: joinNetworkResult,
@@ -186,6 +203,7 @@ export const setUpStake = async ({
     quantity: transferQty,
     memory,
     cast: true,
+    timestamp,
   });
 
   // Stake a gateway for the user to delegate to
@@ -193,7 +211,7 @@ export const setUpStake = async ({
     memory,
     address: gatewayAddress,
     tags: gatewayTags,
-    timestamp: timestamp - 1,
+    timestamp: timestamp,
   });
   assertNoResultError(joinNetworkResult);
   memory = joinNetworkResult.memory;
@@ -270,17 +288,21 @@ export const getDelegates = async ({
   };
 };
 
-export const getDelegatesItems = async ({ memory, gatewayAddress }) => {
+export const getDelegatesItems = async ({
+  memory,
+  gatewayAddress,
+  timestamp = STUB_TIMESTAMP,
+}) => {
   const { result } = await getDelegates({
     memory,
     from: STUB_ADDRESS,
-    timestamp: STUB_TIMESTAMP,
+    timestamp,
     gatewayAddress,
   });
   return JSON.parse(result.Messages?.[0]?.Data).items;
 };
 
-export const getDelegations = async ({ memory, address }) => {
+export const getDelegations = async ({ memory, address, timestamp }) => {
   const result = await handle({
     options: {
       Tags: [
@@ -289,6 +311,7 @@ export const getDelegations = async ({ memory, address }) => {
       ],
     },
     memory,
+    timestamp,
   });
   return JSON.parse(result.Messages?.[0]?.Data);
 };
@@ -299,6 +322,7 @@ export const getVaults = async ({
   limit,
   sortBy,
   sortOrder,
+  timestamp = STUB_TIMESTAMP,
 }) => {
   const { Memory, ...rest } = await handle({
     options: {
@@ -309,6 +333,7 @@ export const getVaults = async ({
         ...(sortBy ? [{ name: 'Sort-By', value: sortBy }] : []),
         ...(sortOrder ? [{ name: 'Sort-Order', value: sortOrder }] : []),
       ],
+      Timestamp: timestamp,
     },
     memory,
   });
@@ -318,13 +343,18 @@ export const getVaults = async ({
   };
 };
 
-export const getGatewayVaultsItems = async ({ memory, gatewayAddress }) => {
+export const getGatewayVaultsItems = async ({
+  memory,
+  gatewayAddress,
+  timestamp = STUB_TIMESTAMP,
+}) => {
   const gatewayVaultsResult = await handle({
     options: {
       Tags: [
         { name: 'Action', value: 'Paginated-Gateway-Vaults' },
         { name: 'Address', value: gatewayAddress },
       ],
+      Timestamp: timestamp,
     },
     memory,
   });
@@ -422,6 +452,7 @@ export const delegateStake = async ({
     recipient: delegatorAddress,
     quantity,
     memory,
+    timestamp,
   });
 
   const delegateResult = await handle({
@@ -455,8 +486,8 @@ export const getGateway = async ({
         { name: 'Action', value: 'Gateway' },
         { name: 'Address', value: address },
       ],
-      Timestamp: timestamp,
     },
+    timestamp,
     memory,
   });
   const gateway = JSON.parse(gatewayResult.Messages?.[0]?.Data);
@@ -689,7 +720,7 @@ export const buyRecord = async ({
   memory,
   from,
   name,
-  processId,
+  processId = STUB_PROCESS_ID,
   type = 'lease',
   years = 1,
   timestamp = STUB_TIMESTAMP,
@@ -705,10 +736,11 @@ export const buyRecord = async ({
         { name: 'Process-Id', value: processId },
         { name: 'Years', value: `${years}` },
       ],
-      Timestamp: timestamp,
     },
+    timestamp,
     memory,
   });
+  assertNoResultError(buyRecordResult);
   return {
     result: buyRecordResult,
     memory: buyRecordResult.Memory,
@@ -756,4 +788,101 @@ export const totalTokenSupply = async ({ memory, timestamp = 0 }) => {
     },
     memory,
   });
+};
+
+export const tick = async ({
+  memory,
+  timestamp = STUB_TIMESTAMP,
+  forcePrune = false,
+}) => {
+  const tickResult = await handle({
+    options: {
+      Tags: [{ name: 'Action', value: 'Tick' }],
+      Timestamp: timestamp,
+      ...(forcePrune ? { name: 'Force-Prune', value: 'true' } : {}),
+    },
+    memory,
+  });
+  return {
+    memory: tickResult.Memory,
+    result: tickResult,
+  };
+};
+
+export const getEpoch = async ({
+  memory,
+  timestamp = STUB_TIMESTAMP,
+  epochIndex,
+}) => {
+  const epochResult = await handle({
+    options: {
+      Tags: [
+        { name: 'Action', value: 'Epoch' },
+        ...(epochIndex !== undefined
+          ? [{ name: 'Epoch-Index', value: epochIndex }]
+          : []),
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  assertNoResultError(epochResult);
+  return JSON.parse(epochResult.Messages[0].Data);
+};
+
+export const getPrescribedObservers = async ({
+  memory,
+  timestamp = STUB_TIMESTAMP,
+  epochIndex,
+}) => {
+  const prescribedObserversResult = await handle({
+    options: {
+      Tags: [
+        { name: 'Action', value: 'Epoch-Prescribed-Observers' },
+        ...(epochIndex !== undefined
+          ? [{ name: 'Epoch-Index', value: epochIndex }]
+          : []),
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  assertNoResultError(prescribedObserversResult);
+  return JSON.parse(prescribedObserversResult.Messages[0].Data);
+};
+
+export const getPrescribedNames = async ({
+  memory,
+  timestamp = STUB_TIMESTAMP,
+  epochIndex,
+}) => {
+  const prescribedNamesResult = await handle({
+    options: {
+      Tags: [
+        { name: 'Action', value: 'Epoch-Prescribed-Names' },
+        ...(epochIndex !== undefined
+          ? [{ name: 'Epoch-Index', value: epochIndex }]
+          : []),
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  assertNoResultError(prescribedNamesResult);
+  return JSON.parse(prescribedNamesResult.Messages[0].Data);
+};
+
+export const getEpochSettings = async ({
+  memory,
+  timestamp = STUB_TIMESTAMP,
+}) => {
+  const epochSettingsResult = await handle({
+    options: {
+      Tags: [{ name: 'Action', value: 'Epoch-Settings' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  assertNoResultError(epochSettingsResult);
+  return JSON.parse(epochSettingsResult.Messages[0].Data);
 };
