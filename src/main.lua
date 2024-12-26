@@ -2281,24 +2281,29 @@ addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", Act
 	local isStakeMovingFromDelegateToOperator = delegateAddress == targetAddress
 	local isStakeMovingFromOperatorToDelegate = delegateAddress == sourceAddress
 	local isStakeMovingFromWithdrawal = vaultId ~= nil
+	if isStakeMovingFromWithdrawal then
+		LastKnownWithdrawSupply = LastKnownWithdrawSupply - quantity
+	end
 
 	if isStakeMovingFromDelegateToOperator then
-		if isStakeMovingFromWithdrawal then
-			LastKnownWithdrawSupply = LastKnownWithdrawSupply - stakeMoved
-		else
-			LastKnownDelegatedSupply = LastKnownDelegatedSupply - stakeMoved
+		if not isStakeMovingFromWithdrawal then
+			LastKnownDelegatedSupply = LastKnownDelegatedSupply - quantity
 		end
 		LastKnownStakedSupply = LastKnownStakedSupply + stakeMoved
 	elseif isStakeMovingFromOperatorToDelegate then
-		if isStakeMovingFromWithdrawal then
-			LastKnownWithdrawSupply = LastKnownWithdrawSupply + stakeMoved
-		else
-			LastKnownStakedSupply = LastKnownStakedSupply - stakeMoved
+		if not isStakeMovingFromWithdrawal then
+			LastKnownStakedSupply = LastKnownStakedSupply - quantity
 		end
 		LastKnownDelegatedSupply = LastKnownDelegatedSupply + stakeMoved
+	elseif isStakeMovingFromWithdrawal then
+		LastKnownStakedSupply = LastKnownStakedSupply + stakeMoved
+		-- else
+		-- Stake is simply moving from one delegation to another
 	end
 
-	LastKnownCirculatingSupply = LastKnownCirculatingSupply - redelegationResult.redelegationFee
+	if redelegationFee > 0 then
+		msg.ioEvent:addField("Redelegation-Fee", redelegationFee)
+	end
 	addSupplyData(msg.ioEvent)
 
 	Send(msg, {
