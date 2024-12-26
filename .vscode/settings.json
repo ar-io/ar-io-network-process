@@ -37,5 +37,11 @@
     "editor.formatOnPaste": true,
     "editor.formatOnSaveMode": "file"
   },
-  "cSpell.words": ["ARIO", "hashchain", "redelegate"]
+  "cSpell.words": [
+    "ARIO",
+    "hashchain",
+    "redelegate",
+    "redelegation",
+    "redelegations"
+  ]
 }

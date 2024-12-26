@@ -1597,6 +1597,7 @@ describe('GatewayRegistry', async () => {
         },
         memory,
       });
+      assertNoResultError(result);
       return {
         result,
         memory: result.Memory,
@@ -1625,13 +1626,15 @@ describe('GatewayRegistry', async () => {
         memory: joinTargetMemory,
       });
 
-      const { memory: delegatedStakeMemory } = await delegateStake({
-        delegatorAddress,
-        quantity: stakeQty,
-        gatewayAddress: sourceAddress,
-        timestamp: STUB_TIMESTAMP,
-        memory: transferMemory,
-      });
+      const { result: delegateStakeResult, memory: delegatedStakeMemory } =
+        await delegateStake({
+          delegatorAddress,
+          quantity: stakeQty,
+          gatewayAddress: sourceAddress,
+          timestamp: STUB_TIMESTAMP,
+          memory: transferMemory,
+        });
+      assertNoResultError(delegateStakeResult);
 
       const sourceGatewayBefore = await getGateway({
         address: sourceAddress,
@@ -1780,14 +1783,16 @@ describe('GatewayRegistry', async () => {
       );
 
       const decreaseStakeMsgId = 'decrease-stake-message-id-'.padEnd(43, 'x');
-      const { memory: decreaseStakeMemory } = await decreaseDelegateStake({
-        memory: delegatedStakeMemory,
-        timestamp: STUB_TIMESTAMP + 1,
-        delegatorAddress,
-        decreaseQty: stakeQty,
-        gatewayAddress: sourceAddress,
-        messageId: decreaseStakeMsgId,
-      });
+      const { result: decreaseStakeResult, memory: decreaseStakeMemory } =
+        await decreaseDelegateStake({
+          memory: delegatedStakeMemory,
+          timestamp: STUB_TIMESTAMP + 1,
+          delegatorAddress,
+          decreaseQty: stakeQty,
+          gatewayAddress: sourceAddress,
+          messageId: decreaseStakeMsgId,
+        });
+      assertNoResultError(decreaseStakeResult);
 
       const { memory: redelegateStakeMemory } = await redelegateStake({
         memory: decreaseStakeMemory,
