@@ -1777,10 +1777,10 @@ end
 --- @field vaultId string | nil # The vault id to redelegate from (optional)
 
 --- @class RedelegateStakeResult
---- @field sourceGateway table # The updated gateway object that the stake was moved from
---- @field targetGateway table # The updated gateway object that the stake was moved to
+--- @field sourceAddress WalletAddress # The address of the gateway that the stake was moved from
+--- @field targetAddress table # The address of the gateway that the stake was moved to
 --- @field redelegationFee number # The fee charged for the redelegation
---- @field feeResetTimestamp number # The timestamp when the reldelegation fee will be reset
+--- @field feeResetTimestamp number # The timestamp when the redelegation fee will be reset
 --- @field redelegationsSinceFeeReset number # The number of redelegations the user has made since the last fee reset
 
 --- Take stake from a delegate and stake it to a new delegate.
