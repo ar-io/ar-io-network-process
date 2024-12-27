@@ -1129,9 +1129,11 @@ describe("gar", function()
 				weights = testGateway.weights,
 			}, result)
 		end)
+	end)
 
-		it("should decrease delegated stake if the remaining stake is greater than the minimum stake", function()
-			local totalDelegatedStake = 750000000
+	describe("decreaseDelegateStake", function()
+		it("should decrease delegated stake if the remaining stake is at least the minimum stake", function()
+			local totalDelegatedStake = minDelegatedStake + 100000000
 			local decreaseAmount = 100000000
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
 			_G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake = totalDelegatedStake
@@ -1141,13 +1143,13 @@ describe("gar", function()
 				vaults = {},
 			}
 
-			local expectation = {
+			local expectedGateway = {
 				operatorStake = testGateway.operatorStake,
-				totalDelegatedStake = totalDelegatedStake - decreaseAmount,
+				totalDelegatedStake = minDelegatedStake,
 				vaults = {},
 				delegates = {
 					[stubRandomAddress] = {
-						delegatedStake = totalDelegatedStake - decreaseAmount,
+						delegatedStake = minDelegatedStake,
 						startTimestamp = 0,
 						vaults = {
 							[stubMessageId] = {
@@ -1166,6 +1168,25 @@ describe("gar", function()
 				observerAddress = testGateway.observerAddress,
 				weights = testGateway.weights,
 			}
+
+			local expectation = {
+				amountWithdrawn = 0,
+				delegatePruned = false,
+				expeditedWithdrawalFee = 0,
+				gatewayTotalDelegatedStake = minDelegatedStake,
+				penaltyRate = 0,
+				updatedDelegate = {
+					delegatedStake = minDelegatedStake,
+					startTimestamp = 0,
+					vaults = {
+						[stubMessageId] = {
+							balance = decreaseAmount,
+							startTimestamp = startTimestamp,
+							endTimestamp = startTimestamp + (90 * 24 * 60 * 60 * 1000), -- 90 days
+						},
+					},
+				},
+			}
 			local status, result = pcall(
 				gar.decreaseDelegateStake,
 				stubGatewayAddress,
@@ -1175,58 +1196,79 @@ describe("gar", function()
 				stubMessageId
 			)
 			assert.is_true(status)
-			assert.are.same(expectation, result.gateway)
-			assert.are.same(expectation, _G.GatewayRegistry[stubGatewayAddress])
+			assert.are.same(expectation, result)
+			assert.are.same(expectedGateway, _G.GatewayRegistry[stubGatewayAddress])
 		end)
 
-		it("should decrease delegated stake with instant withdrawal and apply penalty and remove delegate", function()
-			_G.Balances[ao.id] = 0
-			local expeditedWithdrawalFee = 1000 * 0.50
-			local withdrawalAmount = 1000 - expeditedWithdrawalFee
-			_G.GatewayRegistry[stubGatewayAddress] = {
-				operatorStake = minOperatorStake,
-				totalDelegatedStake = minDelegatedStake + 1000,
-				vaults = {},
-				startTimestamp = startTimestamp,
-				stats = testGateway.stats,
-				services = testGateway.services,
-				settings = testGateway.settings,
-				status = testGateway.status,
-				observerAddress = testGateway.observerAddress,
-				delegates = {
-					[stubRandomAddress] = {
-						delegatedStake = minDelegatedStake + 1000,
+		it(
+			"should decrease delegated stake with instant withdrawal if the remaining stake is at least the minimum stake",
+			function()
+				local totalDelegatedStake = minDelegatedStake + 100000000
+				local decreaseAmount = 100000000
+				local expeditedWithdrawalFee = decreaseAmount * 0.50
+				local withdrawalAmount = decreaseAmount - expeditedWithdrawalFee
+				_G.GatewayRegistry[stubGatewayAddress] = testGateway
+				_G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake = totalDelegatedStake
+				_G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress] = {
+					delegatedStake = totalDelegatedStake,
+					startTimestamp = 0,
+					vaults = {},
+				}
+
+				local expectedGateway = {
+					operatorStake = testGateway.operatorStake,
+					totalDelegatedStake = minDelegatedStake,
+					vaults = {},
+					delegates = {
+						[stubRandomAddress] = {
+							delegatedStake = minDelegatedStake,
+							startTimestamp = 0,
+							vaults = {},
+						},
+					},
+					startTimestamp = testGateway.startTimestamp,
+					stats = testGateway.stats,
+					services = testGateway.services,
+					settings = testGateway.settings,
+					status = testGateway.status,
+					observerAddress = testGateway.observerAddress,
+					weights = testGateway.weights,
+				}
+
+				local expectation = {
+					amountWithdrawn = withdrawalAmount,
+					delegatePruned = false,
+					expeditedWithdrawalFee = expeditedWithdrawalFee,
+					gatewayTotalDelegatedStake = minDelegatedStake,
+					penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE,
+					updatedDelegate = {
+						delegatedStake = minDelegatedStake,
 						startTimestamp = 0,
 						vaults = {},
 					},
-				},
-			}
-			local status, result = pcall(
-				gar.decreaseDelegateStake,
-				stubGatewayAddress,
-				stubRandomAddress,
-				1000,
-				startTimestamp,
-				stubMessageId,
-				true -- instant withdrawal
-			)
-
-			assert.is_true(status)
-			assert.are.same(result.gateway.delegates[stubRandomAddress].delegatedStake, minDelegatedStake)
-			assert.are.equal(result.gateway.totalDelegatedStake, minDelegatedStake)
-			assert.are.equal(withdrawalAmount, result.amountWithdrawn)
-			assert.are.equal(withdrawalAmount, _G.Balances[stubRandomAddress])
-			assert.are.equal(expeditedWithdrawalFee, result.expeditedWithdrawalFee)
-			assert.are.equal(expeditedWithdrawalFee, _G.Balances[ao.id])
-			assert.are.equal(constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE, result.penaltyRate)
-			assert.are.equal(minDelegatedStake, _G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
-		end)
+				}
+				local status, result = pcall(
+					gar.decreaseDelegateStake,
+					stubGatewayAddress,
+					stubRandomAddress,
+					decreaseAmount,
+					startTimestamp,
+					stubMessageId,
+					true -- Instant withdrawal flag
+				)
+				assert.is_true(status)
+				assert.are.same(expectation, result)
+				assert.are.same(expectedGateway, _G.GatewayRegistry[stubGatewayAddress])
+				assert.are.equal(withdrawalAmount, _G.Balances[stubRandomAddress])
+				assert.are.equal(expeditedWithdrawalFee, _G.Balances[ao.id])
+			end
+		)
 
 		it("should error if the remaining delegate stake is less than the minimum stake", function()
 			local delegatedStake = minDelegatedStake
 			_G.GatewayRegistry[stubGatewayAddress] = {
 				operatorStake = minOperatorStake,
-				totalDelegatedStake = minDelegatedStake - 1,
+				totalDelegatedStake = minDelegatedStake,
 				vaults = {},
 				delegates = {
 					[stubRandomAddress] = {
