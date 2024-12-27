@@ -494,6 +494,7 @@ end
 --- @param gateway Gateway
 --- @param quantity mARIO
 --- @param ban boolean|nil do not add the delegate back to the gateway allowlist if their delegation is over
+--- @return Delegate, boolean # a copy of the updated delegate and whether or not it was pruned
 function decreaseDelegateStakeAtGateway(delegateAddress, gateway, quantity, ban)
 	local delegate = gateway.delegates[delegateAddress]
 	assert(delegate, "Delegate is required")
@@ -505,10 +506,11 @@ function decreaseDelegateStakeAtGateway(delegateAddress, gateway, quantity, ban)
 	assert(gateway, "Gateway is required")
 	delegate.delegatedStake = delegate.delegatedStake - quantity
 	gateway.totalDelegatedStake = gateway.totalDelegatedStake - quantity
-	gar.pruneDelegateFromGatewayIfNecessary(delegateAddress, gateway)
+	local pruned = gar.pruneDelegateFromGatewayIfNecessary(delegateAddress, gateway)
 	if ban and gateway.settings.allowedDelegatesLookup then
 		gateway.settings.allowedDelegatesLookup[delegateAddress] = nil
 	end
+	return utils.deepCopy(delegate), pruned
 end
 
 --- Creates a delegate at a gateway, managing allowlisting accounting if necessary
@@ -615,6 +617,21 @@ function gar.getSettingsUnsafe()
 	return GatewayRegistrySettings
 end
 
+--- @class DecreaseDelegateStakeReturn
+--- @field gatewayTotalDelegatedStake mARIO The updated amount of total delegated stake at the gateway
+--- @field updatedDelegate Delegate The updated delegate object
+--- @field delegatePruned boolean Whether or not the delegate was pruned from the gateway
+--- @field penaltyRate number The penalty rate for the expedited withdrawal, if applicable
+--- @field expeditedWithdrawalFee number The fee deducted from the stake for the expedited withdrawal, if applicable
+--- @field amountWithdrawn number The amount of stake withdrawn after any penalty fee is deducted
+
+--- @param gatewayAddress WalletAddress The address of the gateway from which to decrease delegated stake
+--- @param delegator WalletAddress The address of the delegator for which to decrease delegated stake
+--- @param qty mARIO The amount of delegated stake to decrease
+--- @param currentTimestamp Timestamp The current timestamp
+--- @param messageId MessageId The message ID of the current action
+--- @param instantWithdraw boolean Whether to withdraw the stake instantly; otherwise allow it to be vaulted
+--- @return DecreaseDelegateStakeReturn # Details about the outcome of the operation
 function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimestamp, messageId, instantWithdraw)
 	assert(type(qty) == "number", "Quantity is required and must be a number")
 	assert(qty > 0, "Quantity must be greater than 0")
@@ -624,9 +641,10 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 	assert(gateway, "Gateway not found")
 	assert(gateway.status ~= "leaving", "Gateway is leaving the network and cannot withdraw more stake.")
 
-	assert(gateway.delegates[delegator], "This delegate is not staked at this gateway.")
+	local delegate = gateway.delegates[delegator]
+	assert(delegate, "This delegate is not staked at this gateway.")
 
-	local existingStake = gateway.delegates[delegator].delegatedStake
+	local existingStake = delegate.delegatedStake
 	local requiredMinimumStake = gateway.settings.minDelegatedStake
 	local maxAllowedToWithdraw = existingStake - requiredMinimumStake
 	assert(
@@ -645,12 +663,14 @@ function gar.decreaseDelegateStake(gatewayAddress, delegator, qty, currentTimest
 	else
 		createDelegateWithdrawVault(gateway, delegator, messageId, qty, currentTimestamp)
 	end
-	decreaseDelegateStakeAtGateway(delegator, gateway, qty)
+	local updatedDelegate, pruned = decreaseDelegateStakeAtGateway(delegator, gateway, qty)
 
 	-- update the gateway
 	GatewayRegistry[gatewayAddress] = gateway
 	return {
-		gateway = gateway,
+		gatewayTotalDelegatedStake = gateway.totalDelegatedStake,
+		updatedDelegate = updatedDelegate,
+		delegatePruned = pruned,
 		penaltyRate = penaltyRate,
 		expeditedWithdrawalFee = expeditedWithdrawalFee,
 		amountWithdrawn = amountToWithdraw,
@@ -1219,16 +1239,20 @@ end
 --- Preserves delegate's position in allow list upon removal from gateway
 --- @param delegateAddress string The address of the delegator
 --- @param gateway table The gateway from which the delegate is being removed
+--- @return boolean # Whether or not the delegate was pruned
 function gar.pruneDelegateFromGatewayIfNecessary(delegateAddress, gateway)
+	local pruned = false
 	local delegate = gateway.delegates[delegateAddress]
 	if delegate.delegatedStake == 0 and utils.lengthOfTable(delegate.vaults) == 0 then
 		gateway.delegates[delegateAddress] = nil
+		pruned = true
 
 		-- replace the delegate in the allowedDelegatesLookup table if necessary
 		if gateway.settings.allowedDelegatesLookup then
 			gateway.settings.allowedDelegatesLookup[delegateAddress] = true
 		end
 	end
+	return pruned
 end
 
 --- Add delegate addresses to the allowedDelegatesLookup table in the gateway's settings
