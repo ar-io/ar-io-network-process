@@ -922,10 +922,12 @@ describe('GatewayRegistry', async () => {
   });
 
   describe('Decrease-Delegate-Stake', () => {
-    it('should allow withdrawing a delegated stake from a gateway', async () => {
+    async function decreaseDelegateStakeTest({
+      stakeQty,
+      decreaseQty,
+      instant = false,
+    }) {
       const decreaseStakeTimestamp = STUB_TIMESTAMP + 1000 * 60 * 15; // 15 minutes after stubbedTimestamp
-      const stakeQty = 10000000000;
-      const decreaseQty = stakeQty / 2;
       const decreaseStakeMsgId = 'decrease-stake-message-id-'.padEnd(43, 'x');
       const { memory: delegatedStakeMemory } = await delegateStake({
         delegatorAddress,
@@ -939,14 +941,81 @@ describe('GatewayRegistry', async () => {
         memory: delegatedStakeMemory,
         timestamp: STUB_TIMESTAMP,
       });
-      const { memory: decreaseStakeMemory } = await decreaseDelegateStake({
+      const {
+        result: decreaseDelegateStakeResult,
+        memory: decreaseStakeMemory,
+      } = await decreaseDelegateStake({
         memory: delegatedStakeMemory,
         delegatorAddress,
         decreaseQty,
         timestamp: decreaseStakeTimestamp,
         gatewayAddress: STUB_ADDRESS,
         messageId: decreaseStakeMsgId,
+        instant,
       });
+
+      if (instant) {
+        assert.equal(decreaseDelegateStakeResult.Messages.length, 1);
+        decreaseDelegateStakeResult.Messages[0].Tags.sort((a, b) =>
+          a.name.localeCompare(b.name),
+        );
+        assert.deepStrictEqual(decreaseDelegateStakeResult.Messages[0], {
+          Data: `{"vaults":[],"startTimestamp":21600000,"delegatedStake":${stakeQty - decreaseQty}}`,
+          Target: delegatorAddress,
+          Anchor: '00000000000000000000000000000008',
+          Tags: [
+            {
+              name: 'Action',
+              value: 'Decrease-Delegate-Stake-Notice',
+            },
+            {
+              name: 'Address',
+              value: STUB_ADDRESS,
+            },
+            {
+              name: 'Amount-Withdrawn',
+              value: `${decreaseQty / 2}`,
+            },
+            {
+              name: 'Data-Protocol',
+              value: 'ao',
+            },
+            {
+              name: 'Expedited-Withdrawal-Fee',
+              value: `${decreaseQty / 2}`,
+            },
+            {
+              name: 'From-Module',
+              value: '',
+            },
+            {
+              name: 'From-Process',
+              value: PROCESS_ID,
+            },
+            {
+              name: 'Penalty-Rate',
+              value: '0.5',
+            },
+            {
+              name: 'Quantity',
+              value: decreaseQty,
+            },
+            {
+              name: 'Ref_',
+              value: '8',
+            },
+            {
+              name: 'Type',
+              value: 'Message',
+            },
+            {
+              name: 'Variant',
+              value: 'ao.TN.1',
+            },
+          ],
+        });
+      }
+
       // get the gateway record
       const gatewayAfter = await getGateway({
         address: STUB_ADDRESS,
@@ -963,6 +1032,34 @@ describe('GatewayRegistry', async () => {
         timestamp: decreaseStakeTimestamp,
       });
 
+      const delegationsForDelegator = await getDelegations({
+        memory: decreaseStakeMemory,
+        address: delegatorAddress,
+        timestamp: decreaseStakeTimestamp,
+      });
+
+      return {
+        gatewayAfter,
+        delegateItems,
+        delegationsForDelegator,
+        decreaseStakeMemory,
+        decreaseStakeTimestamp,
+      };
+    }
+
+    it('should allow decreasing a delegated stake from a gateway', async () => {
+      const stakeQty = 10000000000;
+      const decreaseQty = stakeQty / 2;
+      const {
+        delegateItems,
+        delegationsForDelegator,
+        decreaseStakeMemory,
+        decreaseStakeTimestamp,
+      } = await decreaseDelegateStakeTest({
+        stakeQty,
+        decreaseQty,
+      });
+
       assert.deepStrictEqual(delegateItems, [
         {
           startTimestamp: STUB_TIMESTAMP,
@@ -974,11 +1071,6 @@ describe('GatewayRegistry', async () => {
       const expectedEndTimestamp =
         90 * 24 * 60 * 60 * 1000 + decreaseStakeTimestamp;
       // check the vault was created and delegation still exists
-      const delegationsForDelegator = await getDelegations({
-        memory: decreaseStakeMemory,
-        address: delegatorAddress,
-        timestamp: decreaseStakeTimestamp,
-      });
       assert.deepStrictEqual(delegationsForDelegator.items, [
         {
           balance: decreaseQty,
@@ -987,7 +1079,7 @@ describe('GatewayRegistry', async () => {
           endTimestamp: expectedEndTimestamp,
           delegationId: expectedDelegateId,
           type: 'vault',
-          vaultId: decreaseStakeMsgId,
+          vaultId: 'decrease-stake-message-id-'.padEnd(43, 'x'),
         },
         {
           balance: stakeQty - decreaseQty,
@@ -997,6 +1089,62 @@ describe('GatewayRegistry', async () => {
           type: 'stake',
         },
       ]);
+      sharedMemory = decreaseStakeMemory;
+      lastTimestamp = decreaseStakeTimestamp;
+    });
+
+    it('should allow partially withdrawing a delegated stake from a gateway', async () => {
+      const stakeQty = 10000000000;
+      const decreaseQty = stakeQty / 2;
+      const {
+        delegateItems,
+        delegationsForDelegator,
+        decreaseStakeMemory,
+        decreaseStakeTimestamp,
+      } = await decreaseDelegateStakeTest({
+        stakeQty,
+        decreaseQty,
+        instant: true,
+      });
+
+      assert.deepStrictEqual(delegateItems, [
+        {
+          startTimestamp: STUB_TIMESTAMP,
+          delegatedStake: stakeQty - decreaseQty,
+          address: delegatorAddress,
+        },
+      ]);
+      // check that no vault was created and delegation still exists
+      assert.deepStrictEqual(delegationsForDelegator.items, [
+        {
+          balance: stakeQty - decreaseQty,
+          gatewayAddress: STUB_ADDRESS,
+          startTimestamp: STUB_TIMESTAMP,
+          delegationId: `${STUB_ADDRESS}_${STUB_TIMESTAMP}`,
+          type: 'stake',
+        },
+      ]);
+      sharedMemory = decreaseStakeMemory;
+      lastTimestamp = decreaseStakeTimestamp;
+    });
+
+    it('should allow fully withdrawing a delegated stake from a gateway', async () => {
+      const stakeQty = 10000000000;
+      const decreaseQty = stakeQty;
+      const {
+        delegateItems,
+        delegationsForDelegator,
+        decreaseStakeMemory,
+        decreaseStakeTimestamp,
+      } = await decreaseDelegateStakeTest({
+        stakeQty,
+        decreaseQty,
+        instant: true,
+      });
+
+      // Ensure delegation no longer exists
+      assert.deepStrictEqual(delegateItems, []);
+      assert.deepStrictEqual(delegationsForDelegator.items, []);
       sharedMemory = decreaseStakeMemory;
       lastTimestamp = decreaseStakeTimestamp;
     });
