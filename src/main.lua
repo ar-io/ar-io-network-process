@@ -1386,7 +1386,6 @@ addEventingHandler(
 
 		local result = gar.decreaseDelegateStake(target, msg.From, quantity, msg.Timestamp, msg.Id, instantWithdraw)
 		local decreaseDelegateStakeResult = {
-			gateway = result and result.gateway or {},
 			penaltyRate = result and result.penaltyRate or 0,
 			expeditedWithdrawalFee = result and result.expeditedWithdrawalFee or 0,
 			amountWithdrawn = result and result.amountWithdrawn or 0,
@@ -1394,13 +1393,11 @@ addEventingHandler(
 
 		msg.ioEvent:addField("Sender-New-Balance", Balances[msg.From]) -- should be unchanged
 
-		local delegateResult = {}
-		if result ~= nil and result.gateway ~= nil then
-			local gateway = result.gateway
-			local newStake = gateway.delegates[msg.From].delegatedStake
+		if result ~= nil then
+			local newStake = result.updatedDelegate.delegatedStake
 			msg.ioEvent:addField("Previous-Stake", newStake + quantity)
 			msg.ioEvent:addField("New-Stake", newStake)
-			msg.ioEvent:addField("Gateway-Total-Delegated-Stake", gateway.totalDelegatedStake)
+			msg.ioEvent:addField("Gateway-Total-Delegated-Stake", result.gatewayTotalDelegatedStake)
 
 			if instantWithdraw then
 				msg.ioEvent:addField("Instant-Withdrawal", instantWithdraw)
@@ -1409,8 +1406,7 @@ addEventingHandler(
 				msg.ioEvent:addField("Penalty-Rate", result.penaltyRate)
 			end
 
-			delegateResult = gateway.delegates[msg.From]
-			local newDelegateVaults = delegateResult.vaults
+			local newDelegateVaults = result.updatedDelegate.vaults
 			if newDelegateVaults ~= nil then
 				msg.ioEvent:addField("Vaults-Count", utils.lengthOfTable(newDelegateVaults))
 				local newDelegateVault = newDelegateVaults[msg.Id]
@@ -1440,7 +1436,7 @@ addEventingHandler(
 				["Expedited-Withdrawal-Fee"] = tostring(decreaseDelegateStakeResult.expeditedWithdrawalFee),
 				["Amount-Withdrawn"] = tostring(decreaseDelegateStakeResult.amountWithdrawn),
 			},
-			Data = json.encode(delegateResult),
+			Data = json.encode(result and result.updatedDelegate or {}),
 		})
 	end
 )
@@ -2282,24 +2278,29 @@ addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", Act
 	local isStakeMovingFromDelegateToOperator = delegateAddress == targetAddress
 	local isStakeMovingFromOperatorToDelegate = delegateAddress == sourceAddress
 	local isStakeMovingFromWithdrawal = vaultId ~= nil
+	if isStakeMovingFromWithdrawal then
+		LastKnownWithdrawSupply = LastKnownWithdrawSupply - quantity
+	end
 
 	if isStakeMovingFromDelegateToOperator then
-		if isStakeMovingFromWithdrawal then
-			LastKnownWithdrawSupply = LastKnownWithdrawSupply - stakeMoved
-		else
-			LastKnownDelegatedSupply = LastKnownDelegatedSupply - stakeMoved
+		if not isStakeMovingFromWithdrawal then
+			LastKnownDelegatedSupply = LastKnownDelegatedSupply - quantity
 		end
 		LastKnownStakedSupply = LastKnownStakedSupply + stakeMoved
 	elseif isStakeMovingFromOperatorToDelegate then
-		if isStakeMovingFromWithdrawal then
-			LastKnownWithdrawSupply = LastKnownWithdrawSupply + stakeMoved
-		else
-			LastKnownStakedSupply = LastKnownStakedSupply - stakeMoved
+		if not isStakeMovingFromWithdrawal then
+			LastKnownStakedSupply = LastKnownStakedSupply - quantity
 		end
 		LastKnownDelegatedSupply = LastKnownDelegatedSupply + stakeMoved
+	elseif isStakeMovingFromWithdrawal then
+		LastKnownStakedSupply = LastKnownStakedSupply + stakeMoved
+		-- else
+		-- Stake is simply moving from one delegation to another
 	end
 
-	LastKnownCirculatingSupply = LastKnownCirculatingSupply - redelegationResult.redelegationFee
+	if redelegationFee > 0 then
+		msg.ioEvent:addField("Redelegation-Fee", redelegationFee)
+	end
 	addSupplyData(msg.ioEvent)
 
 	Send(msg, {
