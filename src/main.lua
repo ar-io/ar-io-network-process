@@ -1835,7 +1835,7 @@ addEventingHandler(ActionMap.Balance, Handlers.utils.hasMatchingTag("Action", Ac
 		Target = msg.From,
 		Action = "Balance-Notice",
 		Account = target,
-		Data = balance,
+		Data = tostring(balance),
 		Balance = tostring(balance),
 		Ticker = Ticker,
 	})
