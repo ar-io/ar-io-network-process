@@ -123,8 +123,18 @@ export const getBalance = async ({
   memory,
   timestamp = STUB_TIMESTAMP,
 }) => {
-  const balances = await getBalances({ memory, timestamp });
-  return balances[address];
+  const result = await handle({
+    options: {
+      Tags: [
+        { name: 'Action', value: 'Balance' },
+        { name: 'Address', value: address },
+      ],
+    },
+    timestamp,
+    memory,
+  });
+  const balance = JSON.parse(result.Messages[0].Data);
+  return balance;
 };
 
 export const transfer = async ({
