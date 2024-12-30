@@ -135,13 +135,14 @@ export const getBalance = async ({
   });
   // enforce the token.lua "spec" as defined by https://github.com/permaweb/aos/blob/15dd81ee596518e2f44521e973b8ad1ce3ee9945/blueprints/token.lua
   assert(
-    result.Messages[0].Tags.every(
-      (tag) => tag.name in ['Action', 'Address', 'Balance'],
+    ['Action', 'Balance', 'Account', 'Ticker'].every((tag) =>
+      result.Messages[0].Tags.map((t) => t.name).includes(tag),
     ),
-    'Tags are not in compliance with the token.lua spec.',
+    `Tags are not in compliance with the token.lua spec. ${JSON.stringify(result.Messages[0].Tags, null, 2)}`,
   );
   assert(
-    typeof result.Messages[0].Data === 'string',
+    typeof result.Messages[0].Data === 'string' &&
+      !isNaN(Number(result.Messages[0].Data)),
     'Balance is invalid. It is not a string which is out of compliance with the token.lua spec',
   );
   const balance = JSON.parse(result.Messages[0].Data);
