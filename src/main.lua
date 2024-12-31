@@ -2278,6 +2278,23 @@ addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", Act
 	local isStakeMovingFromDelegateToOperator = delegateAddress == targetAddress
 	local isStakeMovingFromOperatorToDelegate = delegateAddress == sourceAddress
 	local isStakeMovingFromWithdrawal = vaultId ~= nil
+
+	--- Stake Direction Codings:
+	--- dw2o = Delegate Withdrawal to Operator Stake
+	--- d2o = Delegate Stake to Operator Stake
+	--- ow2d = Operator Withdrawal to Delegate Stake
+	--- o2d = Operator Stake to Delegate Stake
+	--- dw2d = Delegate Withdrawal to Other Delegate Stake
+	--- d2d = Delegate Stake to Other Delegate Stake
+	msg.ioEvent:addField(
+		"Stake-Direction",
+		isStakeMovingFromDelegateToOperator and (isStakeMovingFromWithdrawal and "dw2o" or "d2o")
+			or (
+				isStakeMovingFromOperatorToDelegate and (isStakeMovingFromWithdrawal("ow2d") or "o2d")
+				or (isStakeMovingFromWithdrawal and "dw2d" or "d2d")
+			)
+	)
+
 	if isStakeMovingFromWithdrawal then
 		LastKnownWithdrawSupply = LastKnownWithdrawSupply - quantity
 	end
@@ -2294,8 +2311,8 @@ addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", Act
 		LastKnownDelegatedSupply = LastKnownDelegatedSupply + stakeMoved
 	elseif isStakeMovingFromWithdrawal then
 		LastKnownStakedSupply = LastKnownStakedSupply + stakeMoved
-		-- else
-		-- Stake is simply moving from one delegation to another
+	else
+		LastKnownStakedSupply = LastKnownStakedSupply - redelegationFee
 	end
 
 	if redelegationFee > 0 then

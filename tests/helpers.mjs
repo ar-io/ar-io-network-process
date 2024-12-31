@@ -321,6 +321,7 @@ export const getDelegatesItems = async ({
     timestamp,
     gatewayAddress,
   });
+  assertNoResultError(result);
   return JSON.parse(result.Messages?.[0]?.Data).items;
 };
 
