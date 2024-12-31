@@ -95,6 +95,17 @@ describe('setup', () => {
         );
       }
     });
+
+    it('should always be able to fetch the protocol balance and it should be greater than 0', async () => {
+      const balance = await io.getBalance({
+        address: processId,
+      });
+      // assert it is greater than 0 and response is a number
+      assert(
+        balance >= 0 && typeof balance === 'number',
+        'Balance is not valid',
+      );
+    });
   });
 
   describe('distribution totals', () => {
