@@ -959,8 +959,17 @@ describe('GatewayRegistry', async () => {
         decreaseDelegateStakeResult.Messages[0].Tags.sort((a, b) =>
           a.name.localeCompare(b.name),
         );
+        // Annoyingly this JSON data does not serialize to a string stably for reliable deepStrictEqual against Messages[0]
+        const returnedData = JSON.parse(
+          decreaseDelegateStakeResult.Messages[0].Data,
+        );
+        assert.deepStrictEqual(returnedData, {
+          vaults: [],
+          startTimestamp: 21600000,
+          delegatedStake: stakeQty - decreaseQty,
+        });
+        delete decreaseDelegateStakeResult.Messages[0].Data;
         assert.deepStrictEqual(decreaseDelegateStakeResult.Messages[0], {
-          Data: `{"vaults":[],"startTimestamp":21600000,"delegatedStake":${stakeQty - decreaseQty}}`,
           Target: delegatorAddress,
           Anchor: '00000000000000000000000000000008',
           Tags: [
@@ -1755,42 +1764,44 @@ describe('GatewayRegistry', async () => {
     const sourceAddress = 'source-address-'.padEnd(43, 'a');
     const targetAddress = 'target-address-'.padEnd(43, 'b');
     const delegatorAddress = 'delegator-address-'.padEnd(43, 'c');
-    const stakeQty = 10_000_000;
+    const stakeQty = 11_111_112;
 
     it('should allow re-delegating stake', async () => {
-      const { memory: joinSourceMemory } = await joinNetwork({
+      const { memory: joinGateway1Memory } = await joinNetwork({
         address: sourceAddress,
         memory: sharedMemory,
         timestamp: STUB_TIMESTAMP,
       });
-      const { memory: joinTargetMemory } = await joinNetwork({
+      const { memory: joinGateway2Memory } = await joinNetwork({
         address: targetAddress,
-        memory: joinSourceMemory,
+        memory: joinGateway1Memory,
         timestamp: STUB_TIMESTAMP,
       });
       const transferMemory = await transfer({
         recipient: delegatorAddress,
         quantity: stakeQty,
-        memory: joinTargetMemory,
+        memory: joinGateway2Memory,
       });
 
-      const { result: delegateStakeResult, memory: delegatedStakeMemory } =
-        await delegateStake({
-          delegatorAddress,
-          quantity: stakeQty,
-          gatewayAddress: sourceAddress,
-          timestamp: STUB_TIMESTAMP,
-          memory: transferMemory,
-        });
-      assertNoResultError(delegateStakeResult);
+      const {
+        result: delegateStakeToGw1Result,
+        memory: delegateStakeToGw1Memory,
+      } = await delegateStake({
+        delegatorAddress,
+        quantity: stakeQty,
+        gatewayAddress: sourceAddress,
+        timestamp: STUB_TIMESTAMP,
+        memory: transferMemory,
+      });
+      assertNoResultError(delegateStakeToGw1Result);
 
-      const sourceGatewayBefore = await getGateway({
+      const gw1BeforeRedelegation = await getGateway({
         address: sourceAddress,
-        memory: delegatedStakeMemory,
+        memory: delegateStakeToGw1Memory,
       });
-      assert(sourceGatewayBefore.totalDelegatedStake === stakeQty);
+      assert(gw1BeforeRedelegation.totalDelegatedStake === stakeQty);
       const delegateItems = await getDelegatesItems({
-        memory: delegatedStakeMemory,
+        memory: delegateStakeToGw1Memory,
         gatewayAddress: sourceAddress,
         timestamp: STUB_TIMESTAMP,
       });
@@ -1805,8 +1816,8 @@ describe('GatewayRegistry', async () => {
         delegateItems,
       );
 
-      const { memory: redelegateStakeMemory, result } = await redelegateStake({
-        memory: delegatedStakeMemory,
+      const { memory: redelegateStakeMemory } = await redelegateStake({
+        memory: delegateStakeToGw1Memory,
         delegatorAddress,
         quantity: stakeQty,
         sourceAddress,
@@ -1814,12 +1825,12 @@ describe('GatewayRegistry', async () => {
         timestamp: STUB_TIMESTAMP,
       });
 
-      const targetGatewayAfter = await getGateway({
+      const gw2AfterFirstRedelegation = await getGateway({
         address: targetAddress,
         memory: redelegateStakeMemory,
         timestamp: STUB_TIMESTAMP,
       });
-      assert(targetGatewayAfter.totalDelegatedStake === stakeQty);
+      assert(gw2AfterFirstRedelegation.totalDelegatedStake === stakeQty);
       assert.deepStrictEqual(
         await getDelegatesItems({
           memory: redelegateStakeMemory,
@@ -1834,12 +1845,12 @@ describe('GatewayRegistry', async () => {
         ],
       );
 
-      const sourceGatewayAfter = await getGateway({
+      const gw1AfterFirstRedelegation = await getGateway({
         address: sourceAddress,
         memory: redelegateStakeMemory,
         timestamp: STUB_TIMESTAMP,
       });
-      assert(sourceGatewayAfter.totalDelegatedStake === 0);
+      assert(gw1AfterFirstRedelegation.totalDelegatedStake === 0);
       assert.deepStrictEqual(
         await getDelegatesItems({
           memory: redelegateStakeMemory,
@@ -1865,6 +1876,55 @@ describe('GatewayRegistry', async () => {
         },
       );
 
+      // Ensure redelegation fee is applied
+      const { memory: secondRedelegateStakeMemory } = await redelegateStake({
+        memory: redelegateStakeMemory,
+        delegatorAddress,
+        quantity: stakeQty,
+        sourceAddress: targetAddress,
+        targetAddress: sourceAddress,
+        timestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7 - 1, // just before fee reset
+      });
+
+      const gw1AfterSecondRedelegation = await getGateway({
+        address: sourceAddress,
+        memory: secondRedelegateStakeMemory,
+        timestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7 - 1,
+      });
+      assert.equal(
+        Math.floor(stakeQty * 0.9),
+        gw1AfterSecondRedelegation.totalDelegatedStake,
+      );
+      assert.deepStrictEqual(
+        await getDelegatesItems({
+          memory: secondRedelegateStakeMemory,
+          gatewayAddress: sourceAddress,
+          timestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7 - 1,
+        }),
+        [
+          {
+            delegatedStake: Math.floor(stakeQty * 0.9),
+            startTimestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7 - 1,
+            address: delegatorAddress,
+          },
+        ],
+      );
+
+      const gw2AfterSecondRedelegation = await getGateway({
+        address: targetAddress,
+        memory: secondRedelegateStakeMemory,
+        timestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7 - 1,
+      });
+      assert(gw2AfterSecondRedelegation.totalDelegatedStake === 0);
+      assert.deepStrictEqual(
+        await getDelegatesItems({
+          memory: secondRedelegateStakeMemory,
+          gatewayAddress: targetAddress,
+          timestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7 - 1,
+        }),
+        [],
+      );
+
       // Fee is pruned after 7 days
       const feeResultSevenEpochsLater = await handle({
         options: {
@@ -1873,7 +1933,7 @@ describe('GatewayRegistry', async () => {
           Tags: [{ name: 'Action', value: 'Redelegation-Fee' }],
           Timestamp: STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7 * 7 + 1, // 7 days
         },
-        memory: redelegateStakeMemory,
+        memory: secondRedelegateStakeMemory,
       });
       assert.deepStrictEqual(
         JSON.parse(feeResultSevenEpochsLater.Messages[0].Data),
@@ -1881,7 +1941,8 @@ describe('GatewayRegistry', async () => {
           redelegationFeeRate: 0,
         },
       );
-      sharedMemory = redelegateStakeMemory;
+      sharedMemory = secondRedelegateStakeMemory;
+      lastTimestamp = STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7 * 7 + 1;
     });
 
     it("should allow re-delegating stake with a vault and the vault's balance", async () => {
