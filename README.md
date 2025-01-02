@@ -12,6 +12,76 @@ The implementation of the ar.io network contract is written in lua and deployed 
 
 Each handler is identified by an action name and it has required and optional tags for its input. The handlers can be categorized into "read" and "write" operations.
 
+<!-- 	Info = "Info",
+	TotalSupply = "Total-Supply", -- for token.lua spec compatibility, gives just the total supply (circulating + locked + staked + delegated + withdraw)
+	TotalTokenSupply = "Total-Token-Supply", -- gives the total token supply and all components (protocol balance, locked supply, staked supply, delegated supply, and withdraw supply)
+	State = "State",
+	Transfer = "Transfer",
+	Balance = "Balance",
+	Balances = "Balances",
+	DemandFactor = "Demand-Factor",
+	DemandFactorInfo = "Demand-Factor-Info",
+	DemandFactorSettings = "Demand-Factor-Settings",
+	-- EPOCH READ APIS
+	Epochs = "Epochs",
+	Epoch = "Epoch",
+	EpochSettings = "Epoch-Settings",
+	PrescribedObservers = "Epoch-Prescribed-Observers",
+	PrescribedNames = "Epoch-Prescribed-Names",
+	Observations = "Epoch-Observations",
+	Distributions = "Epoch-Distributions",
+	--- Vaults
+	Vault = "Vault",
+	Vaults = "Vaults",
+	CreateVault = "Create-Vault",
+	VaultedTransfer = "Vaulted-Transfer",
+	ExtendVault = "Extend-Vault",
+	IncreaseVault = "Increase-Vault",
+	-- GATEWAY REGISTRY READ APIS
+	Gateway = "Gateway",
+	Gateways = "Gateways",
+	GatewayRegistrySettings = "Gateway-Registry-Settings",
+	Delegates = "Delegates",
+	JoinNetwork = "Join-Network",
+	LeaveNetwork = "Leave-Network",
+	IncreaseOperatorStake = "Increase-Operator-Stake",
+	DecreaseOperatorStake = "Decrease-Operator-Stake",
+	UpdateGatewaySettings = "Update-Gateway-Settings",
+	SaveObservations = "Save-Observations",
+	DelegateStake = "Delegate-Stake",
+	RedelegateStake = "Redelegate-Stake",
+	DecreaseDelegateStake = "Decrease-Delegate-Stake",
+	CancelWithdrawal = "Cancel-Withdrawal",
+	InstantWithdrawal = "Instant-Withdrawal",
+	RedelegationFee = "Redelegation-Fee",
+	--- ArNS
+	Record = "Record",
+	Records = "Records",
+	BuyRecord = "Buy-Record", -- TODO: standardize these as `Buy-Name` or `Upgrade-Record`
+	UpgradeName = "Upgrade-Name", -- TODO: may be more aligned to `Upgrade-Record`
+	ExtendLease = "Extend-Lease",
+	IncreaseUndernameLimit = "Increase-Undername-Limit",
+	ReassignName = "Reassign-Name",
+	ReleaseName = "Release-Name",
+	ReservedNames = "Reserved-Names",
+	ReservedName = "Reserved-Name",
+	TokenCost = "Token-Cost",
+	CostDetails = "Get-Cost-Details-For-Action",
+	GetRegistrationFees = "Get-Registration-Fees",
+	ReturnedNames = "Returned-Names",
+	ReturnedName = "Returned-Name",
+	AllowDelegates = "Allow-Delegates",
+	DisallowDelegates = "Disallow-Delegates",
+	Delegations = "Delegations",
+	-- PRIMARY NAMES
+	RemovePrimaryNames = "Remove-Primary-Names",
+	RequestPrimaryName = "Request-Primary-Name",
+	PrimaryNameRequest = "Primary-Name-Request",
+	PrimaryNameRequests = "Primary-Name-Requests",
+	ApprovePrimaryNameRequest = "Approve-Primary-Name-Request",
+	PrimaryNames = "Primary-Names",
+	PrimaryName = "Primary-Name", -->
+
 | **Category**              | **Action**                                                   | **Description**                                                                                                       | **Inputs (Required/Optional)**                                                                                                     |
 | ------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | **General**               | `Info`                                                       | Provides metadata about the process, including name, ticker, logo, denomination, owner, and handlers.                 | None                                                                                                                               |
@@ -37,6 +107,7 @@ Each handler is identified by an action name and it has required and optional ta
 |                           | `Prescribed-Names`                                           | Retrieves prescribed names for a specific epoch.                                                                      | **Optional:** `Epoch-Index`or uses current timestamp.                                                                              |
 | **Gateway Registry**      | `Gateway`                                                    | Fetches details of a specific gateway by its address.                                                                 | **Required:** `Address`or defaults to `From`                                                                                       |
 |                           | `Gateways` or `Paginated-Gateways`                           | Lists all gateways, with pagination support.                                                                          | **Optional:** `Cursor`, `Limit`, `SortBy`, `SortOrder`                                                                             |
+|                           | `Gateway-Registry-Settings`                                  | Retrieves the settings for the gateway registry.                                                                      | None                                                                                                                               |
 |                           | `Join-Network`                                               | Adds a gateway to the network with specified configurations.                                                          | **Required:** `Operator-Stake` <br> **Optional:** `Label`, `Note`, `Services`, `FQDN`, `Protocol`, `Allow-Delegated-Staking`, etc. |
 |                           | `Leave-Network`                                              | Removes a gateway from the network.                                                                                   | None                                                                                                                               |
 |                           | `Update-Gateway-Settings`                                    | Updates the settings of a gateway.                                                                                    | **Optional:** `Label`, `Note`, `FQDN`, `Port`, `Protocol`, `Allow-Delegated-Staking`, etc.                                         |
@@ -44,12 +115,15 @@ Each handler is identified by an action name and it has required and optional ta
 |                           | `Allowed-Delegates` or `Paginated-Allowed-Delegates`         | Lists allowed delegates with pagination support for a specific gateway.                                               | **Optional:** `Cursor`, `Limit`, `SortOrder`                                                                                       |
 |                           | `Gateway-Vaults` or `Paginated-Gateway-Vaults`               | Lists vaults for a specific gateway, with pagination support.                                                         | **Optional:** `Cursor`, `Limit`, `SortBy`, `SortOrder`                                                                             |
 |                           | `Redelegate-Stake`                                           | Redelegates stake from one gateway to another.                                                                        | **Required:** `Source`, `Target`, `Quantity` <br> **Optional:** `Vault-Id`                                                         |
-|                           | `Increase-Delegated-Stake`                                   | Increases the delegated stake for a specific gateway.                                                                 | **Required:** `Gateway`, `Quantity` <br> **Optional:** `Vault-Id`                                                                  |
-|                           | `Decrease-Delegated-Stake`                                   | Decreases the delegated stake for a specific gateway.                                                                 | **Required:** `Gateway`, `Quantity` <br> **Optional:** `Vault-Id`                                                                  |
-|                           | `Increase-Operator-Stake`                                    | Withdraws stake from a specific gateway.                                                                              | **Required:** `Gateway`, `Quantity` <br> **Optional:** `Vault-Id`                                                                  |
-|                           | `Decrease-Operator-Stake`                                    | Withdraws stake from a specific gateway.                                                                              | **Required:** `Gateway`, `Quantity` <br> **Optional:** `Vault-Id`                                                                  |
+|                           | `Delegate-Stake`                                             | Delegates stake to a gateway.                                                                                         | **Required:** `Gateway`, `Quantity` <br> **Optional:** `Vault-Id`                                                                  |
+|                           | `Decrease-Delegate-Stake`                                    | Decreases delegated stake from a gateway.                                                                             | **Required:** `Gateway`, `Quantity` <br> **Optional:** `Vault-Id`                                                                  |
+|                           | `Increase-Operator-Stake`                                    | Increases operator stake for a gateway.                                                                               | **Required:** `Gateway`, `Quantity` <br> **Optional:** `Vault-Id`                                                                  |
+|                           | `Decrease-Operator-Stake`                                    | Decreases operator stake from a gateway.                                                                              | **Required:** `Gateway`, `Quantity` <br> **Optional:** `Vault-Id`                                                                  |
 |                           | `Cancel-Withdrawal`                                          | Cancels a withdrawal request.                                                                                         | **Required:** `Withdrawal-Id`                                                                                                      |
 |                           | `Instant-Withdrawal`                                         | Instantly withdraws stake from a specific gateway.                                                                    | **Required:** `Gateway`, `Quantity` <br> **Optional:** `Vault-Id`                                                                  |
+|                           | `Allow-Delegates`                                            | Allows delegates for a gateway.                                                                                       | None                                                                                                                               |
+|                           | `Disallow-Delegates`                                         | Disallows delegates for a gateway.                                                                                    | None                                                                                                                               |
+|                           | `Delegations`                                                | Paginated delegations for a gateway.                                                                                  | **Optional:** `Address` (defaults to msg.From), `Cursor`, `Limit`, `SortBy`, `SortOrder`                                           |
 | **Name Registry (ArNS)**  | `Record`                                                     | Fetches details of a specific record by its name.                                                                     | **Required:** `Name`                                                                                                               |
 |                           | `Records` or `Paginated-Records`                             | Lists all records, with pagination support.                                                                           | **Optional:** `Cursor`, `Limit`, `SortBy`, `SortOrder`                                                                             |
 |                           | `Buy-Record`                                                 | Purchases a name record for a specified duration.                                                                     | **Required:** `Name` <br> **Optional:** `Years`, `Fund-From`                                                                       |
@@ -62,6 +136,7 @@ Each handler is identified by an action name and it has required and optional ta
 |                           | `Reassign-Name`                                              | Reassigns a name to a new process id.                                                                                 | **Required:** `Name`, `Process-Id` <br> **Optional:** `Allow-Unsafe-Addresses`, `Initiator`                                        |
 | **Token Cost**            | `Token-Cost`                                                 | Retrieves the total mARIO required for a specific action. Recommended to use `Cost-Details` instead for more details. | **Required:** `Intent`, `Name`<br> **Optional:** `Years`, `Quantity`, `Purchase-Type`                                              |
 |                           | `Cost-Details`                                               | Retrieves the total mARIO required for a specific action with fundingPlan and discount details.                       | **Required:** `Intent`, `Name`<br> **Optional:** `Years`, `Quantity`, `Purchase-Type`                                              |
+|                           | `Get-Registration-Fees`                                      | Gets the registration fees for a name.                                                                                | **Required:** `Name`                                                                                                               |
 |                           | `Redelegation-Fee`                                           | Retrieves the fee in mARIO for redelegating stake.                                                                    | **Optional:** `Address` (defaults to `From`)                                                                                       |
 | **Primary Names**         | `Primary-Name`                                               | Resolves a name or address to its primary name details.                                                               | **Required:** `Name`or `Address`                                                                                                   |
 |                           | `Primary-Names` or `Paginated-Primary-Names`                 | Lists all primary names, with pagination support.                                                                     | **Optional:** `Cursor`, `Limit`, `SortBy`, `SortOrder`                                                                             |

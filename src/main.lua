@@ -48,7 +48,6 @@ local ActionMap = {
 	Info = "Info",
 	TotalSupply = "Total-Supply", -- for token.lua spec compatibility, gives just the total supply (circulating + locked + staked + delegated + withdraw)
 	TotalTokenSupply = "Total-Token-Supply", -- gives the total token supply and all components (protocol balance, locked supply, staked supply, delegated supply, and withdraw supply)
-	State = "State",
 	Transfer = "Transfer",
 	Balance = "Balance",
 	Balances = "Balances",
