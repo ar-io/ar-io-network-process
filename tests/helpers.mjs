@@ -10,6 +10,7 @@ import {
   STUB_MESSAGE_ID,
   validGatewayTags,
   STUB_PROCESS_ID,
+  INITIAL_OPERATOR_STAKE,
 } from '../tools/constants.mjs';
 
 const initialOperatorStake = 100_000_000_000;
@@ -184,8 +185,9 @@ export const joinNetwork = async ({
   timestamp = STUB_TIMESTAMP,
   address,
   observerAddress,
-  tags = validGatewayTags({ observerAddress }),
+  stakeQuantity = INITIAL_OPERATOR_STAKE,
   quantity = 100_000_000_000,
+  tags = validGatewayTags({ observerAddress, operatorStake: stakeQuantity }),
 }) => {
   const transferMemory = await transfer({
     recipient: address,

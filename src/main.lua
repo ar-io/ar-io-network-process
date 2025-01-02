@@ -2289,7 +2289,7 @@ addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", Act
 		"Stake-Direction",
 		isStakeMovingFromDelegateToOperator and (isStakeMovingFromWithdrawal and "dw2o" or "d2o")
 			or (
-				isStakeMovingFromOperatorToDelegate and (isStakeMovingFromWithdrawal("ow2d") or "o2d")
+				isStakeMovingFromOperatorToDelegate and (isStakeMovingFromWithdrawal and "ow2d" or "o2d")
 				or (isStakeMovingFromWithdrawal and "dw2d" or "d2d")
 			)
 	)
