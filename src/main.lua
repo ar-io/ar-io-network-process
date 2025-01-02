@@ -436,7 +436,7 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 			--- non critical errors will send an invalid notice back to the caller with the error information, memory is not discarded
 			Send(msg, {
 				Target = msg.From,
-				Action = "Invalid-" .. handlerName .. "-Notice",
+				Action = "Invalid-" .. utils.toTrainCase(handlerName) .. "-Notice",
 				Error = tostring(error),
 				Data = tostring(error),
 			})
