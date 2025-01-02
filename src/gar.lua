@@ -304,7 +304,9 @@ function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWi
 
 	assert(
 		qty <= maxWithdraw,
-		"Resulting stake is not enough to maintain the minimum operator stake of "
+		"Resulting stake of "
+			.. gateway.operatorStake - qty
+			.. " mARIO is not enough to maintain the minimum operator stake of "
 			.. gar.getSettings().operators.minStake
 			.. " mARIO"
 	)
@@ -1873,7 +1875,9 @@ function gar.redelegateStake(params)
 			local maxWithdraw = sourceGateway.operatorStake - gar.getSettings().operators.minStake
 			assert(
 				stakeToTakeFromSource <= maxWithdraw,
-				"Resulting stake is not enough to maintain the minimum operator stake of "
+				"Resulting stake of "
+					.. sourceGateway.operatorStake - stakeToTakeFromSource
+					.. " mARIO is not enough to maintain the minimum operator stake of "
 					.. gar.getSettings().operators.minStake
 					.. " mARIO"
 			)

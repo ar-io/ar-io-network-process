@@ -811,7 +811,10 @@ describe("gar", function()
 			)
 
 			assert.is_false(status)
-			assert.matches("Resulting stake is not enough to maintain the minimum operator stake", result)
+			assert.matches(
+				"Resulting stake of 9999999500 mARIO is not enough to maintain the minimum operator stake",
+				result
+			)
 		end)
 
 		it("should fail if Gateway not found", function()
@@ -3820,7 +3823,10 @@ describe("gar", function()
 
 				assert(not isSuccess)
 				assert(error)
-				assert(error:find("Resulting stake is not enough to maintain the minimum operator stake of") ~= nil)
+				assert.matches(
+					"Resulting stake of 9999999999 mARIO is not enough to maintain the minimum operator stake",
+					error
+				)
 			end
 		)
 

@@ -1766,7 +1766,7 @@ describe('GatewayRegistry', async () => {
     const delegatorAddress = 'delegator-address-'.padEnd(43, 'c');
     const stakeQty = 11_111_112;
 
-    it('should allow re-delegating stake', async () => {
+    it('should allow re-delegating stake (d2d)', async () => {
       const { memory: joinGateway1Memory } = await joinNetwork({
         address: sourceAddress,
         memory: sharedMemory,
@@ -1945,7 +1945,7 @@ describe('GatewayRegistry', async () => {
       lastTimestamp = STUB_TIMESTAMP + 1000 * 60 * 60 * 24 * 7 * 7 + 1;
     });
 
-    it("should allow re-delegating stake with a vault and the vault's balance", async () => {
+    it("should allow re-delegating stake with a vault and the vault's balance (dw2d)", async () => {
       const { memory: joinSourceMemory } = await joinNetwork({
         address: sourceAddress,
         memory: sharedMemory,
@@ -2049,6 +2049,269 @@ describe('GatewayRegistry', async () => {
         [],
       );
       sharedMemory = redelegateStakeMemory;
+      lastTimestamp = STUB_TIMESTAMP + 2;
+    });
+
+    it('should allow re-delegating operator excess stake as delegated stake at another gateway (o2d)', async () => {
+      const { memory: joinSourceMemory } = await joinNetwork({
+        address: sourceAddress,
+        memory: sharedMemory,
+        timestamp: STUB_TIMESTAMP,
+        quantity: 10_010_000_000, // minimum operator stake + minimum delegated stake
+        stakeQuantity: 10_010_000_000, // minimum operator stake + minimum delegated stake
+      });
+      const { memory: joinTargetMemory } = await joinNetwork({
+        address: targetAddress,
+        memory: joinSourceMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+
+      const { memory: redelegateStakeMemory } = await redelegateStake({
+        memory: joinTargetMemory,
+        delegatorAddress: sourceAddress,
+        quantity: 10_000_000,
+        sourceAddress,
+        targetAddress,
+        timestamp: STUB_TIMESTAMP + 1,
+      });
+
+      const sourceGatewayAfter = await getGateway({
+        address: sourceAddress,
+        memory: redelegateStakeMemory,
+        timestamp: STUB_TIMESTAMP + 1,
+      });
+      assert.equal(sourceGatewayAfter.operatorStake, 10_000_000_000);
+
+      const targetGatewayAfter = await getGateway({
+        address: targetAddress,
+        memory: redelegateStakeMemory,
+        timestamp: STUB_TIMESTAMP + 1,
+      });
+      assert(targetGatewayAfter.totalDelegatedStake === 10_000_000);
+      assert.deepStrictEqual(
+        await getDelegatesItems({
+          memory: redelegateStakeMemory,
+          gatewayAddress: targetAddress,
+          timestamp: STUB_TIMESTAMP + 1,
+        }),
+        [
+          {
+            delegatedStake: 10_000_000,
+            startTimestamp: STUB_TIMESTAMP + 1,
+            address: sourceAddress,
+          },
+        ],
+      );
+      sharedMemory = redelegateStakeMemory;
+      lastTimestamp = STUB_TIMESTAMP + 1;
+    });
+
+    it('should allow re-delegating vaulted operator excess stake as delegated stake at another gateway (ow2d)', async () => {
+      const { memory: joinSourceMemory } = await joinNetwork({
+        address: sourceAddress,
+        memory: sharedMemory,
+        timestamp: STUB_TIMESTAMP,
+        quantity: 10_010_000_000, // minimum operator stake + minimum delegated stake
+        stakeQuantity: 10_010_000_000, // minimum operator stake + minimum delegated stake
+      });
+      const { memory: joinTargetMemory } = await joinNetwork({
+        address: targetAddress,
+        memory: joinSourceMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+
+      const { memory: decreaseStakeMemory } = await decreaseOperatorStake({
+        address: sourceAddress,
+        memory: joinTargetMemory,
+        messageId: 'decrease-operator-stake-message-'.padEnd(43, '1'),
+        decreaseQty: 10_000_000,
+        timestamp: STUB_TIMESTAMP + 1,
+      });
+
+      const { memory: redelegateStakeMemory } = await redelegateStake({
+        memory: decreaseStakeMemory,
+        delegatorAddress: sourceAddress,
+        quantity: 10_000_000,
+        sourceAddress,
+        targetAddress,
+        vaultId: 'decrease-operator-stake-message-'.padEnd(43, '1'),
+        timestamp: STUB_TIMESTAMP + 1,
+      });
+
+      const sourceGatewayAfter = await getGateway({
+        address: sourceAddress,
+        memory: redelegateStakeMemory,
+        timestamp: STUB_TIMESTAMP + 1,
+      });
+      assert.equal(sourceGatewayAfter.operatorStake, 10_000_000_000);
+
+      const targetGatewayAfter = await getGateway({
+        address: targetAddress,
+        memory: redelegateStakeMemory,
+        timestamp: STUB_TIMESTAMP + 1,
+      });
+      assert(targetGatewayAfter.totalDelegatedStake === 10_000_000);
+      assert.deepStrictEqual(
+        await getDelegatesItems({
+          memory: redelegateStakeMemory,
+          gatewayAddress: targetAddress,
+          timestamp: STUB_TIMESTAMP + 1,
+        }),
+        [
+          {
+            delegatedStake: 10_000_000,
+            startTimestamp: STUB_TIMESTAMP + 1,
+            address: sourceAddress,
+          },
+        ],
+      );
+      sharedMemory = redelegateStakeMemory;
+      lastTimestamp = STUB_TIMESTAMP + 1;
+    });
+
+    it('should allow re-delegating delegated stake to own operator stake (d2o)', async () => {
+      const { memory: joinSourceMemory } = await joinNetwork({
+        address: sourceAddress,
+        memory: sharedMemory,
+        timestamp: STUB_TIMESTAMP,
+        stakeQuantity: INITIAL_OPERATOR_STAKE,
+      });
+      const { memory: joinTargetMemory } = await joinNetwork({
+        address: targetAddress,
+        memory: joinSourceMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+
+      const transferMemory = await transfer({
+        recipient: sourceAddress,
+        quantity: stakeQty,
+        memory: joinTargetMemory,
+      });
+
+      const { result: delegateStakeResult, memory: delegateStakeMemory } =
+        await delegateStake({
+          delegatorAddress: sourceAddress,
+          quantity: stakeQty,
+          gatewayAddress: targetAddress,
+          timestamp: STUB_TIMESTAMP,
+          memory: transferMemory,
+        });
+      assertNoResultError(delegateStakeResult);
+
+      const { memory: redelegateStakeMemory } = await redelegateStake({
+        memory: delegateStakeMemory,
+        delegatorAddress: sourceAddress,
+        quantity: stakeQty,
+        sourceAddress: targetAddress,
+        targetAddress: sourceAddress,
+        timestamp: STUB_TIMESTAMP + 1,
+      });
+
+      const sourceGatewayAfter = await getGateway({
+        address: sourceAddress,
+        memory: redelegateStakeMemory,
+        timestamp: STUB_TIMESTAMP + 1,
+      });
+      assert.equal(
+        sourceGatewayAfter.operatorStake,
+        INITIAL_OPERATOR_STAKE + stakeQty,
+      );
+
+      const targetGatewayAfter = await getGateway({
+        address: targetAddress,
+        memory: redelegateStakeMemory,
+        timestamp: STUB_TIMESTAMP + 1,
+      });
+      assert.equal(0, targetGatewayAfter.totalDelegatedStake);
+      assert.deepStrictEqual(
+        await getDelegatesItems({
+          memory: redelegateStakeMemory,
+          gatewayAddress: targetAddress,
+          timestamp: STUB_TIMESTAMP + 1,
+        }),
+        [],
+      );
+      sharedMemory = redelegateStakeMemory;
+      lastTimestamp = STUB_TIMESTAMP + 1;
+    });
+
+    it('should allow re-delegating vaulted delegated stake to own operator stake (dw2o)', async () => {
+      const { memory: joinSourceMemory } = await joinNetwork({
+        address: sourceAddress,
+        memory: sharedMemory,
+        timestamp: STUB_TIMESTAMP,
+        stakeQuantity: INITIAL_OPERATOR_STAKE,
+      });
+      const { memory: joinTargetMemory } = await joinNetwork({
+        address: targetAddress,
+        memory: joinSourceMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+
+      const transferMemory = await transfer({
+        recipient: sourceAddress,
+        quantity: stakeQty,
+        memory: joinTargetMemory,
+      });
+
+      const { result: delegateStakeResult, memory: delegateStakeMemory } =
+        await delegateStake({
+          delegatorAddress: sourceAddress,
+          quantity: stakeQty,
+          gatewayAddress: targetAddress,
+          timestamp: STUB_TIMESTAMP,
+          memory: transferMemory,
+        });
+      assertNoResultError(delegateStakeResult);
+
+      const decreaseStakeMsgId = 'decrease-stake-message-id-'.padEnd(43, 'x');
+      const { result: decreaseStakeResult, memory: decreaseStakeMemory } =
+        await decreaseDelegateStake({
+          memory: delegateStakeMemory,
+          timestamp: STUB_TIMESTAMP + 1,
+          delegatorAddress: sourceAddress,
+          decreaseQty: stakeQty,
+          gatewayAddress: targetAddress,
+          messageId: decreaseStakeMsgId,
+        });
+      assertNoResultError(decreaseStakeResult);
+
+      const { memory: redelegateStakeMemory } = await redelegateStake({
+        memory: decreaseStakeMemory,
+        delegatorAddress: sourceAddress,
+        quantity: stakeQty,
+        sourceAddress: targetAddress,
+        targetAddress: sourceAddress,
+        timestamp: STUB_TIMESTAMP + 1,
+        vaultId: decreaseStakeMsgId,
+      });
+
+      const sourceGatewayAfter = await getGateway({
+        address: sourceAddress,
+        memory: redelegateStakeMemory,
+        timestamp: STUB_TIMESTAMP + 1,
+      });
+      assert.equal(
+        sourceGatewayAfter.operatorStake,
+        INITIAL_OPERATOR_STAKE + stakeQty,
+      );
+
+      const targetGatewayAfter = await getGateway({
+        address: targetAddress,
+        memory: redelegateStakeMemory,
+        timestamp: STUB_TIMESTAMP + 1,
+      });
+      assert.equal(0, targetGatewayAfter.totalDelegatedStake);
+      assert.deepStrictEqual(
+        await getDelegatesItems({
+          memory: redelegateStakeMemory,
+          gatewayAddress: targetAddress,
+          timestamp: STUB_TIMESTAMP + 1,
+        }),
+        [],
+      );
+      sharedMemory = redelegateStakeMemory;
+      lastTimestamp = STUB_TIMESTAMP + 1;
     });
   });
 });
