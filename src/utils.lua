@@ -332,7 +332,7 @@ function utils.formatAddress(address)
 end
 
 --- Safely decodes a JSON string
---- @param jsonString string The JSON string to decode
+--- @param jsonString string|nil The JSON string to decode
 --- @return table|nil decodedJson - the decoded JSON or nil if the string is nil or the decoding fails
 function utils.safeDecodeJson(jsonString)
 	if not jsonString then
@@ -500,10 +500,14 @@ function utils.trimString(input)
 end
 
 --- Splits a string by a delimiter and trims each token
---- @param input string The string to split
---- @param delimiter string The delimiter to split by
+--- @param input string|nil The string to split
+--- @param delimiter string|nil The delimiter to split by, defaults to ","
 --- @return table tokens - the split and trimmed string
 function utils.splitAndTrimString(input, delimiter)
+	delimiter = escapePattern(delimiter or ",")
+	if not input then
+		return {}
+	end
 	local tokens = {}
 	for _, token in ipairs(utils.splitString(input, delimiter)) do
 		local trimmed = utils.trimString(token)

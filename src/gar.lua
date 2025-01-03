@@ -27,7 +27,7 @@ local gar = {}
 --- @field services GatewayServices | nil
 --- @field status "joined"|"leaving"
 --- @field observerAddress WalletAddress
---- @field weights GatewayWeights | nil // TODO: make this required and update tests to match the type
+--- @field weights GatewayWeights
 --- @field slashings table<Timestamp, mARIO> | nil
 
 --- @class Gateway : CompactGateway
@@ -1724,7 +1724,7 @@ end
 
 --- Fetch a heterogenous array of all active and vaulted delegated stakes, cursored on startTimestamp
 --- @param address string The address of the delegator
---- @param cursor string|nil The cursor after which to fetch more stakes (optional)
+--- @param cursor string|number|nil The cursor after which to fetch more stakes (optional)
 --- @param limit number The max number of stakes to fetch
 --- @param sortBy string The field to sort by. Default is "startTimestamp"
 --- @param sortOrder string The order to sort by, either "asc" or "desc". Default is "asc"
