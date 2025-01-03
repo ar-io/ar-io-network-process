@@ -119,7 +119,7 @@ describe('setup', () => {
         'No eligible rewards found for current epoch',
       );
 
-      // TODO: for now pass if distributions are empty
+      // No eligible rewards for the current epoch
       if (
         Object.keys(currentEpochDistributions.rewards.eligible).length === 0
       ) {
@@ -180,7 +180,6 @@ describe('setup', () => {
         `Delegated supply is undefined: ${supplyData.delegated}`,
       );
 
-      // TODO: there is an unknown precision loss on these values, we are discussing why with Forward. Once fixed, uncomment these tests
       const { items: balances } = await io.getBalances({
         limit: 10_000,
       });
@@ -365,7 +364,7 @@ describe('setup', () => {
 
   // gateway registry - ensure no invalid gateways
   describe('gateway registry', () => {
-    it('should only have valid gateways', async () => {
+    it('should only have valid gateways', { timeout: 60000 }, async () => {
       const { durationMs, epochZeroStartTimestamp } =
         await io.getEpochSettings();
       // compute the epoch index based on the epoch settings
@@ -542,16 +541,10 @@ describe('setup', () => {
   // arns registry - ensure no invalid arns
   describe('arns names', () => {
     const twoWeeks = 2 * 7 * 24 * 60 * 60 * 1000;
-    it('should not have any arns records older than two weeks', async () => {
-      // TODO: Remove this when we figure out whether do/while is causing test hanging
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(
-          () => reject(new Error('Test timed out after 60 seconds')),
-          60000,
-        ),
-      );
-
-      const testLogicPromise = (async () => {
+    it(
+      'should not have any arns records older than two weeks',
+      { timeout: 60000 },
+      async () => {
         let cursor = undefined;
         let totalArns = 0;
         const uniqueNames = new Set();
@@ -604,9 +597,7 @@ describe('setup', () => {
           uniqueNames.size === totalArns,
           `Counted total ARNs (${uniqueNames.size}) does not match total ARNs (${totalArns})`,
         );
-      })();
-
-      await Promise.race([testLogicPromise, timeoutPromise]);
-    });
+      },
+    );
   });
 });

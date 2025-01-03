@@ -89,8 +89,9 @@ local ActionMap = {
 	--- ArNS
 	Record = "Record",
 	Records = "Records",
-	BuyRecord = "Buy-Record", -- TODO: standardize these as `Buy-Name` or `Upgrade-Record`
-	UpgradeName = "Upgrade-Name", -- TODO: may be more aligned to `Upgrade-Record`
+	BuyRecord = "Buy-Record", -- deprecated - use Buy-Name instead
+	BuyName = "Buy-Name",
+	UpgradeName = "Upgrade-Name",
 	ExtendLease = "Extend-Lease",
 	IncreaseUndernameLimit = "Increase-Undername-Limit",
 	ReassignName = "Reassign-Name",
@@ -98,8 +99,10 @@ local ActionMap = {
 	ReservedNames = "Reserved-Names",
 	ReservedName = "Reserved-Name",
 	TokenCost = "Token-Cost",
-	CostDetails = "Get-Cost-Details-For-Action",
-	GetRegistrationFees = "Get-Registration-Fees",
+	GetCostDetails = "Get-Cost-Details-For-Action", -- deprecated - use Cost-Details instead
+	CostDetails = "Cost-Details",
+	GetRegistrationFees = "Get-Registration-Fees", -- deprecated - use Registration-Fees instead
+	RegistrationFees = "Registration-Fees",
 	ReturnedNames = "Returned-Names",
 	ReturnedName = "Returned-Name",
 	AllowDelegates = "Allow-Delegates",
@@ -157,7 +160,7 @@ local function adjustSuppliesForFundingPlan(fundingPlan, rewardForInitiator)
 	LastKnownCirculatingSupply = LastKnownCirculatingSupply - fundingPlan.balance + rewardForInitiator
 end
 
---- @param ioEvent IOEvent
+--- @param ioEvent ARIOEvent
 --- @param result BuyRecordResult|RecordInteractionResult|CreatePrimaryNameResult|PrimaryNameRequestApproval
 local function addResultFundingPlanFields(ioEvent, result)
 	ioEvent:addFieldsWithPrefixIfExist(result.fundingPlan, "FP-", { "balance" })
@@ -199,7 +202,7 @@ local function addResultFundingPlanFields(ioEvent, result)
 	adjustSuppliesForFundingPlan(result.fundingPlan, result.returnedName and result.returnedName.rewardForInitiator)
 end
 
---- @param ioEvent IOEvent
+--- @param ioEvent ARIOEvent
 ---@param result RecordInteractionResult|BuyRecordResult
 local function addRecordResultFields(ioEvent, result)
 	ioEvent:addFieldsIfExist(result, {
@@ -227,11 +230,8 @@ end
 
 local function addReturnedNameResultFields(ioEvent, result)
 	ioEvent:addFieldsIfExist(result, {
-		"bidAmount",
 		"rewardForInitiator",
 		"rewardForProtocol",
-		"startPrice",
-		"floorPrice",
 		"type",
 		"years",
 	})
@@ -322,7 +322,7 @@ local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
 	end
 end
 
---- @param ioEvent IOEvent
+--- @param ioEvent ARIOEvent
 local function addNextPruneTimestampsData(ioEvent)
 	ioEvent:addField("Next-Returned-Names-Prune-Timestamp", arns.nextReturnedNamesPruneTimestamp())
 	ioEvent:addField("Next-Epochs-Prune-Timestamp", epochs.nextEpochsPruneTimestamp())
@@ -333,7 +333,7 @@ local function addNextPruneTimestampsData(ioEvent)
 	ioEvent:addField("Next-Primary-Names-Prune-Timestamp", primaryNames.nextPrimaryNamesPruneTimestamp())
 end
 
---- @param ioEvent IOEvent
+--- @param ioEvent ARIOEvent
 --- @param prunedStateResult PruneStateResult
 local function addNextPruneTimestampsResults(ioEvent, prunedStateResult)
 	--- @type PrunedGatewaysResult
@@ -367,13 +367,13 @@ local function assertValidFundFrom(fundFrom)
 	assert(validFundFrom[fundFrom], "Invalid fund from type. Must be one of: any, balance, stakes")
 end
 
---- @param ioEvent IOEvent
+--- @param ioEvent ARIOEvent
 local function addPrimaryNameCounts(ioEvent)
 	ioEvent:addField("Total-Primary-Names", utils.lengthOfTable(primaryNames.getUnsafePrimaryNames()))
 	ioEvent:addField("Total-Primary-Name-Requests", utils.lengthOfTable(primaryNames.getUnsafePrimaryNameRequests()))
 end
 
---- @param ioEvent IOEvent
+--- @param ioEvent ARIOEvent
 --- @param primaryNameResult CreatePrimaryNameResult|PrimaryNameRequestApproval
 local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
 	ioEvent:addFieldsIfExist(primaryNameResult, { "baseNameOwner" })
@@ -408,15 +408,13 @@ local function updateLastKnownMessage(msg)
 	end
 end
 
---- @alias IOEvent table -- TODO: Type this
-
 --- @class ParsedMessage
 --- @field Id string
 --- @field Action string
 --- @field From string
 --- @field Timestamp Timestamp
 --- @field Tags table<string, any>
---- @field ioEvent IOEvent
+--- @field ioEvent ARIOEvent
 --- @field Cast boolean?
 --- @field reply? fun(response: any)
 
@@ -429,7 +427,7 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 	critical = critical or false
 	printEvent = printEvent == nil and true or printEvent
 	Handlers.add(handlerName, pattern, function(msg)
-		-- add an IOEvent to the message if it doesn't exist
+		-- add an ARIOEvent to the message if it doesn't exist
 		msg.ioEvent = msg.ioEvent or ARIOEvent(msg)
 		-- global handler for all eventing errors, so we can log them and send a notice to the sender for non critical errors and discard the memory on critical errors
 		local status, resultOrError = eventingPcall(msg.ioEvent, function(error)
@@ -785,7 +783,9 @@ addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", Actio
 	})
 end)
 
-addEventingHandler(ActionMap.BuyRecord, utils.hasMatchingTag("Action", ActionMap.BuyRecord), function(msg)
+addEventingHandler(ActionMap.BuyRecord, function(msg)
+	return msg.Action == ActionMap.BuyRecord or msg.Action == ActionMap.BuyName
+end, function(msg)
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
 	local purchaseType = msg.Tags["Purchase-Type"] and string.lower(msg.Tags["Purchase-Type"]) or "lease"
 	local years = msg.Tags.Years or nil
@@ -1003,7 +1003,9 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 	})
 end)
 
-addEventingHandler(ActionMap.CostDetails, utils.hasMatchingTag("Action", ActionMap.CostDetails), function(msg)
+addEventingHandler(ActionMap.GetCostDetails, function(msg)
+	return msg.Action == ActionMap.CostDetails or msg.Action == ActionMap.GetCostDetails
+end, function(msg)
 	local fundFrom = msg.Tags["Fund-From"]
 	local name = string.lower(msg.Tags.Name)
 	local years = msg.Tags.Years or 1
@@ -1033,23 +1035,19 @@ addEventingHandler(ActionMap.CostDetails, utils.hasMatchingTag("Action", ActionM
 	})
 end)
 
-addEventingHandler(
-	ActionMap.GetRegistrationFees,
-	utils.hasMatchingTag("Action", ActionMap.GetRegistrationFees),
-	function(msg)
-		local priceList = arns.getRegistrationFees()
+addEventingHandler(ActionMap.GetRegistrationFees, function(msg)
+	return msg.Action == ActionMap.RegistrationFees or msg.Action == ActionMap.GetRegistrationFees
+end, function(msg)
+	local priceList = arns.getRegistrationFees()
 
-		Send(msg, {
-			Target = msg.From,
-			Tags = { Action = ActionMap.GetRegistrationFees .. "-Notice" },
-			Data = json.encode(priceList),
-		})
-	end
-)
+	Send(msg, {
+		Target = msg.From,
+		Tags = { Action = ActionMap.GetRegistrationFees .. "-Notice" },
+		Data = json.encode(priceList),
+	})
+end)
 
 addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.JoinNetwork), function(msg)
-	-- TODO: add assertions on all the provided input, although the joinNetwork function will throw an error if the input is invalid
-
 	local updatedSettings = {
 		label = msg.Tags.Label,
 		note = msg.Tags.Note,
@@ -1440,7 +1438,6 @@ addEventingHandler(
 	end
 )
 
--- TODO: Update the UpdateGatewaySettings handler to consider replacing the allowedDelegates list
 addEventingHandler(
 	ActionMap.UpdateGatewaySettings,
 	utils.hasMatchingTag("Action", ActionMap.UpdateGatewaySettings),
@@ -1486,7 +1483,6 @@ addEventingHandler(
 				or msg.Tags["Auto-Stake"] == "true",
 		}
 
-		-- TODO: we could standardize this on our prepended handler to inject and ensure formatted addresses and converted values
 		local observerAddress = msg.Tags["Observer-Address"] or unsafeGateway.observerAddress
 		local result = gar.updateGatewaySettings(
 			msg.From,
@@ -1631,7 +1627,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.
 		["Withdraw-Supply"] = tostring(totalSupplyDetails.withdrawSupply),
 		["Protocol-Balance"] = tostring(totalSupplyDetails.protocolBalance),
 		Data = json.encode({
-			-- TODO: we are losing precision on these values unexpectedly. This has been brought to the AO team - for now the tags should be correct as they are stringified
+			-- NOTE: json.lua supports up to stringified numbers with 20 significant digits - numbers should always be stringified
 			total = totalSupplyDetails.totalSupply,
 			circulating = totalSupplyDetails.circulatingSupply,
 			locked = totalSupplyDetails.lockedSupply,
@@ -1728,7 +1724,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 		msg.ioEvent:addField("Prescribed-Observers", prescribedObserverAddresses)
 	end
 	if #newDemandFactors > 0 then
-		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors, ";")
+		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors)
 	end
 	if #newPruneGatewaysResults > 0 then
 		-- Reduce the prune gateways results and then track changes
@@ -1817,7 +1813,7 @@ addEventingHandler(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", Ac
 	})
 end)
 
---- TODO: we want to remove this but need to ensure we don't break downstream apps
+--- NOTE: this handler does not scale well, but various ecosystem apps rely on it (arconnect, ao.link, etc.)
 addEventingHandler(ActionMap.Balances, Handlers.utils.hasMatchingTag("Action", ActionMap.Balances), function(msg)
 	Send(msg, {
 		Target = msg.From,
@@ -1883,15 +1879,8 @@ addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epo
 	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
 		or epochs.getEpochIndexForTimestamp(msg.Timestamp)
 	local epoch = epochs.getEpoch(epochIndex)
-	-- TODO: this check can be removed after 14 days of release once old epochs are pruned
-	if
-		not epoch.prescribedObservers
-		or not epoch.prescribedObservers[1]
-		or not epoch.prescribedObservers[1].gatewayAddress
-	then
-		epoch.prescribedObservers = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
-	end
-	-- populate the prescribed observers with weights
+	-- populate the prescribed observers with weights for the epoch, this helps improve DX of downstream apps
+	epoch.prescribedObservers = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 	Send(msg, { Target = msg.From, Action = "Epoch-Notice", Data = json.encode(epoch) })
 end)
 
@@ -1922,18 +1911,7 @@ addEventingHandler(
 	function(msg)
 		local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
 			or epochs.getEpochIndexForTimestamp(msg.Timestamp)
-		local epoch = epochs.getEpoch(epochIndex)
-		local prescribedObserversWithWeights
-		-- TODO: this is to support old epochs that have full array of prescribedObservers, we can remove after the new epochs are created
-		if
-			epoch.prescribedObservers
-			and epoch.prescribedObservers[1]
-			and epoch.prescribedObservers[1].gatewayAddress
-		then
-			prescribedObserversWithWeights = epoch.prescribedObservers
-		else
-			prescribedObserversWithWeights = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
-		end
+		local prescribedObserversWithWeights = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 		Send(msg, {
 			Target = msg.From,
 			Action = "Prescribed-Observers-Notice",
@@ -2029,7 +2007,6 @@ end, function(msg)
 	Send(msg, { Target = msg.From, Action = "Gateways-Notice", Data = json.encode(result) })
 end)
 
---- TODO: make this support `Balances` requests
 addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginated-Balances"), function(msg)
 	local page = utils.parsePaginationTags(msg)
 	local walletBalances =
@@ -2085,7 +2062,6 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	assert(record, "Record not found")
 	assert(record.type == "permabuy", "Only permabuy names can be released")
 	assert(record.processId == processId, "Process-Id mismatch")
-	-- TODO: throw an error here instead of allowing release and force removal of primary names? I tend to favor the protection for primary name owners.
 	assert(
 		#primaryNames.getPrimaryNamesForBaseName(name) == 0,
 		"Primary names are associated with this name. They must be removed before releasing the name."
@@ -2344,6 +2320,7 @@ addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap
 	local names = utils.splitAndTrimString(msg.Tags.Names, ",")
 	assert(names and #names > 0, "Names are required")
 	assert(msg.From, "From is required")
+	local notifyOwners = msg.Tags["Notify-Owners"] and msg.Tags["Notify-Owners"] == "true" or false
 
 	local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNames(names, msg.From)
 	local removedPrimaryNamesCount = utils.lengthOfTable(removedPrimaryNamesAndOwners)
@@ -2370,15 +2347,16 @@ addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap
 		Data = json.encode(removedPrimaryNamesAndOwners),
 	})
 
-	-- TODO: send messages to the recipients of the claims? we could index on unique recipients and send one per recipient to avoid multiple messages
-	-- OR ANTS are responsible for sending messages to the recipients of the claims
-	for _, removedPrimaryNameAndOwner in pairs(removedPrimaryNamesAndOwners) do
-		Send(msg, {
-			Target = removedPrimaryNameAndOwner.owner,
-			Action = ActionMap.RemovePrimaryNames .. "-Notice",
-			Tags = { Name = removedPrimaryNameAndOwner.name },
-			Data = json.encode(removedPrimaryNameAndOwner),
-		})
+	-- Send messages to the owners of the removed primary names if the notifyOwners flag is true
+	if notifyOwners then
+		for _, removedPrimaryNameAndOwner in pairs(removedPrimaryNamesAndOwners) do
+			Send(msg, {
+				Target = removedPrimaryNameAndOwner.owner,
+				Action = ActionMap.RemovePrimaryNames .. "-Notice",
+				Tags = { Name = removedPrimaryNameAndOwner.name },
+				Data = json.encode(removedPrimaryNameAndOwner),
+			})
+		end
 	end
 end)
 

@@ -27,7 +27,7 @@ local gar = {}
 --- @field services GatewayServices | nil
 --- @field status "joined"|"leaving"
 --- @field observerAddress WalletAddress
---- @field weights GatewayWeights | nil // TODO: make this required and update tests to match the type
+--- @field weights GatewayWeights
 --- @field slashings table<Timestamp, mARIO> | nil
 
 --- @class Gateway : CompactGateway
@@ -723,8 +723,6 @@ function gar.getGatewayWeightsAtTimestamp(gatewayAddresses, timestamp)
 			-- the percentage of the epoch the gateway was joined for before this epoch, if the gateway starts in the future this will be 0
 			local gatewayStartTimestamp = gateway.startTimestamp
 			local totalTimeForGateway = timestamp >= gatewayStartTimestamp and (timestamp - gatewayStartTimestamp) or -1
-			-- TODO: should we increment by one here or are observers that join at the epoch start not eligible to be selected as an observer
-
 			local calculatedTenureWeightForGateway = totalTimeForGateway < 0 and 0
 				or (
 					totalTimeForGateway > 0 and totalTimeForGateway / gar.getSettings().observers.tenureWeightPeriod
@@ -1066,7 +1064,6 @@ function gar.slashOperatorStake(address, slashAmount, currentTimestamp)
 	gateway.slashings[tostring(currentTimestamp)] = slashAmount
 	balances.increaseBalance(ao.id, slashAmount)
 	GatewayRegistry[address] = gateway
-	-- TODO: send slash notice to gateway address
 end
 
 ---@param cursor string|nil # The cursor gateway address after which to fetch more gateways (optional)
@@ -1599,7 +1596,6 @@ function planMinimumStakesDrawdown(fundingPlan, stakingProfile)
 	end
 end
 
--- TODO: return event-worthy data
 --- Reduces all balances and creates withdraw stakes as prescribed by the funding plan
 --- @param fundingPlan table The funding plan to apply
 --- @param msgId string The current message ID
@@ -1728,7 +1724,7 @@ end
 
 --- Fetch a heterogenous array of all active and vaulted delegated stakes, cursored on startTimestamp
 --- @param address string The address of the delegator
---- @param cursor string|nil The cursor after which to fetch more stakes (optional)
+--- @param cursor string|number|nil The cursor after which to fetch more stakes (optional)
 --- @param limit number The max number of stakes to fetch
 --- @param sortBy string The field to sort by. Default is "startTimestamp"
 --- @param sortOrder string The order to sort by, either "asc" or "desc". Default is "asc"
