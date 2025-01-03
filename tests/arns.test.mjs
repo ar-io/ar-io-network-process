@@ -1821,20 +1821,6 @@ describe('ArNS', async () => {
           timestamp: returnedNameTimestamp,
           memory: buyRecordResult.Memory,
         });
-        console.log('tickResult', tickResult);
-
-        // the returnedName should have been created
-        const returnedNameData = await handle({
-          options: {
-            Tags: [
-              { name: 'Action', value: 'Returned-Name' },
-              { name: 'Name', value: 'great-name' },
-            ],
-            Timestamp: returnedNameTimestamp,
-          },
-
-          memory: tickResult.memory,
-        });
 
         const result = await handle({
           options: {
