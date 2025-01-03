@@ -56,7 +56,7 @@ Each handler is identified by an action name and it has required and optional ta
 |                           | `Delegations`                                                | Paginated delegations for a gateway.                                                                                  | **Optional:** `Address` (defaults to msg.From), `Cursor`, `Limit`, `SortBy`, `SortOrder`                                           |
 | **Name Registry (ArNS)**  | `Record`                                                     | Fetches details of a specific record by its name.                                                                     | **Required:** `Name`                                                                                                               |
 |                           | `Records` or `Paginated-Records`                             | Lists all records, with pagination support.                                                                           | **Optional:** `Cursor`, `Limit`, `SortBy`, `SortOrder`                                                                             |
-|                           | `Buy-Record`                                                 | Purchases a name record for a specified duration.                                                                     | **Required:** `Name` <br> **Optional:** `Years`, `Fund-From`                                                                       |
+|                           | `Buy-Name`                                                   | Purchases a name record for a specified duration.                                                                     | **Required:** `Name` <br> **Optional:** `Years`, `Fund-From`                                                                       |
 |                           | `Upgrade-Name`                                               | Upgrades a name record to a permanent record.                                                                         | **Required:** `Name` <br> **Optional:** `Fund-From`                                                                                |
 |                           | `Extend-Lease`                                               | Extends the lease of a name record.                                                                                   | **Required:** `Name`, `Years` <br> **Optional:** `Fund-From`                                                                       |
 |                           | `Increase-Undername-Limit`                                   | Increases the undername limit for a specific record.                                                                  | **Required:** `Name`, `Quantity` <br> **Optional:** `Fund-From`                                                                    |
@@ -213,6 +213,6 @@ dependencies = {
 
 ### Deployment
 
-TODO:
+Merging to develop or main will evolve the devnet or testnet contract to the next version. The script managing the logic is located at `tools/evolve.mjs`, which uses aoconnect to perform an `Eval` action. The deployment process is automated using Github Actions.
 
 [contract whitepaper]: https://ar.io/whitepaper

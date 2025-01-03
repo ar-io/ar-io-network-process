@@ -23,6 +23,8 @@ constants.maximumRewardRate = 0.001
 constants.minimumRewardRate = 0.0005
 constants.rewardDecayStartEpoch = 365
 constants.rewardDecayLastEpoch = 547
+constants.observerRewardRatio = 0.1
+constants.gatewayOperatorRewardRatio = 0.9
 
 -- GAR
 constants.DEFAULT_UNDERNAME_COUNT = 10

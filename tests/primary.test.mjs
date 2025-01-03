@@ -40,7 +40,7 @@ describe('primary names', function () {
     const buyRecordResult = await handle({
       options: {
         Tags: [
-          { name: 'Action', value: 'Buy-Record' },
+          { name: 'Action', value: 'Buy-Name' },
           { name: 'Name', value: name },
           { name: 'Purchase-Type', value: type },
           { name: 'Years', value: years },
@@ -140,6 +140,7 @@ describe('primary names', function () {
     caller,
     memory,
     timestamp = STUB_TIMESTAMP,
+    notifyOwners = false,
   }) => {
     const removePrimaryNamesResult = await handle({
       options: {
@@ -149,6 +150,7 @@ describe('primary names', function () {
         Tags: [
           { name: 'Action', value: 'Remove-Primary-Names' },
           { name: 'Names', value: names.join(',') },
+          { name: 'Notify-Owners', value: notifyOwners ? 'true' : 'false' },
         ],
       },
       memory,
@@ -508,6 +510,7 @@ describe('primary names', function () {
       caller: processId,
       memory: approvePrimaryNameRequestResult.Memory,
       timestamp: requestTimestamp,
+      notifyOwners: true, // notify the owner of the primary name
     });
 
     // assert no error
@@ -553,6 +556,7 @@ describe('primary names', function () {
       Timestamp: requestTimestamp,
       'Total-Primary-Name-Requests': 0,
       'Total-Primary-Names': 0,
+      'Notify-Owners': 'true',
     });
     // assert the primary name is no longer set
     const { result: primaryNameForAddressResult, memory } =

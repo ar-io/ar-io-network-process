@@ -123,6 +123,14 @@ describe("epochs", function()
 				settings = testSettings,
 				status = "joined",
 				observerAddress = "observerAddress",
+				weights = {
+					normalizedCompositeWeight = 1,
+					stakeWeight = 1,
+					tenureWeight = 1,
+					gatewayRewardRatioWeight = 1,
+					observerRewardRatioWeight = 1,
+					compositeWeight = 1,
+				},
 			}
 			local expectation = {
 				["observerAddress"] = "test-this-is-valid-arweave-wallet-address-1",
@@ -158,6 +166,14 @@ describe("epochs", function()
 					settings = testSettings,
 					status = "joined",
 					observerAddress = "observer-address-" .. i,
+					weights = {
+						normalizedCompositeWeight = 1,
+						stakeWeight = 1,
+						tenureWeight = 1,
+						gatewayRewardRatioWeight = 1,
+						observerRewardRatioWeight = 1,
+						compositeWeight = 1,
+					},
 				}
 				-- note - ordering of keys is not guaranteed when insert into maps
 				_G.GatewayRegistry["observer" .. i] = gateway
@@ -304,6 +320,14 @@ describe("epochs", function()
 						settings = testSettings,
 						status = "joined",
 						observerAddress = "test-this-is-valid-arweave-observer-address-1",
+						weights = {
+							normalizedCompositeWeight = 1,
+							stakeWeight = 1,
+							tenureWeight = 1,
+							gatewayRewardRatioWeight = 1,
+							observerRewardRatioWeight = 1,
+							compositeWeight = 1,
+						},
 					},
 					["test-this-is-valid-arweave-wallet-address-2"] = {
 						operatorStake = gar.getSettings().operators.minStake,
@@ -323,6 +347,14 @@ describe("epochs", function()
 						settings = testSettings,
 						status = "joined",
 						observerAddress = "test-this-is-valid-arweave-observer-address-2",
+						weights = {
+							normalizedCompositeWeight = 1,
+							stakeWeight = 1,
+							tenureWeight = 1,
+							gatewayRewardRatioWeight = 1,
+							observerRewardRatioWeight = 1,
+							compositeWeight = 1,
+						},
 					},
 					["test-this-is-valid-arweave-wallet-address-3"] = {
 						operatorStake = gar.getSettings().operators.minStake,
@@ -342,6 +374,14 @@ describe("epochs", function()
 						settings = testSettings,
 						status = "joined",
 						observerAddress = "test-this-is-valid-arweave-observer-address-3",
+						weights = {
+							normalizedCompositeWeight = 1,
+							stakeWeight = 1,
+							tenureWeight = 1,
+							gatewayRewardRatioWeight = 1,
+							observerRewardRatioWeight = 1,
+							compositeWeight = 1,
+						},
 					},
 					["test-this-is-valid-arweave-wallet-address-4"] = {
 						operatorStake = gar.getSettings().operators.minStake,
@@ -362,6 +402,14 @@ describe("epochs", function()
 						settings = testSettings,
 						status = "leaving", -- leaving, so it is not eligible to receive stats from this epoch
 						observerAddress = "test-this-is-valid-arweave-observer-address-4",
+						weights = {
+							normalizedCompositeWeight = 1,
+							stakeWeight = 1,
+							tenureWeight = 1,
+							gatewayRewardRatioWeight = 1,
+							observerRewardRatioWeight = 1,
+							compositeWeight = 1,
+						},
 					},
 				}
 				_G.Epochs[0].prescribedObservers = {
