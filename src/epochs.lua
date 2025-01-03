@@ -462,7 +462,7 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 
 	local epoch = epochs.getEpoch(epochIndex)
 
-	-- check if this is the first report filed in this epoch (TODO: use start or end?)
+	-- check if this is the first report filed in this epoch
 	if epoch.observations == nil then
 		epoch.observations = {
 			failureSummaries = {},

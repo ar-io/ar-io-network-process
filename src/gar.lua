@@ -723,8 +723,6 @@ function gar.getGatewayWeightsAtTimestamp(gatewayAddresses, timestamp)
 			-- the percentage of the epoch the gateway was joined for before this epoch, if the gateway starts in the future this will be 0
 			local gatewayStartTimestamp = gateway.startTimestamp
 			local totalTimeForGateway = timestamp >= gatewayStartTimestamp and (timestamp - gatewayStartTimestamp) or -1
-			-- TODO: should we increment by one here or are observers that join at the epoch start not eligible to be selected as an observer
-
 			local calculatedTenureWeightForGateway = totalTimeForGateway < 0 and 0
 				or (
 					totalTimeForGateway > 0 and totalTimeForGateway / gar.getSettings().observers.tenureWeightPeriod
@@ -1066,7 +1064,6 @@ function gar.slashOperatorStake(address, slashAmount, currentTimestamp)
 	gateway.slashings[tostring(currentTimestamp)] = slashAmount
 	balances.increaseBalance(ao.id, slashAmount)
 	GatewayRegistry[address] = gateway
-	-- TODO: send slash notice to gateway address
 end
 
 ---@param cursor string|nil # The cursor gateway address after which to fetch more gateways (optional)

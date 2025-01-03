@@ -1627,7 +1627,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.
 		["Withdraw-Supply"] = tostring(totalSupplyDetails.withdrawSupply),
 		["Protocol-Balance"] = tostring(totalSupplyDetails.protocolBalance),
 		Data = json.encode({
-			-- TODO: we are losing precision on these values unexpectedly. This has been brought to the AO team - for now the tags should be correct as they are stringified
+			-- NOTE: json.lua supports up to stringified numbers with 20 significant digits - numbers should always be stringified
 			total = totalSupplyDetails.totalSupply,
 			circulating = totalSupplyDetails.circulatingSupply,
 			locked = totalSupplyDetails.lockedSupply,
@@ -1813,7 +1813,7 @@ addEventingHandler(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", Ac
 	})
 end)
 
---- TODO: we want to remove this but need to ensure we don't break downstream apps
+--- NOTE: this handler does not scale well, but various ecosystem apps rely on it (arconnect, ao.link, etc.)
 addEventingHandler(ActionMap.Balances, Handlers.utils.hasMatchingTag("Action", ActionMap.Balances), function(msg)
 	Send(msg, {
 		Target = msg.From,
@@ -1879,15 +1879,8 @@ addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epo
 	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
 		or epochs.getEpochIndexForTimestamp(msg.Timestamp)
 	local epoch = epochs.getEpoch(epochIndex)
-	-- TODO: this check can be removed after 14 days of release once old epochs are pruned
-	if
-		not epoch.prescribedObservers
-		or not epoch.prescribedObservers[1]
-		or not epoch.prescribedObservers[1].gatewayAddress
-	then
-		epoch.prescribedObservers = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
-	end
-	-- populate the prescribed observers with weights
+	-- populate the prescribed observers with weights for the epoch, this helps improve DX of downstream apps
+	epoch.prescribedObservers = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 	Send(msg, { Target = msg.From, Action = "Epoch-Notice", Data = json.encode(epoch) })
 end)
 
@@ -1918,18 +1911,7 @@ addEventingHandler(
 	function(msg)
 		local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
 			or epochs.getEpochIndexForTimestamp(msg.Timestamp)
-		local epoch = epochs.getEpoch(epochIndex)
-		local prescribedObserversWithWeights
-		-- TODO: this is to support old epochs that have full array of prescribedObservers, we can remove after the new epochs are created
-		if
-			epoch.prescribedObservers
-			and epoch.prescribedObservers[1]
-			and epoch.prescribedObservers[1].gatewayAddress
-		then
-			prescribedObserversWithWeights = epoch.prescribedObservers
-		else
-			prescribedObserversWithWeights = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
-		end
+		local prescribedObserversWithWeights = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 		Send(msg, {
 			Target = msg.From,
 			Action = "Prescribed-Observers-Notice",
@@ -2025,7 +2007,6 @@ end, function(msg)
 	Send(msg, { Target = msg.From, Action = "Gateways-Notice", Data = json.encode(result) })
 end)
 
---- TODO: make this support `Balances` requests
 addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginated-Balances"), function(msg)
 	local page = utils.parsePaginationTags(msg)
 	local walletBalances =
@@ -2339,6 +2320,7 @@ addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap
 	local names = utils.splitAndTrimString(msg.Tags.Names, ",")
 	assert(names and #names > 0, "Names are required")
 	assert(msg.From, "From is required")
+	local notifyOwners = msg.Tags["Notify-Owners"] and msg.Tags["Notify-Owners"] == "true" or false
 
 	local removedPrimaryNamesAndOwners = primaryNames.removePrimaryNames(names, msg.From)
 	local removedPrimaryNamesCount = utils.lengthOfTable(removedPrimaryNamesAndOwners)
@@ -2365,15 +2347,16 @@ addEventingHandler("removePrimaryName", utils.hasMatchingTag("Action", ActionMap
 		Data = json.encode(removedPrimaryNamesAndOwners),
 	})
 
-	-- TODO: send messages to the recipients of the claims? we could index on unique recipients and send one per recipient to avoid multiple messages
-	-- OR ANTS are responsible for sending messages to the recipients of the claims
-	for _, removedPrimaryNameAndOwner in pairs(removedPrimaryNamesAndOwners) do
-		Send(msg, {
-			Target = removedPrimaryNameAndOwner.owner,
-			Action = ActionMap.RemovePrimaryNames .. "-Notice",
-			Tags = { Name = removedPrimaryNameAndOwner.name },
-			Data = json.encode(removedPrimaryNameAndOwner),
-		})
+	-- Send messages to the owners of the removed primary names if the notifyOwners flag is true
+	if notifyOwners then
+		for _, removedPrimaryNameAndOwner in pairs(removedPrimaryNamesAndOwners) do
+			Send(msg, {
+				Target = removedPrimaryNameAndOwner.owner,
+				Action = ActionMap.RemovePrimaryNames .. "-Notice",
+				Tags = { Name = removedPrimaryNameAndOwner.name },
+				Data = json.encode(removedPrimaryNameAndOwner),
+			})
+		end
 	end
 end)
 
