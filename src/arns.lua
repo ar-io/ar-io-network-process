@@ -632,6 +632,7 @@ end
 ---@class TokenCostResult
 ---@field tokenCost number The token cost in mARIO of the intended action
 ---@field discounts table|nil The discounts applied to the token cost
+---@field returnedNameDetails table|nil The details of anything returned name in the token cost result
 
 --- @class IntendedAction
 --- @field purchaseType string|nil The type of purchase (lease/permabuy)
@@ -655,6 +656,7 @@ function arns.getTokenCost(intendedAction)
 	local qty = tonumber(intendedAction.quantity)
 	local record = intendedAction.record or arns.getRecord(name)
 	local currentTimestamp = tonumber(intendedAction.currentTimestamp)
+	local returnedNameDetails = nil
 
 	assert(type(intent) == "string", "Intent is required and must be a string.")
 	assert(type(name) == "string", "Name is required and must be a string.")
@@ -665,9 +667,18 @@ function arns.getTokenCost(intendedAction)
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
 		local returnedName = arns.getReturnedNameUnsafe(name)
 		if returnedName then
-			tokenCost = math.floor(
-				tokenCost * arns.getReturnedNamePremiumMultiplier(returnedName.startTimestamp, currentTimestamp)
-			)
+			local premiumMultiplier =
+				arns.getReturnedNamePremiumMultiplier(returnedName.startTimestamp, currentTimestamp)
+			local basePrice = tokenCost
+			tokenCost = math.floor(tokenCost * premiumMultiplier)
+			returnedNameDetails = {
+				name = name,
+				initiator = returnedName.initiator,
+				startTimestamp = returnedName.startTimestamp,
+				endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod,
+				premiumMultiplier = premiumMultiplier,
+				basePrice = basePrice,
+			}
 		end
 	elseif intent == "Extend-Lease" then
 		assert(record, "Name is not registered")
@@ -722,6 +733,7 @@ function arns.getTokenCost(intendedAction)
 	return {
 		tokenCost = tokenCost,
 		discounts = discounts,
+		returnedNameDetails = returnedNameDetails,
 	}
 end
 
@@ -729,6 +741,7 @@ end
 ---@field tokenCost number The token cost in mARIO of the intended action
 ---@field discounts table|nil The discounts applied to the token cost
 ---@field fundingPlan table|nil The funding plan for the intended action
+---@field returnedNameDetails table|nil The details of anything returned name in the token cost result
 
 --- Gets the token cost and funding plan for the given intent
 --- @param intent string The intent to get the cost and funding plan for
@@ -764,6 +777,7 @@ function arns.getTokenCostAndFundingPlanForIntent(
 		tokenCost = tokenCostResult.tokenCost,
 		fundingPlan = fundingPlan,
 		discounts = tokenCostResult.discounts,
+		returnedNameDetails = tokenCostResult.returnedNameDetails,
 	}
 end
 
