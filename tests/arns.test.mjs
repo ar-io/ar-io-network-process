@@ -68,7 +68,7 @@ describe('ArNS', async () => {
         From: sender,
         Owner: sender,
         Tags: [
-          { name: 'Action', value: 'Buy-Record' },
+          { name: 'Action', value: 'Buy-Name' },
           { name: 'Name', value: name },
           { name: 'Purchase-Type', value: type },
           { name: 'Process-Id', value: processId },
@@ -102,7 +102,7 @@ describe('ArNS', async () => {
       'DF-Purchases-This-Period': 1,
       'DF-Revenue-This-Period': buyRecordData.purchasePrice,
       'DF-Current-Demand-Factor': 1,
-      Action: 'Buy-Record',
+      Action: 'Buy-Name',
       'Name-Length': 9,
       'Base-Registration-Fee': 500000000,
       'DF-Current-Period': 1,
@@ -158,7 +158,7 @@ describe('ArNS', async () => {
     };
   };
 
-  describe('Buy-Record', () => {
+  describe('Buy-Name', () => {
     it('should buy a record with an Arweave address', async () => {
       sharedMemory = (await runBuyRecord({ sender: STUB_ADDRESS })).memory;
     });
@@ -171,7 +171,7 @@ describe('ArNS', async () => {
       const buyRecordResult = await handle({
         options: {
           Tags: [
-            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Action', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'permabuy' },
             { name: 'Process-Id', value: ''.padEnd(43, 'a') },
@@ -204,7 +204,7 @@ describe('ArNS', async () => {
       const failedBuyRecordResult = await handle({
         options: {
           Tags: [
-            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Action', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
             { name: 'Years', value: '1' },
@@ -230,7 +230,7 @@ describe('ArNS', async () => {
       const buyRecordResult = await handle({
         options: {
           Tags: [
-            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Action', value: 'Buy-Name' },
             { name: 'Name', value: 'Test-NAme' },
             { name: 'Purchase-Type', value: 'lease' },
             { name: 'Years', value: '1' },
@@ -293,7 +293,7 @@ describe('ArNS', async () => {
             From: sender,
             Owner: sender,
             Tags: [
-              { name: 'Action', value: 'Buy-Record' },
+              { name: 'Action', value: 'Buy-Name' },
               { name: 'Name', value: 'test-name' },
               { name: 'Purchase-Type', value: 'lease' },
               { name: 'Years', value: '1' },
@@ -374,7 +374,7 @@ describe('ArNS', async () => {
             From: sender,
             Owner: sender,
             Tags: [
-              { name: 'Action', value: 'Buy-Record' },
+              { name: 'Action', value: 'Buy-Name' },
               { name: 'Name', value: 'test-name' },
               { name: 'Purchase-Type', value: 'lease' },
               { name: 'Years', value: '1' },
@@ -461,7 +461,7 @@ describe('ArNS', async () => {
           Owner: STUB_ADDRESS,
           Tags: [
             { name: 'Action', value: 'Get-Cost-Details-For-Action' },
-            { name: 'Intent', value: 'Buy-Record' },
+            { name: 'Intent', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
             { name: 'Years', value: '1' },
@@ -490,7 +490,7 @@ describe('ArNS', async () => {
       const buyRecordResult = await handle({
         options: {
           Tags: [
-            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Action', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
             { name: 'Years', value: '1' },
@@ -527,7 +527,7 @@ describe('ArNS', async () => {
       const buyRecordResult = await handle({
         options: {
           Tags: [
-            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Action', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
             { name: 'Years', value: '1' },
@@ -563,7 +563,7 @@ describe('ArNS', async () => {
       const buyRecordResult = await handle({
         options: {
           Tags: [
-            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Action', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
             { name: 'Years', value: '1' },
@@ -646,7 +646,7 @@ describe('ArNS', async () => {
       const buyUndernameResult = await handle({
         options: {
           Tags: [
-            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Action', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
             { name: 'Years', value: '1' },
@@ -708,7 +708,7 @@ describe('ArNS', async () => {
           From: STUB_ADDRESS,
           Owner: STUB_ADDRESS,
           Tags: [
-            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Action', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
             { name: 'Years', value: '1' },
@@ -772,7 +772,7 @@ describe('ArNS', async () => {
       const buyRecordResult = await handle({
         options: {
           Tags: [
-            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Action', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
             { name: 'Years', value: '1' },
@@ -845,7 +845,7 @@ describe('ArNS', async () => {
           From: STUB_ADDRESS,
           Owner: STUB_ADDRESS,
           Tags: [
-            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Action', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
             { name: 'Years', value: '1' },
@@ -980,12 +980,12 @@ describe('ArNS', async () => {
         timestamp: newBuyTimestamp,
       });
 
-      // should send three messages including a Buy-Record-Notice and a Debit-Notice
+      // should send three messages including a Buy-Name-Notice and a Debit-Notice
       assert.equal(newBuyResult.Messages.length, 2);
 
       // should send a buy record notice
       const buyRecordNoticeTag = newBuyResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Action' && tag.value === 'Buy-Record-Notice',
+        (tag) => tag.name === 'Action' && tag.value === 'Buy-Name-Notice',
       );
 
       assert.ok(buyRecordNoticeTag);
@@ -1190,7 +1190,7 @@ describe('ArNS', async () => {
           From: bidderAddress,
           Owner: bidderAddress,
           Tags: [
-            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Action', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Process-Id', value: processId },
             { name: 'Purchase-Type', value: 'lease' },
@@ -1209,13 +1209,13 @@ describe('ArNS', async () => {
         );
       assert.equal(buyReturnedNameErrorTag, undefined);
 
-      // should send three messages including a Buy-Record-Notice and a Debit-Notice
+      // should send three messages including a Buy-Name-Notice and a Debit-Notice
       assert.equal(buyReturnedNameResult.Messages.length, 2);
 
       // should send a buy record notice
       const buyRecordNoticeTag =
         buyReturnedNameResult.Messages?.[0]?.Tags?.find(
-          (tag) => tag.name === 'Action' && tag.value === 'Buy-Record-Notice',
+          (tag) => tag.name === 'Action' && tag.value === 'Buy-Name-Notice',
         );
 
       assert.ok(buyRecordNoticeTag);
@@ -1385,7 +1385,7 @@ describe('ArNS', async () => {
         options: {
           Tags: [
             { name: 'Action', value: 'Token-Cost' },
-            { name: 'Intent', value: 'Buy-Record' },
+            { name: 'Intent', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
             { name: 'Years', value: '1' },
@@ -1413,7 +1413,7 @@ describe('ArNS', async () => {
         options: {
           Tags: [
             { name: 'Action', value: 'Token-Cost' },
-            { name: 'Intent', value: 'Buy-Record' },
+            { name: 'Intent', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
             { name: 'Years', value: '1' },
@@ -1438,7 +1438,7 @@ describe('ArNS', async () => {
         options: {
           Tags: [
             { name: 'Action', value: 'Token-Cost' },
-            { name: 'Intent', value: 'Buy-Record' },
+            { name: 'Intent', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
             { name: 'Years', value: '1' },
@@ -1595,7 +1595,7 @@ describe('ArNS', async () => {
         const buyRecordsResult = await handle({
           options: {
             Tags: [
-              { name: 'Action', value: 'Buy-Record' },
+              { name: 'Action', value: 'Buy-Name' },
               { name: 'Name', value: `test-name-${i}` },
               { name: 'Process-Id', value: ''.padEnd(43, `${i}`) },
             ],
@@ -1725,7 +1725,7 @@ describe('ArNS', async () => {
         options: {
           Tags: [
             { name: 'Action', value: 'Get-Cost-Details-For-Action' },
-            { name: 'Intent', value: 'Buy-Record' },
+            { name: 'Intent', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
             { name: 'Years', value: '1' },
@@ -1757,7 +1757,7 @@ describe('ArNS', async () => {
           Owner: nonEligibleAddress,
           Tags: [
             { name: 'Action', value: 'Get-Cost-Details-For-Action' },
-            { name: 'Intent', value: 'Buy-Record' },
+            { name: 'Intent', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
           ],
           Timestamp: afterDistributionTimestamp,
@@ -1782,7 +1782,7 @@ describe('ArNS', async () => {
             From: joinedGateway,
             Owner: joinedGateway,
             Tags: [
-              { name: 'Action', value: 'Buy-Record' },
+              { name: 'Action', value: 'Buy-Name' },
               { name: 'Name', value: 'great-name' },
               { name: 'Purchase-Type', value: 'lease' },
               { name: 'Process-Id', value: ''.padEnd(43, 'a') },
@@ -1797,7 +1797,7 @@ describe('ArNS', async () => {
             From: nonEligibleAddress,
             Owner: nonEligibleAddress,
             Tags: [
-              { name: 'Action', value: 'Buy-Record' },
+              { name: 'Action', value: 'Buy-Name' },
               { name: 'Name', value: 'great-name' },
               { name: 'Purchase-Type', value: 'lease' },
               { name: 'Process-Id', value: ''.padEnd(43, 'a') },

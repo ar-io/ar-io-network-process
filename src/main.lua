@@ -824,7 +824,7 @@ end, function(msg)
 
 	Send(msg, {
 		Target = msg.From,
-		Tags = { Action = ActionMap.BuyRecord .. "-Notice", Name = name },
+		Tags = { Action = ActionMap.BuyName .. "-Notice", Name = name },
 		Data = json.encode({
 			name = name,
 			startTimestamp = record.startTimestamp,
@@ -950,7 +950,8 @@ addEventingHandler(
 function assertTokenCostTags(msg)
 	local intentType = msg.Tags.Intent
 	local validIntents = utils.createLookupTable({
-		ActionMap.BuyRecord,
+		ActionMap.BuyRecord, -- Deprecated
+		ActionMap.BuyName,
 		ActionMap.ExtendLease,
 		ActionMap.IncreaseUndernameLimit,
 		ActionMap.UpgradeName,
@@ -958,7 +959,7 @@ function assertTokenCostTags(msg)
 	})
 	assert(
 		intentType and type(intentType) == "string" and validIntents[intentType],
-		"Intent must be valid registry interaction (e.g. Buy-Record, Extend-Lease, Increase-Undername-Limit, Upgrade-Name, Primary-Name-Request). Provided intent: "
+		"Intent must be valid registry interaction (e.g. Buy-Name, Extend-Lease, Increase-Undername-Limit, Upgrade-Name, Primary-Name-Request). Provided intent: "
 			.. (intentType or "nil")
 	)
 	arns.assertValidArNSName(msg.Tags.Name)
