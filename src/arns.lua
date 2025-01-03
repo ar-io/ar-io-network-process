@@ -103,7 +103,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 
 	local tokenCostResult = arns.getTokenCost({
 		currentTimestamp = timestamp,
-		intent = "Buy-Record",
+		intent = "Buy-Name",
 		name = name,
 		purchaseType = purchaseType,
 		years = numYears,
@@ -638,7 +638,7 @@ end
 --- @field years number|nil The number of years for lease
 --- @field quantity number|nil The quantity for increasing undername limit
 --- @field name string The name of the record
---- @field intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name/Primary-Name-Request)
+--- @field intent string The intended action type (Buy-Name/Extend-Lease/Increase-Undername-Limit/Upgrade-Name/Primary-Name-Request)
 --- @field currentTimestamp number The current timestamp
 --- @field from string|nil The target address of the intended action
 --- @field record StoredRecord|nil The record to perform the intended action on
@@ -658,7 +658,7 @@ function arns.getTokenCost(intendedAction)
 
 	assert(type(intent) == "string", "Intent is required and must be a string.")
 	assert(type(name) == "string", "Name is required and must be a string.")
-	if intent == "Buy-Record" then
+	if intent == "Buy-Name" or intent == "Buy-Record" then
 		-- stub the process id as it is not required for this intent
 		local processId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 		arns.assertValidBuyRecord(name, years, purchaseType, processId, false)

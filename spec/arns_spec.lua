@@ -806,7 +806,7 @@ describe("arns", function()
 			local demandFactor = 0.974
 			local expectedCost = math.floor((years * baseFee * 0.20) + baseFee) * demandFactor
 			local intendedAction = {
-				intent = "Buy-Record",
+				intent = "Buy-Name",
 				purchaseType = "lease",
 				years = 2,
 				name = "test-name",
@@ -820,7 +820,7 @@ describe("arns", function()
 			local demandFactor = 1.052
 			local expectedCost = math.floor((baseFee * 0.2 * 20) + baseFee) * demandFactor
 			local intendedAction = {
-				intent = "Buy-Record",
+				intent = "Buy-Name",
 				purchaseType = "permabuy",
 				name = "test-name",
 				currentTimestamp = timestamp,
@@ -888,7 +888,7 @@ describe("arns", function()
 			local expectedCost =
 				math.floor((((years * baseFee * 0.20) + baseFee) * demandFactor) * constants.returnedNameMaxMultiplier)
 			local intendedAction = {
-				intent = "Buy-Record",
+				intent = "Buy-Name",
 				purchaseType = "lease",
 				years = years,
 				name = "test-name",
@@ -911,7 +911,7 @@ describe("arns", function()
 			local demandFactor = 1.052
 			local expectedCost = math.floor((baseFee * 0.2 * 20) + baseFee) * demandFactor
 			local intendedAction = {
-				intent = "Buy-Record",
+				intent = "Buy-Name",
 				purchaseType = "permabuy",
 				name = "test-name",
 				currentTimestamp = timestamp,
@@ -936,7 +936,7 @@ describe("arns", function()
 			local demandFactor = 1.052
 			local expectedCost = math.floor((baseFee * 0.2 * 20) + baseFee) * demandFactor
 			local intendedAction = {
-				intent = "Buy-Record",
+				intent = "Buy-Name",
 				purchaseType = "permabuy",
 				name = "test-name",
 				currentTimestamp = timestamp,
@@ -1016,7 +1016,7 @@ describe("arns", function()
 			local demandFactor = 0.974
 			local expectedCost = math.floor((years * baseFee * 0.20) + baseFee) * demandFactor
 			local intendedAction = {
-				intent = "Buy-Record",
+				intent = "Buy-Name",
 				purchaseType = "lease",
 				years = 2,
 				name = "test-name",

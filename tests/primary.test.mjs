@@ -40,7 +40,7 @@ describe('primary names', function () {
     const buyRecordResult = await handle({
       options: {
         Tags: [
-          { name: 'Action', value: 'Buy-Record' },
+          { name: 'Action', value: 'Buy-Name' },
           { name: 'Name', value: name },
           { name: 'Purchase-Type', value: type },
           { name: 'Years', value: years },
