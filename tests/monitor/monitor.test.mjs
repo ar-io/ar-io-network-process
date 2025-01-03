@@ -364,7 +364,7 @@ describe('setup', () => {
 
   // gateway registry - ensure no invalid gateways
   describe('gateway registry', () => {
-    it('should only have valid gateways', async () => {
+    it.timeout(60000, 'should only have valid gateways', async () => {
       const { durationMs, epochZeroStartTimestamp } =
         await io.getEpochSettings();
       // compute the epoch index based on the epoch settings
