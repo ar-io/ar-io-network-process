@@ -669,16 +669,15 @@ function arns.getTokenCost(intendedAction)
 		if returnedName then
 			local premiumMultiplier =
 				arns.getReturnedNamePremiumMultiplier(returnedName.startTimestamp, currentTimestamp)
-			local basePrice = tokenCost
-			tokenCost = math.floor(tokenCost * premiumMultiplier)
 			returnedNameDetails = {
 				name = name,
 				initiator = returnedName.initiator,
 				startTimestamp = returnedName.startTimestamp,
 				endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod,
 				premiumMultiplier = premiumMultiplier,
-				basePrice = basePrice,
+				basePrice = tokenCost,
 			}
+			tokenCost = math.floor(tokenCost * premiumMultiplier)
 		end
 	elseif intent == "Extend-Lease" then
 		assert(record, "Name is not registered")
