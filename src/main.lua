@@ -256,6 +256,21 @@ local function addSupplyData(ioEvent, supplyData)
 	ioEvent:addField("Protocol-Balance", Balances[Protocol])
 end
 
+--- @param ioEvent ARIOEvent
+--- @param talliesData StateObjectTallies
+local function addTalliesData(ioEvent, talliesData)
+	ioEvent:addFieldsIfExist(talliesData, {
+		"numAddressesVaulting",
+		"numBalanceVaults",
+		"numBalances",
+		"numDelegateVaults",
+		"numDelegations",
+		"numExitingDelegations",
+		"numGatewayVaults",
+		"numGateways",
+	})
+end
+
 local function gatewayStats()
 	local numJoinedGateways = 0
 	local numLeavingGateways = 0
@@ -1602,6 +1617,7 @@ addEventingHandler("totalSupply", utils.hasMatchingTag("Action", ActionMap.Total
 	addSupplyData(msg.ioEvent, {
 		totalTokenSupply = totalSupplyDetails.totalSupply,
 	})
+	addTalliesData(msg.ioEvent, totalSupplyDetails)
 	msg.ioEvent:addField("Last-Known-Total-Token-Supply", token.lastKnownTotalTokenSupply())
 	Send(msg, {
 		Action = "Total-Supply",
@@ -1615,6 +1631,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.
 	addSupplyData(msg.ioEvent, {
 		totalTokenSupply = totalSupplyDetails.totalSupply,
 	})
+	addTalliesData(msg.ioEvent, totalSupplyDetails)
 	msg.ioEvent:addField("Last-Known-Total-Token-Supply", token.lastKnownTotalTokenSupply())
 
 	Send(msg, {
