@@ -21,7 +21,17 @@ function token.lastKnownTotalTokenSupply()
 		+ Balances[Protocol]
 end
 
---- @class TotalSupplyDetails
+--- @class StateObjectTallies
+--- @field numAddressesVaulting number
+--- @field numBalanceVaults number
+--- @field numBalances number
+--- @field numDelegateVaults number
+--- @field numDelegations number
+--- @field numExitingDelegations number
+--- @field numGatewayVaults number
+--- @field numGateways number
+
+--- @class TotalSupplyDetails : StateObjectTallies
 --- @field totalSupply number
 --- @field circulatingSupply number
 --- @field lockedSupply number
@@ -41,39 +51,59 @@ function token.computeTotalSupply()
 	local delegatedSupply = 0
 	local withdrawSupply = 0
 	local protocolBalance = balances.getBalance(Protocol)
-	local userBalances = balances.getBalances()
+	local userBalances = balances.getBalancesUnsafe()
+	local numBalances = 0
+	local numGateways = 0
+	local numGatewayVaults = 0
+	local numDelegations = 0
+	local numExitingDelegations = 0
+	local numDelegateVaults = 0
+	local numBalanceVaults = 0
+	local numAddressesVaulting = 0
 
 	-- tally circulating supply
 	for _, balance in pairs(userBalances) do
 		circulatingSupply = circulatingSupply + balance
+		numBalances = numBalances + 1
 	end
 	circulatingSupply = circulatingSupply - protocolBalance
 	totalSupply = totalSupply + protocolBalance + circulatingSupply
 
 	-- tally supply stashed in gateways and delegates
 	for _, gateway in pairs(gar.getGatewaysUnsafe()) do
+		numGateways = numGateways + 1
 		totalSupply = totalSupply + gateway.operatorStake + gateway.totalDelegatedStake
 		stakedSupply = stakedSupply + gateway.operatorStake
 		delegatedSupply = delegatedSupply + gateway.totalDelegatedStake
 		for _, delegate in pairs(gateway.delegates) do
+			if delegate.delegatedStake == 0 then
+				numExitingDelegations = numExitingDelegations + 1
+			else
+				numDelegations = numDelegations + 1
+			end
+
 			-- tally delegates' vaults
 			for _, vault in pairs(delegate.vaults) do
+				numDelegateVaults = numDelegateVaults + 1
 				totalSupply = totalSupply + vault.balance
 				withdrawSupply = withdrawSupply + vault.balance
 			end
 		end
 		-- tally gateway's own vaults
 		for _, vault in pairs(gateway.vaults) do
+			numGatewayVaults = numGatewayVaults + 1
 			totalSupply = totalSupply + vault.balance
 			withdrawSupply = withdrawSupply + vault.balance
 		end
 	end
 
 	-- user vaults
-	local userVaults = vaults.getVaults()
+	local userVaults = vaults.getVaultsUnsafe()
 	for _, vaultsForAddress in pairs(userVaults) do
+		numAddressesVaulting = numAddressesVaulting + 1
 		-- they may have several vaults iterate through them
 		for _, vault in pairs(vaultsForAddress) do
+			numBalanceVaults = numBalanceVaults + 1
 			totalSupply = totalSupply + vault.balance
 			lockedSupply = lockedSupply + vault.balance
 		end
@@ -93,6 +123,14 @@ function token.computeTotalSupply()
 		delegatedSupply = delegatedSupply,
 		withdrawSupply = withdrawSupply,
 		protocolBalance = protocolBalance,
+		numAddressesVaulting = numAddressesVaulting,
+		numBalanceVaults = numBalanceVaults,
+		numBalances = numBalances,
+		numDelegateVaults = numDelegateVaults,
+		numDelegations = numDelegations,
+		numExitingDelegations = numExitingDelegations,
+		numGatewayVaults = numGatewayVaults,
+		numGateways = numGateways,
 	}
 end
 
