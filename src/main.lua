@@ -1667,7 +1667,9 @@ end)
 
 -- distribute rewards
 -- NOTE: THIS IS A CRITICAL HANDLER AND WILL DISCARD THE MEMORY ON ERROR
-addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
+addEventingHandler("distribute", function(msg)
+	return msg.Action == "Tick" or msg.Action == "Distribute"
+end, function(msg)
 	local msgId = msg.Id
 	local blockHeight = tonumber(msg["Block-Height"])
 	local hashchain = msg["Hash-Chain"]
@@ -1736,6 +1738,12 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 				tickResult.maybeDistributedEpoch.distributions.totalDistributedRewards
 			totalTickedRewardsDistributed = totalTickedRewardsDistributed
 				+ tickResult.maybeDistributedEpoch.distributions.totalDistributedRewards
+			Send(msg, {
+				Target = msg.From,
+				Action = "Epoch-Distribution-Notice",
+				["Epoch-Index"] = tostring(tickResult.maybeDistributedEpoch.epochIndex),
+				Data = json.encode(tickResult.maybeDistributedEpoch),
+			})
 		end
 	end
 	if #tickedEpochIndexes > 0 then
