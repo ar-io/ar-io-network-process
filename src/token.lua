@@ -36,16 +36,6 @@ end
 --- @field numGateways number
 --- @field numExitingGateways number
 
---- @class GatewayObjectMaybeTallies
---- @field numDelegateVaults number|nil
---- @field numDelegatesVaulting number|nil
---- @field numDelegations number|nil
---- @field numExitingDelegations number|nil
---- @field numGatewayVaults number|nil
---- @field numGatewaysVaulting number|nil
---- @field numGateways number|nil
---- @field numExitingGateways number|nil
-
 --- @class StateObjectTallies : GatewayObjectTallies, BalanceObjectTallies
 
 --- @class TotalSupplyDetails
