@@ -1,4 +1,5 @@
 -- balances.lua
+--- @type table<WalletAddress, mARIO>
 Balances = Balances or {}
 
 -- Utility functions that modify global Balance object
@@ -33,16 +34,22 @@ function balances.transfer(recipient, from, qty, allowUnsafeAddresses)
 end
 
 --- Gets the balance for a specific address
----@param target string The address to get balance for
----@return number The balance amount (0 if address has no balance)
+---@param target WalletAddress The address to get balance for
+---@return mARIO The balance amount (0 if address has no balance)
 function balances.getBalance(target)
 	return Balances[target] or 0
 end
 
---- Gets all balances in the system
----@return table All address:balance pairs
+--- Gets a deep copy of all balances in the system
+---@return table<WalletAddress, mARIO> # All address:balance pairs
 function balances.getBalances()
 	return utils.deepCopy(Balances) or {}
+end
+
+--- Gets all balances in the system
+---@return table<WalletAddress, mARIO> # All address:balance pairs
+function balances.getBalancesUnsafe()
+	return Balances or {}
 end
 
 --- Reduces the balance of an address
