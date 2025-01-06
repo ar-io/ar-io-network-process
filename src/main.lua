@@ -1725,6 +1725,12 @@ end, function(msg)
 		})
 		if tickResult.maybeNewEpoch ~= nil then
 			table.insert(newEpochIndexes, tickResult.maybeNewEpoch.epochIndex)
+			Send(msg, {
+				Target = msg.From,
+				Action = "Epoch-Created-Notice",
+				["Epoch-Index"] = tostring(tickResult.maybeNewEpoch.epochIndex),
+				Data = json.encode(tickResult.maybeNewEpoch),
+			})
 		end
 		if tickResult.maybeDemandFactor ~= nil then
 			table.insert(newDemandFactors, tickResult.maybeDemandFactor)
