@@ -257,17 +257,20 @@ local function addSupplyData(ioEvent, supplyData)
 end
 
 --- @param ioEvent ARIOEvent
---- @param talliesData StateObjectTallies
+--- @param talliesData StateObjectTallies|GatewayObjectTallies|nil
 local function addTalliesData(ioEvent, talliesData)
 	ioEvent:addFieldsIfExist(talliesData, {
 		"numAddressesVaulting",
 		"numBalanceVaults",
 		"numBalances",
 		"numDelegateVaults",
+		"numDelegatesVaulting",
 		"numDelegations",
 		"numExitingDelegations",
 		"numGatewayVaults",
+		"numGatewaysVaulting",
 		"numGateways",
+		"numExitingGateways",
 	})
 end
 
@@ -287,6 +290,8 @@ local function gatewayStats()
 	}
 end
 
+--- @param ioEvent ARIOEvent
+--- @param pruneGatewaysResult PruneGatewaysResult
 local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
 	LastKnownCirculatingSupply = LastKnownCirculatingSupply
 		+ (pruneGatewaysResult.delegateStakeReturned or 0)
@@ -335,6 +340,8 @@ local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
 			ioEvent:addField("Invariant-Slashed-Gateways", invariantSlashedGateways)
 		end
 	end
+
+	addTalliesData(ioEvent, pruneGatewaysResult.gatewayObjectTallies)
 end
 
 --- @param ioEvent ARIOEvent
@@ -351,7 +358,7 @@ end
 --- @param ioEvent ARIOEvent
 --- @param prunedStateResult PruneStateResult
 local function addNextPruneTimestampsResults(ioEvent, prunedStateResult)
-	--- @type PrunedGatewaysResult
+	--- @type PruneGatewaysResult
 	local pruneGatewaysResult = prunedStateResult.pruneGatewaysResult
 
 	-- If anything meaningful was pruned, collect the next prune timestamps
@@ -1617,7 +1624,7 @@ addEventingHandler("totalSupply", utils.hasMatchingTag("Action", ActionMap.Total
 	addSupplyData(msg.ioEvent, {
 		totalTokenSupply = totalSupplyDetails.totalSupply,
 	})
-	addTalliesData(msg.ioEvent, totalSupplyDetails)
+	addTalliesData(msg.ioEvent, totalSupplyDetails.stateObjectTallies)
 	msg.ioEvent:addField("Last-Known-Total-Token-Supply", token.lastKnownTotalTokenSupply())
 	Send(msg, {
 		Action = "Total-Supply",
@@ -1631,7 +1638,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.
 	addSupplyData(msg.ioEvent, {
 		totalTokenSupply = totalSupplyDetails.totalSupply,
 	})
-	addTalliesData(msg.ioEvent, totalSupplyDetails)
+	addTalliesData(msg.ioEvent, totalSupplyDetails.stateObjectTallies)
 	msg.ioEvent:addField("Last-Known-Total-Token-Supply", token.lastKnownTotalTokenSupply())
 
 	Send(msg, {
@@ -1689,6 +1696,7 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	local tickedEpochIndexes = {}
 	local newEpochIndexes = {}
 	local newDemandFactors = {}
+	--- @type PruneGatewaysResult[]
 	local newPruneGatewaysResults = {}
 	local tickedRewardDistributions = {}
 	local totalTickedRewardsDistributed = 0
@@ -1746,8 +1754,12 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	end
 	if #newPruneGatewaysResults > 0 then
 		-- Reduce the prune gateways results and then track changes
+		--- @type PruneGatewaysResult
 		local aggregatedPruneGatewaysResult = utils.reduce(
 			newPruneGatewaysResults,
+			--- @param acc PruneGatewaysResult
+			--- @param _ any
+			--- @param pruneGatewaysResult PruneGatewaysResult
 			function(acc, _, pruneGatewaysResult)
 				for _, address in pairs(pruneGatewaysResult.prunedGateways) do
 					table.insert(acc.prunedGateways, address)
@@ -1761,6 +1773,8 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 				acc.delegateStakeWithdrawing = acc.delegateStakeWithdrawing
 					+ pruneGatewaysResult.delegateStakeWithdrawing
 				acc.stakeSlashed = acc.stakeSlashed + pruneGatewaysResult.stakeSlashed
+				-- Upsert to the latest tallies if available
+				acc.gatewayObjectTallies = pruneGatewaysResult.gatewayObjectTallies or acc.gatewayObjectTallies
 				return acc
 			end,
 			{

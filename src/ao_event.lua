@@ -6,7 +6,7 @@ local json = require("json")
 --- @field sampleRate number|nil Optional sample rate.
 --- @field addField fun(self: AOEvent, key: string, value: any): AOEvent Adds a single field to the event.
 --- @field addFields fun(self: AOEvent, fields: table<string, any>): AOEvent Adds multiple fields to the event.
---- @field addFieldsIfExist fun(self: AOEvent, table: table<string, any>, fields: table<string>): AOEvent Adds specific fields if they exist in the given table.
+--- @field addFieldsIfExist fun(self: AOEvent, table: table<string, any>|nil, fields: table<string>): AOEvent Adds specific fields if they exist in the given table.
 --- @field addFieldsWithPrefixIfExist fun(self: AOEvent, srcTable: table<string, any>, prefix: string, fields: table<string>): AOEvent
 ---  Adds fields with a prefix if they exist in the source table.
 --- @field printEvent fun(self: AOEvent): nil Prints the event in JSON format.

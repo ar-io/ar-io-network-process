@@ -2009,6 +2009,16 @@ describe("gar", function()
 					gatewayStakeReturned = 0,
 					delegateStakeWithdrawing = 0,
 					gatewayStakeWithdrawing = 8000010000,
+					gatewayObjectTallies = {
+						numDelegateVaults = 0,
+						numDelegatesVaulting = 0,
+						numDelegations = 0,
+						numExitingDelegations = 0,
+						numExitingGateways = 1,
+						numGatewayVaults = 0,
+						numGateways = 1,
+						numGatewaysVaulting = 0,
+					},
 				}, result)
 
 				local expectedRemainingStake = math.floor(minOperatorStake * 0.8) + 10000

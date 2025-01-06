@@ -7,7 +7,7 @@ local gar = require("gar")
 --- @field maybeDistributedEpoch Epoch | nil The distributed epoch
 --- @field maybeNewEpoch Epoch | nil The new epoch
 --- @field maybeDemandFactor number | nil The demand factor
---- @field pruneGatewaysResult PrunedGatewaysResult The prune gateways result
+--- @field pruneGatewaysResult PruneGatewaysResult The prune gateways result
 
 --- Ticks an epoch. A tick is the process of updating the demand factor, distributing rewards, pruning gateways, and creating a new epoch.
 --- @param timestamp number The timestamp
