@@ -13,6 +13,7 @@ import {
   buyRecord,
   baseLeasePriceFor9CharNameFor3Years,
   totalTokenSupply,
+  tick,
 } from './helpers.mjs';
 import assert from 'node:assert';
 import {
@@ -1808,6 +1809,45 @@ describe('ArNS', async () => {
           memory: arnsDiscountMemory,
         });
         assertNoResultError(buyRecordResult);
+      });
+
+      it('returns the correct cost details for a returned name', async () => {
+        // Tick to the end of the lease period and grace period
+        const oneYearMs = 1000 * 60 * 60 * 24 * 365;
+        const twoWeeksMs = 1000 * 60 * 60 * 24 * 14;
+        const returnedNameTimestamp =
+          buyRecordTimestamp + oneYearMs + twoWeeksMs + 1; // 1 year and 2 weeks after the buy record
+        const tickResult = await tick({
+          timestamp: returnedNameTimestamp,
+          memory: buyRecordResult.Memory,
+        });
+
+        const result = await handle({
+          options: {
+            From: joinedGateway,
+            Owner: joinedGateway,
+            Tags: [
+              { name: 'Action', value: 'Get-Cost-Details-For-Action' },
+              { name: 'Intent', value: 'Buy-Name' },
+              { name: 'Name', value: 'great-name' },
+              { name: 'Purchase-Type', value: 'lease' },
+              { name: 'Years', value: '1' },
+              { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+            ],
+            Timestamp: returnedNameTimestamp,
+          },
+          memory: tickResult.memory,
+        });
+
+        const resultData = JSON.parse(result.Messages[0].Data);
+        assert.deepEqual(resultData.returnedNameDetails, {
+          initiator: PROCESS_ID,
+          basePrice: 4687500,
+          premiumMultiplier: 50,
+          startTimestamp: 1752734400001,
+          endTimestamp: 1753944000001,
+          name: 'great-name',
+        });
       });
 
       describe('extending the lease', () => {
