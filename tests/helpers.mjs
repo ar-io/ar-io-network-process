@@ -743,12 +743,14 @@ export const updateGatewaySettings = async ({
 
 export const buyRecord = async ({
   memory,
-  from,
+  from = PROCESS_OWNER,
   name,
   processId = STUB_PROCESS_ID,
   type = 'lease',
   years = 1,
   timestamp = STUB_TIMESTAMP,
+  fundFrom,
+  assertError = true,
 }) => {
   const buyRecordResult = await handle({
     options: {
@@ -760,12 +762,16 @@ export const buyRecord = async ({
         { name: 'Purchase-Type', value: type },
         { name: 'Process-Id', value: processId },
         { name: 'Years', value: `${years}` },
+        ...(fundFrom ? [{ name: 'Fund-From', value: fundFrom }] : []),
       ],
     },
+    shouldAssertNoResultError: assertError,
     timestamp,
     memory,
   });
-  assertNoResultError(buyRecordResult);
+  if (assertError) {
+    assertNoResultError(buyRecordResult);
+  }
   return {
     result: buyRecordResult,
     memory: buyRecordResult.Memory,
