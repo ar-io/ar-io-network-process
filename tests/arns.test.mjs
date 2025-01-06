@@ -52,172 +52,149 @@ describe('ArNS', async () => {
     });
   });
 
-  // describe('Buy-Name', () => {
-  //   it('should buy a record with an Arweave address', async () => {
-  //     const { result: buyRecordResult } = await buyRecord({
-  //       from: STUB_ADDRESS,
-  //       name: 'test-arweave-address',
-  //       type: 'lease',
-  //       years: 1,
-  //       processId: ''.padEnd(43, 'a'),
-  //       memory: sharedMemory,
-  //     });
+  describe('Buy-Name', () => {
+    it('should buy a record with an Arweave address', async () => {
+      const { result: buyRecordResult } = await buyRecord({
+        from: STUB_ADDRESS,
+        name: 'test-arweave-address',
+        type: 'lease',
+        years: 1,
+        processId: ''.padEnd(43, 'a'),
+        memory: sharedMemory,
+      });
 
-  //     const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
-  //     const recordResult = await handle({
-  //       options: {
-  //         Tags: [
-  //           { name: 'Action', value: 'Record' },
-  //           { name: 'Name', value: 'test-arweave-address' },
-  //         ],
-  //       },
-  //       memory: buyRecordResult.Memory,
-  //     });
+      const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
+      const recordResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Record' },
+            { name: 'Name', value: 'test-arweave-address' },
+          ],
+        },
+        memory: buyRecordResult.Memory,
+      });
 
-  //     const record = JSON.parse(recordResult.Messages[0].Data);
-  //     assert.deepEqual(record, {
-  //       processId: ''.padEnd(43, 'a'),
-  //       purchasePrice: buyRecordData.purchasePrice,
-  //       startTimestamp: buyRecordData.startTimestamp,
-  //       type: 'lease',
-  //       undernameLimit: 10,
-  //       endTimestamp: buyRecordData.endTimestamp,
-  //     });
-  //     sharedMemory = buyRecordResult.Memory;
-  //   });
+      const record = JSON.parse(recordResult.Messages[0].Data);
+      assert.deepEqual(record, {
+        processId: ''.padEnd(43, 'a'),
+        purchasePrice: buyRecordData.purchasePrice,
+        startTimestamp: buyRecordData.startTimestamp,
+        type: 'lease',
+        undernameLimit: 10,
+        endTimestamp: buyRecordData.endTimestamp,
+      });
+      sharedMemory = buyRecordResult.Memory;
+    });
 
-  //   it('should buy a record with an Ethereum address', async () => {
-  //     // transfer it tokens
-  //     const transferMemory = await transfer({
-  //       recipient: testEthAddress,
-  //       quantity: 1_000_000_000_000,
-  //       memory: sharedMemory,
-  //     });
+    it('should buy a record with an Ethereum address', async () => {
+      // transfer it tokens
+      const transferMemory = await transfer({
+        recipient: testEthAddress,
+        quantity: 1_000_000_000_000,
+        memory: sharedMemory,
+      });
 
-  //     const { result: buyRecordResult } = await buyRecord({
-  //       from: testEthAddress,
-  //       name: 'test-ethereum-address',
-  //       type: 'lease',
-  //       years: 1,
-  //       processId: ''.padEnd(43, 'a'),
-  //       memory: transferMemory,
-  //     });
+      const { result: buyRecordResult } = await buyRecord({
+        from: testEthAddress,
+        name: 'test-ethereum-address',
+        type: 'lease',
+        years: 1,
+        processId: ''.padEnd(43, 'a'),
+        memory: transferMemory,
+      });
 
-  //     const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
-  //     const recordResult = await handle({
-  //           options: {
-  //             Tags: [
-  //               { name: 'Action', value: 'Record' },
-  //               { name: 'Name', value: 'test-ethereum-address' },
-  //             ],
-  //           },
-  //           memory: buyRecordResult.Memory,
-  //     });
+      const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
+      const recordResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Record' },
+            { name: 'Name', value: 'test-ethereum-address' },
+          ],
+        },
+        memory: buyRecordResult.Memory,
+      });
 
-  //     const record = JSON.parse(recordResult.Messages[0].Data);
-  //     assert.deepEqual(record, {
-  //       processId: ''.padEnd(43, 'a'),
-  //       purchasePrice: buyRecordData.purchasePrice,
-  //       startTimestamp: buyRecordData.startTimestamp,
-  //       type: 'lease',
-  //       undernameLimit: 10,
-  //       endTimestamp: buyRecordData.endTimestamp,
-  //     });
-  //     sharedMemory = buyRecordResult.Memory;
-  //   });
+      const record = JSON.parse(recordResult.Messages[0].Data);
+      assert.deepEqual(record, {
+        processId: ''.padEnd(43, 'a'),
+        purchasePrice: buyRecordData.purchasePrice,
+        startTimestamp: buyRecordData.startTimestamp,
+        type: 'lease',
+        undernameLimit: 10,
+        endTimestamp: buyRecordData.endTimestamp,
+      });
+      sharedMemory = buyRecordResult.Memory;
+    });
 
-  //   it('should support `Buy-Record` as a backwards compatible alias', async () => {
-  //     // not using stub to test the backwards compatibility of the tag
-  //     const buyRecordResult = await handle({
-  //       options: {
-  //         Tags: [
-  //           { name: 'Action', value: 'Buy-Record' },
-  //           { name: 'Name', value: 'test-buy-record-tag' },
-  //           { name: 'Purchase-Type', value: 'lease' },
-  //           { name: 'Years', value: '1' },
-  //           { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-  //         ],
-  //       },
-  //       memory: sharedMemory,
-  //     });
-  //     assertNoResultError(buyRecordResult);
-  //     const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
-  //     assert.equal(
-  //       buyRecordResult.Messages[0].Tags.find((t) => t.name === 'Action').value,
-  //       'Buy-Name-Notice',
-  //     );
-  //     const record = JSON.parse(buyRecordResult.Messages[0].Data);
-  //     assert.deepEqual(record, {
-  //       name: 'test-buy-record-tag',
-  //       processId: ''.padEnd(43, 'a'),
-  //       purchasePrice: buyRecordData.purchasePrice,
-  //       startTimestamp: buyRecordData.startTimestamp,
-  //       type: 'lease',
-  //       undernameLimit: 10,
-  //       endTimestamp: buyRecordData.endTimestamp,
-  //       baseRegistrationFee: buyRecordData.baseRegistrationFee,
-  //       remainingBalance: 948999520000000,
-  //     });
-  //   });
+    it('should support `Buy-Record` as a backwards compatible alias', async () => {
+      // not using stub to test the backwards compatibility of the tag
+      const buyRecordResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Name', value: 'test-buy-record-tag' },
+            { name: 'Purchase-Type', value: 'lease' },
+            { name: 'Years', value: '1' },
+            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+          ],
+        },
+        memory: sharedMemory,
+      });
+      assertNoResultError(buyRecordResult);
+      const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
+      assert.equal(
+        buyRecordResult.Messages[0].Tags.find((t) => t.name === 'Action').value,
+        'Buy-Name-Notice',
+      );
+      const record = JSON.parse(buyRecordResult.Messages[0].Data);
+      assert.deepEqual(record, {
+        name: 'test-buy-record-tag',
+        processId: ''.padEnd(43, 'a'),
+        purchasePrice: buyRecordData.purchasePrice,
+        startTimestamp: buyRecordData.startTimestamp,
+        type: 'lease',
+        undernameLimit: 10,
+        endTimestamp: buyRecordData.endTimestamp,
+        baseRegistrationFee: buyRecordData.baseRegistrationFee,
+        remainingBalance: 948999520000000,
+      });
+    });
 
-  //   it('should fail to buy a permanently registered record', async () => {
-  //     const { result: buyRecordResult } = await buyRecord({
-  //       name: 'test-owned-name',
-  //       processId: ''.padEnd(43, 'a'),
-  //       type: 'permabuy',
-  //       years: 1,
-  //       timestamp: STUB_TIMESTAMP,
-  //       memory: sharedMemory,
-  //       from: STUB_ADDRESS,
-  //     });
+    it('should fail to buy a permanently registered record', async () => {
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-owned-name',
+        processId: ''.padEnd(43, 'a'),
+        type: 'permabuy',
+        years: 1,
+        timestamp: STUB_TIMESTAMP,
+        memory: sharedMemory,
+        from: STUB_ADDRESS,
+      });
 
-  //     // try and buy it again
-  //     const { result: failedBuyRecordResult } = await buyRecord({
-  //       name: 'test-owned-name',
-  //       processId: ''.padEnd(43, 'a'),
-  //       type: 'permabuy',
-  //       years: 1,
-  //       timestamp: STUB_TIMESTAMP,
-  //       memory: buyRecordResult.Memory,
-  //       assertError: false,
-  //     });
+      // try and buy it again
+      const { result: failedBuyRecordResult } = await buyRecord({
+        name: 'test-owned-name',
+        processId: ''.padEnd(43, 'a'),
+        type: 'permabuy',
+        years: 1,
+        timestamp: STUB_TIMESTAMP,
+        memory: buyRecordResult.Memory,
+        assertError: false,
+      });
 
-  //     const failedBuyRecordError = failedBuyRecordResult.Messages[0].Tags.find(
-  //       (t) => t.name === 'Error',
-  //     );
-  //     assert.ok(failedBuyRecordError, 'Error tag should be present');
-  //     const alreadyRegistered = failedBuyRecordResult.Messages[0].Data.includes(
-  //       'Name is already registered',
-  //     );
-  //     assert(alreadyRegistered);
-  //     sharedMemory = failedBuyRecordResult.Memory;
-  //   });
-
-  //   it('should buy a record and default the name to lower case', async () => {
-  //     const { result: buyRecordResult } = await buyRecord({
-  //       name: 'Test-Name',
-  //       processId: ''.padEnd(43, 'a'),
-  //       type: 'lease',
-  //       years: 1,
-  //       timestamp: STUB_TIMESTAMP,
-  //       memory: sharedMemory,
-  //     });
-
-  //     const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
-
-  //     // fetch the record
-  //     const realRecord = await handle({
-  //       options: {
-  //         Tags: [
-  //           { name: 'Action', value: 'Record' },
-  //           { name: 'Name', value: 'test-name' },
-  //         ],
-  //       },
-  //       memory: buyRecordResult.Memory,
-  //     });
+      const failedBuyRecordError = failedBuyRecordResult.Messages[0].Tags.find(
+        (t) => t.name === 'Error',
+      );
+      assert.ok(failedBuyRecordError, 'Error tag should be present');
+      const alreadyRegistered = failedBuyRecordResult.Messages[0].Data.includes(
+        'Name is already registered',
+      );
+      assert(alreadyRegistered);
+      sharedMemory = failedBuyRecordResult.Memory;
+    });
 
     it('should buy a record and default the name to lower case', async () => {
-      const buyRecordResult = await buyRecord({
+      const { result: buyRecordResult } = await buyRecord({
         name: 'Test-Name',
         processId: ''.padEnd(43, 'a'),
         type: 'lease',
@@ -238,11 +215,43 @@ describe('ArNS', async () => {
         },
         memory: buyRecordResult.Memory,
       });
-
       const record = JSON.parse(realRecord.Messages[0].Data);
       assert.deepEqual(record, {
         processId: ''.padEnd(43, 'a'),
-        purchasePrice: baseLeasePriceFor9CharNameFor1Year,
+        purchasePrice: buyRecordData.purchasePrice,
+        startTimestamp: buyRecordData.startTimestamp,
+        endTimestamp: buyRecordData.endTimestamp,
+        type: 'lease',
+        undernameLimit: 10,
+      });
+      sharedMemory = realRecord.Memory;
+    });
+
+    it('should buy a record and default the name to lower case', async () => {
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'Test-Name',
+        processId: ''.padEnd(43, 'a'),
+        type: 'lease',
+        years: 1,
+        timestamp: STUB_TIMESTAMP,
+        memory: sharedMemory,
+      });
+
+      const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
+      // fetch the record
+      const realRecord = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Record' },
+            { name: 'Name', value: 'test-name' },
+          ],
+        },
+        memory: buyRecordResult.Memory,
+      });
+      const record = JSON.parse(realRecord.Messages[0].Data);
+      assert.deepEqual(record, {
+        processId: ''.padEnd(43, 'a'),
+        purchasePrice: buyRecordData.purchasePrice,
         startTimestamp: buyRecordData.startTimestamp,
         endTimestamp: buyRecordData.endTimestamp,
         type: 'lease',
