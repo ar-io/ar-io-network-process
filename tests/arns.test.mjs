@@ -36,7 +36,13 @@ describe('ArNS', async () => {
     const { Memory: totalTokenSupplyMemory } = await totalTokenSupply({
       memory: startMemory,
     });
-    sharedMemory = totalTokenSupplyMemory;
+
+    const transferMemory = await transfer({
+      recipient: STUB_ADDRESS,
+      quantity: 1_000_000_000_000,
+      memory: totalTokenSupplyMemory,
+    });
+    sharedMemory = transferMemory;
   });
 
   afterEach(async () => {
@@ -46,174 +52,134 @@ describe('ArNS', async () => {
     });
   });
 
-  const runBuyRecord = async ({
-    sender = STUB_ADDRESS,
-    processId = ''.padEnd(43, 'a'),
-    transferQty = 1_000_000_000_000,
-    name = 'test-name',
-    type = 'lease',
-    memory = sharedMemory,
-  }) => {
-    if (sender != PROCESS_OWNER) {
-      // transfer from the owner to the sender
-      memory = await transfer({
-        recipient: sender,
-        quantity: transferQty,
-        cast: true,
-        memory,
-      });
-    }
-
-    const buyRecordResult = await handle({
-      options: {
-        From: sender,
-        Owner: sender,
-        Tags: [
-          { name: 'Action', value: 'Buy-Name' },
-          { name: 'Name', value: name },
-          { name: 'Purchase-Type', value: type },
-          { name: 'Process-Id', value: processId },
-          { name: 'Years', value: '1' },
-        ],
-        Timestamp: STUB_TIMESTAMP,
-      },
-      memory,
-    });
-
-    const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
-    const buyRecordEvent = JSON.parse(
-      buyRecordResult.Output.data.split('\n')[1],
-    );
-
-    const expectedRemainingBalance = {
-      '0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa': 0,
-      [PROCESS_OWNER]: 950000000000000 - transferQty,
-      [PROCESS_ID]: 50_000_000_000_000 + buyRecordData.purchasePrice,
-      [sender]: transferQty - buyRecordData.purchasePrice,
-    };
-    const expectedEvent = {
-      _e: 1,
-      Timestamp: STUB_TIMESTAMP,
-      'Start-Timestamp': STUB_TIMESTAMP,
-      ...(type == 'lease' && { 'End-Timestamp': STUB_TIMESTAMP + 31536000000 }), // 1 year in ms
-      'Purchase-Type': type,
-      Years: '1', // Note: this added because we are sending the tag, but not relevant for permabuys
-      'Undername-Limit': 10,
-      'Purchase-Price': buyRecordData.purchasePrice,
-      'DF-Purchases-This-Period': 1,
-      'DF-Revenue-This-Period': buyRecordData.purchasePrice,
-      'DF-Current-Demand-Factor': 1,
-      Action: 'Buy-Name',
-      'Name-Length': 9,
-      'Base-Registration-Fee': 500000000,
-      'DF-Current-Period': 1,
-      'DF-Trailing-Period-Revenues': [0, 0, 0, 0, 0, 0],
-      'DF-Trailing-Period-Purchases': [0, 0, 0, 0, 0, 0, 0],
-      Cron: false,
-      Cast: false,
-      Name: name,
-      'DF-Consecutive-Periods-With-Min-Demand-Factor': 0,
-      'Process-Id': processId,
-      From: sender,
-      'From-Formatted': sender,
-      'Message-Id': STUB_MESSAGE_ID,
-      'Records-Count': 1,
-      'Protocol-Balance': expectedRemainingBalance[PROCESS_ID],
-      'Reserved-Records-Count': 0,
-      'Remaining-Balance': expectedRemainingBalance[sender],
-      'Circulating-Supply': -buyRecordData.purchasePrice, // Artifact of starting out without initializing this properly
-      'Total-Token-Supply': 50000000000000, // Artifact of starting out without initializing this properly
-      'Staked-Supply': 0, // Artifact of starting out without initializing this properly
-      'Delegated-Supply': 0, // Artifact of starting out without initializing this properly
-      'Withdraw-Supply': 0, // Artifact of starting out without initializing this properly
-      'Locked-Supply': 0, // Artifact of starting out without initializing this properly
-    };
-    // TODO: ASSERT THE EVENT DATA
-
-    // fetch the record
-    const realRecord = await handle({
-      options: {
-        From: sender,
-        Owner: sender,
-        Tags: [
-          { name: 'Action', value: 'Record' },
-          { name: 'Name', value: name },
-        ],
-      },
-      memory: buyRecordResult.Memory,
-    });
-
-    const record = JSON.parse(realRecord.Messages[0].Data);
-    assert.deepEqual(record, {
-      processId: processId,
-      purchasePrice: buyRecordData.purchasePrice,
-      startTimestamp: buyRecordData.startTimestamp,
-      type: type,
-      undernameLimit: 10,
-      ...(type == 'lease' && { endTimestamp: buyRecordData.endTimestamp }),
-    });
-
-    return {
-      record,
-      memory: buyRecordResult.Memory,
-    };
-  };
-
   describe('Buy-Name', () => {
     it('should buy a record with an Arweave address', async () => {
-      sharedMemory = (await runBuyRecord({ sender: STUB_ADDRESS })).memory;
-    });
-
-    it('should buy a record with an Ethereum address', async () => {
-      sharedMemory = await runBuyRecord({ sender: testEthAddress });
-    });
-
-    it('should fail to buy a permanently registered record', async () => {
-      const buyRecordResult = await handle({
-        options: {
-          Tags: [
-            { name: 'Action', value: 'Buy-Name' },
-            { name: 'Name', value: 'test-name' },
-            { name: 'Purchase-Type', value: 'permabuy' },
-            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-          ],
-        },
+      const { result: buyRecordResult } = await buyRecord({
+        from: STUB_ADDRESS,
+        name: 'test-arweave-address',
+        type: 'lease',
+        years: 1,
+        processId: ''.padEnd(43, 'a'),
         memory: sharedMemory,
       });
-      const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
 
-      // fetch the record
-      const realRecord = await handle({
+      const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
+      const recordResult = await handle({
         options: {
           Tags: [
             { name: 'Action', value: 'Record' },
-            { name: 'Name', value: 'test-name' },
+            { name: 'Name', value: 'test-arweave-address' },
           ],
         },
         memory: buyRecordResult.Memory,
       });
 
-      const record = JSON.parse(realRecord.Messages[0].Data);
+      const record = JSON.parse(recordResult.Messages[0].Data);
       assert.deepEqual(record, {
         processId: ''.padEnd(43, 'a'),
-        purchasePrice: basePermabuyPrice,
+        purchasePrice: buyRecordData.purchasePrice,
         startTimestamp: buyRecordData.startTimestamp,
-        type: 'permabuy',
+        type: 'lease',
         undernameLimit: 10,
+        endTimestamp: buyRecordData.endTimestamp,
+      });
+      sharedMemory = buyRecordResult.Memory;
+    });
+
+    it('should buy a record with an Ethereum address', async () => {
+      // transfer it tokens
+      const transferMemory = await transfer({
+        recipient: testEthAddress,
+        quantity: 1_000_000_000_000,
+        memory: sharedMemory,
       });
 
-      const failedBuyRecordResult = await handle({
+      const { result: buyRecordResult } = await buyRecord({
+        from: testEthAddress,
+        name: 'test-ethereum-address',
+        type: 'lease',
+        years: 1,
+        processId: ''.padEnd(43, 'a'),
+        memory: transferMemory,
+      });
+
+      const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
+      const recordResult = await handle({
         options: {
           Tags: [
-            { name: 'Action', value: 'Buy-Name' },
-            { name: 'Name', value: 'test-name' },
+            { name: 'Action', value: 'Record' },
+            { name: 'Name', value: 'test-ethereum-address' },
+          ],
+        },
+        memory: buyRecordResult.Memory,
+      });
+
+      const record = JSON.parse(recordResult.Messages[0].Data);
+      assert.deepEqual(record, {
+        processId: ''.padEnd(43, 'a'),
+        purchasePrice: buyRecordData.purchasePrice,
+        startTimestamp: buyRecordData.startTimestamp,
+        type: 'lease',
+        undernameLimit: 10,
+        endTimestamp: buyRecordData.endTimestamp,
+      });
+      sharedMemory = buyRecordResult.Memory;
+    });
+
+    it('should support `Buy-Record` as a backwards compatible alias', async () => {
+      // not using stub to test the backwards compatibility of the tag
+      const buyRecordResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Buy-Record' },
+            { name: 'Name', value: 'test-buy-record-tag' },
             { name: 'Purchase-Type', value: 'lease' },
             { name: 'Years', value: '1' },
             { name: 'Process-Id', value: ''.padEnd(43, 'a') },
           ],
         },
+        memory: sharedMemory,
+      });
+      assertNoResultError(buyRecordResult);
+      const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
+      assert.equal(
+        buyRecordResult.Messages[0].Tags.find((t) => t.name === 'Action').value,
+        'Buy-Name-Notice',
+      );
+      const record = JSON.parse(buyRecordResult.Messages[0].Data);
+      assert.deepEqual(record, {
+        name: 'test-buy-record-tag',
+        processId: ''.padEnd(43, 'a'),
+        purchasePrice: buyRecordData.purchasePrice,
+        startTimestamp: buyRecordData.startTimestamp,
+        type: 'lease',
+        undernameLimit: 10,
+        endTimestamp: buyRecordData.endTimestamp,
+        baseRegistrationFee: buyRecordData.baseRegistrationFee,
+        remainingBalance: 948999520000000,
+      });
+    });
+
+    it('should fail to buy a permanently registered record', async () => {
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-owned-name',
+        processId: ''.padEnd(43, 'a'),
+        type: 'permabuy',
+        years: 1,
+        timestamp: STUB_TIMESTAMP,
+        memory: sharedMemory,
+        from: STUB_ADDRESS,
+      });
+
+      // try and buy it again
+      const { result: failedBuyRecordResult } = await buyRecord({
+        name: 'test-owned-name',
+        processId: ''.padEnd(43, 'a'),
+        type: 'permabuy',
+        years: 1,
+        timestamp: STUB_TIMESTAMP,
         memory: buyRecordResult.Memory,
-        shouldAssertNoResultError: false,
+        assertError: false,
       });
 
       const failedBuyRecordError = failedBuyRecordResult.Messages[0].Tags.find(
@@ -228,16 +194,12 @@ describe('ArNS', async () => {
     });
 
     it('should buy a record and default the name to lower case', async () => {
-      const buyRecordResult = await handle({
-        options: {
-          Tags: [
-            { name: 'Action', value: 'Buy-Name' },
-            { name: 'Name', value: 'Test-NAme' },
-            { name: 'Purchase-Type', value: 'lease' },
-            { name: 'Years', value: '1' },
-            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-          ],
-        },
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'Test-Name',
+        processId: ''.padEnd(43, 'a'),
+        type: 'lease',
+        years: 1,
+        timestamp: STUB_TIMESTAMP,
         memory: sharedMemory,
       });
 
@@ -253,11 +215,43 @@ describe('ArNS', async () => {
         },
         memory: buyRecordResult.Memory,
       });
-
       const record = JSON.parse(realRecord.Messages[0].Data);
       assert.deepEqual(record, {
         processId: ''.padEnd(43, 'a'),
-        purchasePrice: baseLeasePriceFor9CharNameFor1Year,
+        purchasePrice: buyRecordData.purchasePrice,
+        startTimestamp: buyRecordData.startTimestamp,
+        endTimestamp: buyRecordData.endTimestamp,
+        type: 'lease',
+        undernameLimit: 10,
+      });
+      sharedMemory = realRecord.Memory;
+    });
+
+    it('should buy a record and default the name to lower case', async () => {
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'Test-Name',
+        processId: ''.padEnd(43, 'a'),
+        type: 'lease',
+        years: 1,
+        timestamp: STUB_TIMESTAMP,
+        memory: sharedMemory,
+      });
+
+      const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
+      // fetch the record
+      const realRecord = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Record' },
+            { name: 'Name', value: 'test-name' },
+          ],
+        },
+        memory: buyRecordResult.Memory,
+      });
+      const record = JSON.parse(realRecord.Messages[0].Data);
+      assert.deepEqual(record, {
+        processId: ''.padEnd(43, 'a'),
+        purchasePrice: buyRecordData.purchasePrice,
         startTimestamp: buyRecordData.startTimestamp,
         endTimestamp: buyRecordData.endTimestamp,
         type: 'lease',
@@ -273,34 +267,21 @@ describe('ArNS', async () => {
         let memory = sharedMemory;
 
         if (sender != PROCESS_OWNER) {
-          const transferResult = await handle({
-            options: {
-              From: PROCESS_OWNER,
-              Owner: PROCESS_OWNER,
-              Tags: [
-                { name: 'Action', value: 'Transfer' },
-                { name: 'Recipient', value: sender },
-                { name: 'Quantity', value: 6000000000 },
-                { name: 'Cast', value: true },
-              ],
-            },
-            memory: sharedMemory,
+          const transferResultMemory = await transfer({
+            recipient: sender,
+            quantity: 6000000000,
+            cast: true,
+            memory,
           });
-          memory = transferResult.Memory;
+          memory = transferResultMemory;
         }
 
-        const buyUndernameResult = await handle({
-          options: {
-            From: sender,
-            Owner: sender,
-            Tags: [
-              { name: 'Action', value: 'Buy-Name' },
-              { name: 'Name', value: 'test-name' },
-              { name: 'Purchase-Type', value: 'lease' },
-              { name: 'Years', value: '1' },
-              { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-            ],
-          },
+        const { result: buyRecordResult } = await buyRecord({
+          name: 'test-name',
+          processId: ''.padEnd(43, 'a'),
+          type: 'lease',
+          years: 1,
+          timestamp: STUB_TIMESTAMP,
           memory,
         });
 
@@ -314,12 +295,10 @@ describe('ArNS', async () => {
               { name: 'Quantity', value: '1' },
             ],
           },
-          memory: buyUndernameResult.Memory,
+          memory: buyRecordResult.Memory,
         });
         const result = await handle({
           options: {
-            From: sender,
-            Owner: sender,
             Tags: [
               { name: 'Action', value: 'Record' },
               { name: 'Name', value: 'test-name' },
@@ -370,22 +349,17 @@ describe('ArNS', async () => {
           memory = stakeResult.Memory;
         }
 
-        const buyUndernameResult = await handle({
-          options: {
-            From: sender,
-            Owner: sender,
-            Tags: [
-              { name: 'Action', value: 'Buy-Name' },
-              { name: 'Name', value: 'test-name' },
-              { name: 'Purchase-Type', value: 'lease' },
-              { name: 'Years', value: '1' },
-              { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-              { name: 'Fund-From', value: 'stakes' },
-            ],
-          },
+        const { result: buyRecordResult } = await buyRecord({
+          name: 'test-name',
+          from: sender,
+          processId: ''.padEnd(43, 'a'),
+          type: 'lease',
+          years: 1,
+          timestamp: STUB_TIMESTAMP,
+          fundFrom: 'stakes',
           memory,
         });
-        memory = buyUndernameResult.Memory;
+        memory = buyRecordResult.Memory;
 
         const increaseUndernameResult = await handle({
           options: {
@@ -446,11 +420,12 @@ describe('ArNS', async () => {
   });
 
   describe('Token-Cost', () => {
+    const testNewAddress = 'test-new-address-'.padEnd(43, 'b');
     //Reference: https://ardriveio.sharepoint.com/:x:/s/AR.IOLaunch/Ec3L8aX0wuZOlG7yRtlQoJgB39wCOoKu02PE_Y4iBMyu7Q?e=ZG750l
     it('should return the correct cost of buying a name as a lease', async () => {
       // the name will cost 600_000_000, so we'll want to see a shortfall of 200_000_000 in the funding plan
       const transferMemory = await transfer({
-        recipient: STUB_ADDRESS,
+        recipient: testNewAddress,
         quantity: 400_000_000,
         cast: true,
         memory: sharedMemory,
@@ -458,9 +433,10 @@ describe('ArNS', async () => {
 
       const result = await handle({
         options: {
-          From: STUB_ADDRESS,
-          Owner: STUB_ADDRESS,
+          From: testNewAddress,
+          Owner: testNewAddress,
           Tags: [
+            // backwards compatible with old action
             { name: 'Action', value: 'Get-Cost-Details-For-Action' },
             { name: 'Intent', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
@@ -478,7 +454,48 @@ describe('ArNS', async () => {
         discounts: [],
         tokenCost: baseLeasePriceFor9CharNameFor1Year,
         fundingPlan: {
-          address: STUB_ADDRESS,
+          address: testNewAddress,
+          balance: 400_000_000,
+          shortfall: 200_000_000,
+          stakes: [],
+        },
+      });
+      sharedMemory = result.Memory;
+    });
+
+    it('should return the correct cost of buying a name as a lease', async () => {
+      // the name will cost 600_000_000, so we'll want to see a shortfall of 200_000_000 in the funding plan
+      const transferMemory = await transfer({
+        recipient: testNewAddress,
+        quantity: 400_000_000,
+        cast: true,
+        memory: sharedMemory,
+      });
+
+      const result = await handle({
+        options: {
+          From: testNewAddress,
+          Owner: testNewAddress,
+          Tags: [
+            // latest tags
+            { name: 'Action', value: 'Cost-Details' },
+            { name: 'Intent', value: 'Buy-Name' },
+            { name: 'Name', value: 'test-name' },
+            { name: 'Purchase-Type', value: 'lease' },
+            { name: 'Years', value: '1' },
+            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
+            { name: 'Fund-From', value: 'balance' },
+          ],
+        },
+        memory: transferMemory,
+      });
+
+      const tokenCostResult = JSON.parse(result.Messages[0].Data);
+      assert.deepEqual(tokenCostResult, {
+        discounts: [],
+        tokenCost: baseLeasePriceFor9CharNameFor1Year,
+        fundingPlan: {
+          address: testNewAddress,
           balance: 400_000_000,
           shortfall: 200_000_000,
           stakes: [],
@@ -488,24 +505,14 @@ describe('ArNS', async () => {
     });
 
     it('should return the correct cost of increasing an undername limit', async () => {
-      const buyRecordResult = await handle({
-        options: {
-          Tags: [
-            { name: 'Action', value: 'Buy-Name' },
-            { name: 'Name', value: 'test-name' },
-            { name: 'Purchase-Type', value: 'lease' },
-            { name: 'Years', value: '1' },
-            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-          ],
-        },
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-name',
+        processId: ''.padEnd(43, 'a'),
+        type: 'lease',
+        years: 1,
+        timestamp: STUB_TIMESTAMP,
         memory: sharedMemory,
       });
-
-      // assert no error tag
-      const buyRecordErrorTag = buyRecordResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
-      assert.equal(buyRecordErrorTag, undefined);
 
       const result = await handle({
         options: {
@@ -525,24 +532,14 @@ describe('ArNS', async () => {
     });
 
     it('should return the correct cost of extending an existing leased record', async () => {
-      const buyRecordResult = await handle({
-        options: {
-          Tags: [
-            { name: 'Action', value: 'Buy-Name' },
-            { name: 'Name', value: 'test-name' },
-            { name: 'Purchase-Type', value: 'lease' },
-            { name: 'Years', value: '1' },
-            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-          ],
-        },
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-name',
+        processId: ''.padEnd(43, 'a'),
+        type: 'lease',
+        years: 1,
+        timestamp: STUB_TIMESTAMP,
         memory: sharedMemory,
       });
-
-      // assert no error tag
-      const buyRecordErrorTag = buyRecordResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
-      assert.equal(buyRecordErrorTag, undefined);
 
       const result = await handle({
         options: {
@@ -561,24 +558,14 @@ describe('ArNS', async () => {
     });
 
     it('should get the cost of upgrading an existing leased record to permanently owned', async () => {
-      const buyRecordResult = await handle({
-        options: {
-          Tags: [
-            { name: 'Action', value: 'Buy-Name' },
-            { name: 'Name', value: 'test-name' },
-            { name: 'Purchase-Type', value: 'lease' },
-            { name: 'Years', value: '1' },
-            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-          ],
-        },
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-name',
+        processId: ''.padEnd(43, 'a'),
+        type: 'lease',
+        years: 1,
+        timestamp: STUB_TIMESTAMP,
         memory: sharedMemory,
       });
-
-      // assert no error tag
-      const buyRecordErrorTag = buyRecordResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
-      assert.equal(buyRecordErrorTag, undefined);
 
       const upgradeNameResult = await handle({
         options: {
@@ -644,16 +631,12 @@ describe('ArNS', async () => {
 
   describe('Extend-Lease', () => {
     it('should properly handle extending a leased record', async () => {
-      const buyUndernameResult = await handle({
-        options: {
-          Tags: [
-            { name: 'Action', value: 'Buy-Name' },
-            { name: 'Name', value: 'test-name' },
-            { name: 'Purchase-Type', value: 'lease' },
-            { name: 'Years', value: '1' },
-            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-          ],
-        },
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-name',
+        processId: ''.padEnd(43, 'a'),
+        type: 'lease',
+        years: 1,
+        timestamp: STUB_TIMESTAMP,
         memory: sharedMemory,
       });
       const recordResultBefore = await handle({
@@ -663,7 +646,7 @@ describe('ArNS', async () => {
             { name: 'Name', value: 'test-name' },
           ],
         },
-        memory: buyUndernameResult.Memory,
+        memory: buyRecordResult.Memory,
       });
       const recordBefore = JSON.parse(recordResultBefore.Messages[0].Data);
       const extendResult = await handle({
@@ -674,7 +657,7 @@ describe('ArNS', async () => {
             { name: 'Years', value: '1' },
           ],
         },
-        memory: buyUndernameResult.Memory,
+        memory: buyRecordResult.Memory,
       });
       const recordResult = await handle({
         options: {
@@ -704,19 +687,12 @@ describe('ArNS', async () => {
 
       memory = stakeResult.memory;
 
-      const buyRecordResult = await handle({
-        options: {
-          From: STUB_ADDRESS,
-          Owner: STUB_ADDRESS,
-          Tags: [
-            { name: 'Action', value: 'Buy-Name' },
-            { name: 'Name', value: 'test-name' },
-            { name: 'Purchase-Type', value: 'lease' },
-            { name: 'Years', value: '1' },
-            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-            { name: 'Fund-From', value: 'any' },
-          ],
-        },
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-name',
+        processId: ''.padEnd(43, 'a'),
+        type: 'lease',
+        years: 1,
+        timestamp: STUB_TIMESTAMP,
         memory,
       });
       memory = buyRecordResult.Memory;
@@ -770,25 +746,14 @@ describe('ArNS', async () => {
   describe('Upgrade-Name', () => {
     it('should properly handle upgrading a name', async () => {
       const buyRecordTimestamp = STUB_TIMESTAMP + 1;
-      const buyRecordResult = await handle({
-        options: {
-          Tags: [
-            { name: 'Action', value: 'Buy-Name' },
-            { name: 'Name', value: 'test-name' },
-            { name: 'Purchase-Type', value: 'lease' },
-            { name: 'Years', value: '1' },
-            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-          ],
-          Timestamp: buyRecordTimestamp,
-        },
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-name',
+        processId: ''.padEnd(43, 'a'),
+        type: 'lease',
+        years: 1,
+        timestamp: buyRecordTimestamp,
         memory: sharedMemory,
       });
-
-      // assert no error tag
-      const buyRecordErrorTag = buyRecordResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
-      assert.equal(buyRecordErrorTag, undefined);
 
       // now upgrade the name
       const upgradeNameResult = await handle({
@@ -797,7 +762,7 @@ describe('ArNS', async () => {
             { name: 'Action', value: 'Upgrade-Name' },
             { name: 'Name', value: 'test-name' },
           ],
-          Timestamp: buyRecordTimestamp + 1,
+          Timestamp: buyRecordTimestamp,
         },
         memory: buyRecordResult.Memory,
       });
@@ -841,23 +806,15 @@ describe('ArNS', async () => {
       memory = stakeResult.memory;
 
       const buyRecordTimestamp = STUB_TIMESTAMP + 1;
-      const buyRecordResult = await handle({
-        options: {
-          From: STUB_ADDRESS,
-          Owner: STUB_ADDRESS,
-          Tags: [
-            { name: 'Action', value: 'Buy-Name' },
-            { name: 'Name', value: 'test-name' },
-            { name: 'Purchase-Type', value: 'lease' },
-            { name: 'Years', value: '1' },
-            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-            { name: 'Fund-From', value: 'any' },
-          ],
-          Timestamp: buyRecordTimestamp,
-        },
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-name',
+        processId: ''.padEnd(43, 'a'),
+        type: 'lease',
+        years: 1,
+        fundFrom: 'any',
+        timestamp: buyRecordTimestamp,
         memory,
       });
-      assertNoResultError(buyRecordResult);
 
       // now upgrade the name
       const upgradeNameResult = await handle({
@@ -908,15 +865,20 @@ describe('ArNS', async () => {
   });
 
   describe('Release-Name', () => {
-    it('should create a released name for an existing permabuy record owned by a process id, accept a buy-record and add the new record to the registry', async () => {
+    it('should create a released name for an existing permabuy record owned by a process id, accept a Buy-Name and add the new record to the registry', async () => {
       // buy the name first
       const processId = ''.padEnd(43, 'a');
       const initiator = 'ant-owner-'.padEnd(43, '0'); // owner of the ANT at the time of release
-      const { memory, record: initialRecord } = await runBuyRecord({
-        sender: STUB_ADDRESS,
+      const { memory, result: buyRecordResult } = await buyRecord({
+        from: STUB_ADDRESS,
+        name: 'test-name',
         processId,
         type: 'permabuy',
+        memory: sharedMemory,
+        timestamp: STUB_TIMESTAMP,
       });
+
+      const initialRecord = JSON.parse(buyRecordResult.Messages[0].Data);
 
       const releaseNameResult = await handle({
         options: {
@@ -1090,14 +1052,17 @@ describe('ArNS', async () => {
     });
 
     const runReturnedNameTest = async ({ fundFrom }) => {
-      const { record: initialRecord, memory } = await runBuyRecord({
-        sender: STUB_ADDRESS,
+      const { result: buyRecordResult } = await buyRecord({
+        from: STUB_ADDRESS,
+        name: 'test-name',
         processId: ''.padEnd(43, 'a'),
         type: 'lease',
         years: 1,
         timestamp: STUB_TIMESTAMP,
         memory: sharedMemory,
       });
+
+      const initialRecord = JSON.parse(buyRecordResult.Messages[0].Data);
 
       // tick the contract after the lease leaves its grace period
       const futureTimestamp =
@@ -1107,7 +1072,7 @@ describe('ArNS', async () => {
           Tags: [{ name: 'Action', value: 'Tick' }],
           Timestamp: futureTimestamp,
         },
-        memory,
+        memory: buyRecordResult.Memory,
       });
 
       // fetch the returned name
@@ -1186,29 +1151,16 @@ describe('ArNS', async () => {
       }
 
       const processId = 'new-name-owner-'.padEnd(43, '1');
-      const buyReturnedNameResult = await handle({
-        options: {
-          From: bidderAddress,
-          Owner: bidderAddress,
-          Tags: [
-            { name: 'Action', value: 'Buy-Name' },
-            { name: 'Name', value: 'test-name' },
-            { name: 'Process-Id', value: processId },
-            { name: 'Purchase-Type', value: 'lease' },
-            { name: 'Years', value: years.toString() },
-            ...(fundFrom ? [{ name: 'Fund-From', value: fundFrom }] : []),
-          ],
-          Timestamp: bidTimestamp,
-        },
+      const { result: buyReturnedNameResult } = await buyRecord({
+        from: bidderAddress,
+        fundFrom,
+        name: 'test-name',
+        processId,
+        type: 'lease',
+        years: 3,
+        timestamp: bidTimestamp,
         memory: memoryToUse,
       });
-
-      // assert no error tag
-      const buyReturnedNameErrorTag =
-        buyReturnedNameResult.Messages[0].Tags.find(
-          (tag) => tag.name === 'Error',
-        );
-      assert.equal(buyReturnedNameErrorTag, undefined);
 
       // should send three messages including a Buy-Name-Notice and a Debit-Notice
       assert.equal(buyReturnedNameResult.Messages.length, 2);
@@ -1343,10 +1295,11 @@ describe('ArNS', async () => {
       // buy the name first
       const processId = ''.padEnd(43, 'a');
       const initiator = 'ant-owner-'.padEnd(43, '0'); // owner of the ANT at the time of release
-      const { memory } = await runBuyRecord({
-        sender: STUB_ADDRESS,
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-name',
         processId,
         type: 'permabuy',
+        memory: sharedMemory,
       });
 
       const releasedTimestamp = STUB_TIMESTAMP;
@@ -1362,7 +1315,7 @@ describe('ArNS', async () => {
           Owner: processId,
           Timestamp: releasedTimestamp,
         },
-        memory,
+        memory: buyRecordResult.Memory,
       });
 
       // assert no error tag
@@ -1370,17 +1323,6 @@ describe('ArNS', async () => {
         (tag) => tag.name === 'Error',
       );
       assert.equal(releaseNameErrorTag, undefined);
-
-      // fetch the returnedName
-      const returnedNameResult = await handle({
-        options: {
-          Tags: [
-            { name: 'Action', value: 'Returned-Name' },
-            { name: 'Name', value: 'test-name' },
-          ],
-        },
-        memory: releaseNameResult.Memory,
-      });
 
       const tokenCostForReturnedName = await handle({
         options: {
@@ -1396,11 +1338,6 @@ describe('ArNS', async () => {
         memory: releaseNameResult.Memory,
       });
 
-      const returnedNamePricesErrorTag =
-        tokenCostForReturnedName.Messages?.[0]?.Tags?.find(
-          (tag) => tag.name === 'Error',
-        );
-      assert.equal(returnedNamePricesErrorTag, undefined);
       const returnedNameTokenCost = JSON.parse(
         tokenCostForReturnedName.Messages?.[0]?.Data,
       );
@@ -1462,10 +1399,11 @@ describe('ArNS', async () => {
     it('should reassign an arns name to a new process id', async () => {
       // buy the name first
       const processId = ''.padEnd(43, 'a');
-      const { memory } = await runBuyRecord({
-        sender: STUB_ADDRESS,
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-name',
         processId,
         type: 'permabuy',
+        memory: sharedMemory,
       });
 
       const reassignNameResult = await handle({
@@ -1478,14 +1416,9 @@ describe('ArNS', async () => {
           From: processId,
           Owner: processId,
         },
-        memory,
+        memory: buyRecordResult.Memory,
       });
 
-      // assert no error tag
-      const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
-      assert.equal(releaseNameErrorTag, undefined);
       assert.equal(reassignNameResult.Messages?.[0]?.Target, processId);
       sharedMemory = reassignNameResult.Memory;
     });
@@ -1493,10 +1426,11 @@ describe('ArNS', async () => {
     it('should reassign an arns name to a new process id with initiator', async () => {
       // buy the name first
       const processId = ''.padEnd(43, 'a');
-      const { memory } = await runBuyRecord({
-        sender: STUB_ADDRESS,
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-name',
         processId,
         type: 'permabuy',
+        memory: sharedMemory,
       });
 
       const reassignNameResult = await handle({
@@ -1510,14 +1444,9 @@ describe('ArNS', async () => {
           From: processId,
           Owner: processId,
         },
-        memory,
+        memory: buyRecordResult.Memory,
       });
 
-      // assert no error tag
-      const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
-        (tag) => tag.name === 'Error',
-      );
-      assert.equal(releaseNameErrorTag, undefined);
       assert.equal(reassignNameResult.Messages?.[0]?.Target, processId);
       assert.equal(reassignNameResult.Messages?.[1]?.Target, STUB_MESSAGE_ID); // Check for the message sent to the initiator
       sharedMemory = reassignNameResult.Memory;
@@ -1526,10 +1455,11 @@ describe('ArNS', async () => {
     it('should not reassign an arns name with invalid ownership', async () => {
       // buy the name first
       const processId = ''.padEnd(43, 'a');
-      const { memory } = await runBuyRecord({
-        sender: STUB_ADDRESS,
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-name',
         processId,
         type: 'permabuy',
+        memory: sharedMemory,
       });
 
       const reassignNameResult = await handle({
@@ -1542,25 +1472,26 @@ describe('ArNS', async () => {
           From: STUB_ADDRESS,
           Owner: STUB_ADDRESS,
         },
-        memory,
+        memory: buyRecordResult.Memory,
         shouldAssertNoResultError: false,
       });
 
       // assert error
-      const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
+      const reassignNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
         (tag) => tag.name === 'Error',
       );
-      assert.ok(releaseNameErrorTag, 'Error tag should be present');
+      assert.ok(reassignNameErrorTag, 'Error tag should be present');
       sharedMemory = reassignNameResult.Memory;
     });
 
     it('should not reassign an arns name with invalid new process id', async () => {
       // buy the name first
       const processId = ''.padEnd(43, 'a');
-      const { memory } = await runBuyRecord({
-        sender: STUB_ADDRESS,
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-name',
         processId,
         type: 'permabuy',
+        memory: sharedMemory,
       });
 
       const reassignNameResult = await handle({
@@ -1573,15 +1504,15 @@ describe('ArNS', async () => {
           From: processId,
           Owner: processId,
         },
-        memory,
+        memory: buyRecordResult.Memory,
         shouldAssertNoResultError: false,
       });
 
       // assert error
-      const releaseNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
+      const reassignNameErrorTag = reassignNameResult.Messages?.[0]?.Tags?.find(
         (tag) => tag.name === 'Error',
       );
-      assert.ok(releaseNameErrorTag, 'Error tag should be present');
+      assert.ok(reassignNameErrorTag, 'Error tag should be present');
       sharedMemory = reassignNameResult.Memory;
     });
   });
@@ -1593,15 +1524,13 @@ describe('ArNS', async () => {
       let buyRecordsMemory = sharedMemory; // updated after each purchase
       const recordsCount = 3;
       for (let i = 0; i < recordsCount; i++) {
-        const buyRecordsResult = await handle({
-          options: {
-            Tags: [
-              { name: 'Action', value: 'Buy-Name' },
-              { name: 'Name', value: `test-name-${i}` },
-              { name: 'Process-Id', value: ''.padEnd(43, `${i}`) },
-            ],
-            Timestamp: lastTimestamp + i * 1000, // order of names is based on timestamp
-          },
+        const { result: buyRecordsResult } = await buyRecord({
+          name: `test-name-${i}`,
+          processId: ''.padEnd(43, `${i}`),
+          type: 'lease',
+          years: 1,
+          timestamp: lastTimestamp + i * 1000,
+          fundFrom: 'any',
           memory: buyRecordsMemory,
         });
         buyRecordsMemory = buyRecordsResult.Memory;
@@ -1623,11 +1552,6 @@ describe('ArNS', async () => {
           },
           memory: buyRecordsMemory,
         });
-        // assert no error tag
-        const errorTag = result.Messages?.[0]?.Tags?.find(
-          (tag) => tag.name === 'Error',
-        );
-        assert.equal(errorTag, undefined);
         // add the records to the paginated records array
         const {
           items: records,
