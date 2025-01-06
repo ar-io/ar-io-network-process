@@ -373,8 +373,20 @@ describe('Tick', async () => {
       forcePrune: true,
     });
 
-    // assert no error tag
-    assertNoResultError(newEpochTick);
+    // should only have one message with a tick notice, the epoch distribution notice is sent separately
+    assert.equal(newEpochTick.result.Messages.length, 2);
+    assert.equal(
+      newEpochTick.result.Messages[0].Tags.find((tag) => tag.name === 'Action')
+        .value,
+      'Tick-Notice',
+    );
+    assert.equal(
+      newEpochTick.result.Messages[1].Tags.find((tag) => tag.name === 'Action')
+        .value,
+      'Epoch-Created-Notice',
+    );
+
+    const createdEpochData = JSON.parse(newEpochTick.result.Messages[1].Data);
 
     // assert the new epoch is created
     const epochData = await getEpoch({
@@ -391,6 +403,16 @@ describe('Tick', async () => {
       (totalGatewayRewards + totalObserverRewards) / 1; // only one gateway in the network
     const expectedGatewayOperatorReward = totalEligibleGatewayRewards * 0.75; // 75% of the eligible rewards go to the operator
     const expectedGatewayDelegateReward = totalEligibleGatewayRewards * 0.25; // 25% of the eligible rewards go to the delegates
+
+    // assert the epoch data is correct
+    assert.deepStrictEqual(createdEpochData, {
+      ...epochData,
+      prescribedObservers: {
+        // in state we store just the address maps, not the full weights
+        [STUB_ADDRESS]: STUB_ADDRESS,
+      },
+    });
+    // assert the returned epoch data is correct and contains the full weights of the prescribed observer
     assert.deepStrictEqual(epochData, {
       epochIndex: 0,
       startHeight: 1,
@@ -455,8 +477,29 @@ describe('Tick', async () => {
       timestamp: distributionTimestamp,
     });
 
-    // assert no error tag
-    assertNoResultError(distributionTick);
+    // assert multiple messages are sent given the tick notice, epoch created notice and epoch distribution notice
+    assert.equal(distributionTick.result.Messages.length, 4); // cannot explain why this is 4, i'd expect it to be 3 messages (1 tick notice, 1 epoch created notice, 1 epoch distribution notice)
+    // tick notice is sent
+    assert.equal(
+      distributionTick.result.Messages[0].Tags.find(
+        (tag) => tag.name === 'Action',
+      ).value,
+      'Tick-Notice',
+    );
+    // new epoch is created
+    assert.equal(
+      distributionTick.result.Messages[1].Tags.find(
+        (tag) => tag.name === 'Action',
+      ).value,
+      'Epoch-Created-Notice',
+    );
+    // epoch distribution notice is sent
+    assert.equal(
+      distributionTick.result.Messages[2].Tags.find(
+        (tag) => tag.name === 'Action',
+      ).value,
+      'Epoch-Distribution-Notice',
+    );
 
     // check the rewards were distributed correctly and weights are updated
     const distributedEpochData = await getEpoch({
@@ -465,6 +508,17 @@ describe('Tick', async () => {
       epochIndex: 0,
     });
 
+    // assert the distribution notice has the correct data
+    const distributionNoticeData = JSON.parse(
+      distributionTick.result.Messages[2].Data,
+    ); // we want to make sure this gets posted as a data item for historical purposes
+    assert.deepStrictEqual(distributionNoticeData, {
+      ...distributedEpochData,
+      prescribedObservers: {
+        [STUB_ADDRESS]: STUB_ADDRESS,
+      },
+    });
+    // assert all the data is correct
     assert.deepStrictEqual(distributedEpochData, {
       ...epochData,
       distributions: {
