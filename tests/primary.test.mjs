@@ -1,5 +1,6 @@
 import {
   assertNoResultError,
+  buyRecord,
   handle,
   parseEventsFromResult,
   setUpStake,
@@ -28,33 +29,6 @@ describe('primary names', function () {
       memory: endingMemory,
     });
   });
-
-  const buyRecord = async ({
-    name,
-    processId,
-    type = 'permabuy',
-    years = 1,
-    timestamp = STUB_TIMESTAMP,
-    memory = sharedMemory,
-  }) => {
-    const buyRecordResult = await handle({
-      options: {
-        Tags: [
-          { name: 'Action', value: 'Buy-Record' },
-          { name: 'Name', value: name },
-          { name: 'Purchase-Type', value: type },
-          { name: 'Years', value: years },
-          { name: 'Process-Id', value: processId },
-        ],
-        Timestamp: timestamp,
-      },
-      memory,
-    });
-    return {
-      record: JSON.parse(buyRecordResult.Messages[0].Data),
-      memory: buyRecordResult.Memory,
-    };
-  };
 
   const requestPrimaryName = async ({
     name,
@@ -140,6 +114,7 @@ describe('primary names', function () {
     caller,
     memory,
     timestamp = STUB_TIMESTAMP,
+    notifyOwners = false,
   }) => {
     const removePrimaryNamesResult = await handle({
       options: {
@@ -149,6 +124,7 @@ describe('primary names', function () {
         Tags: [
           { name: 'Action', value: 'Remove-Primary-Names' },
           { name: 'Names', value: names.join(',') },
+          { name: 'Notify-Owners', value: notifyOwners ? 'true' : 'false' },
         ],
       },
       memory,
@@ -207,14 +183,16 @@ describe('primary names', function () {
     const processId = ''.padEnd(43, 'a');
     const recipient = ''.padEnd(43, 'b');
     const requestTimestamp = 1234567890;
-    const { memory: buyRecordMemory, result } = await buyRecord({
+    const { result: buyRecordResult } = await buyRecord({
       name: 'test-name',
       processId,
       timestamp: requestTimestamp,
+      memory: sharedMemory,
+      type: 'permabuy',
     });
 
     const stakeResult = await setUpStake({
-      memory: buyRecordMemory,
+      memory: buyRecordResult.Memory,
       stakerAddress: recipient,
       transferQty: 550000000,
       stakeQty: 500000000,
@@ -367,10 +345,12 @@ describe('primary names', function () {
   it('should immediately approve a primary name for an existing base name when the caller of the request is the base name owner', async function () {
     const processId = ''.padEnd(43, 'a');
     const requestTimestamp = 1234567890;
-    const { memory: buyRecordMemory } = await buyRecord({
+    const { result: buyRecordResult } = await buyRecord({
       name: 'test-name',
       processId,
       timestamp: requestTimestamp,
+      memory: sharedMemory,
+      type: 'permabuy',
     });
 
     const approvalTimestamp = 1234567899;
@@ -378,7 +358,7 @@ describe('primary names', function () {
       name: 'test-name',
       caller: processId,
       timestamp: approvalTimestamp,
-      memory: buyRecordMemory,
+      memory: buyRecordResult.Memory,
     });
 
     assertNoResultError(requestPrimaryNameResult);
@@ -480,17 +460,19 @@ describe('primary names', function () {
     const processId = ''.padEnd(43, 'a');
     const recipient = ''.padEnd(43, 'b');
     const requestTimestamp = 1234567890;
-    const { memory: buyRecordMemory } = await buyRecord({
+    const { result: buyRecordResult } = await buyRecord({
       name: 'test-name',
       processId,
       timestamp: requestTimestamp,
+      memory: sharedMemory,
+      type: 'permabuy',
     });
     // create a primary name claim
     const { result: requestPrimaryNameResult } = await requestPrimaryName({
       name: 'test-name',
       caller: recipient,
       timestamp: requestTimestamp,
-      memory: buyRecordMemory,
+      memory: buyRecordResult.Memory,
     });
     // claim the primary name
     const { result: approvePrimaryNameRequestResult } =
@@ -508,6 +490,7 @@ describe('primary names', function () {
       caller: processId,
       memory: approvePrimaryNameRequestResult.Memory,
       timestamp: requestTimestamp,
+      notifyOwners: true, // notify the owner of the primary name
     });
 
     // assert no error
@@ -553,6 +536,7 @@ describe('primary names', function () {
       Timestamp: requestTimestamp,
       'Total-Primary-Name-Requests': 0,
       'Total-Primary-Names': 0,
+      'Notify-Owners': 'true',
     });
     // assert the primary name is no longer set
     const { result: primaryNameForAddressResult, memory } =

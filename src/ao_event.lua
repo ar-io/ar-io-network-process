@@ -1,7 +1,20 @@
 local utils = require("utils")
 local json = require("json")
 
--- Factory function for creating an "AOEvent"
+--- @class AOEvent
+--- @field data table<string, any> The data table holding the event fields.
+--- @field sampleRate number|nil Optional sample rate.
+--- @field addField fun(self: AOEvent, key: string, value: any): AOEvent Adds a single field to the event.
+--- @field addFields fun(self: AOEvent, fields: table<string, any>): AOEvent Adds multiple fields to the event.
+--- @field addFieldsIfExist fun(self: AOEvent, table: table<string, any>|nil, fields: table<string>): AOEvent Adds specific fields if they exist in the given table.
+--- @field addFieldsWithPrefixIfExist fun(self: AOEvent, srcTable: table<string, any>, prefix: string, fields: table<string>): AOEvent
+---  Adds fields with a prefix if they exist in the source table.
+--- @field printEvent fun(self: AOEvent): nil Prints the event in JSON format.
+--- @field toJSON fun(self: AOEvent): string Converts the event to a JSON string.
+
+--- Factory function for creating an "AOEvent"
+--- @param initialData table<string, any> Optional initial data to populate the event with.
+--- @returns AOEvent
 local function AOEvent(initialData)
 	local event = {
 		sampleRate = nil, -- Optional sample rate

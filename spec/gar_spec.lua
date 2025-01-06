@@ -334,15 +334,7 @@ describe("gar", function()
 				vaults = {},
 				delegates = {},
 				startTimestamp = startTimestamp,
-				stats = {
-					prescribedEpochCount = 0,
-					observedEpochCount = 0,
-					totalEpochCount = 0,
-					passedEpochCount = 0,
-					failedEpochCount = 0,
-					failedConsecutiveEpochs = 0,
-					passedConsecutiveEpochs = 0,
-				},
+				stats = testGateway.stats,
 				settings = {
 					allowDelegatedStaking = testSettings.allowDelegatedStaking,
 					delegateRewardShareRatio = testSettings.delegateRewardShareRatio,
@@ -574,15 +566,7 @@ describe("gar", function()
 				totalDelegatedStake = minDelegatedStake,
 				vaults = {},
 				startTimestamp = startTimestamp,
-				stats = {
-					prescribedEpochCount = 0,
-					observedEpochCount = 0,
-					totalEpochCount = 0,
-					passedEpochCount = 0,
-					failedEpochCount = 0,
-					failedConsecutiveEpochs = 0,
-					passedConsecutiveEpochs = 0,
-				},
+				stats = testGateway.stats,
 				settings = testSettings,
 				status = "joined",
 				observerAddress = stubObserverAddress,
@@ -593,6 +577,7 @@ describe("gar", function()
 						vaults = {},
 					},
 				},
+				weights = testGateway.weights,
 			}
 			local expectedSettings = utils.deepCopy(testSettings)
 			expectedSettings.allowedDelegatesLookup = {
@@ -632,18 +617,11 @@ describe("gar", function()
 				},
 				startTimestamp = startTimestamp,
 				endTimestamp = operatorLeaveLengthMs,
-				stats = {
-					prescribedEpochCount = 0,
-					observedEpochCount = 0,
-					totalEpochCount = 0,
-					passedEpochCount = 0,
-					failedEpochCount = 0,
-					failedConsecutiveEpochs = 0,
-					passedConsecutiveEpochs = 0,
-				},
+				stats = testGateway.stats,
 				settings = expectedSettings,
 				status = "leaving",
 				observerAddress = stubObserverAddress,
+				weights = testGateway.weights,
 			})
 		end)
 	end)
@@ -657,18 +635,11 @@ describe("gar", function()
 				vaults = {},
 				delegates = {},
 				startTimestamp = startTimestamp,
-				stats = {
-					prescribedEpochCount = 0,
-					observedEpochCount = 0,
-					totalEpochCount = 0,
-					passedEpochCount = 0,
-					failedEpochCount = 0,
-					failedConsecutiveEpochs = 0,
-					passedConsecutiveEpochs = 0,
-				},
+				stats = testGateway.stats,
 				settings = testSettings,
 				status = "joined",
 				observerAddress = stubObserverAddress,
+				weights = testGateway.weights,
 			}
 			local result = gar.increaseOperatorStake(stubGatewayAddress, 1000)
 			assert.are.equal(_G.Balances[stubGatewayAddress], 0)
@@ -678,18 +649,11 @@ describe("gar", function()
 				vaults = {},
 				delegates = {},
 				startTimestamp = startTimestamp,
-				stats = {
-					prescribedEpochCount = 0,
-					observedEpochCount = 0,
-					totalEpochCount = 0,
-					passedEpochCount = 0,
-					failedEpochCount = 0,
-					failedConsecutiveEpochs = 0,
-					passedConsecutiveEpochs = 0,
-				},
+				stats = testGateway.stats,
 				settings = testSettings,
 				status = "joined",
 				observerAddress = stubObserverAddress,
+				weights = testGateway.weights,
 			})
 		end)
 	end)
@@ -702,18 +666,11 @@ describe("gar", function()
 				vaults = {},
 				delegates = {},
 				startTimestamp = startTimestamp,
-				stats = {
-					prescribedEpochCount = 0,
-					observedEpochCount = 0,
-					totalEpochCount = 0,
-					passedEpochCount = 0,
-					failedEpochCount = 0,
-					failedConsecutiveEpochs = 0,
-					passedConsecutiveEpochs = 0,
-				},
+				stats = testGateway.stats,
 				settings = testSettings,
 				status = "joined",
 				observerAddress = stubObserverAddress,
+				weights = testGateway.weights,
 			}
 			local status, result =
 				pcall(gar.decreaseOperatorStake, stubGatewayAddress, 1000, startTimestamp, stubMessageId)
@@ -730,18 +687,11 @@ describe("gar", function()
 				},
 				delegates = {},
 				startTimestamp = startTimestamp,
-				stats = {
-					prescribedEpochCount = 0,
-					observedEpochCount = 0,
-					totalEpochCount = 0,
-					passedEpochCount = 0,
-					failedEpochCount = 0,
-					failedConsecutiveEpochs = 0,
-					passedConsecutiveEpochs = 0,
-				},
+				stats = testGateway.stats,
 				settings = testSettings,
 				status = "joined",
 				observerAddress = stubObserverAddress,
+				weights = testGateway.weights,
 			})
 		end)
 		it("should instantly withdraw operator stake with expedited withdrawal fee", function()
@@ -756,18 +706,11 @@ describe("gar", function()
 				vaults = {},
 				delegates = {},
 				startTimestamp = startTimestamp,
-				stats = {
-					prescribedEpochCount = 0,
-					observedEpochCount = 0,
-					totalEpochCount = 0,
-					passedEpochCount = 0,
-					failedEpochCount = 0,
-					failedConsecutiveEpochs = 0,
-					passedConsecutiveEpochs = 0,
-				},
+				stats = testGateway.stats,
 				settings = testSettings,
 				status = "joined",
 				observerAddress = stubObserverAddress,
+				weights = testGateway.weights,
 			}
 
 			local status, result = pcall(
@@ -799,6 +742,7 @@ describe("gar", function()
 				settings = testSettings,
 				status = "joined",
 				observerAddress = stubObserverAddress,
+				weights = testGateway.weights,
 			}
 
 			local status, result = pcall(
@@ -837,6 +781,7 @@ describe("gar", function()
 				settings = testSettings,
 				status = "leaving",
 				observerAddress = stubObserverAddress,
+				weights = testGateway.weights,
 			}
 
 			local status, result =
@@ -859,6 +804,7 @@ describe("gar", function()
 				settings = testGateway.settings,
 				status = testGateway.status,
 				observerAddress = testGateway.observerAddress,
+				weights = testGateway.weights,
 			}
 			local newObserverWallet = stubGatewayAddress
 			local updatedSettings = {
@@ -883,6 +829,7 @@ describe("gar", function()
 				stats = testGateway.stats,
 				settings = updatedSettings,
 				status = testGateway.status,
+				weights = testGateway.weights,
 			}
 			local result = gar.updateGatewaySettings(
 				stubGatewayAddress,
@@ -907,6 +854,7 @@ describe("gar", function()
 				settings = testGateway.settings,
 				status = testGateway.status,
 				observerAddress = testGateway.observerAddress,
+				weights = testGateway.weights,
 			}
 			local newObserverWallet = stubGatewayAddress
 			local inputUpdatedSettings = {
@@ -941,6 +889,7 @@ describe("gar", function()
 				stats = testGateway.stats,
 				settings = expectedSettings,
 				status = testGateway.status,
+				weights = testGateway.weights,
 			}
 			local result = gar.updateGatewaySettings(
 				stubGatewayAddress,
@@ -965,6 +914,7 @@ describe("gar", function()
 				settings = testGateway.settings,
 				status = testGateway.status,
 				observerAddress = testGateway.observerAddress,
+				weights = testGateway.weights,
 			}
 
 			local updatedServices = {
@@ -992,6 +942,7 @@ describe("gar", function()
 				status = testGateway.status,
 				observerAddress = testGateway.observerAddress,
 				services = updatedServices,
+				weights = testGateway.weights,
 			}, result)
 		end)
 
@@ -1006,6 +957,7 @@ describe("gar", function()
 				settings = testGateway.settings,
 				status = "leaving",
 				observerAddress = testGateway.observerAddress,
+				weights = testGateway.weights,
 			}
 
 			local updatedSettings = {
@@ -1050,6 +1002,7 @@ describe("gar", function()
 					settings = settings,
 					status = testGateway.status,
 					observerAddress = testGateway.observerAddress,
+					weights = testGateway.weights,
 				}
 
 				local updatedSettings = {
@@ -1410,6 +1363,7 @@ describe("gar", function()
 				settings = testGateway.settings,
 				status = testGateway.status,
 				observerAddress = testGateway.observerAddress,
+				weights = testGateway.weights,
 			}
 
 			local status, err = pcall(
@@ -1445,6 +1399,15 @@ describe("gar", function()
 				_G.Balances[from] = 0
 
 				_G.GatewayRegistry[gatewayAddress] = {
+					startTimestamp = testGateway.startTimestamp,
+					stats = testGateway.stats,
+					services = testGateway.services,
+					settings = testGateway.settings,
+					status = testGateway.status,
+					observerAddress = testGateway.observerAddress,
+					weights = testGateway.weights,
+					delegates = {},
+					totalDelegatedStake = 0,
 					operatorStake = 2000,
 					vaults = {
 						[vaultId] = {
@@ -1490,6 +1453,15 @@ describe("gar", function()
 					_G.Balances[from] = 0
 
 					_G.GatewayRegistry[gatewayAddress] = {
+						startTimestamp = testGateway.startTimestamp,
+						stats = testGateway.stats,
+						services = testGateway.services,
+						settings = testGateway.settings,
+						status = testGateway.status,
+						observerAddress = testGateway.observerAddress,
+						weights = testGateway.weights,
+						delegates = {},
+						totalDelegatedStake = 0,
 						operatorStake = 2000,
 						vaults = {
 							[vaultId] = {
@@ -1540,6 +1512,15 @@ describe("gar", function()
 				local currentTimestamp = 1000000
 
 				_G.GatewayRegistry[from] = {
+					startTimestamp = testGateway.startTimestamp,
+					stats = testGateway.stats,
+					services = testGateway.services,
+					settings = testGateway.settings,
+					status = testGateway.status,
+					observerAddress = testGateway.observerAddress,
+					weights = testGateway.weights,
+					delegates = {},
+					totalDelegatedStake = 0,
 					operatorStake = 2000,
 					vaults = {},
 				}
@@ -1559,6 +1540,14 @@ describe("gar", function()
 				local currentTimestamp = 1000000
 
 				_G.GatewayRegistry[from] = {
+					startTimestamp = testGateway.startTimestamp,
+					stats = testGateway.stats,
+					services = testGateway.services,
+					settings = testGateway.settings,
+					observerAddress = testGateway.observerAddress,
+					weights = testGateway.weights,
+					delegates = {},
+					totalDelegatedStake = 0,
 					operatorStake = 2000,
 					status = "leaving",
 					vaults = {
@@ -1586,6 +1575,15 @@ describe("gar", function()
 				local currentTimestamp = vaultTimestamp - 1 -- Negative elapsed time
 
 				_G.GatewayRegistry[from] = {
+					startTimestamp = testGateway.startTimestamp,
+					stats = testGateway.stats,
+					services = testGateway.services,
+					settings = testGateway.settings,
+					status = testGateway.status,
+					observerAddress = testGateway.observerAddress,
+					weights = testGateway.weights,
+					delegates = {},
+					totalDelegatedStake = 0,
 					operatorStake = 2000,
 					vaults = {
 						[vaultId] = {
@@ -1643,6 +1641,7 @@ describe("gar", function()
 						settings = testGateway.settings,
 						status = testGateway.status,
 						observerAddress = testGateway.observerAddress,
+						weights = testGateway.weights,
 					}
 
 					local withdrawalResult =
@@ -1703,6 +1702,7 @@ describe("gar", function()
 						settings = testGateway.settings,
 						status = testGateway.status,
 						observerAddress = testGateway.observerAddress,
+						weights = testGateway.weights,
 					}
 
 					local withdrawalResult =
@@ -1769,6 +1769,7 @@ describe("gar", function()
 						settings = testGateway.settings,
 						status = testGateway.status,
 						observerAddress = testGateway.observerAddress,
+						weights = testGateway.weights,
 					}
 
 					local withdrawalResult =
@@ -1820,6 +1821,7 @@ describe("gar", function()
 					settings = testGateway.settings,
 					status = testGateway.status,
 					observerAddress = testGateway.observerAddress,
+					weights = testGateway.weights,
 				}
 
 				local status, err = pcall(
@@ -1866,6 +1868,7 @@ describe("gar", function()
 				settings = testGateway.settings,
 				status = testGateway.status,
 				observerAddress = testGateway.observerAddress,
+				weights = testGateway.weights,
 			}
 			local currentTimestamp = 123456
 			local status, err = pcall(gar.slashOperatorStake, stubGatewayAddress, slashAmount, currentTimestamp)
@@ -1884,6 +1887,7 @@ describe("gar", function()
 				settings = testGateway.settings,
 				status = testGateway.status,
 				observerAddress = testGateway.observerAddress,
+				weights = testGateway.weights,
 			}, _G.GatewayRegistry[stubGatewayAddress])
 			assert.are.equal(slashAmount, _G.Balances[ao.id])
 		end)
@@ -1909,6 +1913,7 @@ describe("gar", function()
 				settings = testSettings,
 				status = "joined",
 				observerAddress = stubObserverAddress,
+				weights = testGateway.weights,
 			}
 			local timestamp = 100
 			local expectedTenureWeight = timestamp / gar.getSettings().observers.tenureWeightPeriod
@@ -2004,6 +2009,16 @@ describe("gar", function()
 					gatewayStakeReturned = 0,
 					delegateStakeWithdrawing = 0,
 					gatewayStakeWithdrawing = 8000010000,
+					gatewayObjectTallies = {
+						numDelegateVaults = 0,
+						numDelegatesVaulting = 0,
+						numDelegations = 0,
+						numExitingDelegations = 0,
+						numExitingGateways = 1,
+						numGatewayVaults = 0,
+						numGateways = 1,
+						numGatewaysVaulting = 0,
+					},
 				}, result)
 
 				local expectedRemainingStake = math.floor(minOperatorStake * 0.8) + 10000
@@ -2359,6 +2374,10 @@ describe("gar", function()
 			_G.GatewayRegistry[stubRandomAddress].weights = {
 				tenureWeight = 0.5,
 				gatewayRewardRatioWeight = 0.85,
+				stakeWeight = 0,
+				observerRewardRatioWeight = 0,
+				compositeWeight = 0,
+				normalizedCompositeWeight = 0,
 			}
 			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
 			assert.is_false(result)
@@ -2369,6 +2388,10 @@ describe("gar", function()
 			_G.GatewayRegistry[stubRandomAddress].weights = {
 				tenureWeight = 1,
 				gatewayRewardRatioWeight = 0.84,
+				stakeWeight = 0,
+				observerRewardRatioWeight = 0,
+				compositeWeight = 0,
+				normalizedCompositeWeight = 0,
 			}
 			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
 			assert.is_false(result)
@@ -2379,6 +2402,10 @@ describe("gar", function()
 			_G.GatewayRegistry[stubRandomAddress].weights = {
 				tenureWeight = 1,
 				gatewayRewardRatioWeight = 0.85,
+				stakeWeight = 0,
+				observerRewardRatioWeight = 0,
+				compositeWeight = 0,
+				normalizedCompositeWeight = 0,
 			}
 			_G.GatewayRegistry[stubRandomAddress].status = "joined"
 			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)

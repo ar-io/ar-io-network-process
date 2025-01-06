@@ -103,7 +103,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 
 	local tokenCostResult = arns.getTokenCost({
 		currentTimestamp = timestamp,
-		intent = "Buy-Record",
+		intent = "Buy-Name",
 		name = name,
 		purchaseType = purchaseType,
 		years = numYears,
@@ -352,8 +352,6 @@ end
 
 function arns.getProcessIdForRecord(name)
 	local record = arns.getRecord(name)
-	-- TODO: Could assert for type safety -- but on pruneState flow, the record does not exist
-	-- assert(record, "Name is not registered: " .. name)
 	return record ~= nil and record.processId or nil
 end
 
@@ -634,13 +632,14 @@ end
 ---@class TokenCostResult
 ---@field tokenCost number The token cost in mARIO of the intended action
 ---@field discounts table|nil The discounts applied to the token cost
+---@field returnedNameDetails table|nil The details of anything returned name in the token cost result
 
 --- @class IntendedAction
---- @field purchaseType string|nil The type of purchase (lease/permabuy)
+--- @field purchaseType 'lease' | 'permabuy' The type of purchase (lease/permabuy)
 --- @field years number|nil The number of years for lease
 --- @field quantity number|nil The quantity for increasing undername limit
 --- @field name string The name of the record
---- @field intent string The intended action type (Buy-Record/Extend-Lease/Increase-Undername-Limit/Upgrade-Name/Primary-Name-Request)
+--- @field intent string The intended action type (Buy-Name/Extend-Lease/Increase-Undername-Limit/Upgrade-Name/Primary-Name-Request)
 --- @field currentTimestamp number The current timestamp
 --- @field from string|nil The target address of the intended action
 --- @field record StoredRecord|nil The record to perform the intended action on
@@ -657,19 +656,28 @@ function arns.getTokenCost(intendedAction)
 	local qty = tonumber(intendedAction.quantity)
 	local record = intendedAction.record or arns.getRecord(name)
 	local currentTimestamp = tonumber(intendedAction.currentTimestamp)
+	local returnedNameDetails = nil
 
 	assert(type(intent) == "string", "Intent is required and must be a string.")
 	assert(type(name) == "string", "Name is required and must be a string.")
-	if intent == "Buy-Record" then
+	if intent == "Buy-Name" or intent == "Buy-Record" then
 		-- stub the process id as it is not required for this intent
 		local processId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 		arns.assertValidBuyRecord(name, years, purchaseType, processId, false)
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
 		local returnedName = arns.getReturnedNameUnsafe(name)
 		if returnedName then
-			tokenCost = math.floor(
-				tokenCost * arns.getReturnedNamePremiumMultiplier(returnedName.startTimestamp, currentTimestamp)
-			)
+			local premiumMultiplier =
+				arns.getReturnedNamePremiumMultiplier(returnedName.startTimestamp, currentTimestamp)
+			returnedNameDetails = {
+				name = name,
+				initiator = returnedName.initiator,
+				startTimestamp = returnedName.startTimestamp,
+				endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod,
+				premiumMultiplier = premiumMultiplier,
+				basePrice = tokenCost,
+			}
+			tokenCost = math.floor(tokenCost * premiumMultiplier)
 		end
 	elseif intent == "Extend-Lease" then
 		assert(record, "Name is not registered")
@@ -724,6 +732,7 @@ function arns.getTokenCost(intendedAction)
 	return {
 		tokenCost = tokenCost,
 		discounts = discounts,
+		returnedNameDetails = returnedNameDetails,
 	}
 end
 
@@ -731,6 +740,7 @@ end
 ---@field tokenCost number The token cost in mARIO of the intended action
 ---@field discounts table|nil The discounts applied to the token cost
 ---@field fundingPlan table|nil The funding plan for the intended action
+---@field returnedNameDetails table|nil The details of anything returned name in the token cost result
 
 --- Gets the token cost and funding plan for the given intent
 --- @param intent string The intent to get the cost and funding plan for
@@ -766,6 +776,7 @@ function arns.getTokenCostAndFundingPlanForIntent(
 		tokenCost = tokenCostResult.tokenCost,
 		fundingPlan = fundingPlan,
 		discounts = tokenCostResult.discounts,
+		returnedNameDetails = tokenCostResult.returnedNameDetails,
 	}
 end
 
