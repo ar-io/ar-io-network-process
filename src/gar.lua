@@ -966,6 +966,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 
 	--- @type GatewayObjectTallies
 	local gatewayObjectTallies = {
+		numDelegates = 0,
 		numDelegations = 0,
 		numExitingDelegations = 0,
 		numDelegateVaults = 0,
@@ -988,13 +989,14 @@ function gar.pruneGateways(currentTimestamp, msgId)
 
 	--- @type Timestamp|nil
 	local minNextEndTimestamp
-	for address, gateway in pairs(gateways) do
+	local uniqueDelegators = {}
+	for gatewayAddress, gateway in pairs(gateways) do
 		if gateway then
 			gatewayObjectTallies.numGateways = gatewayObjectTallies.numGateways + 1
 			-- first, return any expired vaults regardless of the gateway status
 			for vaultId, vault in pairs(gateway.vaults) do
 				if vault.endTimestamp <= currentTimestamp then
-					unlockGatewayWithdrawVault(gateway, address, vaultId)
+					unlockGatewayWithdrawVault(gateway, gatewayAddress, vaultId)
 
 					result.gatewayStakeReturned = result.gatewayStakeReturned + vault.balance
 				else
@@ -1028,13 +1030,17 @@ function gar.pruneGateways(currentTimestamp, msgId)
 					gateway.delegates[delegateAddress] = nil
 				elseif delegate.delegatedStake > 0 then
 					gatewayObjectTallies.numDelegations = gatewayObjectTallies.numDelegations + 1
+					if not uniqueDelegators[delegateAddress] then
+						uniqueDelegators[delegateAddress] = true
+						gatewayObjectTallies.numDelegates = gatewayObjectTallies.numDelegates + 1
+					end
 				else
 					gatewayObjectTallies.numExitingDelegations = gatewayObjectTallies.numExitingDelegations + 1
 				end
 			end
 
 			-- update the gateway before we do anything else
-			GatewayRegistry[address] = gateway
+			GatewayRegistry[gatewayAddress] = gateway
 
 			-- if gateway is joined but failed more than 30 consecutive epochs, mark it as leaving and put operator stake and delegate stakes in vaults
 			if
@@ -1047,9 +1053,9 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				local slashAmount = math.floor(slashableOperatorStake * garSettings.operators.failedEpochSlashRate)
 				result.delegateStakeWithdrawing = result.delegateStakeWithdrawing + gateway.totalDelegatedStake
 				result.gatewayStakeWithdrawing = result.gatewayStakeWithdrawing + (gateway.operatorStake - slashAmount)
-				gar.slashOperatorStake(address, slashAmount, currentTimestamp)
-				gar.leaveNetwork(address, currentTimestamp, msgId)
-				result.slashedGateways[address] = slashAmount
+				gar.slashOperatorStake(gatewayAddress, slashAmount, currentTimestamp)
+				gar.leaveNetwork(gatewayAddress, currentTimestamp, msgId)
+				result.slashedGateways[gatewayAddress] = slashAmount
 				result.stakeSlashed = result.stakeSlashed + slashAmount
 				gatewayObjectTallies.numGateways = gatewayObjectTallies.numGateways - 1
 				gatewayObjectTallies.numExitingGateways = gatewayObjectTallies.numExitingGateways + 1
@@ -1061,8 +1067,8 @@ function gar.pruneGateways(currentTimestamp, msgId)
 						if gateway.endTimestamp <= currentTimestamp then
 							gatewayObjectTallies.numExitingGateways = gatewayObjectTallies.numExitingGateways - 1
 							-- prune the gateway
-							GatewayRegistry[address] = nil
-							table.insert(result.prunedGateways, address)
+							GatewayRegistry[gatewayAddress] = nil
+							table.insert(result.prunedGateways, gatewayAddress)
 						else
 							-- find the next prune timestamp
 							minNextEndTimestamp =

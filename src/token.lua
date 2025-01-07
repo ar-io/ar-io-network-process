@@ -30,6 +30,7 @@ end
 --- @field numDelegateVaults number
 --- @field numDelegatesVaulting number
 --- @field numDelegations number
+--- @field numDelegates number
 --- @field numExitingDelegations number
 --- @field numGatewayVaults number
 --- @field numGatewaysVaulting number
@@ -67,6 +68,7 @@ function token.computeTotalSupply()
 		numBalances = 0,
 		numDelegateVaults = 0,
 		numDelegatesVaulting = 0,
+		numDelegates = 0,
 		numDelegations = 0,
 		numExitingDelegations = 0,
 		numGatewayVaults = 0,
@@ -76,14 +78,20 @@ function token.computeTotalSupply()
 	}
 
 	-- tally circulating supply
-	for _, balance in pairs(userBalances) do
-		circulatingSupply = circulatingSupply + balance
-		stateObjectTallies.numBalances = stateObjectTallies.numBalances + 1
+	for walletAddress, balance in pairs(userBalances) do
+		-- clean up 0 balances opportunistically
+		if balance > 0 then
+			circulatingSupply = circulatingSupply + balance
+			stateObjectTallies.numBalances = stateObjectTallies.numBalances + 1
+		else
+			Balances[walletAddress] = nil
+		end
 	end
 	circulatingSupply = circulatingSupply - protocolBalance
 	totalSupply = totalSupply + protocolBalance + circulatingSupply
 
 	-- tally supply stashed in gateways and delegates
+	local uniqueDelegates = {}
 	for _, gateway in pairs(gar.getGatewaysUnsafe()) do
 		if gateway.status == "leaving" then
 			stateObjectTallies.numExitingGateways = stateObjectTallies.numExitingGateways + 1
@@ -93,11 +101,15 @@ function token.computeTotalSupply()
 		totalSupply = totalSupply + gateway.operatorStake + gateway.totalDelegatedStake
 		stakedSupply = stakedSupply + gateway.operatorStake
 		delegatedSupply = delegatedSupply + gateway.totalDelegatedStake
-		for _, delegate in pairs(gateway.delegates) do
+		for delegateAddress, delegate in pairs(gateway.delegates) do
 			if delegate.delegatedStake == 0 then
 				stateObjectTallies.numExitingDelegations = stateObjectTallies.numExitingDelegations + 1
 			else
 				stateObjectTallies.numDelegations = stateObjectTallies.numDelegations + 1
+				if not uniqueDelegates[delegateAddress] then
+					uniqueDelegates[delegateAddress] = true
+					stateObjectTallies.numDelegates = stateObjectTallies.numDelegates + 1
+				end
 			end
 
 			-- tally delegates' vaults
