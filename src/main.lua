@@ -245,6 +245,17 @@ local function addReturnedNameResultFields(ioEvent, result)
 	addResultFundingPlanFields(ioEvent, result)
 end
 
+--- @class SupplyData
+--- @field circulatingSupply number|nil
+--- @field lockedSupply number|nil
+--- @field stakedSupply number|nil
+--- @field delegatedSupply number|nil
+--- @field withdrawSupply number|nil
+--- @field totalTokenSupply number|nil
+--- @field protocolBalance number|nil
+
+--- @param ioEvent ARIOEvent
+--- @param supplyData SupplyData|nil
 local function addSupplyData(ioEvent, supplyData)
 	supplyData = supplyData or {}
 	ioEvent:addField("Circulating-Supply", supplyData.circulatingSupply or LastKnownCirculatingSupply)
@@ -1689,7 +1700,7 @@ end, function(msg)
 		Send(msg, {
 			Target = msg.From,
 			Action = "Tick-Notice",
-			LastTickedEpochIndex = LastTickedEpochIndex,
+			LastTickedEpochIndex = tostring(LastTickedEpochIndex),
 			Data = json.encode("Genesis epoch has not started yet."),
 		})
 		return
@@ -1704,8 +1715,11 @@ end, function(msg)
 	local tickedRewardDistributions = {}
 	local totalTickedRewardsDistributed = 0
 
+	print("Ticking from " .. lastTickedEpochIndex .. " to " .. targetCurrentEpochIndex)
+
 	--- tick to the newest epoch, and stub out any epochs that are not yet created
 	for i = lastTickedEpochIndex + 1, targetCurrentEpochIndex do
+		print("Ticking epoch " .. i)
 		local _, _, epochDistributionTimestamp = epochs.getEpochTimestampsForIndex(i)
 		-- use the minimum of the msg timestamp or the epoch distribution timestamp, this ensures an epoch gets created for the genesis block
 		-- and that we don't try and distribute before an epoch is created
@@ -1713,17 +1727,7 @@ end, function(msg)
 		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height,
 		-- we should set the prescribed observers and names to empty arrays and distribute rewards accordingly
 		local tickResult = tick.tickEpoch(tickTimestamp, blockHeight, hashchain, msgId)
-		if tickTimestamp == epochDistributionTimestamp then
-			-- if we are distributing rewards, we should update the last ticked epoch index to the current epoch index
-			LastTickedEpochIndex = i
-			table.insert(tickedEpochIndexes, i)
-		end
-		Send(msg, {
-			Target = msg.From,
-			Action = "Tick-Notice",
-			LastTickedEpochIndex = tostring(LastTickedEpochIndex),
-			Data = json.encode(tickResult),
-		})
+		print("Ticked epoch " .. i)
 		if tickResult.maybeNewEpoch ~= nil then
 			table.insert(newEpochIndexes, tickResult.maybeNewEpoch.epochIndex)
 			Send(msg, {
@@ -1734,12 +1738,14 @@ end, function(msg)
 			})
 		end
 		if tickResult.maybeDemandFactor ~= nil then
+			print("Updated demand factor for epoch " .. tickResult.maybeDemandFactor)
 			table.insert(newDemandFactors, tickResult.maybeDemandFactor)
 		end
 		if tickResult.pruneGatewaysResult ~= nil then
 			table.insert(newPruneGatewaysResults, tickResult.pruneGatewaysResult)
 		end
 		if tickResult.maybeDistributedEpoch ~= nil then
+			print("Distributed rewards for epoch " .. tickResult.maybeDistributedEpoch.epochIndex)
 			tickedRewardDistributions[tostring(tickResult.maybeDistributedEpoch.epochIndex)] =
 				tickResult.maybeDistributedEpoch.distributions.totalDistributedRewards
 			totalTickedRewardsDistributed = totalTickedRewardsDistributed
@@ -1751,6 +1757,14 @@ end, function(msg)
 				Data = json.encode(tickResult.maybeDistributedEpoch),
 			})
 		end
+		LastTickedEpochIndex = i -- this is better represented as LastDistributedEpochIndex
+		table.insert(tickedEpochIndexes, i)
+		Send(msg, {
+			Target = msg.From,
+			Action = "Tick-Notice",
+			LastTickedEpochIndex = tostring(LastTickedEpochIndex),
+			Data = json.encode(tickResult),
+		})
 	end
 	if #tickedEpochIndexes > 0 then
 		msg.ioEvent:addField("Ticked-Epoch-Indexes", tickedEpochIndexes)

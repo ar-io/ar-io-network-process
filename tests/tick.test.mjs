@@ -27,17 +27,18 @@ import {
   saveObservations,
   getEpochSettings,
   leaveNetwork,
+  getDemandFactorSettings,
 } from './helpers.mjs';
 import { assertNoInvariants } from './invariants.mjs';
 
-const genesisEpochStart = 1722837600000 + 1;
-const epochDurationMs = 60 * 1000 * 60 * 24; // 24 hours
-const distributionDelayMs = 60 * 1000 * 40; // 40 minutes (~ 20 arweave blocks)
-
 describe('Tick', async () => {
   let sharedMemory;
+  let epochSettings;
   beforeEach(async () => {
     const { Memory: totalTokenSupplyMemory } = await totalTokenSupply({
+      memory: startMemory,
+    });
+    epochSettings = await getEpochSettings({
       memory: startMemory,
     });
     sharedMemory = totalTokenSupplyMemory;
@@ -45,7 +46,8 @@ describe('Tick', async () => {
 
   afterEach(async () => {
     await assertNoInvariants({
-      timestamp: genesisEpochStart + 1000 * 60 * 60 * 24 * 365,
+      timestamp:
+        epochSettings.epochZeroStartTimestamp + 1000 * 60 * 60 * 24 * 365,
       memory: sharedMemory,
     });
   });
@@ -359,11 +361,6 @@ describe('Tick', async () => {
     // assert no error tag
     assertNoResultError(newDelegateResult);
 
-    // fast forward to the start of the first epoch
-    const epochSettings = await getEpochSettings({
-      memory: newDelegateResult.Memory,
-      timestamp: delegateTimestamp,
-    });
     const genesisEpochTimestamp = epochSettings.epochZeroStartTimestamp;
     // now tick to create the first epoch after the epoch start timestamp
     const createEpochTimestamp = genesisEpochTimestamp + 1;
@@ -378,15 +375,15 @@ describe('Tick', async () => {
     assert.equal(
       newEpochTick.result.Messages[0].Tags.find((tag) => tag.name === 'Action')
         .value,
-      'Tick-Notice',
+      'Epoch-Created-Notice',
     );
     assert.equal(
       newEpochTick.result.Messages[1].Tags.find((tag) => tag.name === 'Action')
         .value,
-      'Epoch-Created-Notice',
+      'Tick-Notice',
     );
 
-    const createdEpochData = JSON.parse(newEpochTick.result.Messages[1].Data);
+    const createdEpochData = JSON.parse(newEpochTick.result.Messages[0].Data);
 
     // assert the new epoch is created
     const epochData = await getEpoch({
@@ -478,27 +475,29 @@ describe('Tick', async () => {
     });
 
     // assert multiple messages are sent given the tick notice, epoch created notice and epoch distribution notice
-    assert.equal(distributionTick.result.Messages.length, 4); // cannot explain why this is 4, i'd expect it to be 3 messages (1 tick notice, 1 epoch created notice, 1 epoch distribution notice)
+    assert.equal(distributionTick.result.Messages.length, 3); // cannot explain why this is 4, i'd expect it to be 3 messages (1 tick notice, 1 epoch created notice, 1 epoch distribution notice)
     // tick notice is sent
     assert.equal(
       distributionTick.result.Messages[0].Tags.find(
         (tag) => tag.name === 'Action',
       ).value,
-      'Tick-Notice',
+      'Epoch-Created-Notice',
     );
     // new epoch is created
+
+    // epoch distribution notice is sent
     assert.equal(
       distributionTick.result.Messages[1].Tags.find(
         (tag) => tag.name === 'Action',
       ).value,
-      'Epoch-Created-Notice',
+      'Epoch-Distribution-Notice',
     );
-    // epoch distribution notice is sent
+
     assert.equal(
       distributionTick.result.Messages[2].Tags.find(
         (tag) => tag.name === 'Action',
       ).value,
-      'Epoch-Distribution-Notice',
+      'Tick-Notice',
     );
 
     // check the rewards were distributed correctly and weights are updated
@@ -510,7 +509,7 @@ describe('Tick', async () => {
 
     // assert the distribution notice has the correct data
     const distributionNoticeData = JSON.parse(
-      distributionTick.result.Messages[2].Data,
+      distributionTick.result.Messages[1].Data,
     ); // we want to make sure this gets posted as a data item for historical purposes
     assert.deepStrictEqual(distributionNoticeData, {
       ...distributedEpochData,
@@ -614,36 +613,45 @@ describe('Tick', async () => {
   });
 
   it('should not increase demandFactor and baseRegistrationFee when records are bought until the end of the epoch', async () => {
-    const genesisEpochTick = await handle({
-      options: {
-        Tags: [{ name: 'Action', value: 'Tick' }],
-        Timestamp: genesisEpochStart,
-      },
+    // NOTE: we are not using shared memory here as we want to validate the demandFactor and baseRegistrationFee are correct before any distributions have occurred
+    const demandFactorSettings = await getDemandFactorSettings({
+      memory: sharedMemory,
+      timestamp: epochSettings.epochZeroStartTimestamp,
+    });
+    const firstDemandFactorPeriodTick = await tick({
+      timestamp: demandFactorSettings.periodZeroStartTimestamp,
       memory: sharedMemory,
     });
+    const initialDemandFactor = await getDemandFactor({
+      memory: firstDemandFactorPeriodTick.memory,
+      timestamp: demandFactorSettings.periodZeroStartTimestamp,
+    });
+    assert.equal(initialDemandFactor, 1);
+
+    // get the base registration fee at the beginning of the demand factor period
     const genesisFee = await getBaseRegistrationFeeForName({
-      memory: genesisEpochTick.Memory,
-      timestamp: genesisEpochStart,
+      memory: firstDemandFactorPeriodTick.memory,
+      timestamp: demandFactorSettings.periodZeroStartTimestamp,
     });
     assert.equal(genesisFee, 600_000_000);
-
-    const zeroTickDemandFactorResult = await getDemandFactor({
-      memory: genesisEpochTick.Memory,
-      timestamp: genesisEpochStart,
-    });
-    assert.equal(zeroTickDemandFactorResult, 1);
 
     const fundedUser = 'funded-user-'.padEnd(43, '1');
     const processId = 'process-id-'.padEnd(43, '1');
     const transferMemory = await transfer({
       recipient: fundedUser,
       quantity: 100_000_000_000_000,
-      memory: genesisEpochTick.Memory,
-      timestamp: genesisEpochStart,
+      memory: firstDemandFactorPeriodTick.memory,
+      timestamp: demandFactorSettings.periodZeroStartTimestamp,
+    });
+
+    // reset token supply before any buy records are bought
+    const resetTokenSupplyMemory = await totalTokenSupply({
+      memory: transferMemory,
+      timestamp: demandFactorSettings.periodZeroStartTimestamp,
     });
 
     // Buy records in this epoch
-    let buyRecordMemory = transferMemory;
+    let buyRecordMemory = resetTokenSupplyMemory;
     for (let i = 0; i < 10; i++) {
       const { result: buyRecordResult } = await buyRecord({
         memory: buyRecordMemory,
@@ -651,87 +659,87 @@ describe('Tick', async () => {
         name: `test-name-${i}`,
         purchaseType: 'permabuy',
         processId: processId,
-        timestamp: genesisEpochStart,
+        timestamp: demandFactorSettings.periodZeroStartTimestamp,
       });
       buyRecordMemory = buyRecordResult.Memory;
     }
 
-    // Tick to the half way through the first epoch
-    const firstEpochMidTimestamp = genesisEpochStart + epochDurationMs / 2;
-    const firstEpochMidTick = await handle({
-      options: {
-        Tags: [{ name: 'Action', value: 'Tick' }],
-        Timestamp: firstEpochMidTimestamp,
-      },
+    // Tick to the half way through the first demand factor period
+    const nextDemandFactorPeriodTimestamp =
+      demandFactorSettings.periodZeroStartTimestamp +
+      demandFactorSettings.periodLengthMs;
+    const firstDemandFactorPeriodMidTick = await tick({
       memory: buyRecordMemory,
+      timestamp: nextDemandFactorPeriodTimestamp / 2,
     });
-    const feeDuringFirstEpoch = await getBaseRegistrationFeeForName({
-      memory: firstEpochMidTick.Memory,
-      timestamp: firstEpochMidTimestamp + 1,
-    });
+    const feeDuringFirstDemandFactorPeriod =
+      await getBaseRegistrationFeeForName({
+        memory: firstDemandFactorPeriodMidTick.memory,
+        timestamp: nextDemandFactorPeriodTimestamp / 2,
+      });
 
-    assert.equal(feeDuringFirstEpoch, 600_000_000);
-    const firstEpochDemandFactorResult = await getDemandFactor({
-      memory: firstEpochMidTick.Memory,
-      timestamp: firstEpochMidTimestamp + 1,
+    assert.equal(feeDuringFirstDemandFactorPeriod, 600_000_000);
+    const firstPeriodDemandFactor = await getDemandFactor({
+      memory: firstDemandFactorPeriodMidTick.memory,
+      timestamp: nextDemandFactorPeriodTimestamp,
     });
-    assert.equal(firstEpochDemandFactorResult, 1);
+    assert.equal(firstPeriodDemandFactor, 1);
 
-    // Tick to the end of the first epoch
-    const firstEpochEndTimestamp =
-      genesisEpochStart + epochDurationMs + distributionDelayMs + 1;
-    const firstEpochEndTick = await handle({
-      options: {
-        Tags: [{ name: 'Action', value: 'Tick' }],
-        Timestamp: firstEpochEndTimestamp,
-      },
-      memory: buyRecordMemory,
+    // Tick to the end of the first demand factor period
+    const nextDemandFactorPeriodTick = await tick({
+      memory: firstDemandFactorPeriodMidTick.memory,
+      timestamp: nextDemandFactorPeriodTimestamp,
     });
-    const feeAfterFirstEpochEnd = await getBaseRegistrationFeeForName({
-      memory: firstEpochEndTick.Memory,
-      timestamp: firstEpochEndTimestamp + 1,
+    // get the demand factor after the period has incremented and demand factor has been adjusted
+    const nextDemandFactorPeriodDemandFactor = await getDemandFactor({
+      memory: nextDemandFactorPeriodTick.memory,
+      timestamp: nextDemandFactorPeriodTimestamp,
     });
-
-    assert.equal(feeAfterFirstEpochEnd, 630_000_000);
-
-    const firstEpochEndDemandFactorResult = await getDemandFactor({
-      memory: firstEpochEndTick.Memory,
-      timestamp: firstEpochEndTimestamp + 1,
+    assert.equal(nextDemandFactorPeriodDemandFactor, 1.0500000000000000444);
+    // assert the demand factor is applied to the base registration fee for a name
+    const nextDemandFactorPeriodFee = await getBaseRegistrationFeeForName({
+      memory: nextDemandFactorPeriodTick.memory,
+      timestamp: nextDemandFactorPeriodTimestamp,
     });
-    assert.equal(firstEpochEndDemandFactorResult, 1.0500000000000000444);
-    sharedMemory = firstEpochEndTick.Memory;
+    assert.equal(nextDemandFactorPeriodFee, 630_000_000);
   });
 
   it('should reset to baseRegistrationFee when demandFactor is 0.5 for consecutive epochs', async () => {
-    const zeroEpochTick = await handle({
-      options: {
-        Tags: [{ name: 'Action', value: 'Tick' }],
-        Timestamp: genesisEpochStart,
-      },
+    const demandFactorSettings = await getDemandFactorSettings({
       memory: sharedMemory,
     });
-
-    const baseFeeAtZeroEpoch = await getBaseRegistrationFeeForName({
-      memory: zeroEpochTick.Memory,
-      timestamp: genesisEpochStart,
+    const zeroPeriodDemandFactorTick = await tick({
+      memory: sharedMemory,
+      timestamp: demandFactorSettings.periodZeroStartTimestamp,
     });
-    assert.equal(baseFeeAtZeroEpoch, 600_000_000);
 
-    let tickMemory = zeroEpochTick.Memory;
+    console.log(zeroPeriodDemandFactorTick.result);
+
+    const baseFeeAtFirstDemandFactorPeriod =
+      await getBaseRegistrationFeeForName({
+        memory: zeroPeriodDemandFactorTick.memory,
+        timestamp: demandFactorSettings.periodZeroStartTimestamp,
+      });
+    assert.equal(baseFeeAtFirstDemandFactorPeriod, 600_000_000);
+
+    let tickMemory = zeroPeriodDemandFactorTick.memory;
 
     // Tick to the epoch where demandFactor is 0.5
     for (let i = 0; i <= 49; i++) {
-      const epochTimestamp = genesisEpochStart + (epochDurationMs + 1) * i;
-      const { result: tickResult } = await tick({
+      const nextDemandFactorPeriodTimestamp =
+        demandFactorSettings.periodZeroStartTimestamp +
+        demandFactorSettings.periodLengthMs * i;
+      const nextDemandFactorPeriodTick = await tick({
         memory: tickMemory,
-        timestamp: epochTimestamp,
+        timestamp: nextDemandFactorPeriodTimestamp,
       });
-      tickMemory = tickResult.Memory;
+
+      tickMemory = nextDemandFactorPeriodTick.memory;
 
       if (i === 45) {
         const demandFactor = await getDemandFactor({
           memory: tickMemory,
-          timestamp: epochTimestamp,
+          timestamp: nextDemandFactorPeriodTimestamp,
         });
         assert.equal(demandFactor, 0.50655939255251769548);
       }
@@ -739,21 +747,22 @@ describe('Tick', async () => {
       if ([46, 47, 48].includes(i)) {
         const demandFactor = await getDemandFactor({
           memory: tickMemory,
-          timestamp: epochTimestamp,
+          timestamp: nextDemandFactorPeriodTimestamp,
         });
         assert.equal(demandFactor, 0.5);
       }
     }
-
-    const afterTimestamp = genesisEpochStart + (epochDurationMs + 1) * 50;
+    const demandFactorReadjustFeesTimestamp =
+      demandFactorSettings.periodZeroStartTimestamp +
+      demandFactorSettings.periodLengthMs * 50;
     const demandFactorAfterFeeAdjustment = await getDemandFactor({
       memory: tickMemory,
-      timestamp: afterTimestamp,
+      timestamp: demandFactorReadjustFeesTimestamp,
     });
     const baseFeeAfterConsecutiveTicksWithNoPurchases =
       await getBaseRegistrationFeeForName({
         memory: tickMemory,
-        timestamp: afterTimestamp,
+        timestamp: demandFactorReadjustFeesTimestamp,
       });
 
     assert.equal(demandFactorAfterFeeAdjustment, 1);

@@ -2,12 +2,12 @@
   "type": "module",
   "scripts": {
     "build": "node tools/bundle-aos.mjs",
-    "test:integration": "yarn build && node --test --experimental-wasm-memory64 **/*.test.mjs",
     "format:fix": "prettier --write .",
     "lint": "luacheck src spec",
     "test": "yarn format:fix && yarn test:unit && yarn test:integration",
     "test:unit": "rm -rf coverage && mkdir -p coverage && busted . && luacov",
     "test:coverage": "rm -rf luacov-html && yarn test:unit && luacov --reporter html && open luacov-html/index.html",
+    "test:integration": "yarn build && node --test --experimental-wasm-memory64 **/*.test.mjs",
     "monitor": "node --test tests/monitor/monitor.test.mjs",
     "monitor:devnet": "ARIO_NETWORK_PROCESS_ID=GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc node --test tests/monitor/monitor.test.mjs",
     "monitor:testnet": "ARIO_NETWORK_PROCESS_ID=agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA node --test tests/monitor/monitor.test.mjs",

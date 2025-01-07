@@ -94,7 +94,7 @@ export function assertValidSupplyEventData(result) {
       assert.strictEqual(
         event['Total-Token-Supply'],
         1_000_000_000_000_000,
-        `Total-Token-Supply is invariant for event ${JSON.stringify(event, null, 2)}`,
+        `Total-Token-Supply is invariant for event for message. Logs:\n${result.Output.data}\n\nEvents:\n${JSON.stringify(events, null, 2)}`,
       );
     }
   }
@@ -286,6 +286,17 @@ export const getDemandFactor = async ({ memory, timestamp }) => {
     memory,
   });
   return result.Messages[0].Data;
+};
+
+export const getDemandFactorSettings = async ({ memory, timestamp }) => {
+  const result = await handle({
+    options: {
+      Tags: [{ name: 'Action', value: 'Demand-Factor-Settings' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  return JSON.parse(result.Messages[0].Data);
 };
 
 export const getDelegates = async ({
@@ -859,6 +870,26 @@ export const getEpoch = async ({
   });
   assertNoResultError(epochResult);
   return JSON.parse(epochResult.Messages[0].Data);
+};
+
+export const getEpochDistributions = async ({
+  memory,
+  timestamp = STUB_TIMESTAMP,
+  epochIndex,
+}) => {
+  const distributionsResult = await handle({
+    options: {
+      Tags: [
+        { name: 'Action', value: 'Epoch-Distributions' },
+        ...(epochIndex !== undefined
+          ? [{ name: 'Epoch-Index', value: epochIndex }]
+          : []),
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  return JSON.parse(distributionsResult.Messages[0].Data);
 };
 
 export const getPrescribedObservers = async ({
