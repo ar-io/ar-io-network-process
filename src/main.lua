@@ -22,7 +22,10 @@ Vaults = Vaults or {}
 GatewayRegistry = GatewayRegistry or {}
 NameRegistry = NameRegistry or {}
 Epochs = Epochs or {}
+LastDistributedEpochIndex = LastDistributedEpochIndex or -1
+-- TODO: can remove LastTickedEpochIndex once LastCreatedEpochIndex is properly set to LastTickedEpochIndex on devnet/testnet
 LastTickedEpochIndex = LastTickedEpochIndex or -1
+LastCreatedEpochIndex = LastCreatedEpochIndex or LastTickedEpochIndex or -1
 LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
 LastKnownMessageTimestamp = LastKnownMessageTimestamp or 0
 LastKnownMessageId = LastKnownMessageId or ""
@@ -1683,51 +1686,45 @@ end, function(msg)
 	local msgId = msg.Id
 	local blockHeight = tonumber(msg["Block-Height"])
 	local hashchain = msg["Hash-Chain"]
-	local lastTickedEpochIndex = LastTickedEpochIndex
+	local lastCreatedEpochIndex = LastCreatedEpochIndex
+	local lastDistributedEpochIndex = LastDistributedEpochIndex
 	local targetCurrentEpochIndex = epochs.getEpochIndexForTimestamp(msg.Timestamp)
 
 	assert(blockHeight, "Block height is required")
 	assert(hashchain, "Hash chain is required")
 
-	msg.ioEvent:addField("Last-Ticked-Epoch-Index", lastTickedEpochIndex)
-	msg.ioEvent:addField("Current-Epoch-Index", lastTickedEpochIndex + 1)
+	msg.ioEvent:addField("Last-Created-Epoch-Index", lastCreatedEpochIndex)
+	msg.ioEvent:addField("Last-Distributed-Epoch-Index", lastDistributedEpochIndex)
 	msg.ioEvent:addField("Target-Current-Epoch-Index", targetCurrentEpochIndex)
 
-	-- if epoch index is -1 then we are before the genesis epoch and we should not tick
-	if targetCurrentEpochIndex < 0 then
-		-- do nothing and just send a notice back to the sender
+	-- if the timestamp is before the genesis epoch start timestamp, do nothing
+	if msg.Timestamp < epochs.getSettings().epochZeroStartTimestamp then
 		Send(msg, {
 			Target = msg.From,
-			Action = "Tick-Notice",
-			LastTickedEpochIndex = tostring(LastTickedEpochIndex),
+			Action = "Tick-Notice", -- TODO: this may be better as a "Genesis-Epoch-Not-Started-Notice"
 			Data = json.encode("Genesis epoch has not started yet."),
 		})
 		return
 	end
 
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
-	local tickedEpochIndexes = {}
+	local distributedEpochIndexes = {}
 	local newEpochIndexes = {}
 	local newDemandFactors = {}
-	--- @type PruneGatewaysResult[]
 	local newPruneGatewaysResults = {}
 	local tickedRewardDistributions = {}
 	local totalTickedRewardsDistributed = 0
 
-	print("Ticking from " .. lastTickedEpochIndex .. " to " .. targetCurrentEpochIndex)
+	print("Ticking from " .. lastCreatedEpochIndex .. " to " .. targetCurrentEpochIndex)
 
 	--- tick to the newest epoch, and stub out any epochs that are not yet created
-	for i = lastTickedEpochIndex + 1, targetCurrentEpochIndex do
+	for i = lastCreatedEpochIndex, targetCurrentEpochIndex do
 		print("Ticking epoch " .. i)
-		local _, _, epochDistributionTimestamp = epochs.getEpochTimestampsForIndex(i)
-		-- use the minimum of the msg timestamp or the epoch distribution timestamp, this ensures an epoch gets created for the genesis block
-		-- and that we don't try and distribute before an epoch is created
-		local tickTimestamp = math.min(msg.Timestamp, epochDistributionTimestamp)
-		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height,
-		-- we should set the prescribed observers and names to empty arrays and distribute rewards accordingly
-		local tickResult = tick.tickEpoch(tickTimestamp, blockHeight, hashchain, msgId)
+		-- TODO: if we are significantly behind, we should not prescribed any observers or names, or decrement any gateways for failure
+		local tickResult = tick.tickEpoch(msg.Timestamp, blockHeight, hashchain, msgId)
 		print("Ticked epoch " .. i)
 		if tickResult.maybeNewEpoch ~= nil then
+			LastCreatedEpochIndex = tickResult.maybeNewEpoch.epochIndex
 			table.insert(newEpochIndexes, tickResult.maybeNewEpoch.epochIndex)
 			Send(msg, {
 				Target = msg.From,
@@ -1745,10 +1742,12 @@ end, function(msg)
 		end
 		if tickResult.maybeDistributedEpoch ~= nil then
 			print("Distributed rewards for epoch " .. tickResult.maybeDistributedEpoch.epochIndex)
+			LastDistributedEpochIndex = tickResult.maybeDistributedEpoch.epochIndex
 			tickedRewardDistributions[tostring(tickResult.maybeDistributedEpoch.epochIndex)] =
 				tickResult.maybeDistributedEpoch.distributions.totalDistributedRewards
 			totalTickedRewardsDistributed = totalTickedRewardsDistributed
 				+ tickResult.maybeDistributedEpoch.distributions.totalDistributedRewards
+			table.insert(distributedEpochIndexes, tickResult.maybeDistributedEpoch.epochIndex)
 			Send(msg, {
 				Target = msg.From,
 				Action = "Epoch-Distribution-Notice",
@@ -1756,17 +1755,9 @@ end, function(msg)
 				Data = json.encode(tickResult.maybeDistributedEpoch),
 			})
 		end
-		LastTickedEpochIndex = i -- this is better represented as LastDistributedEpochIndex
-		table.insert(tickedEpochIndexes, i)
-		Send(msg, {
-			Target = msg.From,
-			Action = "Tick-Notice",
-			LastTickedEpochIndex = tostring(LastTickedEpochIndex),
-			Data = json.encode(tickResult),
-		})
 	end
-	if #tickedEpochIndexes > 0 then
-		msg.ioEvent:addField("Ticked-Epoch-Indexes", tickedEpochIndexes)
+	if #distributedEpochIndexes > 0 then
+		msg.ioEvent:addField("Distributed-Epoch-Indexes", distributedEpochIndexes)
 	end
 	if #newEpochIndexes > 0 then
 		msg.ioEvent:addField("New-Epoch-Indexes", newEpochIndexes)
@@ -1827,6 +1818,20 @@ end, function(msg)
 	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
 	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
 	addSupplyData(msg.ioEvent)
+
+	-- Send a single tick notice to the sender after all epochs have been ticked
+	Send(msg, {
+		Target = msg.From,
+		Action = "Tick-Notice",
+		Data = json.encode({
+			distributedEpochIndexes = distributedEpochIndexes,
+			newEpochIndexes = newEpochIndexes,
+			newDemandFactors = newDemandFactors,
+			newPruneGatewaysResults = newPruneGatewaysResults,
+			tickedRewardDistributions = tickedRewardDistributions,
+			totalTickedRewardsDistributed = totalTickedRewardsDistributed,
+		}),
+	})
 end, CRITICAL)
 
 -- READ HANDLERS
@@ -1848,7 +1853,8 @@ addEventingHandler(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", Actio
 			Logo = Logo,
 			Owner = Owner,
 			Denomination = tostring(Denomination),
-			LastTickedEpochIndex = tostring(LastTickedEpochIndex),
+			LastCreatedEpochIndex = tostring(LastCreatedEpochIndex),
+			LastDistributedEpochIndex = tostring(LastDistributedEpochIndex),
 			Handlers = json.encode(handlerNames),
 		},
 		Data = json.encode({
@@ -1857,7 +1863,8 @@ addEventingHandler(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", Actio
 			Logo = Logo,
 			Owner = Owner,
 			Denomination = Denomination,
-			LastTickedEpochIndex = LastTickedEpochIndex,
+			LastCreatedEpochIndex = LastCreatedEpochIndex,
+			LastDistributedEpochIndex = LastDistributedEpochIndex,
 			Handlers = handlerNames,
 		}),
 	})
