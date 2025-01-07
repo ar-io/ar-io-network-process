@@ -476,14 +476,13 @@ describe('Tick', async () => {
 
     // assert multiple messages are sent given the tick notice, epoch created notice and epoch distribution notice
     assert.equal(distributionTick.result.Messages.length, 3); // cannot explain why this is 4, i'd expect it to be 3 messages (1 tick notice, 1 epoch created notice, 1 epoch distribution notice)
-    // tick notice is sent
+    // new epoch is created
     assert.equal(
       distributionTick.result.Messages[0].Tags.find(
         (tag) => tag.name === 'Action',
       ).value,
       'Epoch-Created-Notice',
     );
-    // new epoch is created
 
     // epoch distribution notice is sent
     assert.equal(
@@ -493,6 +492,7 @@ describe('Tick', async () => {
       'Epoch-Distribution-Notice',
     );
 
+    // tick notice is sent
     assert.equal(
       distributionTick.result.Messages[2].Tags.find(
         (tag) => tag.name === 'Action',
@@ -712,8 +712,6 @@ describe('Tick', async () => {
       memory: sharedMemory,
       timestamp: demandFactorSettings.periodZeroStartTimestamp,
     });
-
-    console.log(zeroPeriodDemandFactorTick.result);
 
     const baseFeeAtFirstDemandFactorPeriod =
       await getBaseRegistrationFeeForName({
