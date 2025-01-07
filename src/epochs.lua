@@ -525,11 +525,14 @@ function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObserv
 	local protocolBalance = balances.getBalance(ao.id)
 	local rewardRate = epochs.getRewardRateForEpoch(epochIndex)
 	local totalEligibleRewards = math.floor(protocolBalance * rewardRate)
-	local eligibleGatewayReward =
-		math.floor(totalEligibleRewards * constants.gatewayOperatorRewardRatio / #activeGatewayAddresses)
-	local eligibleObserverReward = math.floor(
-		totalEligibleRewards * constants.observerRewardRatio / utils.lengthOfTable(prescribedObserversLookup)
-	)
+	local eligibleGatewayReward = #activeGatewayAddresses > 0
+			and math.floor(totalEligibleRewards * constants.gatewayOperatorRewardRatio / #activeGatewayAddresses)
+		or 0
+	local eligibleObserverReward = utils.lengthOfTable(prescribedObserversLookup) > 0
+			and math.floor(
+				totalEligibleRewards * constants.observerRewardRatio / utils.lengthOfTable(prescribedObserversLookup)
+			)
+		or 0
 	-- compute for each gateway what their potential rewards are and for their delegates
 	local potentialRewards = {}
 	-- use ipairs as activeGatewayAddresses is an array
