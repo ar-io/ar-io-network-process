@@ -2013,6 +2013,7 @@ describe("gar", function()
 						numDelegateVaults = 0,
 						numDelegatesVaulting = 0,
 						numDelegations = 0,
+						numDelegates = 0,
 						numExitingDelegations = 0,
 						numExitingGateways = 1,
 						numGatewayVaults = 0,

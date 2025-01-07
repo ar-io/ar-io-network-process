@@ -265,6 +265,7 @@ local function addTalliesData(ioEvent, talliesData)
 		"numBalances",
 		"numDelegateVaults",
 		"numDelegatesVaulting",
+		"numDelegates",
 		"numDelegations",
 		"numExitingDelegations",
 		"numGatewayVaults",
