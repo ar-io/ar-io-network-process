@@ -2150,13 +2150,14 @@ function gar.nextRedelegationsPruneTimestamp()
 end
 
 --- @class DelegatesFromAllGateways
+--- @field cursorKey string -- delegateAddress_gatewayAddress
 --- @field address WalletAddress
 --- @field gatewayAddress WalletAddress
 --- @field startTimestamp Timestamp
 --- @field delegatedStake mARIO
 --- @field vaultedStake mARIO
 
---- @param cursor string|nil
+--- @param cursor string|nil -- cursorKey of the last item in the previous page
 --- @param limit number
 --- @param sortBy string|nil
 --- @param sortOrder string|nil
@@ -2165,9 +2166,10 @@ function gar.getPaginatedDelegatesFromAllGateways(cursor, limit, sortBy, sortOrd
 	--- @type DelegatesFromAllGateways[]
 	local allDelegations = {}
 
-	for gatewayAddress, gateway in pairs(GatewayRegistry) do
+	for gatewayAddress, gateway in pairs(gar.getGatewaysUnsafe()) do
 		for delegateAddress, delegate in pairs(gateway.delegates) do
 			table.insert(allDelegations, {
+				cursorKey = delegateAddress .. "_" .. gatewayAddress,
 				address = delegateAddress,
 				gatewayAddress = gatewayAddress,
 				startTimestamp = delegate.startTimestamp,
@@ -2182,7 +2184,7 @@ function gar.getPaginatedDelegatesFromAllGateways(cursor, limit, sortBy, sortOrd
 	return utils.paginateTableWithCursor(
 		allDelegations,
 		cursor,
-		"address",
+		"cursorKey",
 		limit,
 		sortBy or "delegatedStake",
 		sortOrder or "desc"
