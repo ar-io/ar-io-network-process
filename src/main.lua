@@ -109,7 +109,6 @@ local ActionMap = {
 	AllowDelegates = "Allow-Delegates",
 	DisallowDelegates = "Disallow-Delegates",
 	Delegations = "Delegations",
-
 	-- PRIMARY NAMES
 	RemovePrimaryNames = "Remove-Primary-Names",
 	RequestPrimaryName = "Request-Primary-Name",

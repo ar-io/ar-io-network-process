@@ -1461,7 +1461,6 @@ describe('GatewayRegistry', async () => {
           timestamp: STUB_TIMESTAMP + 2,
         });
         // parse items, nextCursor
-        console.log('paginatedDelegates', paginatedDelegates);
         const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
           JSON.parse(paginatedDelegates.Messages?.[0]?.Data);
         assert.equal(totalItems, 2);

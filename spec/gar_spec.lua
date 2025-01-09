@@ -2102,7 +2102,6 @@ describe("gar", function()
 			}, result)
 			assert.are.equal(nil, _G.GatewayRegistry[stubGatewayAddress].vaults["some-previous-withdrawal-id"])
 		end)
-
 		it("should not cancel a gateway withdrawal if the gateway is leaving", function()
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
 			_G.GatewayRegistry[stubGatewayAddress].status = "leaving"
@@ -2116,7 +2115,6 @@ describe("gar", function()
 			assert.is_not_nil(err)
 			assert.matches("Gateway is leaving the network and cannot cancel withdrawals.", err)
 		end)
-
 		it("should not cancel a gateway withdrawal if the vault id is not found", function()
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
 			_G.GatewayRegistry[stubGatewayAddress].status = "joined"
