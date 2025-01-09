@@ -2102,6 +2102,7 @@ describe("gar", function()
 			}, result)
 			assert.are.equal(nil, _G.GatewayRegistry[stubGatewayAddress].vaults["some-previous-withdrawal-id"])
 		end)
+
 		it("should not cancel a gateway withdrawal if the gateway is leaving", function()
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
 			_G.GatewayRegistry[stubGatewayAddress].status = "leaving"
@@ -2115,6 +2116,7 @@ describe("gar", function()
 			assert.is_not_nil(err)
 			assert.matches("Gateway is leaving the network and cannot cancel withdrawals.", err)
 		end)
+
 		it("should not cancel a gateway withdrawal if the vault id is not found", function()
 			_G.GatewayRegistry[stubGatewayAddress] = testGateway
 			_G.GatewayRegistry[stubGatewayAddress].status = "joined"
@@ -4669,5 +4671,78 @@ describe("gar", function()
 				end
 			)
 		end)
+	end)
+
+	describe("getPaginatedDelegatesFromAllGateways", function()
+		it(
+			"should return paginated delegates sorted by delegatedStake in ascending order (most stake first)",
+			function()
+				local gateway1 = utils.deepCopy(testGateway)
+				local gateway2 = utils.deepCopy(testGateway)
+				gateway1.delegates = {
+					[stubGatewayAddress] = {
+						delegatedStake = 100,
+						startTimestamp = 0,
+						vaults = {},
+					},
+				}
+				gateway2.delegates = {
+					[stubRandomAddress] = {
+						delegatedStake = 200,
+						startTimestamp = 0,
+						vaults = {
+							["vault-1"] = {
+								balance = 200,
+								startTimestamp = 0,
+								endTimestamp = 1000,
+							},
+						},
+					},
+				}
+				_G.GatewayRegistry = {
+					[stubRandomAddress] = gateway1,
+					[stubGatewayAddress] = gateway2,
+				}
+				local delegates = gar.getPaginatedDelegatesFromAllGateways(nil, 1)
+
+				assert.are.same({
+					limit = 1,
+					sortBy = "delegatedStake",
+					sortOrder = "desc",
+					hasMore = true,
+					nextCursor = stubRandomAddress,
+					totalItems = 2,
+					items = {
+						{
+							address = stubRandomAddress,
+							gatewayAddress = stubGatewayAddress,
+							delegatedStake = 200,
+							startTimestamp = 0,
+							vaultedStake = 200,
+						},
+					},
+				}, delegates)
+
+				-- get the next page
+				local nextPage = gar.getPaginatedDelegatesFromAllGateways(tostring(delegates.nextCursor), 1)
+				assert.are.same({
+					limit = 1,
+					sortBy = "delegatedStake",
+					sortOrder = "desc",
+					hasMore = false,
+					nextCursor = nil,
+					totalItems = 2,
+					items = {
+						{
+							address = stubGatewayAddress,
+							gatewayAddress = stubRandomAddress,
+							delegatedStake = 100,
+							startTimestamp = 0,
+							vaultedStake = 0,
+						},
+					},
+				}, nextPage)
+			end
+		)
 	end)
 end)
