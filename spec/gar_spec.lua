@@ -4677,9 +4677,15 @@ describe("gar", function()
 			function()
 				local gateway1 = utils.deepCopy(testGateway)
 				local gateway2 = utils.deepCopy(testGateway)
+				local anotherAddress = "0x123"
 				gateway1.delegates = {
 					[stubGatewayAddress] = {
 						delegatedStake = 100,
+						startTimestamp = 0,
+						vaults = {},
+					},
+					[anotherAddress] = {
+						delegatedStake = 300,
 						startTimestamp = 0,
 						vaults = {},
 					},
@@ -4696,43 +4702,72 @@ describe("gar", function()
 							},
 						},
 					},
+					[anotherAddress] = {
+						delegatedStake = 500,
+						startTimestamp = 0,
+						vaults = {
+							["vault-1"] = {
+								balance = 1000,
+								startTimestamp = 0,
+								endTimestamp = 1000,
+							},
+						},
+					},
 				}
 				_G.GatewayRegistry = {
 					[stubRandomAddress] = gateway1,
 					[stubGatewayAddress] = gateway2,
 				}
-				local delegates = gar.getPaginatedDelegatesFromAllGateways(nil, 1)
+				local delegates = gar.getPaginatedDelegatesFromAllGateways(nil, 2)
 
 				assert.are.same({
-					limit = 1,
+					limit = 2,
 					sortBy = "delegatedStake",
 					sortOrder = "desc",
 					hasMore = true,
-					nextCursor = stubRandomAddress,
-					totalItems = 2,
+					nextCursor = anotherAddress .. "_" .. stubRandomAddress,
+					totalItems = 4,
 					items = {
 						{
-							address = stubRandomAddress,
+							address = anotherAddress,
+							cursorKey = anotherAddress .. "_" .. stubGatewayAddress,
 							gatewayAddress = stubGatewayAddress,
-							delegatedStake = 200,
+							delegatedStake = 500,
 							startTimestamp = 0,
-							vaultedStake = 200,
+							vaultedStake = 1000,
+						},
+						{
+							address = anotherAddress,
+							cursorKey = anotherAddress .. "_" .. stubRandomAddress,
+							gatewayAddress = stubRandomAddress,
+							delegatedStake = 300,
+							startTimestamp = 0,
+							vaultedStake = 0,
 						},
 					},
 				}, delegates)
 
 				-- get the next page
-				local nextPage = gar.getPaginatedDelegatesFromAllGateways(tostring(delegates.nextCursor), 1)
+				local nextPage = gar.getPaginatedDelegatesFromAllGateways(tostring(delegates.nextCursor), 2)
 				assert.are.same({
-					limit = 1,
+					limit = 2,
 					sortBy = "delegatedStake",
 					sortOrder = "desc",
 					hasMore = false,
 					nextCursor = nil,
-					totalItems = 2,
+					totalItems = 4,
 					items = {
 						{
+							address = stubRandomAddress,
+							cursorKey = stubRandomAddress .. "_" .. stubGatewayAddress,
+							gatewayAddress = stubGatewayAddress,
+							delegatedStake = 200,
+							startTimestamp = 0,
+							vaultedStake = 200,
+						},
+						{
 							address = stubGatewayAddress,
+							cursorKey = stubGatewayAddress .. "_" .. stubRandomAddress,
 							gatewayAddress = stubRandomAddress,
 							delegatedStake = 100,
 							startTimestamp = 0,
