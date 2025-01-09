@@ -787,7 +787,7 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 		assert(type(settings.allowDelegatedStaking) == "boolean", "allowDelegatedStaking must be a boolean")
 	end
 	if type(settings.allowedDelegates) == "table" then
-		for _, delegate in ipairs(settings.allowedDelegates) do
+		for _, delegate in pairs(settings.allowedDelegates) do
 			assert(utils.isValidAddress(delegate, true), "delegates in allowedDelegates must be valid AO addresses")
 		end
 	else
@@ -934,7 +934,7 @@ function gar.addGateway(address, gateway)
 	return gateway
 end
 
---- @class PrunedGatewaysResult
+--- @class PruneGatewaysResult
 --- @field prunedGateways Gateway[] The pruned gateways
 --- @field slashedGateways table<WalletAddress, number> The slashed gateways and their amounts
 --- @field gatewayStakeReturned number The gateway stake returned
@@ -942,12 +942,14 @@ end
 --- @field gatewayStakeWithdrawing number The gateway stake withdrawing
 --- @field delegateStakeWithdrawing number The delegate stake withdrawing
 --- @field stakeSlashed number The stake slashed
+--- @field gatewayObjectTallies GatewayObjectTallies|nil Statistics on the gateway system
 
 --- Prunes gateways that have failed more than 30 consecutive epochs
 --- @param currentTimestamp number The current timestamp
 --- @param msgId string The message ID
---- @return PrunedGatewaysResult # The result containing the pruned gateways, slashed gateways, and other stats
+--- @return PruneGatewaysResult # The result containing the pruned gateways, slashed gateways, and other stats
 function gar.pruneGateways(currentTimestamp, msgId)
+	--- @type PruneGatewaysResult
 	local result = {
 		prunedGateways = {},
 		slashedGateways = {},
@@ -962,6 +964,19 @@ function gar.pruneGateways(currentTimestamp, msgId)
 		return result
 	end
 
+	--- @type GatewayObjectTallies
+	local gatewayObjectTallies = {
+		numDelegates = 0,
+		numDelegations = 0,
+		numExitingDelegations = 0,
+		numDelegateVaults = 0,
+		numDelegatesVaulting = 0,
+		numGatewayVaults = 0,
+		numGatewaysVaulting = 0,
+		numGateways = 0,
+		numExitingGateways = 0,
+	}
+
 	-- we take a deep copy so we can operate directly on the gateway objects
 	local gateways = gar.getGateways()
 	local garSettings = gar.getSettings()
@@ -974,18 +989,24 @@ function gar.pruneGateways(currentTimestamp, msgId)
 
 	--- @type Timestamp|nil
 	local minNextEndTimestamp
-	for address, gateway in pairs(gateways) do
+	local uniqueDelegators = {}
+	for gatewayAddress, gateway in pairs(gateways) do
 		if gateway then
+			gatewayObjectTallies.numGateways = gatewayObjectTallies.numGateways + 1
 			-- first, return any expired vaults regardless of the gateway status
 			for vaultId, vault in pairs(gateway.vaults) do
 				if vault.endTimestamp <= currentTimestamp then
-					unlockGatewayWithdrawVault(gateway, address, vaultId)
+					unlockGatewayWithdrawVault(gateway, gatewayAddress, vaultId)
 
 					result.gatewayStakeReturned = result.gatewayStakeReturned + vault.balance
 				else
 					-- find the next prune timestamp
 					minNextEndTimestamp = math.min(minNextEndTimestamp or vault.endTimestamp, vault.endTimestamp)
+					gatewayObjectTallies.numGatewayVaults = gatewayObjectTallies.numGatewayVaults + 1
 				end
+			end
+			if next(gateway.vaults) ~= nil then
+				gatewayObjectTallies.numGatewaysVaulting = gatewayObjectTallies.numGatewaysVaulting + 1
 			end
 			-- return any delegated vaults and return the stake to the delegate
 			for delegateAddress, delegate in pairs(gateway.delegates) do
@@ -996,18 +1017,30 @@ function gar.pruneGateways(currentTimestamp, msgId)
 					else
 						-- find the next prune timestamp
 						minNextEndTimestamp = math.min(minNextEndTimestamp or vault.endTimestamp, vault.endTimestamp)
+						gatewayObjectTallies.numDelegateVaults = gatewayObjectTallies.numDelegateVaults + 1
 					end
 				end
-			end
-			-- remove the delegate if all vaults are empty and the delegated stake is 0
-			for delegateAddress, delegate in pairs(gateway.delegates) do
+				if next(delegate.vaults) ~= nil then
+					gatewayObjectTallies.numDelegatesVaulting = gatewayObjectTallies.numDelegatesVaulting + 1
+				end
+
+				-- remove the delegate if all vaults are empty and the delegated stake is 0
 				if delegate.delegatedStake == 0 and next(delegate.vaults) == nil then
 					-- any allowlist reassignment would have already taken place by now
 					gateway.delegates[delegateAddress] = nil
+				elseif delegate.delegatedStake > 0 then
+					gatewayObjectTallies.numDelegations = gatewayObjectTallies.numDelegations + 1
+					if not uniqueDelegators[delegateAddress] then
+						uniqueDelegators[delegateAddress] = true
+						gatewayObjectTallies.numDelegates = gatewayObjectTallies.numDelegates + 1
+					end
+				else
+					gatewayObjectTallies.numExitingDelegations = gatewayObjectTallies.numExitingDelegations + 1
 				end
 			end
+
 			-- update the gateway before we do anything else
-			GatewayRegistry[address] = gateway
+			GatewayRegistry[gatewayAddress] = gateway
 
 			-- if gateway is joined but failed more than 30 consecutive epochs, mark it as leaving and put operator stake and delegate stakes in vaults
 			if
@@ -1020,21 +1053,28 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				local slashAmount = math.floor(slashableOperatorStake * garSettings.operators.failedEpochSlashRate)
 				result.delegateStakeWithdrawing = result.delegateStakeWithdrawing + gateway.totalDelegatedStake
 				result.gatewayStakeWithdrawing = result.gatewayStakeWithdrawing + (gateway.operatorStake - slashAmount)
-				gar.slashOperatorStake(address, slashAmount, currentTimestamp)
-				gar.leaveNetwork(address, currentTimestamp, msgId)
-				result.slashedGateways[address] = slashAmount
+				gar.slashOperatorStake(gatewayAddress, slashAmount, currentTimestamp)
+				gar.leaveNetwork(gatewayAddress, currentTimestamp, msgId)
+				result.slashedGateways[gatewayAddress] = slashAmount
 				result.stakeSlashed = result.stakeSlashed + slashAmount
+				gatewayObjectTallies.numGateways = gatewayObjectTallies.numGateways - 1
+				gatewayObjectTallies.numExitingGateways = gatewayObjectTallies.numExitingGateways + 1
 			else
-				if gateway.status == "leaving" and gateway.endTimestamp ~= nil then
-					if gateway.endTimestamp <= currentTimestamp then
-						-- prune the gateway
-						GatewayRegistry[address] = nil
-						table.insert(result.prunedGateways, address)
-					else
-						-- find the next prune timestamp
-						minNextEndTimestamp =
-							--- @diagnostic disable-next-line: param-type-mismatch
-							math.min(minNextEndTimestamp or gateway.endTimestamp, gateway.endTimestamp)
+				if gateway.status == "leaving" then
+					gatewayObjectTallies.numGateways = gatewayObjectTallies.numGateways - 1
+					gatewayObjectTallies.numExitingGateways = gatewayObjectTallies.numExitingGateways + 1
+					if gateway.endTimestamp ~= nil then
+						if gateway.endTimestamp <= currentTimestamp then
+							gatewayObjectTallies.numExitingGateways = gatewayObjectTallies.numExitingGateways - 1
+							-- prune the gateway
+							GatewayRegistry[gatewayAddress] = nil
+							table.insert(result.prunedGateways, gatewayAddress)
+						else
+							-- find the next prune timestamp
+							minNextEndTimestamp =
+								--- @diagnostic disable-next-line: param-type-mismatch
+								math.min(minNextEndTimestamp or gateway.endTimestamp, gateway.endTimestamp)
+						end
 					end
 				end
 			end
@@ -1046,6 +1086,8 @@ function gar.pruneGateways(currentTimestamp, msgId)
 	if minNextEndTimestamp then
 		gar.scheduleNextGatewaysPruning(minNextEndTimestamp)
 	end
+
+	result.gatewayObjectTallies = gatewayObjectTallies
 
 	return result
 end
@@ -1301,10 +1343,10 @@ function gar.isEligibleForArNSDiscount(from)
 end
 
 --- Remove delegate addresses from the allowedDelegatesLookup table in the gateway's settings
---- @param delegates table The list of delegate addresses to remove
---- @param gatewayAddress string The address of the gateway
---- @param msgId string The associated message ID
---- @param currentTimestamp number The current timestamp
+--- @param delegates WalletAddress[] The list of delegate addresses to remove
+--- @param gatewayAddress WalletAddress The address of the gateway
+--- @param msgId MessageId The associated message ID
+--- @param currentTimestamp Timestamp The current timestamp
 --- @return table result Result table containing updated gateway object and the delegates that were actually removed
 function gar.disallowDelegates(delegates, gatewayAddress, msgId, currentTimestamp)
 	local gateway = gar.getGateway(gatewayAddress)

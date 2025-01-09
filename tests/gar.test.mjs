@@ -23,6 +23,11 @@ import {
   distributionDelay,
   epochLength,
   totalTokenSupply,
+  tick,
+  getEpochSettings,
+  getEpoch,
+  getEpochDistributions,
+  getPrescribedObservers,
 } from './helpers.mjs';
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
@@ -46,14 +51,20 @@ describe('GatewayRegistry', async () => {
 
   let sharedMemory = startMemory; // memory we'll use across unique tests;
   let lastTimestamp = STUB_TIMESTAMP;
+  let epochSettings;
 
   beforeEach(async () => {
     const { Memory: totalTokenSupplyMemory } = await totalTokenSupply({
       memory: startMemory,
     });
+
     const { memory: joinNetworkMemory } = await joinNetwork({
       address: STUB_ADDRESS,
       memory: totalTokenSupplyMemory,
+    });
+    epochSettings = await getEpochSettings({
+      memory: sharedMemory,
+      timestamp: STUB_TIMESTAMP,
     });
     // NOTE: all tests will start with this gateway joined to the network - use `sharedMemory` for the first interaction for each test to avoid having to join the network again
     sharedMemory = joinNetworkMemory;
@@ -1481,37 +1492,50 @@ describe('GatewayRegistry', async () => {
   });
 
   describe('Save-Observations', () => {
-    const distributionTimestamp = genesisEpochTimestamp + distributionDelay;
     const observerAddress = 'observer-address-'.padEnd(43, 'a');
 
     let gatewayMemory = sharedMemory;
+    let observationTimestamp;
+
+    const failedGateways = [
+      'failed-gateway-a-'.padEnd(43, 'c'),
+      'failed-gateway-b-'.padEnd(43, 'd'),
+    ].join(',');
+    const reportTxId = 'report-tx-id-'.padEnd(43, 'e');
+
     beforeEach(async () => {
       // Join a gateway with the observer
       const gatewayAddress = 'gateway-address-'.padEnd(43, 'a');
       const { memory: addGatewayMemory } = await joinNetwork({
         address: gatewayAddress,
         memory: sharedMemory,
-        timestamp: genesisEpochTimestamp,
+        timestamp: epochSettings.epochZeroStartTimestamp, // if a gateway joins the network at the start of the epoch, it will be prescribed to the observer
         observerAddress,
       });
 
-      // Create the first epoch with distributions already set
-      const futureTick = await handle({
-        options: {
-          Tags: [{ name: 'Action', value: 'Tick' }],
-          Timestamp: distributionTimestamp, // Tick to when we'll accept observations
-        },
+      // create the first epoch, this will setup the epoch and prescribe the observer to the gateway
+      const { result: createFirstEpoch } = await tick({
+        timestamp: epochSettings.epochZeroStartTimestamp,
         memory: addGatewayMemory,
       });
 
-      // Assert distributions are correct
+      // set the timestamp the gateway will use to make the next observation in the middle of the epoch
+      observationTimestamp =
+        epochSettings.epochZeroStartTimestamp + epochSettings.durationMs / 2;
+
+      // get the epoch that was created
       const {
         totalEligibleObserverReward,
         totalEligibleGatewayReward,
         totalEligibleRewards,
         totalEligibleGateways,
         rewards,
-      } = JSON.parse(futureTick.Messages[0].Data).maybeNewEpoch.distributions;
+      } = await getEpochDistributions({
+        memory: createFirstEpoch.Memory,
+        timestamp: epochSettings.epochZeroStartTimestamp,
+      });
+
+      // assert the eligible distributions are correct
       assert.equal(totalEligibleObserverReward, 1_250_000_000);
       assert.equal(totalEligibleGatewayReward, 11_250_000_000);
       assert.equal(totalEligibleRewards, 25_000_000_000);
@@ -1529,25 +1553,21 @@ describe('GatewayRegistry', async () => {
         },
       });
 
-      // Assert prescribed observers
-      const prescribedObservers = JSON.parse(futureTick.Messages[0].Data)
-        .maybeNewEpoch.prescribedObservers;
-      assert.deepEqual(prescribedObservers, {
-        [STUB_ADDRESS]: STUB_ADDRESS,
-        [observerAddress]: gatewayAddress,
+      // assert the joined gateway is prescribed to the observer
+      const prescribedObservers = await getPrescribedObservers({
+        memory: createFirstEpoch.Memory,
+        timestamp: epochSettings.epochZeroStartTimestamp,
       });
-      const prescribedObserverAddresses = Object.keys(prescribedObservers);
-      assert.ok(prescribedObserverAddresses.includes(STUB_ADDRESS));
-      assert.ok(prescribedObserverAddresses.includes(observerAddress));
-      gatewayMemory = futureTick.Memory;
-    });
 
-    const failedGateways = [
-      'failed-gateway-a-'.padEnd(43, 'c'),
-      'failed-gateway-b-'.padEnd(43, 'd'),
-    ].join(',');
-    const reportTxId = 'report-tx-id-'.padEnd(43, 'e');
-    const observationTimestamp = distributionTimestamp + 1;
+      // assert both gateways were prescribed for the first epoch
+      assert.ok(
+        prescribedObservers.some((o) => o.gatewayAddress === STUB_ADDRESS),
+      );
+      assert.ok(
+        prescribedObservers.some((o) => o.gatewayAddress === gatewayAddress),
+      );
+      gatewayMemory = createFirstEpoch.Memory;
+    });
 
     it('should save a valid observation from a prescribed observer', async () => {
       const { result } = await saveObservations({

@@ -22,7 +22,10 @@ Vaults = Vaults or {}
 GatewayRegistry = GatewayRegistry or {}
 NameRegistry = NameRegistry or {}
 Epochs = Epochs or {}
+LastDistributedEpochIndex = LastDistributedEpochIndex or -1
+-- TODO: can remove LastTickedEpochIndex once LastCreatedEpochIndex is properly set to LastTickedEpochIndex on devnet/testnet
 LastTickedEpochIndex = LastTickedEpochIndex or -1
+LastCreatedEpochIndex = LastCreatedEpochIndex or LastTickedEpochIndex or -1
 LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
 LastKnownMessageTimestamp = LastKnownMessageTimestamp or 0
 LastKnownMessageId = LastKnownMessageId or ""
@@ -246,6 +249,17 @@ local function addReturnedNameResultFields(ioEvent, result)
 	addResultFundingPlanFields(ioEvent, result)
 end
 
+--- @class SupplyData
+--- @field circulatingSupply number|nil
+--- @field lockedSupply number|nil
+--- @field stakedSupply number|nil
+--- @field delegatedSupply number|nil
+--- @field withdrawSupply number|nil
+--- @field totalTokenSupply number|nil
+--- @field protocolBalance number|nil
+
+--- @param ioEvent ARIOEvent
+--- @param supplyData SupplyData|nil
 local function addSupplyData(ioEvent, supplyData)
 	supplyData = supplyData or {}
 	ioEvent:addField("Circulating-Supply", supplyData.circulatingSupply or LastKnownCirculatingSupply)
@@ -255,6 +269,25 @@ local function addSupplyData(ioEvent, supplyData)
 	ioEvent:addField("Withdraw-Supply", supplyData.withdrawSupply or LastKnownWithdrawSupply)
 	ioEvent:addField("Total-Token-Supply", supplyData.totalTokenSupply or token.lastKnownTotalTokenSupply())
 	ioEvent:addField("Protocol-Balance", Balances[Protocol])
+end
+
+--- @param ioEvent ARIOEvent
+--- @param talliesData StateObjectTallies|GatewayObjectTallies|nil
+local function addTalliesData(ioEvent, talliesData)
+	ioEvent:addFieldsIfExist(talliesData, {
+		"numAddressesVaulting",
+		"numBalanceVaults",
+		"numBalances",
+		"numDelegateVaults",
+		"numDelegatesVaulting",
+		"numDelegates",
+		"numDelegations",
+		"numExitingDelegations",
+		"numGatewayVaults",
+		"numGatewaysVaulting",
+		"numGateways",
+		"numExitingGateways",
+	})
 end
 
 local function gatewayStats()
@@ -273,6 +306,8 @@ local function gatewayStats()
 	}
 end
 
+--- @param ioEvent ARIOEvent
+--- @param pruneGatewaysResult PruneGatewaysResult
 local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
 	LastKnownCirculatingSupply = LastKnownCirculatingSupply
 		+ (pruneGatewaysResult.delegateStakeReturned or 0)
@@ -321,6 +356,8 @@ local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
 			ioEvent:addField("Invariant-Slashed-Gateways", invariantSlashedGateways)
 		end
 	end
+
+	addTalliesData(ioEvent, pruneGatewaysResult.gatewayObjectTallies)
 end
 
 --- @param ioEvent ARIOEvent
@@ -337,7 +374,7 @@ end
 --- @param ioEvent ARIOEvent
 --- @param prunedStateResult PruneStateResult
 local function addNextPruneTimestampsResults(ioEvent, prunedStateResult)
-	--- @type PrunedGatewaysResult
+	--- @type PruneGatewaysResult
 	local pruneGatewaysResult = prunedStateResult.pruneGatewaysResult
 
 	-- If anything meaningful was pruned, collect the next prune timestamps
@@ -1603,6 +1640,7 @@ addEventingHandler("totalSupply", utils.hasMatchingTag("Action", ActionMap.Total
 	addSupplyData(msg.ioEvent, {
 		totalTokenSupply = totalSupplyDetails.totalSupply,
 	})
+	addTalliesData(msg.ioEvent, totalSupplyDetails.stateObjectTallies)
 	msg.ioEvent:addField("Last-Known-Total-Token-Supply", token.lastKnownTotalTokenSupply())
 	Send(msg, {
 		Action = "Total-Supply",
@@ -1616,6 +1654,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.
 	addSupplyData(msg.ioEvent, {
 		totalTokenSupply = totalSupplyDetails.totalSupply,
 	})
+	addTalliesData(msg.ioEvent, totalSupplyDetails.stateObjectTallies)
 	msg.ioEvent:addField("Last-Known-Total-Token-Supply", token.lastKnownTotalTokenSupply())
 
 	Send(msg, {
@@ -1643,78 +1682,84 @@ end)
 
 -- distribute rewards
 -- NOTE: THIS IS A CRITICAL HANDLER AND WILL DISCARD THE MEMORY ON ERROR
-addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), function(msg)
+addEventingHandler("distribute", function(msg)
+	return msg.Action == "Tick" or msg.Action == "Distribute"
+end, function(msg)
 	local msgId = msg.Id
 	local blockHeight = tonumber(msg["Block-Height"])
 	local hashchain = msg["Hash-Chain"]
-	local lastTickedEpochIndex = LastTickedEpochIndex
+	local lastCreatedEpochIndex = LastCreatedEpochIndex
+	local lastDistributedEpochIndex = LastDistributedEpochIndex
 	local targetCurrentEpochIndex = epochs.getEpochIndexForTimestamp(msg.Timestamp)
 
 	assert(blockHeight, "Block height is required")
 	assert(hashchain, "Hash chain is required")
 
-	msg.ioEvent:addField("Last-Ticked-Epoch-Index", lastTickedEpochIndex)
-	msg.ioEvent:addField("Current-Epoch-Index", lastTickedEpochIndex + 1)
+	msg.ioEvent:addField("Last-Created-Epoch-Index", lastCreatedEpochIndex)
+	msg.ioEvent:addField("Last-Distributed-Epoch-Index", lastDistributedEpochIndex)
 	msg.ioEvent:addField("Target-Current-Epoch-Index", targetCurrentEpochIndex)
 
-	-- if epoch index is -1 then we are before the genesis epoch and we should not tick
-	if targetCurrentEpochIndex < 0 then
-		-- do nothing and just send a notice back to the sender
+	-- if the timestamp is before the genesis epoch start timestamp, do nothing
+	if msg.Timestamp < epochs.getSettings().epochZeroStartTimestamp then
 		Send(msg, {
 			Target = msg.From,
-			Action = "Tick-Notice",
-			LastTickedEpochIndex = LastTickedEpochIndex,
+			Action = "Tick-Notice", -- TODO: this may be better as a "Genesis-Epoch-Not-Started-Notice"
 			Data = json.encode("Genesis epoch has not started yet."),
 		})
 		return
 	end
 
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
-	local tickedEpochIndexes = {}
+	local distributedEpochIndexes = {}
 	local newEpochIndexes = {}
 	local newDemandFactors = {}
 	local newPruneGatewaysResults = {}
 	local tickedRewardDistributions = {}
 	local totalTickedRewardsDistributed = 0
 
+	print("Ticking from " .. lastCreatedEpochIndex .. " to " .. targetCurrentEpochIndex)
+
 	--- tick to the newest epoch, and stub out any epochs that are not yet created
-	for i = lastTickedEpochIndex + 1, targetCurrentEpochIndex do
-		local _, _, epochDistributionTimestamp = epochs.getEpochTimestampsForIndex(i)
-		-- use the minimum of the msg timestamp or the epoch distribution timestamp, this ensures an epoch gets created for the genesis block
-		-- and that we don't try and distribute before an epoch is created
-		local tickTimestamp = math.min(msg.Timestamp, epochDistributionTimestamp)
-		-- TODO: if we need to "recover" epochs, we can't rely on just the current message hashchain and block height,
-		-- we should set the prescribed observers and names to empty arrays and distribute rewards accordingly
-		local tickResult = tick.tickEpoch(tickTimestamp, blockHeight, hashchain, msgId)
-		if tickTimestamp == epochDistributionTimestamp then
-			-- if we are distributing rewards, we should update the last ticked epoch index to the current epoch index
-			LastTickedEpochIndex = i
-			table.insert(tickedEpochIndexes, i)
-		end
-		Send(msg, {
-			Target = msg.From,
-			Action = "Tick-Notice",
-			LastTickedEpochIndex = tostring(LastTickedEpochIndex),
-			Data = json.encode(tickResult),
-		})
+	for i = lastCreatedEpochIndex, targetCurrentEpochIndex do
+		print("Ticking epoch " .. i)
+		-- TODO: if we are significantly behind, we should not prescribed any observers or names, or decrement any gateways for failure
+		local tickResult = tick.tickEpoch(msg.Timestamp, blockHeight, hashchain, msgId)
+		print("Ticked epoch " .. i)
 		if tickResult.maybeNewEpoch ~= nil then
+			LastCreatedEpochIndex = tickResult.maybeNewEpoch.epochIndex
 			table.insert(newEpochIndexes, tickResult.maybeNewEpoch.epochIndex)
+			Send(msg, {
+				Target = msg.From,
+				Action = "Epoch-Created-Notice",
+				["Epoch-Index"] = tostring(tickResult.maybeNewEpoch.epochIndex),
+				Data = json.encode(tickResult.maybeNewEpoch),
+			})
 		end
 		if tickResult.maybeDemandFactor ~= nil then
+			print("Updated demand factor for epoch " .. tickResult.maybeDemandFactor)
 			table.insert(newDemandFactors, tickResult.maybeDemandFactor)
 		end
 		if tickResult.pruneGatewaysResult ~= nil then
 			table.insert(newPruneGatewaysResults, tickResult.pruneGatewaysResult)
 		end
 		if tickResult.maybeDistributedEpoch ~= nil then
+			print("Distributed rewards for epoch " .. tickResult.maybeDistributedEpoch.epochIndex)
+			LastDistributedEpochIndex = tickResult.maybeDistributedEpoch.epochIndex
 			tickedRewardDistributions[tostring(tickResult.maybeDistributedEpoch.epochIndex)] =
 				tickResult.maybeDistributedEpoch.distributions.totalDistributedRewards
 			totalTickedRewardsDistributed = totalTickedRewardsDistributed
 				+ tickResult.maybeDistributedEpoch.distributions.totalDistributedRewards
+			table.insert(distributedEpochIndexes, tickResult.maybeDistributedEpoch.epochIndex)
+			Send(msg, {
+				Target = msg.From,
+				Action = "Epoch-Distribution-Notice",
+				["Epoch-Index"] = tostring(tickResult.maybeDistributedEpoch.epochIndex),
+				Data = json.encode(tickResult.maybeDistributedEpoch),
+			})
 		end
 	end
-	if #tickedEpochIndexes > 0 then
-		msg.ioEvent:addField("Ticked-Epoch-Indexes", tickedEpochIndexes)
+	if #distributedEpochIndexes > 0 then
+		msg.ioEvent:addField("Distributed-Epoch-Indexes", distributedEpochIndexes)
 	end
 	if #newEpochIndexes > 0 then
 		msg.ioEvent:addField("New-Epoch-Indexes", newEpochIndexes)
@@ -1730,8 +1775,12 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	end
 	if #newPruneGatewaysResults > 0 then
 		-- Reduce the prune gateways results and then track changes
+		--- @type PruneGatewaysResult
 		local aggregatedPruneGatewaysResult = utils.reduce(
 			newPruneGatewaysResults,
+			--- @param acc PruneGatewaysResult
+			--- @param _ any
+			--- @param pruneGatewaysResult PruneGatewaysResult
 			function(acc, _, pruneGatewaysResult)
 				for _, address in pairs(pruneGatewaysResult.prunedGateways) do
 					table.insert(acc.prunedGateways, address)
@@ -1745,6 +1794,8 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 				acc.delegateStakeWithdrawing = acc.delegateStakeWithdrawing
 					+ pruneGatewaysResult.delegateStakeWithdrawing
 				acc.stakeSlashed = acc.stakeSlashed + pruneGatewaysResult.stakeSlashed
+				-- Upsert to the latest tallies if available
+				acc.gatewayObjectTallies = pruneGatewaysResult.gatewayObjectTallies or acc.gatewayObjectTallies
 				return acc
 			end,
 			{
@@ -1769,6 +1820,20 @@ addEventingHandler("distribute", utils.hasMatchingTag("Action", "Tick"), functio
 	msg.ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
 	msg.ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
 	addSupplyData(msg.ioEvent)
+
+	-- Send a single tick notice to the sender after all epochs have been ticked
+	Send(msg, {
+		Target = msg.From,
+		Action = "Tick-Notice",
+		Data = json.encode({
+			distributedEpochIndexes = distributedEpochIndexes,
+			newEpochIndexes = newEpochIndexes,
+			newDemandFactors = newDemandFactors,
+			newPruneGatewaysResults = newPruneGatewaysResults,
+			tickedRewardDistributions = tickedRewardDistributions,
+			totalTickedRewardsDistributed = totalTickedRewardsDistributed,
+		}),
+	})
 end, CRITICAL)
 
 -- READ HANDLERS
@@ -1790,7 +1855,8 @@ addEventingHandler(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", Actio
 			Logo = Logo,
 			Owner = Owner,
 			Denomination = tostring(Denomination),
-			LastTickedEpochIndex = tostring(LastTickedEpochIndex),
+			LastCreatedEpochIndex = tostring(LastCreatedEpochIndex),
+			LastDistributedEpochIndex = tostring(LastDistributedEpochIndex),
 			Handlers = json.encode(handlerNames),
 		},
 		Data = json.encode({
@@ -1799,7 +1865,8 @@ addEventingHandler(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", Actio
 			Logo = Logo,
 			Owner = Owner,
 			Denomination = Denomination,
-			LastTickedEpochIndex = LastTickedEpochIndex,
+			LastCreatedEpochIndex = LastCreatedEpochIndex,
+			LastDistributedEpochIndex = LastDistributedEpochIndex,
 			Handlers = handlerNames,
 		}),
 	})
