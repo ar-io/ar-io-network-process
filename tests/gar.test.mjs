@@ -1435,6 +1435,62 @@ describe('GatewayRegistry', async () => {
     });
   });
 
+  describe('All-Paginated-Delegates', () => {
+    it('should paginate all delegates correctly', async () => {
+      const stakeQty = 20_000_000;
+      const { memory: delegatedStakeMemory } = await delegateStake({
+        delegatorAddress,
+        quantity: stakeQty,
+        gatewayAddress: STUB_ADDRESS,
+        timestamp: STUB_TIMESTAMP,
+        memory: sharedMemory,
+      });
+      const secondDelegatorAddress = 'second-delegator-'.padEnd(43, 'b');
+      const secondStakeQty = 10_000_000;
+      const { memory: secondDelegatedStakeMemory } = await delegateStake({
+        delegatorAddress: secondDelegatorAddress,
+        quantity: secondStakeQty,
+        gatewayAddress: STUB_ADDRESS,
+        timestamp: STUB_TIMESTAMP + 1,
+        memory: delegatedStakeMemory,
+      });
+
+      let cursor;
+      let fetchedDelegates = [];
+      while (true) {
+        const paginatedDelegates = await handle({
+          options: {
+            Tags: [
+              { name: 'Action', value: 'All-Paginated-Delegates' },
+              { name: 'Cursor', value: cursor },
+              { name: 'Limit', value: '1' },
+              { name: 'Sort-By', value: 'delegatedStake' },
+              { name: 'Sort-Order', value: 'asc' },
+            ],
+          },
+          memory: secondDelegatedStakeMemory,
+          timestamp: STUB_TIMESTAMP + 2,
+        });
+        // parse items, nextCursor
+        const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
+          JSON.parse(paginatedDelegates.Messages?.[0]?.Data);
+        assert.equal(totalItems, 2);
+        assert.equal(items.length, 1);
+        assert.equal(sortBy, 'delegatedStake');
+        assert.equal(sortOrder, 'asc');
+        assert.equal(hasMore, !!nextCursor);
+        cursor = nextCursor;
+        fetchedDelegates.push(...items);
+        if (!cursor) break;
+      }
+      assert.deepStrictEqual(
+        fetchedDelegates.map((d) => d.address),
+        [secondDelegatorAddress, delegatorAddress], // smaller delegated stake first with sortBy 'delegatedStake' and sortOrder 'asc'
+      );
+      sharedMemory = secondDelegatedStakeMemory;
+    });
+  });
+
   describe('Save-Observations', () => {
     const observerAddress = 'observer-address-'.padEnd(43, 'a');
 

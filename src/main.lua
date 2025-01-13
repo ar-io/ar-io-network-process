@@ -89,6 +89,7 @@ local ActionMap = {
 	CancelWithdrawal = "Cancel-Withdrawal",
 	InstantWithdrawal = "Instant-Withdrawal",
 	RedelegationFee = "Redelegation-Fee",
+	AllPaginatedDelegates = "All-Paginated-Delegates",
 	--- ArNS
 	Record = "Record",
 	Records = "Records",
@@ -2594,6 +2595,12 @@ addEventingHandler("getPruningTimestamps", utils.hasMatchingTag("Action", "Pruni
 			vaults = vaults.nextVaultsPruneTimestamp(),
 		}),
 	})
+end)
+
+addEventingHandler("allPaginatedDelegates", utils.hasMatchingTag("Action", "All-Paginated-Delegates"), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local result = gar.getPaginatedDelegatesFromAllGateways(page.cursor, page.limit, page.sortBy, page.sortOrder)
+	Send(msg, { Target = msg.From, Action = "All-Delegates-Notice", Data = json.encode(result) })
 end)
 
 return process
