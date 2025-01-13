@@ -61,7 +61,7 @@ This ADR addresses the need for a flexible and efficient wallet address format s
 
 ## Decision Outcome
 
-The decision is to implement an `Allow-Unsafe-Addresses` tag, which defaults to `false`. This allows clients to choose whether they want to potentially send tokens to invalid wallets, providing flexibility while maintaining a safety net for standard address types. It also leaves from for new signature types supported by AO in the future.
+The decision is to implement an `Allow-Unsafe-Addresses` tag, which defaults to `false`. This allows clients to choose whether they want to potentially send tokens to invalid wallets, providing flexibility while maintaining a safety net for standard address types. It also leaves room for handling new signature types supported by AO in the future.
 
 ## Positive Consequences
 
