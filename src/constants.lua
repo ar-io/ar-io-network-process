@@ -59,7 +59,7 @@ constants.returnedNamePeriod = constants.defaultEpochDurationMs * 14 -- 14 epoch
 constants.returnedNameMaxMultiplier = 50 -- Freshly returned names will have a multiplier of 50x
 
 constants.ARNS_DISCOUNT_PERCENTAGE = 0.2
-constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD = 1
+constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD = 0.5
 constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD = 0.85
 constants.ARNS_DISCOUNT_NAME = "ArNS Discount"
 
