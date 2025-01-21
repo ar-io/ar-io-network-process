@@ -4741,7 +4741,7 @@ describe("gar", function()
 					items = {
 						{
 							address = anotherAddress,
-							cursorKey = anotherAddress .. "_" .. stubGatewayAddress,
+							cursorId = anotherAddress .. "_" .. stubGatewayAddress,
 							gatewayAddress = stubGatewayAddress,
 							delegatedStake = 500,
 							startTimestamp = 0,
@@ -4749,7 +4749,7 @@ describe("gar", function()
 						},
 						{
 							address = anotherAddress,
-							cursorKey = anotherAddress .. "_" .. stubRandomAddress,
+							cursorId = anotherAddress .. "_" .. stubRandomAddress,
 							gatewayAddress = stubRandomAddress,
 							delegatedStake = 300,
 							startTimestamp = 0,
@@ -4770,7 +4770,7 @@ describe("gar", function()
 					items = {
 						{
 							address = stubRandomAddress,
-							cursorKey = stubRandomAddress .. "_" .. stubGatewayAddress,
+							cursorId = stubRandomAddress .. "_" .. stubGatewayAddress,
 							gatewayAddress = stubGatewayAddress,
 							delegatedStake = 200,
 							startTimestamp = 0,
@@ -4778,7 +4778,7 @@ describe("gar", function()
 						},
 						{
 							address = stubGatewayAddress,
-							cursorKey = stubGatewayAddress .. "_" .. stubRandomAddress,
+							cursorId = stubGatewayAddress .. "_" .. stubRandomAddress,
 							gatewayAddress = stubRandomAddress,
 							delegatedStake = 100,
 							startTimestamp = 0,
