@@ -90,6 +90,7 @@ local ActionMap = {
 	InstantWithdrawal = "Instant-Withdrawal",
 	RedelegationFee = "Redelegation-Fee",
 	AllPaginatedDelegates = "All-Paginated-Delegates",
+	AllGatewayVaults = "All-Gateway-Vaults",
 	--- ArNS
 	Record = "Record",
 	Records = "Records",
@@ -2600,6 +2601,12 @@ end)
 addEventingHandler("allPaginatedDelegates", utils.hasMatchingTag("Action", "All-Paginated-Delegates"), function(msg)
 	local page = utils.parsePaginationTags(msg)
 	local result = gar.getPaginatedDelegatesFromAllGateways(page.cursor, page.limit, page.sortBy, page.sortOrder)
+	Send(msg, { Target = msg.From, Action = "All-Delegates-Notice", Data = json.encode(result) })
+end)
+
+addEventingHandler("allPaginatedGatewayVaults", utils.hasMatchingTag("Action", "All-Gateway-Vaults"), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local result = gar.getPaginatedVaultsFromAllGateways(page.cursor, page.limit, page.sortBy, page.sortOrder)
 	Send(msg, { Target = msg.From, Action = "All-Delegates-Notice", Data = json.encode(result) })
 end)
 
