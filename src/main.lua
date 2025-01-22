@@ -2607,7 +2607,7 @@ end)
 addEventingHandler("allPaginatedGatewayVaults", utils.hasMatchingTag("Action", "All-Gateway-Vaults"), function(msg)
 	local page = utils.parsePaginationTags(msg)
 	local result = gar.getPaginatedVaultsFromAllGateways(page.cursor, page.limit, page.sortBy, page.sortOrder)
-	Send(msg, { Target = msg.From, Action = "All-Delegates-Notice", Data = json.encode(result) })
+	Send(msg, { Target = msg.From, Action = "All-Gateway-Vaults-Notice", Data = json.encode(result) })
 end)
 
 return process
