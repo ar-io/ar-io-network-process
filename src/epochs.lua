@@ -726,8 +726,8 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 					earnedRewardForGatewayAndDelegates - totalDistributedToDelegates - totalRewardsForMissingDelegates
 				)
 				if actualOperatorReward > 0 then
-					-- distribute the rewards to the gateway
-					balances.transfer(gatewayAddress, ao.id, actualOperatorReward, false) -- unsafe address should not be allowed to delegate to gateways
+					-- distribute the rewards to the gateway and allow potentially unsafe addresses given they can join the network if they are transferred balance
+					balances.transfer(gatewayAddress, ao.id, actualOperatorReward, true)
 					-- move that balance to the gateway if auto-staking is on
 					if gateway.settings.autoStake then
 						-- only increase stake if the gateway is joined, otherwise it is leaving and cannot accept additional stake so distribute rewards to the operator directly
