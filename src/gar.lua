@@ -2233,13 +2233,21 @@ function gar.getPaginatedDelegatesFromAllGateways(cursor, limit, sortBy, sortOrd
 	)
 end
 
+--- @class VaultsFromAllGateways
+--- @field cursorId string -- gatewayAddress_vaultId
+--- @field vaultId MessageId
+--- @field gatewayAddress WalletAddress
+--- @field balance mARIO
+--- @field startTimestamp Timestamp
+--- @field endTimestamp Timestamp
+
 --- @param cursor string|nil -- cursorId of the last item in the previous page
 --- @param limit number
 --- @param sortBy string|nil
 --- @param sortOrder string|nil
---- @return PaginatedTable
+--- @return PaginatedTable<VaultsFromAllGateways>
 function gar.getPaginatedVaultsFromAllGateways(cursor, limit, sortBy, sortOrder)
-	--- @type DelegatesFromAllGateways[]
+	--- @type VaultsFromAllGateways[]
 	local allVaults = {}
 
 	local gateways = gar.getGatewaysUnsafe()
