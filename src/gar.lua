@@ -2243,7 +2243,7 @@ end
 
 --- @param cursor string|nil -- cursorId of the last item in the previous page
 --- @param limit number
---- @param sortBy string|nil
+--- @param sortBy 'cursorId'|'vaultId'|'gatewayAddress'|'balance'|'startTimestamp'|'endTimestamp'|nil
 --- @param sortOrder string|nil
 --- @return PaginatedTable<VaultsFromAllGateways>
 function gar.getPaginatedVaultsFromAllGateways(cursor, limit, sortBy, sortOrder)
