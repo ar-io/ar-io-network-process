@@ -5,7 +5,7 @@ local utils = require("utils")
 
 --- Convenience factory function for pre populating analytic and msg fields into AOEvents
 --- @param msg table
---- @param initialData table<string, any> Optional initial data to populate the event with.
+--- @param initialData table<string, any> | nil Optional initial data to populate the event with.
 --- @returns ARIOEvent
 local function ARIOEvent(msg, initialData)
 	local event = AOEvent({
