@@ -648,7 +648,7 @@ end
 --- @return TokenCostResult tokenCostResult The token cost result of the intended action
 function arns.getTokenCost(intendedAction)
 	local tokenCost = 0
-	local purchaseType = intendedAction.purchaseType
+	local purchaseType = intendedAction.purchaseType or "lease"
 	local years = tonumber(intendedAction.years)
 	local name = intendedAction.name
 	local baseFee = demand.baseFeeForNameLength(#name)
@@ -664,7 +664,7 @@ function arns.getTokenCost(intendedAction)
 		-- stub the process id as it is not required for this intent
 		local processId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 		arns.assertValidBuyRecord(name, years, purchaseType, processId, false)
-		tokenCost = arns.calculateRegistrationFee(purchaseType or "lease", baseFee, years, demand.getDemandFactor())
+		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
 		local returnedName = arns.getReturnedNameUnsafe(name)
 		if returnedName then
 			local premiumMultiplier =

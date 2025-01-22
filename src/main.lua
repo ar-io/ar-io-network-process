@@ -2610,10 +2610,10 @@ addEventingHandler("allPaginatedGatewayVaults", utils.hasMatchingTag("Action", "
 	Send(msg, { Target = msg.From, Action = "All-Gateway-Vaults-Notice", Data = json.encode(result) })
 end)
 
--- Temporary handler for posting epoch distribution notices (make sure to remove this once previous epochs are distributed)
+-- TODO: handler for posting epoch distribution notices (make sure to remove this once previous epochs are distributed)
 addEventingHandler("postEpochDistributionNotice", utils.hasMatchingTag("Action", "Post-Epochs"), function(msg)
 	-- iterate over epochs and post epoch-distribution-notice for each epoch
-	for epochIndex in pairs(epochs.getEpochs()) do
+	for epochIndex, _ in pairs(epochs.getEpochs()) do
 		local epoch = epochs.getEpoch(epochIndex)
 		if epoch.distributions.distributedTimestamp then
 			epoch.prescribedObservers = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
