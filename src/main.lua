@@ -1847,6 +1847,8 @@ addEventingHandler(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", Actio
 		table.insert(handlerNames, handler.name)
 	end
 
+	local memoryKiBUsed = collectgarbage("count")
+
 	Send(msg, {
 		Target = msg.From,
 		Action = "Info-Notice",
@@ -1859,6 +1861,7 @@ addEventingHandler(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", Actio
 			LastCreatedEpochIndex = tostring(LastCreatedEpochIndex),
 			LastDistributedEpochIndex = tostring(LastDistributedEpochIndex),
 			Handlers = json.encode(handlerNames),
+			["Memory-KiB-Used"] = tostring(memoryKiBUsed),
 		},
 		Data = json.encode({
 			Name = Name,
@@ -1869,6 +1872,7 @@ addEventingHandler(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", Actio
 			LastCreatedEpochIndex = LastCreatedEpochIndex,
 			LastDistributedEpochIndex = LastDistributedEpochIndex,
 			Handlers = handlerNames,
+			["Memory-KiB-Used"] = memoryKiBUsed,
 		}),
 	})
 end)
