@@ -48,7 +48,12 @@ local function AOEvent(initialData)
 		return false
 	end
 
-	function event:addField(key, value)
+	--- Add a field to the event
+	--- @param key string The key to add to the event.
+	--- @param value any The value to add to the event.
+	--- @param trainCase boolean|nil Whether to convert the key to Train Case. Defaults to true.
+	function event:addField(key, value, trainCase)
+		trainCase = trainCase ~= false -- default to true unless explicitly set to false
 		if type(key) ~= "string" then
 			print("ERROR: Field key must be a string.")
 			return self
@@ -61,7 +66,7 @@ local function AOEvent(initialData)
 			)
 			return self
 		end
-		self.data[utils.toTrainCase(key)] = value
+		self.data[trainCase and utils.toTrainCase(key) or key] = value
 		return self
 	end
 
