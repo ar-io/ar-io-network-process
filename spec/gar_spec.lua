@@ -4681,4 +4681,230 @@ describe("gar", function()
 			)
 		end)
 	end)
+
+	describe("getPaginatedDelegatesFromAllGateways", function()
+		it(
+			"should return paginated delegates sorted by delegatedStake in ascending order (most stake first)",
+			function()
+				local gateway1 = utils.deepCopy(testGateway)
+				local gateway2 = utils.deepCopy(testGateway)
+				local anotherAddress = "0x123"
+				gateway1.delegates = {
+					[stubGatewayAddress] = {
+						delegatedStake = 100,
+						startTimestamp = 0,
+						vaults = {},
+					},
+					[anotherAddress] = {
+						delegatedStake = 300,
+						startTimestamp = 0,
+						vaults = {},
+					},
+				}
+				gateway2.delegates = {
+					[stubRandomAddress] = {
+						delegatedStake = 200,
+						startTimestamp = 0,
+						vaults = {
+							["vault-1"] = {
+								balance = 200,
+								startTimestamp = 0,
+								endTimestamp = 1000,
+							},
+						},
+					},
+					[anotherAddress] = {
+						delegatedStake = 500,
+						startTimestamp = 0,
+						vaults = {
+							["vault-1"] = {
+								balance = 1000,
+								startTimestamp = 0,
+								endTimestamp = 1000,
+							},
+						},
+					},
+				}
+				_G.GatewayRegistry = {
+					[stubRandomAddress] = gateway1,
+					[stubGatewayAddress] = gateway2,
+				}
+				local delegates = gar.getPaginatedDelegatesFromAllGateways(nil, 2)
+
+				assert.are.same({
+					limit = 2,
+					sortBy = "delegatedStake",
+					sortOrder = "desc",
+					hasMore = true,
+					nextCursor = anotherAddress .. "_" .. stubRandomAddress,
+					totalItems = 4,
+					items = {
+						{
+							address = anotherAddress,
+							cursorId = anotherAddress .. "_" .. stubGatewayAddress,
+							gatewayAddress = stubGatewayAddress,
+							delegatedStake = 500,
+							startTimestamp = 0,
+							vaultedStake = 1000,
+						},
+						{
+							address = anotherAddress,
+							cursorId = anotherAddress .. "_" .. stubRandomAddress,
+							gatewayAddress = stubRandomAddress,
+							delegatedStake = 300,
+							startTimestamp = 0,
+							vaultedStake = 0,
+						},
+					},
+				}, delegates)
+
+				-- get the next page
+				local nextPage = gar.getPaginatedDelegatesFromAllGateways(tostring(delegates.nextCursor), 2)
+				assert.are.same({
+					limit = 2,
+					sortBy = "delegatedStake",
+					sortOrder = "desc",
+					hasMore = false,
+					nextCursor = nil,
+					totalItems = 4,
+					items = {
+						{
+							address = stubRandomAddress,
+							cursorId = stubRandomAddress .. "_" .. stubGatewayAddress,
+							gatewayAddress = stubGatewayAddress,
+							delegatedStake = 200,
+							startTimestamp = 0,
+							vaultedStake = 200,
+						},
+						{
+							address = stubGatewayAddress,
+							cursorId = stubGatewayAddress .. "_" .. stubRandomAddress,
+							gatewayAddress = stubRandomAddress,
+							delegatedStake = 100,
+							startTimestamp = 0,
+							vaultedStake = 0,
+						},
+					},
+				}, nextPage)
+			end
+		)
+	end)
+
+	describe("getPaginatedVaultsFromAllGateways", function()
+		it("should return paginated vaults sorted by delegatedStake in ascending order (most stake first)", function()
+			local gateway1 = utils.deepCopy(testGateway)
+			local gateway2 = utils.deepCopy(testGateway)
+			gateway1.vaults = {
+				["vault-1"] = {
+					balance = 100,
+					startTimestamp = 0,
+					endTimestamp = 1000,
+				},
+				["vault-2"] = {
+					balance = 300,
+					startTimestamp = 0,
+					endTimestamp = 1000,
+				},
+				["vault-3"] = {
+					balance = 500,
+					startTimestamp = 0,
+					endTimestamp = 1000,
+				},
+			}
+			gateway2.vaults = {
+				["vault-4"] = {
+					balance = 600,
+					startTimestamp = 0,
+					endTimestamp = 1000,
+				},
+				["vault-5"] = {
+					balance = 200,
+					startTimestamp = 0,
+					endTimestamp = 1000,
+				},
+				["vault-6"] = {
+					balance = 400,
+					startTimestamp = 0,
+					endTimestamp = 1000,
+				},
+			}
+			_G.GatewayRegistry = {
+				[stubRandomAddress] = gateway1,
+				[stubGatewayAddress] = gateway2,
+			}
+			local delegates = gar.getPaginatedVaultsFromAllGateways(nil, 3, "balance", "desc")
+
+			assert.are.same({
+				limit = 3,
+				sortBy = "balance",
+				sortOrder = "desc",
+				hasMore = true,
+				nextCursor = stubGatewayAddress .. "_vault-6",
+				totalItems = 6,
+				items = {
+					{
+						vaultId = "vault-4",
+						cursorId = stubGatewayAddress .. "_vault-4",
+						gatewayAddress = stubGatewayAddress,
+						balance = 600,
+						startTimestamp = 0,
+						endTimestamp = 1000,
+					},
+					{
+						vaultId = "vault-3",
+						cursorId = stubRandomAddress .. "_vault-3",
+						gatewayAddress = stubRandomAddress,
+						balance = 500,
+						startTimestamp = 0,
+						endTimestamp = 1000,
+					},
+					{
+						vaultId = "vault-6",
+						cursorId = stubGatewayAddress .. "_vault-6",
+						gatewayAddress = stubGatewayAddress,
+						balance = 400,
+						startTimestamp = 0,
+						endTimestamp = 1000,
+					},
+				},
+			}, delegates)
+
+			-- get the next page
+			local nextPage = gar.getPaginatedVaultsFromAllGateways(tostring(delegates.nextCursor), 3, "balance", "desc")
+			assert.are.same({
+				limit = 3,
+				sortBy = "balance",
+				sortOrder = "desc",
+				hasMore = false,
+				nextCursor = nil,
+				totalItems = 6,
+				items = {
+					{
+						vaultId = "vault-2",
+						cursorId = stubRandomAddress .. "_vault-2",
+						gatewayAddress = stubRandomAddress,
+						balance = 300,
+						startTimestamp = 0,
+						endTimestamp = 1000,
+					},
+					{
+						vaultId = "vault-5",
+						cursorId = stubGatewayAddress .. "_vault-5",
+						gatewayAddress = stubGatewayAddress,
+						balance = 200,
+						startTimestamp = 0,
+						endTimestamp = 1000,
+					},
+					{
+						vaultId = "vault-1",
+						cursorId = stubRandomAddress .. "_vault-1",
+						gatewayAddress = stubRandomAddress,
+						balance = 100,
+						startTimestamp = 0,
+						endTimestamp = 1000,
+					},
+				},
+			}, nextPage)
+		end)
+	end)
 end)

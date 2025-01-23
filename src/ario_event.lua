@@ -5,7 +5,7 @@ local utils = require("utils")
 
 --- Convenience factory function for pre populating analytic and msg fields into AOEvents
 --- @param msg table
---- @param initialData table<string, any> Optional initial data to populate the event with.
+--- @param initialData table<string, any> | nil Optional initial data to populate the event with.
 --- @returns ARIOEvent
 local function ARIOEvent(msg, initialData)
 	local event = AOEvent({
@@ -16,6 +16,7 @@ local function ARIOEvent(msg, initialData)
 	event:addFieldsIfExist(msg, { "From", "Timestamp", "Action" })
 	event:addField("Message-Id", msg.Id)
 	event:addField("From-Formatted", utils.formatAddress(msg.From))
+	event:addField("Memory-KiB-Used", collectgarbage("count"), false)
 	if initialData ~= nil then
 		event:addFields(initialData)
 	end

@@ -89,6 +89,8 @@ local ActionMap = {
 	CancelWithdrawal = "Cancel-Withdrawal",
 	InstantWithdrawal = "Instant-Withdrawal",
 	RedelegationFee = "Redelegation-Fee",
+	AllPaginatedDelegates = "All-Paginated-Delegates",
+	AllGatewayVaults = "All-Gateway-Vaults",
 	--- ArNS
 	Record = "Record",
 	Records = "Records",
@@ -1845,6 +1847,8 @@ addEventingHandler(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", Actio
 		table.insert(handlerNames, handler.name)
 	end
 
+	local memoryKiBUsed = collectgarbage("count")
+
 	Send(msg, {
 		Target = msg.From,
 		Action = "Info-Notice",
@@ -1857,6 +1861,7 @@ addEventingHandler(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", Actio
 			LastCreatedEpochIndex = tostring(LastCreatedEpochIndex),
 			LastDistributedEpochIndex = tostring(LastDistributedEpochIndex),
 			Handlers = json.encode(handlerNames),
+			["Memory-KiB-Used"] = tostring(memoryKiBUsed),
 		},
 		Data = json.encode({
 			Name = Name,
@@ -1867,6 +1872,7 @@ addEventingHandler(ActionMap.Info, Handlers.utils.hasMatchingTag("Action", Actio
 			LastCreatedEpochIndex = LastCreatedEpochIndex,
 			LastDistributedEpochIndex = LastDistributedEpochIndex,
 			Handlers = handlerNames,
+			["Memory-KiB-Used"] = memoryKiBUsed,
 		}),
 	})
 end)
@@ -2594,6 +2600,35 @@ addEventingHandler("getPruningTimestamps", utils.hasMatchingTag("Action", "Pruni
 			vaults = vaults.nextVaultsPruneTimestamp(),
 		}),
 	})
+end)
+
+addEventingHandler("allPaginatedDelegates", utils.hasMatchingTag("Action", "All-Paginated-Delegates"), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local result = gar.getPaginatedDelegatesFromAllGateways(page.cursor, page.limit, page.sortBy, page.sortOrder)
+	Send(msg, { Target = msg.From, Action = "All-Delegates-Notice", Data = json.encode(result) })
+end)
+
+addEventingHandler("allPaginatedGatewayVaults", utils.hasMatchingTag("Action", "All-Gateway-Vaults"), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local result = gar.getPaginatedVaultsFromAllGateways(page.cursor, page.limit, page.sortBy, page.sortOrder)
+	Send(msg, { Target = msg.From, Action = "All-Gateway-Vaults-Notice", Data = json.encode(result) })
+end)
+
+-- TODO: handler for posting epoch distribution notices (make sure to remove this once previous epochs are distributed)
+addEventingHandler("postEpochDistributionNotice", utils.hasMatchingTag("Action", "Post-Epochs"), function(msg)
+	-- iterate over epochs and post epoch-distribution-notice for each epoch
+	for epochIndex, _ in pairs(epochs.getEpochs()) do
+		local epoch = epochs.getEpoch(epochIndex)
+		if epoch.distributions.distributedTimestamp then
+			epoch.prescribedObservers = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
+			Send(msg, {
+				Target = msg.From,
+				Action = "Epoch-Distribution-Notice",
+				["Epoch-Index"] = tostring(epochIndex),
+				Data = json.encode(epoch),
+			})
+		end
+	end
 end)
 
 return process

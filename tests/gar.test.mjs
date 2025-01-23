@@ -1435,6 +1435,225 @@ describe('GatewayRegistry', async () => {
     });
   });
 
+  describe('All-Paginated-Delegates', () => {
+    it('should paginate all delegates correctly', async () => {
+      const stakeQty = 20_000_000;
+      const { memory: delegatedStakeMemory } = await delegateStake({
+        delegatorAddress,
+        quantity: stakeQty,
+        gatewayAddress: STUB_ADDRESS,
+        timestamp: STUB_TIMESTAMP,
+        memory: sharedMemory,
+      });
+      const secondDelegatorAddress = 'second-delegator-'.padEnd(43, 'b');
+      const secondStakeQty = 10_000_000;
+      const { memory: secondDelegatedStakeMemory } = await delegateStake({
+        delegatorAddress: secondDelegatorAddress,
+        quantity: secondStakeQty,
+        gatewayAddress: STUB_ADDRESS,
+        timestamp: STUB_TIMESTAMP + 1,
+        memory: delegatedStakeMemory,
+      });
+
+      let cursor;
+      let fetchedDelegates = [];
+      while (true) {
+        const paginatedDelegates = await handle({
+          options: {
+            Tags: [
+              { name: 'Action', value: 'All-Paginated-Delegates' },
+              { name: 'Cursor', value: cursor },
+              { name: 'Limit', value: '1' },
+              { name: 'Sort-By', value: 'delegatedStake' },
+              { name: 'Sort-Order', value: 'asc' },
+            ],
+          },
+          memory: secondDelegatedStakeMemory,
+          timestamp: STUB_TIMESTAMP + 2,
+        });
+        // parse items, nextCursor
+        const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
+          JSON.parse(paginatedDelegates.Messages?.[0]?.Data);
+        assert.equal(totalItems, 2);
+        assert.equal(items.length, 1);
+        assert.equal(sortBy, 'delegatedStake');
+        assert.equal(sortOrder, 'asc');
+        assert.equal(hasMore, !!nextCursor);
+        cursor = nextCursor;
+        fetchedDelegates.push(...items);
+        if (!cursor) break;
+      }
+      assert.deepStrictEqual(
+        fetchedDelegates.map((d) => d.address),
+        [secondDelegatorAddress, delegatorAddress], // smaller delegated stake first with sortBy 'delegatedStake' and sortOrder 'asc'
+      );
+      sharedMemory = secondDelegatedStakeMemory;
+    });
+  });
+
+  describe('All-Gateway-Vaults', () => {
+    it('should paginate all gateway vaults correctly', async () => {
+      // Setup 2 gateways with 2 vaults each
+      const gateway1 = 'gateway-1'.padEnd(43, 'a');
+      const gateway2 = 'gateway-2'.padEnd(43, 'b');
+
+      let nextTimestamp = STUB_TIMESTAMP;
+
+      const transfer1Memory = await transfer({
+        recipient: gateway1,
+        quantity: 1_000_000_000_000,
+        memory: sharedMemory,
+        timestamp: nextTimestamp++,
+      });
+      const joinNetworkResult = await handle({
+        options: {
+          From: gateway1,
+          Owner: gateway1,
+          Tags: validGatewayTags({
+            operatorStake: 1_000_000_000_000,
+          }),
+          Timestamp: nextTimestamp++,
+        },
+        memory: transfer1Memory,
+      });
+      const transfer2Memory = await transfer({
+        recipient: gateway2,
+        quantity: 1_000_000_000_000,
+        memory: joinNetworkResult.Memory,
+        timestamp: nextTimestamp++,
+      });
+      const joinNetworkResult2 = await handle({
+        options: {
+          From: gateway2,
+          Owner: gateway2,
+          Tags: validGatewayTags({
+            operatorStake: 1_000_000_000_000,
+          }),
+          Timestamp: nextTimestamp++,
+        },
+        memory: transfer2Memory,
+      });
+
+      // Withdraw stake to setup vaults
+      const withdraw1Res = await handle({
+        memory: joinNetworkResult2.Memory,
+        timestamp: nextTimestamp++,
+        options: {
+          From: gateway1,
+          Owner: gateway1,
+          Id: 'withdraw-1',
+          Tags: [
+            { name: 'Action', value: 'Decrease-Operator-Stake' },
+            { name: 'Quantity', value: '5000000' }, // 5 ARIO
+          ],
+        },
+      });
+      const withdraw2Res = await handle({
+        memory: withdraw1Res.Memory,
+        timestamp: nextTimestamp++,
+        options: {
+          From: gateway2,
+          Owner: gateway2,
+          Id: 'withdraw-2',
+          Tags: [
+            { name: 'Action', value: 'Decrease-Operator-Stake' },
+            { name: 'Quantity', value: '2000000' }, // 2 ARIO
+          ],
+        },
+      });
+      const withdraw3Res = await handle({
+        memory: withdraw2Res.Memory,
+        timestamp: nextTimestamp++,
+        options: {
+          From: gateway1,
+          Owner: gateway1,
+          Id: 'withdraw-3',
+          Tags: [
+            { name: 'Action', value: 'Decrease-Operator-Stake' },
+            { name: 'Quantity', value: '4000000' }, // 4 ARIO
+          ],
+        },
+      });
+      const withdraw4Res = await handle({
+        memory: withdraw3Res.Memory,
+        timestamp: nextTimestamp++,
+        options: {
+          From: gateway2,
+          Owner: gateway2,
+          Id: 'withdraw-4',
+          Tags: [
+            { name: 'Action', value: 'Decrease-Operator-Stake' },
+            { name: 'Quantity', value: '3000000' }, // 3 ARIO
+          ],
+        },
+      });
+
+      let cursor;
+      let fetchedVaults = [];
+      while (true) {
+        const paginatedVaults = await handle({
+          options: {
+            Tags: [
+              { name: 'Action', value: 'All-Gateway-Vaults' },
+              { name: 'Cursor', value: cursor },
+              { name: 'Limit', value: '2' },
+              { name: 'Sort-By', value: 'balance' },
+              { name: 'Sort-Order', value: 'desc' },
+            ],
+          },
+          memory: withdraw4Res.Memory,
+          timestamp: STUB_TIMESTAMP + 6,
+        });
+        // parse items, nextCursor
+        const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
+          JSON.parse(paginatedVaults.Messages?.[0]?.Data);
+        assert.equal(totalItems, 4);
+        assert.equal(items.length, 2);
+        assert.equal(sortBy, 'balance');
+        assert.equal(sortOrder, 'desc');
+        assert.equal(hasMore, !!nextCursor);
+        cursor = nextCursor;
+        fetchedVaults.push(...items);
+        if (!cursor) break;
+      }
+      assert.deepStrictEqual(fetchedVaults, [
+        {
+          startTimestamp: 21600004,
+          endTimestamp: 7797600004,
+          vaultId: 'withdraw-1',
+          cursorId: 'gateway-1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_withdraw-1',
+          balance: 5000000,
+          gatewayAddress: 'gateway-1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+        {
+          startTimestamp: 21600006,
+          endTimestamp: 7797600006,
+          vaultId: 'withdraw-3',
+          cursorId: 'gateway-1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_withdraw-3',
+          balance: 4000000,
+          gatewayAddress: 'gateway-1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+        {
+          startTimestamp: 21600007,
+          endTimestamp: 7797600007,
+          vaultId: 'withdraw-4',
+          cursorId: 'gateway-2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb_withdraw-4',
+          balance: 3000000,
+          gatewayAddress: 'gateway-2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        },
+        {
+          startTimestamp: 21600005,
+          endTimestamp: 7797600005,
+          vaultId: 'withdraw-2',
+          cursorId: 'gateway-2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb_withdraw-2',
+          balance: 2000000,
+          gatewayAddress: 'gateway-2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        },
+      ]);
+      sharedMemory = withdraw4Res.Memory;
+    });
+  });
+
   describe('Save-Observations', () => {
     const observerAddress = 'observer-address-'.padEnd(43, 'a');
 

@@ -228,6 +228,7 @@ describe('primary names', function () {
       Timestamp: 1234567890,
       'Total-Primary-Name-Requests': 1,
       'Total-Primary-Names': 0,
+      'Memory-KiB-Used': parsedEvents[0]['Memory-KiB-Used'],
     });
 
     const { result: getPrimaryNameRequestResult } = await getPrimaryNameRequest(
@@ -281,6 +282,7 @@ describe('primary names', function () {
       Timestamp: 1234567899,
       'Total-Primary-Names': 1,
       'Total-Primary-Name-Requests': 0,
+      'Memory-KiB-Used': parsedApproveEvents[0]['Memory-KiB-Used'],
     });
 
     // there should be two messages, one to the ant and one to the owner
@@ -383,6 +385,7 @@ describe('primary names', function () {
       Timestamp: 1234567899,
       'Total-Primary-Name-Requests': 0,
       'Total-Primary-Names': 1,
+      'Memory-KiB-Used': parsedEvents[0]['Memory-KiB-Used'],
     });
 
     // there should be only one message with the Approve-Primary-Name-Request-Notice action
@@ -537,6 +540,7 @@ describe('primary names', function () {
       'Total-Primary-Name-Requests': 0,
       'Total-Primary-Names': 0,
       'Notify-Owners': 'true',
+      'Memory-KiB-Used': removePrimaryNameEvents[0]['Memory-KiB-Used'],
     });
     // assert the primary name is no longer set
     const { result: primaryNameForAddressResult, memory } =

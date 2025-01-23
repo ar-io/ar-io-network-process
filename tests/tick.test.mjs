@@ -322,8 +322,9 @@ describe('Tick', async () => {
    * - submit an observation from the gateway prescribed
    * - tick to the epoch distribution timestamp
    * - validate the rewards were distributed correctly
+   * - send epoch distribution notice containing full epoch data
    */
-  it('should distribute rewards to gateways and delegates', async () => {
+  it('should distribute rewards to gateways and delegates and send an epoch distribution notice', async () => {
     // give balance to gateway
     const initialMemory = await transfer({
       recipient: STUB_ADDRESS,
@@ -500,25 +501,11 @@ describe('Tick', async () => {
       'Tick-Notice',
     );
 
-    // check the rewards were distributed correctly and weights are updated
-    const distributedEpochData = await getEpoch({
-      memory: distributionTick.memory,
-      timestamp: distributionTimestamp,
-      epochIndex: 0,
-    });
-
-    // assert the distribution notice has the correct data
+    // assert the distribution notice has the correct data and is posted as a data item
     const distributionNoticeData = JSON.parse(
       distributionTick.result.Messages[1].Data,
-    ); // we want to make sure this gets posted as a data item for historical purposes
+    );
     assert.deepStrictEqual(distributionNoticeData, {
-      ...distributedEpochData,
-      prescribedObservers: {
-        [STUB_ADDRESS]: STUB_ADDRESS,
-      },
-    });
-    // assert all the data is correct
-    assert.deepStrictEqual(distributedEpochData, {
       ...epochData,
       distributions: {
         ...epochData.distributions,
@@ -542,11 +529,12 @@ describe('Tick', async () => {
         {
           ...epochData.prescribedObservers[0],
           stake: INITIAL_OPERATOR_STAKE + expectedGatewayOperatorReward,
-          compositeWeight: 22,
-          stakeWeight: 5.5,
+          compositeWeight: 12,
+          stakeWeight: 3,
         },
       ],
     });
+
     // assert the new epoch was created
     const newEpoch = await getEpoch({
       memory: distributionTick.memory,

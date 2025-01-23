@@ -635,7 +635,7 @@ end
 ---@field returnedNameDetails table|nil The details of anything returned name in the token cost result
 
 --- @class IntendedAction
---- @field purchaseType 'lease' | 'permabuy' The type of purchase (lease/permabuy)
+--- @field purchaseType 'lease' | 'permabuy'|nil The type of purchase (lease/permabuy)
 --- @field years number|nil The number of years for lease
 --- @field quantity number|nil The quantity for increasing undername limit
 --- @field name string The name of the record
@@ -648,7 +648,7 @@ end
 --- @return TokenCostResult tokenCostResult The token cost result of the intended action
 function arns.getTokenCost(intendedAction)
 	local tokenCost = 0
-	local purchaseType = intendedAction.purchaseType
+	local purchaseType = intendedAction.purchaseType or "lease"
 	local years = tonumber(intendedAction.years)
 	local name = intendedAction.name
 	local baseFee = demand.baseFeeForNameLength(#name)
