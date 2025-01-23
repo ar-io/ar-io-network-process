@@ -16,7 +16,7 @@ local function ARIOEvent(msg, initialData)
 	event:addFieldsIfExist(msg, { "From", "Timestamp", "Action" })
 	event:addField("Message-Id", msg.Id)
 	event:addField("From-Formatted", utils.formatAddress(msg.From))
-	event:addField("Memory-KiB-Used", collectgarbage("count"))
+	event:addField("Memory-KiB-Used", collectgarbage("count"), false)
 	if initialData ~= nil then
 		event:addFields(initialData)
 	end
