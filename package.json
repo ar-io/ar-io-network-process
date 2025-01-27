@@ -8,9 +8,10 @@
     "test:unit": "rm -rf coverage && mkdir -p coverage && busted . && luacov",
     "test:coverage": "rm -rf luacov-html && yarn test:unit && luacov --reporter html && open luacov-html/index.html",
     "test:integration": "yarn build && node --test --experimental-wasm-memory64 **/*.test.mjs",
-    "monitor": "node --test tests/monitor/monitor.test.mjs",
-    "monitor:devnet": "ARIO_NETWORK_PROCESS_ID=GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc node --test tests/monitor/monitor.test.mjs",
-    "monitor:testnet": "ARIO_NETWORK_PROCESS_ID=agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA node --test tests/monitor/monitor.test.mjs",
+    "monitor:down": "docker compose -f tests/monitor/docker-compose.test.yml down",
+    "monitor": "yarn monitor:down && node --test tests/monitor/monitor.test.mjs",
+    "monitor:devnet": "yarn monitor:down && ARIO_NETWORK_PROCESS_ID=GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc node --test tests/monitor/monitor.test.mjs",
+    "monitor:testnet": "yarn monitor:down && ARIO_NETWORK_PROCESS_ID=agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA node --test tests/monitor/monitor.test.mjs",
     "evolve": "yarn build && node tools/evolve.mjs",
     "prepare": "husky"
   },
@@ -21,6 +22,7 @@
     "arweave": "^1.15.1",
     "husky": "^9.1.6",
     "lint-staged": "^15.2.10",
+    "p-limit": "^6.2.0",
     "prettier": "^3.3.2",
     "testcontainers": "^10.13.1"
   },
