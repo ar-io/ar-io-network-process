@@ -961,8 +961,8 @@ addEventingHandler(
 		local quantity = msg.Tags.Quantity
 		assert(type(name) == "string", "Invalid name")
 		assert(
-			quantity and quantity > 0 and quantity < 9990 and utils.isInteger(quantity),
-			"Invalid quantity. Must be an integer value greater than 0 and less than 9990"
+			quantity and quantity > 0 and utils.isInteger(quantity),
+			"Invalid quantity. Must be an integer value greater than 0"
 		)
 		assertValidFundFrom(fundFrom)
 
