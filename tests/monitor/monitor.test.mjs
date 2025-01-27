@@ -469,7 +469,6 @@ describe('setup', () => {
       const { items: delegates } = await io.getAllDelegates({
         limit: 10_000,
       });
-      // this overwhelms the local CU, so keep in a for loop
       await Promise.all(
         delegates.map((delegate) =>
           throttle(async () => {
