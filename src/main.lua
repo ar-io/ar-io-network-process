@@ -72,6 +72,7 @@ local ActionMap = {
 	VaultedTransfer = "Vaulted-Transfer",
 	ExtendVault = "Extend-Vault",
 	IncreaseVault = "Increase-Vault",
+	RevokeVault = "Revoke-Vault",
 	-- GATEWAY REGISTRY READ APIS
 	Gateway = "Gateway",
 	Gateways = "Gateways",
@@ -718,6 +719,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 	local lockLengthMs = msg.Tags["Lock-Length"]
 	local msgId = msg.Id
 	local allowUnsafeAddresses = msg.Tags["Allow-Unsafe-Addresses"] or false
+	local revokable = msg.Tags.Revokable or false
 	assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
 	assert(
 		lockLengthMs and lockLengthMs > 0 and utils.isInteger(lockLengthMs),
@@ -729,14 +731,23 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 	)
 	assert(recipient ~= msg.From, "Cannot transfer to self")
 
-	local vault =
-		vaults.vaultedTransfer(msg.From, recipient, quantity, lockLengthMs, msg.Timestamp, msgId, allowUnsafeAddresses)
+	local vault = vaults.vaultedTransfer(
+		msg.From,
+		recipient,
+		quantity,
+		lockLengthMs,
+		msg.Timestamp,
+		msgId,
+		allowUnsafeAddresses,
+		revokable
+	)
 
-	if vault ~= nil then
-		msg.ioEvent:addField("Vault-Id", msgId)
-		msg.ioEvent:addField("Vault-Balance", vault.balance)
-		msg.ioEvent:addField("Vault-Start-Timestamp", vault.startTimestamp)
-		msg.ioEvent:addField("Vault-End-Timestamp", vault.endTimestamp)
+	msg.ioEvent:addField("Vault-Id", msgId)
+	msg.ioEvent:addField("Vault-Balance", vault.balance)
+	msg.ioEvent:addField("Vault-Start-Timestamp", vault.startTimestamp)
+	msg.ioEvent:addField("Vault-End-Timestamp", vault.endTimestamp)
+	if revokable then
+		msg.ioEvent:addField("Vault-Controller", msg.From)
 	end
 
 	LastKnownLockedSupply = LastKnownLockedSupply + quantity
@@ -765,6 +776,44 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 			["Vault-Id"] = msgId,
 			["Allow-Unsafe-Addresses"] = tostring(allowUnsafeAddresses),
 		},
+		Data = json.encode(vault),
+	})
+end)
+
+addEventingHandler(ActionMap.RevokeVault, utils.hasMatchingTag("Action", ActionMap.RevokeVault), function(msg)
+	local vaultId = msg.Tags["Vault-Id"]
+	local recipient = msg.Tags.Recipient
+	assert(utils.isValidAddress(vaultId, true), "Invalid vault id")
+	assert(utils.isValidAddress(recipient, true), "Invalid recipient")
+
+	local vault = vaults.revokeVaultedTransfer(msg.From, recipient, vaultId, msg.Timestamp)
+
+	msg.ioEvent:addField("Vault-Id", vaultId)
+	msg.ioEvent:addField("Vault-Recipient", recipient)
+	msg.ioEvent:addField("Vault-Controller", vault.controller)
+	msg.ioEvent:addField("Vault-Balance", vault.balance)
+	msg.ioEvent:addField("Vault-Start-Timestamp", vault.startTimestamp)
+	msg.ioEvent:addField("Vault-End-Timestamp", vault.endTimestamp)
+
+	LastKnownLockedSupply = LastKnownLockedSupply - vault.balance
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply + vault.balance
+	addSupplyData(msg.ioEvent)
+
+	-- to the controller, they get a credit notice
+	Send(msg, {
+		Target = msg.From,
+		Recipient = recipient,
+		Quantity = vault.balance,
+		Tags = { Action = "Credit-Notice", ["Vault-Id"] = vaultId },
+		Data = json.encode(vault),
+	})
+
+	-- to the receiver, they get a revoke vault notice
+	Send(msg, {
+		Target = recipient,
+		Quantity = vault.balance,
+		Sender = msg.From,
+		Tags = { Action = ActionMap.RevokeVault .. "-Notice", ["Vault-Id"] = vaultId },
 		Data = json.encode(vault),
 	})
 end)

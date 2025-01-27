@@ -689,6 +689,7 @@ function utils.validateAndSanitizeInputs(table)
 	local knownBooleanTags = {
 		"Allow-Unsafe-Addresses",
 		"Force-Prune",
+		"Revokable",
 	}
 	for _, tagName in ipairs(knownBooleanTags) do
 		sanitizedTable[tagName] = sanitizedTable[tagName]
