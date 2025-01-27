@@ -3,6 +3,7 @@ import { connect } from '@permaweb/aoconnect';
 import { strict as assert } from 'node:assert';
 import { describe, it, before, after } from 'node:test';
 import { DockerComposeEnvironment, Wait } from 'testcontainers';
+import pLimit from 'p-limit';
 
 // set debug level logs for to get detailed messages
 Logger.default.setLogLevel('info');
@@ -21,6 +22,7 @@ const io = ARIO.init({
 });
 
 const projectRootPath = process.cwd();
+const throttle = pLimit(25);
 
 describe('setup', () => {
   let compose;
@@ -29,9 +31,8 @@ describe('setup', () => {
       projectRootPath,
       'tests/monitor/docker-compose.test.yml',
     )
-      .withBuild()
-      .withWaitStrategy('ao-cu-1', Wait.forHttp('/', 6363))
-      .up(['ao-cu']);
+      .withWaitStrategy('ao-cu', Wait.forHttp(`/state/${processId}`, 6363))
+      .up();
   });
 
   after(async () => {
@@ -83,10 +84,17 @@ describe('setup', () => {
   });
 
   describe('balances', () => {
+    let balances;
+
+    before(async () => {
+      balances = (
+        await io.getBalances({
+          limit: 10_000,
+        })
+      ).items;
+    });
+
     it('should always be up to date', async () => {
-      const { items: balances } = await io.getBalances({
-        limit: 10_000,
-      });
       // assert they are all integers
       for (const balance of balances) {
         assert(
@@ -257,13 +265,26 @@ describe('setup', () => {
 
   // epoch information
   describe('epoch', () => {
+    let epochSettings;
+    let currentEpoch;
+    let gateways;
+
+    before(async () => {
+      epochSettings = await io.getEpochSettings();
+      currentEpoch = await io.getCurrentEpoch();
+      gateways = (
+        await io.getGateways({
+          limit: 1000,
+        })
+      ).items;
+    });
+
     it('should always be up to date', async () => {
-      const { durationMs, epochZeroStartTimestamp } =
-        await io.getEpochSettings();
+      const { durationMs, epochZeroStartTimestamp } = epochSettings;
       const currentEpochIndex = Math.floor(
         (Date.now() - epochZeroStartTimestamp) / durationMs,
       );
-      const { epochIndex } = await io.getCurrentEpoch();
+      const { epochIndex } = currentEpoch;
       assert(
         epochIndex === currentEpochIndex,
         `Epoch index is not up to date: ${epochIndex}`,
@@ -276,7 +297,7 @@ describe('setup', () => {
         endTimestamp,
         distributions,
         observations,
-      } = await io.getCurrentEpoch();
+      } = currentEpoch;
       assert(epochIndex > 0, 'Epoch index is not valid');
       assert(distributions, 'Distributions are not valid');
       assert(observations, 'Observations are not valid');
@@ -291,22 +312,25 @@ describe('setup', () => {
       assert(distributions.rewards.eligible, 'Eligible rewards are not valid');
 
       // compare the current gateway count to the current epoch totalEligibleRewards
-      const { items: gateways } = await io.getGateways({
-        limit: 1000, // we will need to update this if the number of gateways grows
-      });
-      const activeGatewayCountForEpoch = gateways.filter(
+      const activeGatewayCountAtBeginningOfEpoch = gateways.filter(
         (gateway) =>
-          gateway.status === 'joined' &&
-          gateway.startTimestamp <= startTimestamp,
+          // gateway joined before epoch started
+          gateway.startTimestamp <= startTimestamp &&
+          // gateway is currently active OR was active at the beginning of the epoch but chose to leave during the epoch via Leave-Network
+          (gateway.status === 'joined' ||
+            (gateway.status === 'leaving' &&
+              gateway.endTimestamp >=
+                startTimestamp + 90 * 24 * 60 * 60 * 1000)),
       ).length;
       assert(
-        activeGatewayCountForEpoch === distributions.totalEligibleGateways,
-        `Active gateway count (${activeGatewayCountForEpoch}) does not match total eligible gateways (${distributions.totalEligibleGateways}) for the current epoch`,
+        activeGatewayCountAtBeginningOfEpoch ===
+          distributions.totalEligibleGateways,
+        `Active gateway count (${activeGatewayCountAtBeginningOfEpoch}) at the beginning of the epoch does not match total eligible gateways (${distributions.totalEligibleGateways}) for the current epoch`,
       );
     });
 
     it('the previous epoch should have a been distributed', async () => {
-      const { epochIndex: currentEpochIndex } = await io.getCurrentEpoch();
+      const { epochIndex: currentEpochIndex } = currentEpoch;
       const previousEpochIndex = currentEpochIndex - 1;
       const { epochIndex, distributions, endTimestamp, startTimestamp } =
         await io.getEpoch({ epochIndex: previousEpochIndex });
@@ -372,73 +396,69 @@ describe('setup', () => {
         (Date.now() - epochZeroStartTimestamp) / durationMs,
       );
 
-      let cursor = undefined;
-      let totalGateways = 0;
-      const uniqueGateways = new Set();
-      do {
-        const {
-          items: gateways,
-          nextCursor,
-          totalItems,
-        } = await io.getGateways({
-          cursor,
+      const { items: gateways, totalItems: totalGateways } =
+        await io.getGateways({
+          limit: 10_000,
         });
-        totalGateways = totalItems;
-        for (const gateway of gateways) {
-          uniqueGateways.add(gateway.gatewayAddress);
-          if (gateway.status === 'joined') {
-            assert(
-              Number.isInteger(gateway.operatorStake),
-              `Gateway ${gateway.gatewayAddress} has an invalid operator stake: ${gateway.operatorStake}`,
-            );
-            assert(
-              Number.isInteger(gateway.totalDelegatedStake),
-              `Gateway ${gateway.gatewayAddress} has an invalid total delegated stake: ${gateway.totalDelegatedStake}`,
-            );
-            assert(
-              gateway.operatorStake >= 10_000_000_000,
-              `Gateway ${gateway.gatewayAddress} has less than 10_000_000_000 ARIO staked`,
-            );
-            assert(
-              gateway.stats.failedConsecutiveEpochs >= 0,
-              `Gateway ${gateway.gatewayAddress} has less than 0 failed consecutive epochs`,
-            );
-            assert(
-              gateway.stats.failedConsecutiveEpochs < 30,
-              `Gateway ${gateway.gatewayAddress} has more than 30 failed consecutive epochs`,
-            );
-            assert(
-              gateway.stats.passedConsecutiveEpochs <= currentEpochIndex,
-              `Gateway ${gateway.gatewayAddress} has more passed consecutive epochs than current epoch index`,
-            );
-            assert(
-              gateway.stats.passedConsecutiveEpochs >= 0,
-              `Gateway ${gateway.gatewayAddress} has less than 0 passed consecutive epochs`,
-            );
-            assert(
-              gateway.stats.totalEpochCount <= currentEpochIndex,
-              `Gateway ${gateway.gatewayAddress} has more total epochs than current epoch index`,
-            );
-            assert(
-              gateway.stats.totalEpochCount >= 0,
-              `Gateway ${gateway.gatewayAddress} has less than 0 total epochs`,
-            );
-            assert(
-              gateway.stats.prescribedEpochCount <= currentEpochIndex,
-              `Gateway ${gateway.gatewayAddress} has more prescribed epochs than current epoch index`,
-            );
-            assert(
-              gateway.stats.prescribedEpochCount >= 0,
-              `Gateway ${gateway.gatewayAddress} has less than 0 prescribed epochs`,
-            );
-          }
-          if (gateway.status === 'leaving') {
-            assert(gateway.totalDelegatedStake === 0);
-            assert(gateway.operatorStake === 0);
-          }
-        }
-        cursor = nextCursor;
-      } while (cursor !== undefined);
+
+      const uniqueGateways = new Set();
+      await Promise.all(
+        gateways.map((gateway) =>
+          throttle(async () => {
+            uniqueGateways.add(gateway.gatewayAddress);
+            if (gateway.status === 'joined') {
+              assert(
+                Number.isInteger(gateway.operatorStake),
+                `Gateway ${gateway.gatewayAddress} has an invalid operator stake: ${gateway.operatorStake}`,
+              );
+              assert(
+                Number.isInteger(gateway.totalDelegatedStake),
+                `Gateway ${gateway.gatewayAddress} has an invalid total delegated stake: ${gateway.totalDelegatedStake}`,
+              );
+              assert(
+                gateway.operatorStake >= 10_000_000_000,
+                `Gateway ${gateway.gatewayAddress} has less than 10_000_000_000 ARIO staked`,
+              );
+              assert(
+                gateway.stats.failedConsecutiveEpochs >= 0,
+                `Gateway ${gateway.gatewayAddress} has less than 0 failed consecutive epochs`,
+              );
+              assert(
+                gateway.stats.failedConsecutiveEpochs < 30,
+                `Gateway ${gateway.gatewayAddress} has more than 30 failed consecutive epochs`,
+              );
+              assert(
+                gateway.stats.passedConsecutiveEpochs <= currentEpochIndex,
+                `Gateway ${gateway.gatewayAddress} has more passed consecutive epochs than current epoch index`,
+              );
+              assert(
+                gateway.stats.passedConsecutiveEpochs >= 0,
+                `Gateway ${gateway.gatewayAddress} has less than 0 passed consecutive epochs`,
+              );
+              assert(
+                gateway.stats.totalEpochCount <= currentEpochIndex,
+                `Gateway ${gateway.gatewayAddress} has more total epochs than current epoch index`,
+              );
+              assert(
+                gateway.stats.totalEpochCount >= 0,
+                `Gateway ${gateway.gatewayAddress} has less than 0 total epochs`,
+              );
+              assert(
+                gateway.stats.prescribedEpochCount <= currentEpochIndex,
+                `Gateway ${gateway.gatewayAddress} has more prescribed epochs than current epoch index`,
+              );
+              assert(
+                gateway.stats.prescribedEpochCount >= 0,
+                `Gateway ${gateway.gatewayAddress} has less than 0 prescribed epochs`,
+              );
+            }
+            if (gateway.status === 'leaving') {
+              assert(gateway.totalDelegatedStake === 0);
+              assert(gateway.operatorStake === 0);
+            }
+          }),
+        ),
+      );
       assert(
         uniqueGateways.size === totalGateways,
         `Counted total gateways (${uniqueGateways.size}) does not match total gateways (${totalGateways})`,
@@ -446,94 +466,57 @@ describe('setup', () => {
     });
 
     it('should have valid delegates for all gateways', async () => {
-      const { items: gateways } = await io.getGateways({
-        limit: 1000,
+      const { items: delegates } = await io.getAllDelegates({
+        limit: 10_000,
       });
-      // NOTE: this is an attempt to get the delegates for a gateway, the UX is not great so consider modifying or adding handlers to support gateway specific delegation filters
-      for (const gateway of gateways) {
-        const { items: delegates } = await io.getGatewayDelegates({
-          address: gateway.gatewayAddress,
-        });
-        if (delegates.length > 0) {
-          for (const delegate of delegates) {
+      await Promise.all(
+        delegates.map((delegate) =>
+          throttle(async () => {
             assert(
               delegate.delegatedStake >= 0 && delegate.startTimestamp > 0,
-              `Gateway ${gateway.gatewayAddress} has invalid delegate`,
+              `Gateway ${delegate.gatewayAddress} has invalid delegate`,
             );
-            const { items: allDelegations } = await io.getDelegations({
-              address: delegate.address,
-              limit: 1000,
-            });
-            const delegations = allDelegations.filter(
-              (delegation) =>
-                delegation.gatewayAddress === gateway.gatewayAddress,
-            );
-            const stakes = delegations.filter(
-              (delegation) => delegation.type === 'stake',
-            );
-            const vaults = delegations.filter(
-              (delegation) => delegation.type === 'vault',
-            );
-            for (const stake of stakes) {
-              assert(
-                stake.balance >= 0, // can be 0 if the delegate is unstaking
-                `Gateway ${gateway.gatewayAddress} has invalid stake for delegate ${delegate.address}: ${stake.balance}`,
-              );
-              assert(
-                stake.startTimestamp > 0,
-                `Gateway ${gateway.gatewayAddress} has invalid stake start timestamp for delegate ${delegate.address}: ${stake.startTimestamp}`,
-              );
-            }
-            for (const vault of vaults) {
-              assert(
-                vault.balance > 0, // should never be zero
-                `Gateway ${gateway.gatewayAddress} has invalid vault for delegate ${delegate.address}: ${vault.balance}`,
-              );
-              assert(
-                vault.startTimestamp > 0 &&
-                  vault.endTimestamp > vault.startTimestamp,
-                `Gateway ${gateway.gatewayAddress} has invalid vault start and end timestamps for delegate ${delegate.address}: ${vault.startTimestamp} and ${vault.endTimestamp}`,
-              );
-            }
-          }
-        }
-      }
+            // TODO: assert it's a valid gateway that is active
+            assert(delegate.gatewayAddress, 'Gateway address is invalid');
+            assert(delegate.vaultedStake >= 0, 'Vaulted stake is invalid');
+          }),
+        ),
+      );
     });
 
     it('should have valid vaults for all gateways', async () => {
-      const { items: gateways } = await io.getGateways({
-        limit: 1000,
+      const { items: vaults } = await io.getAllGatewayVaults({
+        limit: 10_000,
       });
-
-      for (const gateway of gateways) {
-        const { items: vaults } = await io.getGatewayVaults({
-          address: gateway.gatewayAddress,
-        });
-        if (vaults.length === 0) {
-          for (const vault of vaults) {
-            // assert vault balance is greater than 0 and startTimestamp and endTimestamp are valid timestamps (they are all set to 90 by default, but old ones have to expire out)
-            assert(
-              Number.isInteger(vault.balance),
-              `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid balance (${vault.balance})`,
-            );
-            assert(
-              vault.balance >= 0,
-              `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid balance (${vault.balance})`,
-            );
-            assert(
-              vault.startTimestamp > 0,
-              `Vault ${vaultId} on gateway ${gateway.gatewayAddress} has an invalid start timestamp (${vault.startTimestamp})`,
-            );
-            assert(
-              vault.endTimestamp > 0,
-              `Vault ${vault.vaultId} on gateway ${gateway.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`,
-            );
-            assert(
-              vault.endTimestamp > vault.startTimestamp,
-              `Vault ${vault.vaultId} on gateway ${gateway.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`,
-            );
-          }
-        }
+      if (vaults.length > 0) {
+        // Fixed inverted logic
+        await Promise.all(
+          vaults.map((vault) =>
+            throttle(async () => {
+              // assert vault balance is greater than 0 and startTimestamp and endTimestamp are valid timestamps (they are all set to 90 by default, but old ones have to expire out)
+              assert(
+                Number.isInteger(vault.balance),
+                `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid balance (${vault.balance})`, // Fixed vaultId reference
+              );
+              assert(
+                vault.balance >= 0,
+                `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid balance (${vault.balance})`, // Fixed vaultId reference
+              );
+              assert(
+                vault.startTimestamp > 0,
+                `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid start timestamp (${vault.startTimestamp})`, // Fixed vaultId reference
+              );
+              assert(
+                vault.endTimestamp > 0,
+                `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`,
+              );
+              assert(
+                vault.endTimestamp > vault.startTimestamp,
+                `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`,
+              );
+            }),
+          ),
+        );
       }
     });
   });
@@ -541,61 +524,58 @@ describe('setup', () => {
   // arns registry - ensure no invalid arns
   describe('arns names', () => {
     const twoWeeks = 2 * 7 * 24 * 60 * 60 * 1000;
+
     it(
       'should not have any arns records older than two weeks',
       { timeout: 60000 },
       async () => {
-        let cursor = undefined;
-        let totalArns = 0;
-        const uniqueNames = new Set();
-        do {
-          const {
-            items: arns,
-            nextCursor,
-            totalItems,
-          } = await io.getArNSRecords({
-            cursor,
+        const { items: arnsRecords, totalItems: totalArNSRecords } =
+          await io.getArNSRecords({
+            limit: 10000,
           });
-          totalArns = totalItems;
-          for (const arn of arns) {
-            uniqueNames.add(arn.name);
-            assert(arn.processId, `ARNs name '${arn.name}' has no processId`);
-            assert(arn.type, `ARNs name '${arn.name}' has no type`);
-            assert(
-              arn.startTimestamp,
-              `ARNs name '${arn.name}' has no start timestamp`,
-            );
-            assert(
-              Number.isInteger(arn.purchasePrice) && arn.purchasePrice >= 0,
-              `ARNs name '${arn.name}' has invalid purchase price: ${arn.purchasePrice}`,
-            );
-            assert(
-              Number.isInteger(arn.undernameLimit) && arn.undernameLimit >= 10,
-              `ARNs name '${arn.name}' has invalid undername limit: ${arn.undernameLimit}`,
-            );
-            if (arns.type === 'lease') {
+        const uniqueNames = new Set();
+        await Promise.all(
+          arnsRecords.map((arn) =>
+            throttle(async () => {
+              uniqueNames.add(arn.name);
+              assert(arn.processId, `ARNs name '${arn.name}' has no processId`);
+              assert(arn.type, `ARNs name '${arn.name}' has no type`);
               assert(
-                arn.endTimestamp,
-                `ARNs name '${arn.name}' has no end timestamp`,
+                arn.startTimestamp,
+                `ARNs name '${arn.name}' has no start timestamp`,
               );
               assert(
-                arn.endTimestamp > Date.now() - twoWeeks,
-                `ARNs name '${arn.name}' is older than two weeks`,
+                Number.isInteger(arn.purchasePrice) && arn.purchasePrice >= 0,
+                `ARNs name '${arn.name}' has invalid purchase price: ${arn.purchasePrice}`,
               );
-            }
-            // if permabuy, assert no endTimestamp
-            if (arn.type === 'permabuy') {
               assert(
-                !arn.endTimestamp,
-                `ARNs name '${arn.name}' has an end timestamp`,
+                Number.isInteger(arn.undernameLimit) &&
+                  arn.undernameLimit >= 10,
+                `ARNs name '${arn.name}' has invalid undername limit: ${arn.undernameLimit}`,
               );
-            }
-          }
-          cursor = nextCursor;
-        } while (cursor !== undefined);
+              if (arn.type === 'lease') {
+                assert(
+                  arn.endTimestamp,
+                  `ARNs name '${arn.name}' has no end timestamp`,
+                );
+                assert(
+                  arn.endTimestamp > Date.now() - twoWeeks,
+                  `ARNs name '${arn.name}' is older than two weeks`,
+                );
+              }
+              // if permabuy, assert no endTimestamp
+              if (arn.type === 'permabuy') {
+                assert(
+                  !arn.endTimestamp,
+                  `ARNs name '${arn.name}' has an end timestamp`,
+                );
+              }
+            }),
+          ),
+        );
         assert(
-          uniqueNames.size === totalArns,
-          `Counted total ARNs (${uniqueNames.size}) does not match total ARNs (${totalArns})`,
+          uniqueNames.size === totalArNSRecords,
+          `Counted total ARNs (${uniqueNames.size}) does not match total ARNs (${totalArNSRecords})`,
         );
       },
     );
