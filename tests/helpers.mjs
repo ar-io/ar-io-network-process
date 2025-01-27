@@ -443,27 +443,41 @@ export const createVaultedTransfer = async ({
   msgId = STUB_MESSAGE_ID,
   timestamp = STUB_TIMESTAMP,
   from = PROCESS_OWNER,
+  revokable = false,
   shouldAssertNoResultError = true,
 }) => {
+  if (from !== PROCESS_OWNER) {
+    // setup enough balance
+    memory = await transfer({
+      recipient: from,
+      quantity: quantity,
+      memory,
+      timestamp,
+    });
+  }
+
+  const tags = [
+    { name: 'Action', value: 'Vaulted-Transfer' },
+    { name: 'Recipient', value: recipient },
+    { name: 'Quantity', value: quantity.toString() },
+    { name: 'Lock-Length', value: lockLengthMs.toString() },
+  ];
+  if (allowUnsafeAddresses !== undefined) {
+    tags.push({
+      name: 'Allow-Unsafe-Addresses',
+      value: allowUnsafeAddresses.toString(),
+    });
+  }
+  if (revokable) {
+    tags.push({ name: 'Revokable', value: 'true' });
+  }
+
   const createVaultedTransferResult = await handle({
     options: {
       Id: msgId,
       From: from,
       Owner: from,
-      Tags: [
-        { name: 'Action', value: 'Vaulted-Transfer' },
-        { name: 'Recipient', value: recipient },
-        { name: 'Quantity', value: quantity.toString() },
-        { name: 'Lock-Length', value: lockLengthMs.toString() },
-        ...(allowUnsafeAddresses !== undefined
-          ? [
-              {
-                name: 'Allow-Unsafe-Addresses',
-                value: allowUnsafeAddresses.toString(),
-              },
-            ]
-          : []),
-      ],
+      Tags: tags,
       Timestamp: timestamp,
     },
     memory,

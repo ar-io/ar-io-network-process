@@ -282,10 +282,11 @@ describe('Vaults', async () => {
   });
 
   describe('vaultedTransfer', () => {
+    const quantity = 1000000000;
+    const lockLengthMs = 1209600000;
+    const recipient = '0x0000000000000000000000000000000000000000';
+
     it('should create a vault for the recipient with a valid address', async () => {
-      const quantity = 1000000000;
-      const lockLengthMs = 1209600000;
-      const recipient = '0x0000000000000000000000000000000000000000';
       const { result: createVaultedTransferResult } =
         await createVaultedTransfer({
           quantity,
@@ -338,10 +339,81 @@ describe('Vaults', async () => {
       endingMemory = createVaultedTransferResult.Memory;
     });
 
+    it('should create a revokable vault for the recipient and the controller should be able to revoke that vault', async () => {
+      const controller = 'valid-controller-'.padEnd(43, 'a');
+      const { result: createVaultedTransferResult } =
+        await createVaultedTransfer({
+          quantity,
+          lockLengthMs,
+          recipient,
+          from: controller,
+          memory: sharedMemory,
+          revokable: true,
+        });
+
+      const vaultId = createVaultedTransferResult.Messages[0].Tags.find(
+        (tag) => tag.name === 'Vault-Id',
+      ).value;
+
+      // ensure vault id is defined
+      assert.ok(vaultId);
+
+      const expectedVaultData = {
+        balance: quantity,
+        controller,
+        startTimestamp: STUB_TIMESTAMP,
+        endTimestamp: STUB_TIMESTAMP + lockLengthMs,
+      };
+
+      const createdVaultData = await assertVaultExists({
+        vaultId,
+        address: recipient,
+        memory: createVaultedTransferResult.Memory,
+      });
+      assert.deepEqual(createdVaultData, expectedVaultData);
+
+      // Revoke the vault
+      const result = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Revoke-Vault' },
+            { name: 'Recipient', value: recipient },
+            { name: 'Vault-Id', value: vaultId },
+          ],
+          From: controller,
+          Owner: controller,
+        },
+        memory: createVaultedTransferResult.Memory,
+      });
+
+      assert.deepEqual(result.Messages.length, 2);
+      const recipientMessageAfterRevoke = result.Messages.find((msg) =>
+        msg.Tags.find(
+          (tag) => tag.name === 'Action' && tag.value === 'Revoke-Vault-Notice',
+        ),
+      );
+      assert.ok(recipientMessageAfterRevoke);
+      const recipientVaultDataAfterRevoke = JSON.parse(
+        recipientMessageAfterRevoke.Data,
+      );
+      assert.deepEqual(recipientVaultDataAfterRevoke, expectedVaultData);
+
+      const controllerMessageAfterRevoke = result.Messages.find((msg) =>
+        msg.Tags.find(
+          (tag) => tag.name === 'Action' && tag.value === 'Revoke-Vault-Notice',
+        ),
+      );
+      assert.ok(controllerMessageAfterRevoke);
+      const controllerVaultDataAfterRevoke = JSON.parse(
+        controllerMessageAfterRevoke.Data,
+      );
+      assert.deepEqual(controllerVaultDataAfterRevoke, expectedVaultData);
+
+      endingMemory = result.Memory;
+    });
+
     it('should fail if the vault size is too small', async () => {
       const quantity = 99999999;
-      const lockLengthMs = 1209600000;
-      const recipient = '0x0000000000000000000000000000000000000000';
       const { result: createVaultedTransferResult } =
         await createVaultedTransfer({
           quantity,
@@ -363,8 +435,6 @@ describe('Vaults', async () => {
     });
 
     it('should fail if the recipient address is invalid and Allow-Unsafe-Addresses is not provided', async () => {
-      const quantity = 1000000000;
-      const lockLengthMs = 1209600000;
       const recipient = 'invalid-address';
       const { result: createVaultedTransferResult } =
         await createVaultedTransfer({
@@ -384,8 +454,6 @@ describe('Vaults', async () => {
     });
 
     it('should create a vault for the recipient with an invalid address and Allow-Unsafe-Addresses is provided', async () => {
-      const quantity = 1000000000;
-      const lockLengthMs = 1209600000;
       const recipient = 'invalid-address';
       const msgId = 'unique-id-'.padEnd(43, 'a');
       const { result: createVaultedTransferResult } =
