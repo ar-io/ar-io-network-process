@@ -144,7 +144,6 @@ describe('epochs', () => {
         durationMs: epochLength,
         distributionDelayMs: distributionDelay,
         prescribedNameCount: 2,
-        pruneEpochsCount: 14,
       });
     });
   });

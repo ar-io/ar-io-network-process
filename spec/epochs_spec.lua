@@ -47,7 +47,6 @@ describe("epochs", function()
 			durationMs = 100,
 			distributionDelayMs = 15,
 			rewardPercentage = 0.0025, -- 0.25%
-			pruneEpochsCount = 14,
 		}
 	end)
 
@@ -719,9 +718,13 @@ describe("epochs", function()
 			local expectedGatewayReward = epoch.distributions.totalEligibleGatewayReward
 			local expectedObserverReward = epoch.distributions.totalEligibleObserverReward
 
-			-- distribute rewards for the epoch
-			local result = epochs.distributeRewardsForEpoch(epoch.distributionTimestamp)
-			assert.is_not_nil(result)
+			-- validate the distribution of rewards for the epoch
+			local distributedEpoch = epochs.distributeRewardsForEpoch(epoch.distributionTimestamp)
+			assert.is_not_nil(distributedEpoch)
+
+			-- validate the epoch is removed from the epoch table after distribution
+			assert.is_nil(_G.Epochs[epochIndex])
+
 			-- gateway 1 should not get any rewards - failed observation and did not observe, should not get any rewards
 			assert.are.same({
 				prescribedEpochCount = 2, -- increment by one
@@ -794,8 +797,11 @@ describe("epochs", function()
 
 			local rewardsForDelegatesThatLeft = 12500000000
 
-			-- check the epoch was updated
-			local distributions = epochs.getEpoch(epochIndex).distributions
+			-- check the epoch was properly distributed
+			if not distributedEpoch then
+				error("Distributed epoch is nil")
+			end
+			local distributions = distributedEpoch.distributions
 			local expectedTotalDistribution = math.floor(
 				expectedGateway1TotalRewards
 					+ expectedGateway2TotalRewards
@@ -917,31 +923,21 @@ describe("epochs", function()
 			startingEpochs = utils.deepCopy(_G.Epochs)
 		end)
 
-		it("should prune epochs older than 14 days", function()
-			local currentTimestamp = epochs.getSettings().epochZeroStartTimestamp
-				+ epochs.getSettings().durationMs * 20
-				+ 1
-			-- prune epochs
-			epochs.pruneEpochs(currentTimestamp)
-			-- confirm the lenght of epochs is only 14 and the last 14 days are left
-			assert.are.equal(14, utils.lengthOfTable(_G.Epochs))
-			assert.are.same({
-				[7] = _G.Epochs[7],
-				[8] = _G.Epochs[8],
-				[9] = _G.Epochs[9],
-				[10] = _G.Epochs[10],
-				[11] = _G.Epochs[11],
-				[12] = _G.Epochs[12],
-				[13] = _G.Epochs[13],
-				[14] = _G.Epochs[14],
-				[15] = _G.Epochs[15],
-				[16] = _G.Epochs[16],
-				[17] = _G.Epochs[17],
-				[18] = _G.Epochs[18],
-				[19] = _G.Epochs[19],
-				[20] = _G.Epochs[20],
-			}, _G.Epochs)
-		end)
+		it(
+			"should prune any epochs older than the current epoch and previous epoch, until distribution occurs",
+			function()
+				local currentTimestamp = epochs.getSettings().epochZeroStartTimestamp
+					+ epochs.getSettings().durationMs * 20
+					+ 1
+				-- prune epochs, keeping on the current epoch and the previous one
+				epochs.pruneEpochs(currentTimestamp)
+				assert.are.equal(2, utils.lengthOfTable(_G.Epochs))
+				assert.are.same({
+					[19] = _G.Epochs[19],
+					[20] = _G.Epochs[20],
+				}, _G.Epochs)
+			end
+		)
 
 		it("should skip pruning when unnecessary", function()
 			local currentTimestamp = epochs.getSettings().epochZeroStartTimestamp
