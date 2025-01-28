@@ -100,16 +100,10 @@ end
 
 --- Gets an epoch by index
 --- @param epochIndex number The epoch index
---- @return Epoch | PrescribedEpoch | DistributedEpoch # The prescribed epoch
+--- @return Epoch | PrescribedEpoch | DistributedEpoch | nil # The prescribed epoch
 function epochs.getEpoch(epochIndex)
-	local epoch = utils.deepCopy(Epochs[epochIndex]) or {}
+	local epoch = utils.deepCopy(Epochs[epochIndex]) or nil
 	return epoch
-end
-
---- Gets the current epoch
---- @return Epoch # The current epoch
-function epochs.getCurrentEpoch()
-	return epochs.getEpoch(epochs.getEpochIndexForTimestamp(os.time()))
 end
 
 --- Gets the epoch settings
@@ -370,26 +364,19 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	assert(type(hashchain) == "string", "Hashchain must be a string")
 
 	local epochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	if next(epochs.getEpoch(epochIndex)) then
+	if epochs.getEpoch(epochIndex) then
 		-- silently return
 		print("Epoch already exists for index: " .. epochIndex)
-		return
+		return nil -- do not return the existing epoch to prevent sending redundant epoch-created-notices
 	end
 
 	local prevEpochIndex = epochIndex - 1
 	local prevEpoch = epochs.getEpoch(prevEpochIndex)
-	-- if the previous epoch is not the genesis epoch and we have not distributed rewards, we cannot create a new epoch
-	if
-		prevEpochIndex > 0 -- only validate distributions occurred if previous epoch is not the genesis epoch
-		and (
-			prevEpoch.distributions == nil
-			or prevEpoch.distributions.distributedTimestamp == nil
-			or timestamp < prevEpoch.distributions.distributedTimestamp
-		)
-	then
+	-- if there is a previous epoch and it has not been distributed, we cannot create a new epoch. once the epoch has been distributed, it will be removed from the epoch registry
+	if prevEpoch and not prevEpoch.distributions.distributedTimestamp then
 		-- silently return
 		print(
-			"Distributions have not occurred for the previous epoch. A new epoch will not be created until those are complete: "
+			"Distributions have not occurred for the previous epoch. A new epoch cannot be created until distribution for the previous epoch is complete: "
 				.. prevEpochIndex
 		)
 		return
@@ -474,6 +461,7 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	assert(observingGateway, "The associated gateway not found in the registry.")
 
 	local epoch = epochs.getEpoch(epochIndex)
+	assert(epoch, "Unable to save observation. Epoch not found for index: " .. epochIndex)
 
 	-- check if this is the first report filed in this epoch
 	if epoch.observations == nil then
@@ -598,17 +586,18 @@ end
 function epochs.distributeRewardsForEpoch(currentTimestamp)
 	local epochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp - epochs.getSettings().durationMs) -- go back to previous epoch
 	local epoch = epochs.getEpoch(epochIndex)
-	if not next(epoch) then
-		-- silently return
-		print("Not distributing rewards for last epoch. New epoch has not been created yet.")
+	if not epoch then
+		-- TODO: consider throwing an error here instead of silently returning, as this is a critical error and should be fixed
+		print("Unable to distribute rewards for epoch. Epoch not found: " .. epochIndex)
 		return
 	end
 
 	--- The epoch was already distributed
 	--- @cast epoch DistributedEpoch
 	if epoch.distributions.distributedTimestamp then
-		print("Rewards already distributed for epoch: " .. epochIndex)
-		return -- silently return
+		print("Rewards already distributed for epoch. Epoch will be removed from the epoch registry: " .. epochIndex)
+		Epochs[epochIndex] = nil
+		return epoch
 	end
 
 	--- Epoch is prescribed, but not eligible for distribution
@@ -616,7 +605,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	if currentTimestamp < epoch.distributionTimestamp then
 		-- silently ignore - Distribution can only occur after the epoch has ended
 		print("Distribution can only occur after the epoch has ended")
-		return
+		return nil
 	end
 
 	local eligibleGatewaysForEpoch = epoch.distributions.rewards.eligible or {}
