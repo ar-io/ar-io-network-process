@@ -437,7 +437,7 @@ describe('ArNS', async () => {
           Owner: testNewAddress,
           Tags: [
             // backwards compatible with old action
-            { name: 'Action', value: 'Get-Cost-Details-For-Action' },
+            { name: 'Action', value: 'Cost-Details' },
             { name: 'Intent', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
@@ -1649,7 +1649,7 @@ describe('ArNS', async () => {
       const result = await handle({
         options: {
           Tags: [
-            { name: 'Action', value: 'Get-Cost-Details-For-Action' },
+            { name: 'Action', value: 'Cost-Details' },
             { name: 'Intent', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
             { name: 'Purchase-Type', value: 'lease' },
@@ -1681,7 +1681,7 @@ describe('ArNS', async () => {
           From: nonEligibleAddress,
           Owner: nonEligibleAddress,
           Tags: [
-            { name: 'Action', value: 'Get-Cost-Details-For-Action' },
+            { name: 'Action', value: 'Cost-Details' },
             { name: 'Intent', value: 'Buy-Name' },
             { name: 'Name', value: 'test-name' },
           ],
@@ -1751,7 +1751,7 @@ describe('ArNS', async () => {
             From: joinedGateway,
             Owner: joinedGateway,
             Tags: [
-              { name: 'Action', value: 'Get-Cost-Details-For-Action' },
+              { name: 'Action', value: 'Cost-Details' },
               { name: 'Intent', value: 'Buy-Name' },
               { name: 'Name', value: 'great-name' },
               { name: 'Purchase-Type', value: 'lease' },
@@ -1780,7 +1780,7 @@ describe('ArNS', async () => {
           { name: 'Years', value: '1' },
         ];
         const extendLeaseCostDetailsTags = [
-          { name: 'Action', value: 'Get-Cost-Details-For-Action' },
+          { name: 'Action', value: 'Cost-Details' },
           { name: 'Intent', value: 'Extend-Lease' },
           ...extendLeaseTags,
         ];
@@ -1886,7 +1886,7 @@ describe('ArNS', async () => {
 
         describe('upgrading the lease to a permabuy', () => {
           const upgradeToPermabuyTags = [
-            { name: 'Action', value: 'Get-Cost-Details-For-Action' },
+            { name: 'Action', value: 'Cost-Details' },
             { name: 'Intent', value: 'Upgrade-Name' },
             { name: 'Name', value: 'great-name' },
           ];
@@ -1935,60 +1935,56 @@ describe('ArNS', async () => {
             sharedMemory = result.Memory;
           });
         });
+      });
 
-        describe('increasing the undername limit', () => {
-          const increaseUndernameQty = 20;
-          const undernameCostsForOneYear =
-            baseFeeForName * 0.001 * increaseUndernameQty;
-          const increaseUndernameLimitTags = [
-            { name: 'Action', value: 'Get-Cost-Details-For-Action' },
-            { name: 'Intent', value: 'Increase-Undername-Limit' },
-            { name: 'Name', value: 'great-name' },
-            { name: 'Quantity', value: increaseUndernameQty.toString() },
-          ];
+      describe('increasing the undername limit', () => {
+        const increaseUndernameQty = 20;
+        const undernameCostForName =
+          baseFeeForName * 0.001 * increaseUndernameQty;
+        const increaseUndernameLimitTags = [
+          { name: 'Action', value: 'Cost-Details' },
+          { name: 'Intent', value: 'Increase-Undername-Limit' },
+          { name: 'Name', value: 'great-name' },
+          { name: 'Quantity', value: increaseUndernameQty.toString() },
+        ];
 
-          it('should apply the discount to increasing the undername limit for an eligible gateway', async () => {
-            const result = await handle({
-              options: {
-                From: joinedGateway,
-                Owner: joinedGateway,
-                Tags: increaseUndernameLimitTags,
-                Timestamp: afterDistributionTimestamp, // timestamp dependent
-              },
-              memory: buyRecordResult.Memory,
-            });
-            const { tokenCost, discounts } = JSON.parse(
-              result.Messages[0].Data,
-            );
-            assert.equal(tokenCost, undernameCostsForOneYear * 0.8);
-            assert.deepEqual(discounts, [
-              {
-                discountTotal: undernameCostsForOneYear * 0.2,
-                multiplier: 0.2,
-                name: 'ArNS Discount',
-              },
-            ]);
-            sharedMemory = result.Memory;
+        it('should apply the discount to increasing the undername limit for an eligible gateway', async () => {
+          const result = await handle({
+            options: {
+              From: joinedGateway,
+              Owner: joinedGateway,
+              Tags: increaseUndernameLimitTags,
+              Timestamp: afterDistributionTimestamp, // timestamp dependent
+            },
+            memory: buyRecordResult.Memory,
           });
+          const { tokenCost, discounts } = JSON.parse(result.Messages[0].Data);
+          assert.equal(tokenCost, undernameCostForName * 0.8);
+          assert.deepEqual(discounts, [
+            {
+              discountTotal: undernameCostForName * 0.2,
+              multiplier: 0.2,
+              name: 'ArNS Discount',
+            },
+          ]);
+          sharedMemory = result.Memory;
+        });
 
-          it('should not apply the discount to increasing the undername limit for a non-eligible gateway', async () => {
-            const result = await handle({
-              options: {
-                From: nonEligibleAddress,
-                Owner: nonEligibleAddress,
-                Tags: increaseUndernameLimitTags,
-                Timestamp: afterDistributionTimestamp, // timestamp dependent
-              },
-              memory: buyRecordResult.Memory,
-            });
-            assertNoResultError(result);
-            const { tokenCost, discounts } = JSON.parse(
-              result.Messages[0].Data,
-            );
-            assert.equal(tokenCost, undernameCostsForOneYear);
-            assert.deepEqual(discounts, []);
-            sharedMemory = result.Memory;
+        it('should not apply the discount to increasing the undername limit for a non-eligible gateway', async () => {
+          const result = await handle({
+            options: {
+              From: nonEligibleAddress,
+              Owner: nonEligibleAddress,
+              Tags: increaseUndernameLimitTags,
+              Timestamp: afterDistributionTimestamp, // timestamp dependent
+            },
+            memory: buyRecordResult.Memory,
           });
+          assertNoResultError(result);
+          const { tokenCost, discounts } = JSON.parse(result.Messages[0].Data);
+          assert.equal(tokenCost, undernameCostForName);
+          assert.deepEqual(discounts, []);
+          sharedMemory = result.Memory;
         });
       });
     });
