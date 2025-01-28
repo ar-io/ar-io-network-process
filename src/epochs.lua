@@ -786,7 +786,7 @@ function epochs.pruneEpochs(timestamp)
 	--- Reset the next pruning timestamp
 	NextEpochsPruneTimestamp = nil
 	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	local cutoffEpochIndex = currentEpochIndex - 1 -- keep the two most recent epochs, on distribution the last epoch will remove itself
+	local cutoffEpochIndex = currentEpochIndex - 1 -- keep the two most recent epochs, on distribution the previous epoch will remove itself
 	local unsafeEpochs = epochs.getEpochsUnsafe()
 	local nextEpochIndex = next(unsafeEpochs)
 	while nextEpochIndex do
