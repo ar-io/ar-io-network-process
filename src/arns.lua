@@ -498,15 +498,14 @@ end
 --- @param baseFee number The base fee for the name
 --- @param increaseQty number The increase quantity
 --- @param registrationType string The registration type (lease/permabuy)
---- @param years number The number of years
 --- @param demandFactor number The demand factor
 --- @return number undernameCost - the undername cost
-function arns.calculateUndernameCost(baseFee, increaseQty, registrationType, years, demandFactor)
+function arns.calculateUndernameCost(baseFee, increaseQty, registrationType, demandFactor)
 	assert(registrationType == "lease" or registrationType == "permabuy", "Invalid registration type")
 	local undernamePercentageFee = registrationType == "lease" and constants.UNDERNAME_LEASE_FEE_PERCENTAGE
 		or constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE
-	local totalFeeForQtyAndYears = baseFee * undernamePercentageFee * increaseQty * years
-	return math.floor(demandFactor * totalFeeForQtyAndYears)
+	local totalFeeForQty = baseFee * undernamePercentageFee * increaseQty
+	return math.floor(demandFactor * totalFeeForQty)
 end
 
 --- Calculates the number of years between two timestamps
@@ -690,11 +689,7 @@ function arns.getTokenCost(intendedAction)
 		assert(currentTimestamp, "Timestamp is required")
 		assert(qty, "Quantity is required for increasing undername limit")
 		arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
-		local yearsRemaining = constants.PERMABUY_LEASE_FEE_LENGTH
-		if record.type == "lease" then
-			yearsRemaining = arns.calculateYearsBetweenTimestamps(currentTimestamp, record.endTimestamp)
-		end
-		tokenCost = arns.calculateUndernameCost(baseFee, qty, record.type, yearsRemaining, demand.getDemandFactor())
+		tokenCost = arns.calculateUndernameCost(baseFee, qty, record.type, demand.getDemandFactor())
 	elseif intent == "Upgrade-Name" then
 		assert(record, "Name is not registered")
 		assert(currentTimestamp, "Timestamp is required")

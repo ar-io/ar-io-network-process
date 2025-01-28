@@ -841,9 +841,7 @@ describe("arns", function()
 			local undernamePercentageFee = 0.001
 			local increaseQty = 5
 			local demandFactor = 0.60137
-			local yearsRemaining = 0.5
-			local expectedCost =
-				math.floor(baseFee * increaseQty * undernamePercentageFee * yearsRemaining * demandFactor)
+			local expectedCost = math.floor(baseFee * increaseQty * undernamePercentageFee * demandFactor)
 			local intendedAction = {
 				intent = "Increase-Undername-Limit",
 				quantity = 5,
