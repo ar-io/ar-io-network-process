@@ -101,9 +101,9 @@ function vaults.revokeVault(controller, recipient, vaultId, currentTimestamp)
 	local vault = vaults.getVault(recipient, vaultId)
 	assert(vault, "Vault not found.")
 	assert(vault.controller == controller, "Only the controller can revoke the vault.")
-	assert(currentTimestamp <= vault.endTimestamp, "Vault has ended.")
+	assert(currentTimestamp < vault.endTimestamp, "Vault has ended.")
 
-	balances.increaseBalance(recipient, vault.balance)
+	balances.increaseBalance(controller, vault.balance)
 	Vaults[recipient][vaultId] = nil
 	return vault
 end

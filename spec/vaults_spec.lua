@@ -1,7 +1,6 @@
 local vaults = require("vaults")
 local constants = require("constants")
 local utils = require("utils")
-local json = require("json")
 local startTimestamp = 0
 
 describe("vaults", function()
@@ -299,7 +298,6 @@ describe("vaults", function()
 		local recipient = "stub-recipient-address"
 
 		before_each(function()
-			print(json.encode(_G.Balances))
 			_G.Vaults = {
 				[recipient] = {
 					["vaultId"] = {
