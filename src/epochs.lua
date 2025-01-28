@@ -600,8 +600,9 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	--- The epoch was already distributed
 	--- @cast epoch DistributedEpoch
 	if epoch.distributions.distributedTimestamp then
-		print("Rewards already distributed for epoch: " .. epochIndex)
-		return -- silently return
+		print("Rewards already distributed for epoch. Epoch will be removed from the epoch registry: " .. epochIndex)
+		Epochs[epochIndex] = nil
+		return epoch
 	end
 
 	--- Epoch is prescribed, but not eligible for distribution
@@ -609,7 +610,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	if currentTimestamp < epoch.distributionTimestamp then
 		-- silently ignore - Distribution can only occur after the epoch has ended
 		print("Distribution can only occur after the epoch has ended")
-		return
+		return nil
 	end
 
 	local eligibleGatewaysForEpoch = epoch.distributions.rewards.eligible or {}
