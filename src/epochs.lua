@@ -378,15 +378,8 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 
 	local prevEpochIndex = epochIndex - 1
 	local prevEpoch = epochs.getEpoch(prevEpochIndex)
-	-- if the previous epoch is not the genesis epoch and we have not distributed rewards, we cannot create a new epoch
-	if
-		prevEpochIndex > 0 -- only validate distributions occurred if previous epoch is not the genesis epoch
-		and (
-			prevEpoch.distributions == nil
-			or prevEpoch.distributions.distributedTimestamp == nil
-			or timestamp < prevEpoch.distributions.distributedTimestamp
-		)
-	then
+	-- if there is a previous epoch and it has not been distributed, we cannot create a new epoch. once the epoch has been distributed, it will be removed from the epoch registry
+	if prevEpoch and (not prevEpoch.distributions or not prevEpoch.distributions.distributedTimestamp) then
 		-- silently return
 		print(
 			"Distributions have not occurred for the previous epoch. A new epoch will not be created until those are complete: "

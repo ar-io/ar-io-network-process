@@ -459,17 +459,9 @@ describe("epochs", function()
 
 	describe("createEpoch", function()
 		it(
-			"should create a new epoch for the given timestamp once distributions for the last epoch have occurred",
+			"should create a new epoch for the given timestamp if there is no previous epoch that has not been distributed",
 			function()
-				_G.Epochs[0].distributions = {
-					totalEligibleRewards = 0,
-					totalDistributedRewards = 0,
-					distributedTimestamp = 0, -- it has a distribution timestamp
-					rewards = {
-						eligible = {},
-						distributed = {},
-					},
-				}
+				_G.Epochs[0] = nil
 				_G.GatewayRegistry = {
 					["test-this-is-valid-arweave-wallet-address-1"] = {
 						operatorStake = gar.getSettings().operators.minStake,
