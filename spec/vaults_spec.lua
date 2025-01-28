@@ -293,7 +293,7 @@ describe("vaults", function()
 		end)
 	end)
 
-	describe("revokeVaultedTransfer", function()
+	describe("revokeVault", function()
 		local controller = "test-this-is-valid-arweave-wallet-address-1"
 		local recipient = "test-this-is-valid-arweave-wallet-address-2"
 
@@ -311,7 +311,7 @@ describe("vaults", function()
 		end)
 
 		it("should revoke a vault when from the controller", function()
-			local revokedVault = vaults.revokeVaultedTransfer(controller, recipient, "vaultId", 0)
+			local revokedVault = vaults.revokeVault(controller, recipient, "vaultId", 0)
 			assert.are.equal(100, _G.Balances[controller])
 			assert.are.same({
 				balance = 100,
@@ -322,19 +322,19 @@ describe("vaults", function()
 		end)
 
 		it("should throw an error if the vault is expired", function()
-			local status, result = pcall(vaults.revokeVaultedTransfer, controller, recipient, "vaultId", 1001)
+			local status, result = pcall(vaults.revokeVault, controller, recipient, "vaultId", 1001)
 			assert.is_false(status)
 			assert.match("Vault has ended.", result)
 		end)
 
 		it("should throw an error if the vault is not found", function()
-			local status, result = pcall(vaults.revokeVaultedTransfer, controller, recipient, "nonExistentId", 0)
+			local status, result = pcall(vaults.revokeVault, controller, recipient, "nonExistentId", 0)
 			assert.is_false(status)
 			assert.match("Vault not found.", result)
 		end)
 
 		it("should throw an error if the sender is not the controller", function()
-			local status, result = pcall(vaults.revokeVaultedTransfer, recipient, recipient, "vaultId", 0)
+			local status, result = pcall(vaults.revokeVault, recipient, recipient, "vaultId", 0)
 			assert.is_false(status)
 			assert.match("Only the controller can revoke the vault.", result)
 		end)

@@ -786,7 +786,7 @@ addEventingHandler(ActionMap.RevokeVault, utils.hasMatchingTag("Action", ActionM
 	assert(utils.isValidAddress(vaultId, true), "Invalid vault id")
 	assert(utils.isValidAddress(recipient, true), "Invalid recipient")
 
-	local vault = vaults.revokeVaultedTransfer(msg.From, recipient, vaultId, msg.Timestamp)
+	local vault = vaults.revokeVault(msg.From, recipient, vaultId, msg.Timestamp)
 
 	msg.ioEvent:addField("Vault-Id", vaultId)
 	msg.ioEvent:addField("Vault-Recipient", recipient)

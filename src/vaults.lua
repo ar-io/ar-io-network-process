@@ -55,7 +55,7 @@ end
 --- @param currentTimestamp number The current timestamp
 --- @param vaultId string The vault id
 --- @param allowUnsafeAddresses boolean|nil Whether to allow unsafe addresses, since this results in funds eventually being sent to an invalid address
---- @param revokable boolean|nil Whether the vault is revokable
+--- @param revokable boolean|nil Whether the vault is revokable. Defaults to nil
 --- @return Vault -- The created vault
 function vaults.vaultedTransfer(
 	from,
@@ -91,16 +91,16 @@ function vaults.vaultedTransfer(
 	return newVault
 end
 
---- Revokes a vaulted transfer
----@param from WalletAddress
----@param recipient WalletAddress
----@param vaultId VaultId
----@param currentTimestamp Timestamp
+--- Revokes a vaulted transfer back to the controller
+---@param controller WalletAddress The address of the controller of a revokable vault. This is the signer of the vaultedTransfer
+---@param recipient WalletAddress The address of the recipient of the vaultedTransfer
+---@param vaultId VaultId The id of the vault to revoke
+---@param currentTimestamp Timestamp The current timestamp
 ---@return Vault
-function vaults.revokeVaultedTransfer(from, recipient, vaultId, currentTimestamp)
+function vaults.revokeVault(controller, recipient, vaultId, currentTimestamp)
 	local vault = vaults.getVault(recipient, vaultId)
 	assert(vault, "Vault not found.")
-	assert(vault.controller == from, "Only the controller can revoke the vault.")
+	assert(vault.controller == controller, "Only the controller can revoke the vault.")
 	assert(currentTimestamp <= vault.endTimestamp, "Vault has ended.")
 
 	balances.increaseBalance(recipient, vault.balance)
