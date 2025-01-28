@@ -13,6 +13,7 @@ import {
   createVault,
   createVaultedTransfer,
   totalTokenSupply,
+  getBalance,
 } from './helpers.mjs';
 import { assertNoInvariants } from './invariants.mjs';
 
@@ -372,6 +373,13 @@ describe('Vaults', async () => {
       });
       assert.deepEqual(createdVaultData, expectedVaultData);
 
+      // Assert balance is gone for controller
+      const controllerBalance = await getBalance({
+        address: controller,
+        memory: createVaultedTransferResult.Memory,
+      });
+      assert.deepEqual(controllerBalance, 0);
+
       // Revoke the vault
       const result = await handle({
         options: {
@@ -400,7 +408,7 @@ describe('Vaults', async () => {
 
       const controllerMessageAfterRevoke = result.Messages.find((msg) =>
         msg.Tags.find(
-          (tag) => tag.name === 'Action' && tag.value === 'Revoke-Vault-Notice',
+          (tag) => tag.name === 'Action' && tag.value === 'Credit-Notice',
         ),
       );
       assert.ok(controllerMessageAfterRevoke);
@@ -408,6 +416,13 @@ describe('Vaults', async () => {
         controllerMessageAfterRevoke.Data,
       );
       assert.deepEqual(controllerVaultDataAfterRevoke, expectedVaultData);
+
+      // Assert balance is back for controller
+      const controllerBalanceAfter = await getBalance({
+        address: controller,
+        memory: result.Memory,
+      });
+      assert.deepEqual(controllerBalanceAfter, quantity);
 
       endingMemory = result.Memory;
     });
