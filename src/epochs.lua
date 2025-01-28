@@ -366,8 +366,8 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	local epochIndex = epochs.getEpochIndexForTimestamp(timestamp)
 	if epochs.getEpoch(epochIndex) then
 		-- silently return
-		print("Epoch already exists for index. Returning existing epoch: " .. epochIndex)
-		return nil
+		print("Epoch already exists for index: " .. epochIndex)
+		return nil -- do not return the existing epoch to prevent sending redundant epoch-created-notices
 	end
 
 	local prevEpochIndex = epochIndex - 1
@@ -587,7 +587,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	local epochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp - epochs.getSettings().durationMs) -- go back to previous epoch
 	local epoch = epochs.getEpoch(epochIndex)
 	if not epoch then
-		-- silently return
+		-- TODO: consider throwing an error here instead of silently returning, as this is a critical error and should be fixed
 		print("Unable to distribute rewards for epoch. Epoch not found: " .. epochIndex)
 		return
 	end
