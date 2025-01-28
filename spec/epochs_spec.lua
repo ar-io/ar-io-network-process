@@ -461,7 +461,7 @@ describe("epochs", function()
 		it(
 			"should create a new epoch for the given timestamp if there is no previous epoch that has not been distributed",
 			function()
-				_G.Epochs[0] = nil
+				_G.Epochs = {}
 				_G.GatewayRegistry = {
 					["test-this-is-valid-arweave-wallet-address-1"] = {
 						operatorStake = gar.getSettings().operators.minStake,

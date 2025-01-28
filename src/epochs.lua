@@ -100,16 +100,10 @@ end
 
 --- Gets an epoch by index
 --- @param epochIndex number The epoch index
---- @return Epoch | PrescribedEpoch | DistributedEpoch # The prescribed epoch
+--- @return Epoch | PrescribedEpoch | DistributedEpoch | nil # The prescribed epoch
 function epochs.getEpoch(epochIndex)
-	local epoch = utils.deepCopy(Epochs[epochIndex]) or {}
+	local epoch = utils.deepCopy(Epochs[epochIndex]) or nil
 	return epoch
-end
-
---- Gets the current epoch
---- @return Epoch # The current epoch
-function epochs.getCurrentEpoch()
-	return epochs.getEpoch(epochs.getEpochIndexForTimestamp(os.time()))
 end
 
 --- Gets the epoch settings
@@ -370,19 +364,19 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	assert(type(hashchain) == "string", "Hashchain must be a string")
 
 	local epochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	if next(epochs.getEpoch(epochIndex)) then
+	if epochs.getEpoch(epochIndex) then
 		-- silently return
-		print("Epoch already exists for index: " .. epochIndex)
-		return
+		print("Epoch already exists for index. Returning existing epoch: " .. epochIndex)
+		return nil
 	end
 
 	local prevEpochIndex = epochIndex - 1
 	local prevEpoch = epochs.getEpoch(prevEpochIndex)
 	-- if there is a previous epoch and it has not been distributed, we cannot create a new epoch. once the epoch has been distributed, it will be removed from the epoch registry
-	if prevEpoch and (not prevEpoch.distributions or not prevEpoch.distributions.distributedTimestamp) then
+	if prevEpoch and not prevEpoch.distributions.distributedTimestamp then
 		-- silently return
 		print(
-			"Distributions have not occurred for the previous epoch. A new epoch will not be created until those are complete: "
+			"Distributions have not occurred for the previous epoch. A new epoch cannot be created until distribution for the previous epoch is complete: "
 				.. prevEpochIndex
 		)
 		return
@@ -467,6 +461,7 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	assert(observingGateway, "The associated gateway not found in the registry.")
 
 	local epoch = epochs.getEpoch(epochIndex)
+	assert(epoch, "Unable to save observation. Epoch not found for index: " .. epochIndex)
 
 	-- check if this is the first report filed in this epoch
 	if epoch.observations == nil then
@@ -591,9 +586,9 @@ end
 function epochs.distributeRewardsForEpoch(currentTimestamp)
 	local epochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp - epochs.getSettings().durationMs) -- go back to previous epoch
 	local epoch = epochs.getEpoch(epochIndex)
-	if not next(epoch) then
+	if not epoch then
 		-- silently return
-		print("Not distributing rewards for last epoch. New epoch has not been created yet.")
+		print("Unable to distribute rewards for epoch. Epoch not found: " .. epochIndex)
 		return
 	end
 
