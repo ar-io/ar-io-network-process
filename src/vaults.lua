@@ -1,20 +1,22 @@
-Vaults = Vaults or {}
-
 -- Utility functions that modify global Vaults object
 local vaults = {}
 local balances = require("balances")
 local utils = require("utils")
 local constants = require("constants")
 
+--- @class Vault
+--- @field balance mARIO The balance of the vault
+--- @field controller WalletAddress | nil The controller of a revokable vault. Nil if not revokable (default: nil)
+--- @field startTimestamp Timestamp The start timestamp of the vault
+--- @field endTimestamp Timestamp The end timestamp of the vault
+
+--- @alias Vaults table<WalletAddress, table<VaultId, Vault>> -- A table of vaults indexed by owner address, then by vault id
+
+--- @type Vaults
+Vaults = Vaults or {}
+
 --- @type Timestamp|nil
 NextBalanceVaultsPruneTimestamp = NextBalanceVaultsPruneTimestamp or 0
-
---- @class Vault
---- @field balance number The balance of the vault
---- @field startTimestamp number The start timestamp of the vault
---- @field endTimestamp number The end timestamp of the vault
-
---- @class Vaults: table<string, Vault> A table of vaults indexed by owner address
 
 --- Creates a vault
 --- @param from string The address of the owner
@@ -22,7 +24,7 @@ NextBalanceVaultsPruneTimestamp = NextBalanceVaultsPruneTimestamp or 0
 --- @param lockLengthMs number The lock length in milliseconds
 --- @param currentTimestamp number The current timestamp
 --- @param vaultId string The vault id
---- @return Vault The created vault
+--- @return Vault -- The created vault
 function vaults.createVault(from, qty, lockLengthMs, currentTimestamp, vaultId)
 	assert(qty > 0, "Quantity must be greater than 0")
 	assert(not vaults.getVault(from, vaultId), "Vault with id " .. vaultId .. " already exists")
@@ -53,8 +55,18 @@ end
 --- @param currentTimestamp number The current timestamp
 --- @param vaultId string The vault id
 --- @param allowUnsafeAddresses boolean|nil Whether to allow unsafe addresses, since this results in funds eventually being sent to an invalid address
---- @return Vault The created vault
-function vaults.vaultedTransfer(from, recipient, qty, lockLengthMs, currentTimestamp, vaultId, allowUnsafeAddresses)
+--- @param revokable boolean|nil Whether the vault is revokable. Defaults to nil
+--- @return Vault -- The created vault
+function vaults.vaultedTransfer(
+	from,
+	recipient,
+	qty,
+	lockLengthMs,
+	currentTimestamp,
+	vaultId,
+	allowUnsafeAddresses,
+	revokable
+)
 	assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
 	assert(qty > 0, "Quantity must be greater than 0")
 	assert(recipient ~= from, "Cannot transfer to self")
@@ -74,8 +86,26 @@ function vaults.vaultedTransfer(from, recipient, qty, lockLengthMs, currentTimes
 		balance = qty,
 		startTimestamp = currentTimestamp,
 		endTimestamp = currentTimestamp + lockLengthMs,
+		controller = revokable and from or nil,
 	})
 	return newVault
+end
+
+--- Revokes a vaulted transfer back to the controller
+---@param controller WalletAddress The address of the controller of a revokable vault. This is the signer of the vaultedTransfer
+---@param recipient WalletAddress The address of the recipient of the vaultedTransfer
+---@param vaultId VaultId The id of the vault to revoke
+---@param currentTimestamp Timestamp The current timestamp
+---@return Vault
+function vaults.revokeVault(controller, recipient, vaultId, currentTimestamp)
+	local vault = vaults.getVault(recipient, vaultId)
+	assert(vault, "Vault not found.")
+	assert(vault.controller == controller, "Only the controller can revoke the vault.")
+	assert(currentTimestamp < vault.endTimestamp, "Vault has ended.")
+
+	balances.increaseBalance(controller, vault.balance)
+	Vaults[recipient][vaultId] = nil
+	return vault
 end
 
 --- Extends a vault
