@@ -1,6 +1,7 @@
 local vaults = require("vaults")
 local constants = require("constants")
 local utils = require("utils")
+local json = require("json")
 local startTimestamp = 0
 
 describe("vaults", function()
@@ -294,10 +295,11 @@ describe("vaults", function()
 	end)
 
 	describe("revokeVault", function()
-		local controller = "test-this-is-valid-arweave-wallet-address-1"
-		local recipient = "test-this-is-valid-arweave-wallet-address-2"
+		local controller = "stub-controller-address"
+		local recipient = "stub-recipient-address"
 
 		before_each(function()
+			print(json.encode(_G.Balances))
 			_G.Vaults = {
 				[recipient] = {
 					["vaultId"] = {
@@ -311,6 +313,7 @@ describe("vaults", function()
 		end)
 
 		it("should revoke a vault when from the controller", function()
+			assert.are.equal(nil, _G.Balances[controller])
 			local revokedVault = vaults.revokeVault(controller, recipient, "vaultId", 0)
 			assert.are.equal(100, _G.Balances[controller])
 			assert.are.same({
