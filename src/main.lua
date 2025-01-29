@@ -526,6 +526,7 @@ end, function(msg)
 		arns.scheduleNextRecordsPrune(0)
 		primaryNames.scheduleNextPrimaryNamesPruning(0)
 		vaults.scheduleNextVaultsPruning(0)
+		epochs.scheduleNextEpochsPruning(0)
 	end
 
 	print("Pruning state at timestamp: " .. msg.Timestamp)

@@ -767,7 +767,7 @@ end
 --- @return Epoch[] # The pruned epochs
 function epochs.pruneEpochs(timestamp)
 	local prunedEpochIndexes = {}
-	if not NextEpochsPruneTimestamp or timestamp < NextEpochsPruneTimestamp then
+	if not epochs.nextEpochsPruneTimestamp() or timestamp < epochs.nextEpochsPruneTimestamp() then
 		-- No known pruning work to do
 		return prunedEpochIndexes
 	end
@@ -792,6 +792,11 @@ function epochs.pruneEpochs(timestamp)
 		nextEpochIndex = next(unsafeEpochs, nextEpochIndex)
 	end
 	return prunedEpochIndexes
+end
+
+--- @param timestamp Timestamp
+function epochs.scheduleNextEpochsPruning(timestamp)
+	NextEpochsPruneTimestamp = math.min(NextEpochsPruneTimestamp or timestamp, timestamp)
 end
 
 function epochs.nextEpochsPruneTimestamp()
