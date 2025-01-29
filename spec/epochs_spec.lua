@@ -583,7 +583,8 @@ describe("epochs", function()
 	end)
 
 	describe("distributeRewardsForEpoch", function()
-		it("should distribute rewards for the epoch, auto staking for delegates", function()
+		before_each(function()
+			-- adds a fully prescribed epoch to the epoch registry, with 5 gateways and 5 observers and observations
 			_G.Epochs[0] = {
 				epochIndex = 0,
 				observations = {
@@ -656,7 +657,9 @@ describe("epochs", function()
 					["test-this-very-valid-observer-wallet-addr-5"] = "test-this-very-valid-arweave-wallet-addr-5",
 				},
 			}
+		end)
 
+		it("should distribute rewards for the epoch, auto staking for delegates", function()
 			local originalOperatorStake = gar.getSettings().operators.minStake
 			local originalDelegateStake = 100000000
 			local epochIndex = 0
@@ -892,6 +895,26 @@ describe("epochs", function()
 			)
 			-- assert that the balance withdrawn from the protocol balance matches the total distributed rewards
 			assert.are.equal(protocolBalance - expectedTotalDistribution, _G.Balances[ao.id])
+		end)
+		it(
+			"should return nil if the epoch has already been distributed and remove it from the epoch registry",
+			function()
+				local epochIndex = 0
+				-- marks the epoch as distributed
+				_G.Epochs[epochIndex].distributions.distributedTimestamp = 1704092400115
+				local epoch = epochs.getEpoch(epochIndex)
+				local distributedEpoch = epochs.distributeRewardsForEpoch(epoch.distributionTimestamp)
+				assert.is_nil(distributedEpoch)
+				assert.is_nil(_G.Epochs[epochIndex])
+			end
+		)
+
+		it("should return nil if the epoch does not exist in the epoch registry", function()
+			local epochIndex = 0
+			local epoch = epochs.getEpoch(epochIndex)
+			-- remove the epoch from the epoch registry
+			_G.Epochs[epochIndex] = nil
+			assert.is_nil(epochs.distributeRewardsForEpoch(epoch.distributionTimestamp))
 		end)
 	end)
 

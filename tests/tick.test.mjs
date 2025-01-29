@@ -324,7 +324,7 @@ describe('Tick', async () => {
    * - validate the rewards were distributed correctly
    * - send epoch distribution notice containing full epoch data
    */
-  it('should distribute rewards to gateways and delegates and send an epoch distribution notice', async () => {
+  it('should distribute rewards to gateways and delegates, send an epoch distribution notice and remove the epoch from the epoch registry', async () => {
     // give balance to gateway
     const initialMemory = await transfer({
       recipient: STUB_ADDRESS,
@@ -597,6 +597,14 @@ describe('Tick', async () => {
         address: delegateAddress,
       },
     ]);
+
+    // assert the distributed epoch was removed from the epoch registry
+    const epoch = await getEpoch({
+      memory: distributionTick.memory,
+      timestamp: distributionTimestamp,
+      epochIndex: 0,
+    });
+    assert.equal(epoch, undefined);
     sharedMemory = distributionTick.memory;
   });
 
