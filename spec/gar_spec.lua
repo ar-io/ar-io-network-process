@@ -3248,7 +3248,7 @@ describe("gar", function()
 
 	describe("redelegateStake", function()
 		local timestamp = 12345
-		local testRedelgationGateway = utils.deepCopy({
+		local testRedelegationGateway = utils.deepCopy({
 			operatorStake = minOperatorStake,
 			totalDelegatedStake = 0,
 			vaults = {},
@@ -3267,7 +3267,7 @@ describe("gar", function()
 			status = "joined",
 			observerAddress = stubObserverAddress,
 		})
-		testRedelgationGateway.settings.allowedDelegatesLookup = nil
+		testRedelegationGateway.settings.allowedDelegatesLookup = nil
 		local stubDelegation = {
 			delegatedStake = minDelegatedStake,
 			startTimestamp = 0,
@@ -3275,8 +3275,8 @@ describe("gar", function()
 		}
 
 		it("should redelegate stake from one gateway to another", function()
-			local sourceGateway = utils.deepCopy(testRedelgationGateway)
-			local targetGateway = utils.deepCopy(testRedelgationGateway)
+			local sourceGateway = utils.deepCopy(testRedelegationGateway)
+			local targetGateway = utils.deepCopy(testRedelegationGateway)
 			local qty = minDelegatedStake
 
 			sourceGateway.delegates = {
@@ -3323,8 +3323,8 @@ describe("gar", function()
 		end)
 
 		it("should redelegate stake from its own gateway into another gateway", function()
-			local sourceGateway = utils.deepCopy(testRedelgationGateway)
-			local targetGateway = utils.deepCopy(testRedelgationGateway)
+			local sourceGateway = utils.deepCopy(testRedelegationGateway)
+			local targetGateway = utils.deepCopy(testRedelegationGateway)
 			local qty = minDelegatedStake
 
 			targetGateway.settings.allowedDelegatesLookup = nil
@@ -3368,8 +3368,10 @@ describe("gar", function()
 		it(
 			"should allow operators to redelegate to its own stake when that stake is below the minimum delegated stake value",
 			function()
-				local sourceGateway = utils.deepCopy(testRedelgationGateway)
-				local targetGateway = utils.deepCopy(testRedelgationGateway)
+				local sourceGateway = utils.deepCopy(testRedelegationGateway)
+				local targetGateway = utils.deepCopy(testRedelegationGateway)
+
+				sourceGateway.totalDelegatedStake = minDelegatedStake
 
 				sourceGateway.delegates = {
 					[testRedelegatorAddress] = {
@@ -3418,8 +3420,8 @@ describe("gar", function()
 		it(
 			"should redelegate stake for a fee if the delegator has already done redelegations in the last seven epochs",
 			function()
-				local sourceGateway = utils.deepCopy(testRedelgationGateway)
-				local targetGateway = utils.deepCopy(testRedelgationGateway)
+				local sourceGateway = utils.deepCopy(testRedelegationGateway)
+				local targetGateway = utils.deepCopy(testRedelegationGateway)
 
 				-- Use enough stake to account for the 10% fee
 				local initialStakeNeeded = math.ceil(minDelegatedStake / (1 - 0.1))
@@ -3480,8 +3482,8 @@ describe("gar", function()
 		it(
 			"should cap the redelegation fee at 0.6 if the delegator has already over 6 redelegations in the last seven epochs",
 			function()
-				local sourceGateway = utils.deepCopy(testRedelgationGateway)
-				local targetGateway = utils.deepCopy(testRedelgationGateway)
+				local sourceGateway = utils.deepCopy(testRedelegationGateway)
+				local targetGateway = utils.deepCopy(testRedelegationGateway)
 
 				-- Use enough stake to account for the 60% fee
 				local initialStakeNeeded = math.ceil(minDelegatedStake / (1 - 0.6))
@@ -3539,8 +3541,8 @@ describe("gar", function()
 		)
 
 		it("should redelegate stake to their operator stake if target gateway is the delegator", function()
-			local sourceGateway = utils.deepCopy(testRedelgationGateway)
-			local targetGateway = utils.deepCopy(testRedelgationGateway)
+			local sourceGateway = utils.deepCopy(testRedelegationGateway)
+			local targetGateway = utils.deepCopy(testRedelegationGateway)
 
 			sourceGateway.delegates = {
 				[testRedelegatorAddress] = stubDelegation,
@@ -3579,8 +3581,8 @@ describe("gar", function()
 		it(
 			"should be able to redelegate partial amount of delegated stake from a source gateway as long as the remaining stake meets the minimum ",
 			function()
-				local sourceGateway = utils.deepCopy(testRedelgationGateway)
-				local targetGateway = utils.deepCopy(testRedelgationGateway)
+				local sourceGateway = utils.deepCopy(testRedelegationGateway)
+				local targetGateway = utils.deepCopy(testRedelegationGateway)
 
 				sourceGateway.delegates = {
 					[testRedelegatorAddress] = {
@@ -3633,8 +3635,8 @@ describe("gar", function()
 		it(
 			"should not be able to redelegate stake if the amount to stake after the redelegation fee is zero",
 			function()
-				local sourceGateway = utils.deepCopy(testRedelgationGateway)
-				local targetGateway = utils.deepCopy(testRedelgationGateway)
+				local sourceGateway = utils.deepCopy(testRedelegationGateway)
+				local targetGateway = utils.deepCopy(testRedelegationGateway)
 				_G.Redelegations = {
 					[testRedelegatorAddress] = {
 						timestamp = timestamp,
@@ -3666,8 +3668,8 @@ describe("gar", function()
 		)
 
 		it("should not redelegate stake if target gateway is not in the allowedDelegatesLookup", function()
-			local sourceGateway = utils.deepCopy(testRedelgationGateway)
-			local targetGateway = utils.deepCopy(testRedelgationGateway)
+			local sourceGateway = utils.deepCopy(testRedelegationGateway)
+			local targetGateway = utils.deepCopy(testRedelegationGateway)
 
 			targetGateway.settings.allowedDelegatesLookup = {
 				[testRedelegatorAddress] = false,
@@ -3692,7 +3694,7 @@ describe("gar", function()
 		end)
 
 		it("should not redelegate stake if target gateway is not in the GatewayRegistry", function()
-			local sourceGateway = utils.deepCopy(testRedelgationGateway)
+			local sourceGateway = utils.deepCopy(testRedelegationGateway)
 
 			_G.GatewayRegistry = {
 				[testSourceAddress] = sourceGateway,
@@ -3730,8 +3732,8 @@ describe("gar", function()
 		end)
 
 		it("should not redelegate stake if the target gateway is leaving the network", function()
-			local sourceGateway = utils.deepCopy(testRedelgationGateway)
-			local targetGateway = utils.deepCopy(testRedelgationGateway)
+			local sourceGateway = utils.deepCopy(testRedelegationGateway)
+			local targetGateway = utils.deepCopy(testRedelegationGateway)
 
 			targetGateway.status = "leaving"
 
@@ -3758,8 +3760,8 @@ describe("gar", function()
 		end)
 
 		it("should be able to redelegate stake if the source gateway is leaving the network", function()
-			local sourceGateway = utils.deepCopy(testRedelgationGateway)
-			local targetGateway = utils.deepCopy(testRedelgationGateway)
+			local sourceGateway = utils.deepCopy(testRedelegationGateway)
+			local targetGateway = utils.deepCopy(testRedelegationGateway)
 
 			sourceGateway.delegates = {
 				[testRedelegatorAddress] = stubDelegation,
@@ -3802,8 +3804,8 @@ describe("gar", function()
 		end)
 
 		it("should not redelegate stake if target gateway does not allow delegates", function()
-			local sourceGateway = utils.deepCopy(testRedelgationGateway)
-			local targetGateway = utils.deepCopy(testRedelgationGateway)
+			local sourceGateway = utils.deepCopy(testRedelegationGateway)
+			local targetGateway = utils.deepCopy(testRedelegationGateway)
 
 			targetGateway.settings.allowDelegatedStaking = false
 			_G.GatewayRegistry = {
@@ -3829,8 +3831,8 @@ describe("gar", function()
 		it(
 			"should not redelegate stake if the remaining stake in its own gateway stake is less than the minimum operator stake",
 			function()
-				local sourceGateway = utils.deepCopy(testRedelgationGateway)
-				local targetGateway = utils.deepCopy(testRedelgationGateway)
+				local sourceGateway = utils.deepCopy(testRedelegationGateway)
+				local targetGateway = utils.deepCopy(testRedelegationGateway)
 
 				-- Less than the required amount to keep min operator stake and start a new delegate
 				sourceGateway.operatorStake = minOperatorStake + minDelegatedStake - 1
@@ -3859,8 +3861,8 @@ describe("gar", function()
 		)
 
 		it("should redelegate stake if adding stake to a target gateway where they already have stake", function()
-			local sourceGateway = utils.deepCopy(testRedelgationGateway)
-			local targetGateway = utils.deepCopy(testRedelgationGateway)
+			local sourceGateway = utils.deepCopy(testRedelegationGateway)
+			local targetGateway = utils.deepCopy(testRedelegationGateway)
 
 			sourceGateway.operatorStake = minOperatorStake + 1
 			targetGateway.delegates = {
@@ -3909,8 +3911,10 @@ describe("gar", function()
 		it(
 			"should not redelegate stake if the remaining stake in the source gateway is less than the minimum delegated stake",
 			function()
-				local sourceGateway = utils.deepCopy(testRedelgationGateway)
-				local targetGateway = utils.deepCopy(testRedelgationGateway)
+				local sourceGateway = utils.deepCopy(testRedelegationGateway)
+				local targetGateway = utils.deepCopy(testRedelegationGateway)
+
+				sourceGateway.totalDelegatedStake = minDelegatedStake
 
 				sourceGateway.delegates = {
 					[testRedelegatorAddress] = {
@@ -3943,9 +3947,10 @@ describe("gar", function()
 		it(
 			"should not redelegate stake if the resulting stake on the target gateway does not meet the minimum stake amount",
 			function()
-				local sourceGateway = utils.deepCopy(testRedelgationGateway)
-				local targetGateway = utils.deepCopy(testRedelgationGateway)
+				local sourceGateway = utils.deepCopy(testRedelegationGateway)
+				local targetGateway = utils.deepCopy(testRedelegationGateway)
 
+				sourceGateway.totalDelegatedStake = minDelegatedStake + minDelegatedStake - 1
 				sourceGateway.delegates = {
 					[testRedelegatorAddress] = {
 						delegatedStake = minDelegatedStake + minDelegatedStake - 1,
@@ -3975,8 +3980,10 @@ describe("gar", function()
 		)
 
 		it("should not redelegate stake if delegate does not have enough stake to redelegate", function()
-			local sourceGateway = utils.deepCopy(testRedelgationGateway)
-			local targetGateway = utils.deepCopy(testRedelgationGateway)
+			local sourceGateway = utils.deepCopy(testRedelegationGateway)
+			local targetGateway = utils.deepCopy(testRedelegationGateway)
+
+			sourceGateway.totalDelegatedStake = stubDelegation.delegatedStake
 
 			sourceGateway.delegates = {
 				[testRedelegatorAddress] = stubDelegation,
@@ -3991,7 +3998,7 @@ describe("gar", function()
 					delegateAddress = testRedelegatorAddress,
 					sourceAddress = testSourceAddress,
 					targetAddress = testTargetAddress,
-					qty = minDelegatedStake + 1,
+					qty = stubDelegation.delegatedStake + 1,
 					currentTimestamp = timestamp,
 				})
 			end)
@@ -4002,7 +4009,7 @@ describe("gar", function()
 		end)
 
 		it("should not redelegate stake when vault ID cannot be found on the delegate", function()
-			local sourceGateway = utils.deepCopy(testRedelgationGateway)
+			local sourceGateway = utils.deepCopy(testRedelegationGateway)
 			sourceGateway.delegates = {
 				[testRedelegatorAddress] = {
 					delegatedStake = minDelegatedStake,
@@ -4012,7 +4019,7 @@ describe("gar", function()
 			}
 			_G.GatewayRegistry = {
 				[testSourceAddress] = sourceGateway,
-				[testTargetAddress] = testRedelgationGateway,
+				[testTargetAddress] = testRedelegationGateway,
 			}
 
 			local isSuccess, error = pcall(function()
@@ -4033,8 +4040,8 @@ describe("gar", function()
 
 		it("should not redelegate stake when vault ID cannot be found on the operator", function()
 			_G.GatewayRegistry = {
-				[testRedelegatorAddress] = testRedelgationGateway,
-				[testTargetAddress] = testRedelgationGateway,
+				[testRedelegatorAddress] = testRedelegationGateway,
+				[testTargetAddress] = testRedelegationGateway,
 			}
 
 			local isSuccess, error = pcall(function()
@@ -4054,8 +4061,8 @@ describe("gar", function()
 		end)
 
 		it("should redelegate stake from a valid vault ID on the source delegate", function()
-			local sourceGateway = utils.deepCopy(testRedelgationGateway)
-			local targetGateway = utils.deepCopy(testRedelgationGateway)
+			local sourceGateway = utils.deepCopy(testRedelegationGateway)
+			local targetGateway = utils.deepCopy(testRedelegationGateway)
 
 			sourceGateway.delegates = {
 				[testRedelegatorAddress] = {
@@ -4074,7 +4081,7 @@ describe("gar", function()
 
 			_G.GatewayRegistry = {
 				[testSourceAddress] = sourceGateway,
-				[testTargetAddress] = testRedelgationGateway,
+				[testTargetAddress] = testRedelegationGateway,
 			}
 
 			local result = gar.redelegateStake({
@@ -4108,8 +4115,8 @@ describe("gar", function()
 		end)
 
 		it("should remove the delegate when the last vault is emptied from a redelegation", function()
-			local sourceGateway = utils.deepCopy(testRedelgationGateway)
-			local targetGateway = utils.deepCopy(testRedelgationGateway)
+			local sourceGateway = utils.deepCopy(testRedelegationGateway)
+			local targetGateway = utils.deepCopy(testRedelegationGateway)
 
 			sourceGateway.delegates = {
 				[testRedelegatorAddress] = {
@@ -4160,8 +4167,8 @@ describe("gar", function()
 		end)
 
 		it("should redelegate stake from a valid vault ID on the source operator", function()
-			local sourceGateway = utils.deepCopy(testRedelgationGateway)
-			local targetGateway = utils.deepCopy(testRedelgationGateway)
+			local sourceGateway = utils.deepCopy(testRedelegationGateway)
+			local targetGateway = utils.deepCopy(testRedelegationGateway)
 
 			sourceGateway.operatorStake = minOperatorStake
 			sourceGateway.vaults = {
@@ -4207,8 +4214,8 @@ describe("gar", function()
 		end)
 
 		it("should not redelegate stake from when the quantity exceeds the balance of the vault", function()
-			local sourceGateway = utils.deepCopy(testRedelgationGateway)
-			local targetGateway = utils.deepCopy(testRedelgationGateway)
+			local sourceGateway = utils.deepCopy(testRedelegationGateway)
+			local targetGateway = utils.deepCopy(testRedelegationGateway)
 
 			sourceGateway.delegates = {
 				[testRedelegatorAddress] = {
@@ -4246,8 +4253,8 @@ describe("gar", function()
 		end)
 
 		it("should be able to redelegate partial amount of a vault's balance", function()
-			local sourceGateway = utils.deepCopy(testRedelgationGateway)
-			local targetGateway = utils.deepCopy(testRedelgationGateway)
+			local sourceGateway = utils.deepCopy(testRedelegationGateway)
+			local targetGateway = utils.deepCopy(testRedelegationGateway)
 
 			sourceGateway.delegates = {
 				[testRedelegatorAddress] = {

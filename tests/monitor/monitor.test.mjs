@@ -10,7 +10,6 @@ Logger.default.setLogLevel('info');
 
 export const mARIOPerARIO = 1_000_000;
 export const ARIOToMARIO = (amount) => amount * mARIOPerARIO;
-
 const processId = process.env.ARIO_NETWORK_PROCESS_ID || ARIO_DEVNET_PROCESS_ID;
 const io = ARIO.init({
   process: new AOProcess({
@@ -499,7 +498,8 @@ describe('setup', () => {
                 `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid balance (${vault.balance})`, // Fixed vaultId reference
               );
               assert(
-                vault.balance >= 0,
+                vault.balance >= 0 &&
+                  vault.balance <= ARIOToMARIO(1_000_000_000_000),
                 `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid balance (${vault.balance})`, // Fixed vaultId reference
               );
               assert(
@@ -521,6 +521,55 @@ describe('setup', () => {
     });
   });
 
+  describe('vaults', () => {
+    const minLockTimeMs = 14 * 24 * 60 * 60 * 1000;
+    const maxLockTimeMs = 12 * 365 * 24 * 60 * 60 * 1000;
+    it('should have valid vaults with non-zero balance and startTimestamp and endTimestamp', async () => {
+      const { items: vaults } = await io.getVaults({
+        limit: 10_000,
+      });
+      await Promise.all(
+        vaults.map((vault) =>
+          throttle(async () => {
+            assert(
+              vault.address,
+              `Vault ${vault.vaultId} for ${vaults.address} has no address`,
+            );
+            assert(
+              typeof vault.vaultId === 'string',
+              `Vault ${vault.vaultId} for ${vault.address} has an invalid vaultId (${vault.vaultId})`,
+            );
+            assert(
+              vault.balance > 0,
+              `Vault ${vault.vaultId} for ${vault.address} has an invalid balance (${vault.balance})`,
+            );
+            assert(
+              vault.startTimestamp <= Date.now(),
+              `Vault ${vault.vaultId} for ${vault.address} has an invalid start timestamp ${vault.startTimestamp} (${new Date(vault.startTimestamp).toLocaleString()})`,
+            );
+            assert(
+              vault.endTimestamp > vault.startTimestamp &&
+                vault.endTimestamp > Date.now() &&
+                vault.endTimestamp >= vault.startTimestamp + minLockTimeMs &&
+                vault.endTimestamp <= vault.startTimestamp + maxLockTimeMs &&
+                `Vault ${vault.vaultId} for ${vault.address} has an invalid end timestamp ${vault.endTimestamp} (${new Date(vault.endTimestamp).toLocaleString()} - and length of ${
+                  (vault.endTimestamp - vault.startTimestamp) /
+                  (24 * 60 * 60 * 1000)
+                } days)`,
+            );
+            if (vault.controller) {
+              assert(
+                typeof vault.controller === 'string' &&
+                  vault.controller.length > 0,
+                `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid controller (${vault.controller})`,
+              );
+            }
+          }),
+        ),
+      );
+    });
+  });
+
   // arns registry - ensure no invalid arns
   describe('arns names', () => {
     const twoWeeks = 2 * 7 * 24 * 60 * 60 * 1000;
@@ -538,36 +587,36 @@ describe('setup', () => {
           arnsRecords.map((arn) =>
             throttle(async () => {
               uniqueNames.add(arn.name);
-              assert(arn.processId, `ARNs name '${arn.name}' has no processId`);
-              assert(arn.type, `ARNs name '${arn.name}' has no type`);
+              assert(arn.processId, `ArNS name '${arn.name}' has no processId`);
+              assert(arn.type, `ArNS name '${arn.name}' has no type`);
               assert(
                 arn.startTimestamp,
-                `ARNs name '${arn.name}' has no start timestamp`,
+                `ArNS name '${arn.name}' has no start timestamp`,
               );
               assert(
                 Number.isInteger(arn.purchasePrice) && arn.purchasePrice >= 0,
-                `ARNs name '${arn.name}' has invalid purchase price: ${arn.purchasePrice}`,
+                `ArNS name '${arn.name}' has invalid purchase price: ${arn.purchasePrice}`,
               );
               assert(
                 Number.isInteger(arn.undernameLimit) &&
                   arn.undernameLimit >= 10,
-                `ARNs name '${arn.name}' has invalid undername limit: ${arn.undernameLimit}`,
+                `ArNS name '${arn.name}' has invalid undername limit: ${arn.undernameLimit}`,
               );
               if (arn.type === 'lease') {
                 assert(
                   arn.endTimestamp,
-                  `ARNs name '${arn.name}' has no end timestamp`,
+                  `ArNS name '${arn.name}' has no end timestamp`,
                 );
                 assert(
                   arn.endTimestamp > Date.now() - twoWeeks,
-                  `ARNs name '${arn.name}' is older than two weeks`,
+                  `ArNS name '${arn.name}' is older than two weeks`,
                 );
               }
               // if permabuy, assert no endTimestamp
               if (arn.type === 'permabuy') {
                 assert(
                   !arn.endTimestamp,
-                  `ARNs name '${arn.name}' has an end timestamp`,
+                  `ArNS name '${arn.name}' has an end timestamp`,
                 );
               }
             }),
@@ -575,9 +624,67 @@ describe('setup', () => {
         );
         assert(
           uniqueNames.size === totalArNSRecords,
-          `Counted total ARNs (${uniqueNames.size}) does not match total ARNs (${totalArNSRecords})`,
+          `Counted total ArNS (${uniqueNames.size}) does not match total ArNS (${totalArNSRecords})`,
         );
       },
+    );
+  });
+
+  it('should not have any returned names older than two weeks', async () => {
+    const twoWeekMs = 2 * 7 * 24 * 60 * 60 * 1000;
+    const { items: returnedNames } = await io.getArNSReturnedNames({
+      limit: 10000,
+    });
+    await Promise.all(
+      returnedNames.map((returnedName) =>
+        throttle(async () => {
+          assert(returnedName.name, 'Returned name has no name');
+          assert(
+            returnedName.startTimestamp &&
+              returnedName.startTimestamp <= Date.now(),
+            `Returned name ${returnedName.name} has unexpected start timestamp ${returnedName.startTimestamp} (${new Date(returnedName.startTimestamp).toLocaleString()})`,
+          );
+          assert(
+            returnedName.endTimestamp &&
+              returnedName.endTimestamp > Date.now() &&
+              returnedName.endTimestamp ==
+                returnedName.startTimestamp + twoWeekMs,
+            `Returned name ${returnedName.name} has unexpected end timestamp ${returnedName.endTimestamp} (${new Date(returnedName.endTimestamp).toLocaleString()})`,
+          );
+          assert(
+            returnedName.initiator &&
+              typeof returnedName.initiator === 'string' &&
+              returnedName.initiator.length > 0,
+            `Returned name ${returnedName.name} has no initiator`,
+          );
+        }),
+      ),
+    );
+  });
+
+  it('should not have any expired reserved names', async () => {
+    const { items: reservedNames } = await io.getArNSReservedNames({
+      limit: 10_000,
+    });
+    await Promise.all(
+      reservedNames.map((reservedName) =>
+        throttle(async () => {
+          assert(reservedName.name, 'Reserved name has no name');
+          if (reservedName.endTimestamp) {
+            assert(
+              reservedName.endTimestamp > Date.now(),
+              `Reserved name ${reservedName.name} has unexpected end timestamp ${reservedName.endTimestamp} (${new Date(reservedName.endTimestamp).toLocaleString()})`,
+            );
+          }
+          if (reservedName.target) {
+            assert(
+              typeof reservedName.target === 'string' &&
+                reservedName.target.length > 0,
+              `Reserved name ${reservedName.name} has invalid target: ${reservedName.target}`,
+            );
+          }
+        }),
+      ),
     );
   });
 });

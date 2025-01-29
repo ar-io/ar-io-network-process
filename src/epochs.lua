@@ -28,7 +28,6 @@ local epochs = {}
 --- @field prescribedObservers WeightedGateway[] The prescribed observers of the epoch
 
 --- @class EpochSettings
---- @field pruneEpochsCount number The number of epochs to prune
 --- @field prescribedNameCount number The number of prescribed names
 --- @field rewardPercentage number The reward percentage
 --- @field maxObservers number The maximum number of observers
@@ -77,7 +76,6 @@ local epochs = {}
 Epochs = Epochs or {}
 EpochSettings = EpochSettings
 	or {
-		pruneEpochsCount = 14, -- prune epochs older than 14 days
 		prescribedNameCount = 2,
 		maxObservers = 50,
 		epochZeroStartTimestamp = 1719900000000, -- July 9th, 00:00:00 UTC
@@ -102,16 +100,10 @@ end
 
 --- Gets an epoch by index
 --- @param epochIndex number The epoch index
---- @return Epoch | PrescribedEpoch | DistributedEpoch # The prescribed epoch
+--- @return Epoch | PrescribedEpoch | DistributedEpoch | nil # The prescribed epoch
 function epochs.getEpoch(epochIndex)
-	local epoch = utils.deepCopy(Epochs[epochIndex]) or {}
+	local epoch = utils.deepCopy(Epochs[epochIndex]) or nil
 	return epoch
-end
-
---- Gets the current epoch
---- @return Epoch # The current epoch
-function epochs.getCurrentEpoch()
-	return epochs.getEpoch(epochs.getEpochIndexForTimestamp(os.time()))
 end
 
 --- Gets the epoch settings
@@ -372,26 +364,19 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	assert(type(hashchain) == "string", "Hashchain must be a string")
 
 	local epochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	if next(epochs.getEpoch(epochIndex)) then
+	if epochs.getEpoch(epochIndex) then
 		-- silently return
 		print("Epoch already exists for index: " .. epochIndex)
-		return
+		return nil -- do not return the existing epoch to prevent sending redundant epoch-created-notices
 	end
 
 	local prevEpochIndex = epochIndex - 1
 	local prevEpoch = epochs.getEpoch(prevEpochIndex)
-	-- if the previous epoch is not the genesis epoch and we have not distributed rewards, we cannot create a new epoch
-	if
-		prevEpochIndex > 0 -- only validate distributions occurred if previous epoch is not the genesis epoch
-		and (
-			prevEpoch.distributions == nil
-			or prevEpoch.distributions.distributedTimestamp == nil
-			or timestamp < prevEpoch.distributions.distributedTimestamp
-		)
-	then
+	-- if there is a previous epoch and it has not been distributed, we cannot create a new epoch. once the epoch has been distributed, it will be removed from the epoch registry
+	if prevEpoch and not prevEpoch.distributions.distributedTimestamp then
 		-- silently return
 		print(
-			"Distributions have not occurred for the previous epoch. A new epoch will not be created until those are complete: "
+			"Distributions have not occurred for the previous epoch. A new epoch cannot be created until distribution for the previous epoch is complete: "
 				.. prevEpochIndex
 		)
 		return
@@ -476,6 +461,7 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	assert(observingGateway, "The associated gateway not found in the registry.")
 
 	local epoch = epochs.getEpoch(epochIndex)
+	assert(epoch, "Unable to save observation. Epoch not found for index: " .. epochIndex)
 
 	-- check if this is the first report filed in this epoch
 	if epoch.observations == nil then
@@ -590,29 +576,28 @@ function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObserv
 		potentialRewards = potentialRewards,
 	}
 end
---- Distributes the rewards for an epoch
---- 1. Get gateways participated in full epoch based on start and end timestamp
---- 2. Get the prescribed observers for the relevant epoch
---- 3. Calculate the rewards for the epoch based on protocol balance
---- 4. Allocate 95% of the rewards for passed gateways, 5% for observers - based on total gateways during the epoch and # of prescribed observers
---- 5. Distribute the rewards to the gateways and observers
---- 6. Increment the epoch stats for the gateways
+--- Distributes the rewards for a prescribed epoch
+--- 1. Calculate the rewards for the epoch based on protocol balance
+--- 2. Allocate 95% of the rewards for passed gateways, 5% for observers - based on total gateways during the epoch and # of prescribed observers
+--- 3. Distribute the rewards to the gateways and observers
+--- 4. Increment the epoch stats for the gateways
 --- @param currentTimestamp number The current timestamp
 --- @return DistributedEpoch | nil # The updated epoch with the distributed rewards, or nil if no rewards were distributed
 function epochs.distributeRewardsForEpoch(currentTimestamp)
 	local epochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp - epochs.getSettings().durationMs) -- go back to previous epoch
 	local epoch = epochs.getEpoch(epochIndex)
-	if not next(epoch) then
-		-- silently return
-		print("Not distributing rewards for last epoch.")
+	if not epoch then
+		-- TODO: consider throwing an error here instead of silently returning, as this is a critical error and should be fixed
+		print("Unable to distribute rewards for epoch. Epoch not found: " .. epochIndex)
 		return
 	end
 
 	--- The epoch was already distributed
 	--- @cast epoch DistributedEpoch
 	if epoch.distributions.distributedTimestamp then
-		print("Rewards already distributed for epoch: " .. epochIndex)
-		return -- silently return
+		print("Rewards already distributed for epoch. Epoch will be removed from the epoch registry: " .. epochIndex)
+		Epochs[epochIndex] = nil
+		return epoch
 	end
 
 	--- Epoch is prescribed, but not eligible for distribution
@@ -620,7 +605,7 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	if currentTimestamp < epoch.distributionTimestamp then
 		-- silently ignore - Distribution can only occur after the epoch has ended
 		print("Distribution can only occur after the epoch has ended")
-		return
+		return nil
 	end
 
 	local eligibleGatewaysForEpoch = epoch.distributions.rewards.eligible or {}
@@ -742,9 +727,8 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 
 	-- create a distributed epoch from the prescribed epoch
 	local distributedEpoch = convertPrescribedEpochToDistributedEpoch(epoch, currentTimestamp, distributed)
-
-	-- update the epochs -- TODO: remove this from state
-	Epochs[epochIndex] = distributedEpoch
+	-- remove the epoch from the epoch table
+	Epochs[epochIndex] = nil
 	return distributedEpoch
 end
 
@@ -791,11 +775,11 @@ function epochs.pruneEpochs(timestamp)
 	--- Reset the next pruning timestamp
 	NextEpochsPruneTimestamp = nil
 	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	local cutoffEpochIndex = currentEpochIndex - epochs.getSettings().pruneEpochsCount
+	local cutoffEpochIndex = currentEpochIndex - 1 -- keep the two most recent epochs, on distribution the previous epoch will remove itself
 	local unsafeEpochs = epochs.getEpochsUnsafe()
 	local nextEpochIndex = next(unsafeEpochs)
 	while nextEpochIndex do
-		if nextEpochIndex <= cutoffEpochIndex then
+		if nextEpochIndex < cutoffEpochIndex then
 			table.insert(prunedEpochIndexes, nextEpochIndex)
 			-- Safe to assign to nil during next() iteration
 			Epochs[nextEpochIndex] = nil
