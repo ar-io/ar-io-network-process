@@ -10,7 +10,6 @@ Logger.default.setLogLevel('info');
 
 export const mARIOPerARIO = 1_000_000;
 export const ARIOToMARIO = (amount) => amount * mARIOPerARIO;
-
 const processId = process.env.ARIO_NETWORK_PROCESS_ID || ARIO_DEVNET_PROCESS_ID;
 const io = ARIO.init({
   process: new AOProcess({
@@ -499,7 +498,8 @@ describe('setup', () => {
                 `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid balance (${vault.balance})`, // Fixed vaultId reference
               );
               assert(
-                vault.balance >= 0,
+                vault.balance >= 0 &&
+                  vault.balance <= ARIOToMARIO(1_000_000_000_000),
                 `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid balance (${vault.balance})`, // Fixed vaultId reference
               );
               assert(
@@ -522,7 +522,7 @@ describe('setup', () => {
   });
 
   describe('vaults', () => {
-    const minLockTimeMs = 12 * 365 * 24 * 60 * 60 * 1000;
+    const minLockTimeMs = 14 * 24 * 60 * 60 * 1000;
     const maxLockTimeMs = 12 * 365 * 24 * 60 * 60 * 1000;
     it('should have valid vaults with non-zero balance and startTimestamp and endTimestamp', async () => {
       const { items: vaults } = await io.getVaults({
@@ -532,27 +532,35 @@ describe('setup', () => {
         vaults.map((vault) =>
           throttle(async () => {
             assert(
+              vault.address,
+              `Vault ${vault.vaultId} for ${vaults.address} has no address`,
+            );
+            assert(
               typeof vault.vaultId === 'string',
-              `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid vaultId (${vault.vaultId})`,
+              `Vault ${vault.vaultId} for ${vault.address} has an invalid vaultId (${vault.vaultId})`,
             );
             assert(
               vault.balance > 0,
-              `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid balance (${vault.balance})`,
+              `Vault ${vault.vaultId} for ${vault.address} has an invalid balance (${vault.balance})`,
             );
             assert(
               vault.startTimestamp <= Date.now(),
-              `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid start timestamp (${vault.startTimestamp})`,
+              `Vault ${vault.vaultId} for ${vault.address} has an invalid start timestamp ${vault.startTimestamp} (${new Date(vault.startTimestamp).toLocaleString()})`,
             );
             assert(
               vault.endTimestamp > vault.startTimestamp &&
                 vault.endTimestamp > Date.now() &&
                 vault.endTimestamp >= vault.startTimestamp + minLockTimeMs &&
-                vault.endTimestamp <= vault.startTimestamp + maxLockTimeMs,
-              `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`,
+                vault.endTimestamp <= vault.startTimestamp + maxLockTimeMs &&
+                `Vault ${vault.vaultId} for ${vault.address} has an invalid end timestamp ${vault.endTimestamp} (${new Date(vault.endTimestamp).toLocaleString()} - and length of ${
+                  (vault.endTimestamp - vault.startTimestamp) /
+                  (24 * 60 * 60 * 1000)
+                } days)`,
             );
             if (vault.controller) {
               assert(
-                typeof vault.controller === 'string',
+                typeof vault.controller === 'string' &&
+                  vault.controller.length > 0,
                 `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid controller (${vault.controller})`,
               );
             }
@@ -644,7 +652,9 @@ describe('setup', () => {
             `Returned name ${returnedName.name} has unexpected end timestamp ${returnedName.endTimestamp} (${new Date(returnedName.endTimestamp).toLocaleString()})`,
           );
           assert(
-            returnedName.initiator,
+            returnedName.initiator &&
+              typeof returnedName.initiator === 'string' &&
+              returnedName.initiator.length > 0,
             `Returned name ${returnedName.name} has no initiator`,
           );
         }),
@@ -652,7 +662,7 @@ describe('setup', () => {
     );
   });
 
-  it('should not have an expired reserved names', async () => {
+  it('should not have any expired reserved names', async () => {
     const { items: reservedNames } = await io.getArNSReservedNames({
       limit: 10_000,
     });
@@ -668,7 +678,8 @@ describe('setup', () => {
           }
           if (reservedName.target) {
             assert(
-              typeof reservedName.target === 'string',
+              typeof reservedName.target === 'string' &&
+                reservedName.target.length > 0,
               `Reserved name ${reservedName.name} has invalid target: ${reservedName.target}`,
             );
           }
