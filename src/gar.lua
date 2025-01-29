@@ -506,6 +506,11 @@ function decreaseDelegateStakeAtGateway(delegateAddress, gateway, quantity, ban)
 		"Quantity is required and must be an integer greater than or equal to 0: " .. quantity
 	)
 	assert(gateway, "Gateway is required")
+	assert(quantity <= delegate.delegatedStake, "Quantity cannot be greater than the delegate's stake")
+	assert(
+		quantity <= gateway.totalDelegatedStake,
+		"Quantity cannot be greater than the gateway's total delegated stake"
+	)
 	delegate.delegatedStake = delegate.delegatedStake - quantity
 	gateway.totalDelegatedStake = gateway.totalDelegatedStake - quantity
 	local pruned = gar.pruneDelegateFromGatewayIfNecessary(delegateAddress, gateway)
