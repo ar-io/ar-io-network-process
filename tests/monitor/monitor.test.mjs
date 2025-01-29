@@ -532,6 +532,10 @@ describe('setup', () => {
         vaults.map((vault) =>
           throttle(async () => {
             assert(
+              typeof vault.vaultId === 'string',
+              `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid vaultId (${vault.vaultId})`,
+            );
+            assert(
               vault.balance > 0,
               `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid balance (${vault.balance})`,
             );
