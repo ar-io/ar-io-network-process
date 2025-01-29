@@ -521,6 +521,43 @@ describe('setup', () => {
     });
   });
 
+  describe('vaults', () => {
+    const minLockTimeMs = 12 * 365 * 24 * 60 * 60 * 1000;
+    const maxLockTimeMs = 12 * 365 * 24 * 60 * 60 * 1000;
+    it('should have valid vaults with non-zero balance and startTimestamp and endTimestamp', async () => {
+      const { items: vaults } = await io.getVaults({
+        limit: 10_000,
+      });
+      await Promise.all(
+        vaults.map((vault) =>
+          throttle(async () => {
+            assert(
+              vault.balance > 0,
+              `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid balance (${vault.balance})`,
+            );
+            assert(
+              vault.startTimestamp <= Date.now(),
+              `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid start timestamp (${vault.startTimestamp})`,
+            );
+            assert(
+              vault.endTimestamp > vault.startTimestamp &&
+                vault.endTimestamp > Date.now() &&
+                vault.endTimestamp >= vault.startTimestamp + minLockTimeMs &&
+                vault.endTimestamp <= vault.startTimestamp + maxLockTimeMs,
+              `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`,
+            );
+            if (vault.controller) {
+              assert(
+                typeof vault.controller === 'string',
+                `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid controller (${vault.controller})`,
+              );
+            }
+          }),
+        ),
+      );
+    });
+  });
+
   // arns registry - ensure no invalid arns
   describe('arns names', () => {
     const twoWeeks = 2 * 7 * 24 * 60 * 60 * 1000;
@@ -538,36 +575,36 @@ describe('setup', () => {
           arnsRecords.map((arn) =>
             throttle(async () => {
               uniqueNames.add(arn.name);
-              assert(arn.processId, `ARNs name '${arn.name}' has no processId`);
-              assert(arn.type, `ARNs name '${arn.name}' has no type`);
+              assert(arn.processId, `ArNS name '${arn.name}' has no processId`);
+              assert(arn.type, `ArNS name '${arn.name}' has no type`);
               assert(
                 arn.startTimestamp,
-                `ARNs name '${arn.name}' has no start timestamp`,
+                `ArNS name '${arn.name}' has no start timestamp`,
               );
               assert(
                 Number.isInteger(arn.purchasePrice) && arn.purchasePrice >= 0,
-                `ARNs name '${arn.name}' has invalid purchase price: ${arn.purchasePrice}`,
+                `ArNS name '${arn.name}' has invalid purchase price: ${arn.purchasePrice}`,
               );
               assert(
                 Number.isInteger(arn.undernameLimit) &&
                   arn.undernameLimit >= 10,
-                `ARNs name '${arn.name}' has invalid undername limit: ${arn.undernameLimit}`,
+                `ArNS name '${arn.name}' has invalid undername limit: ${arn.undernameLimit}`,
               );
               if (arn.type === 'lease') {
                 assert(
                   arn.endTimestamp,
-                  `ARNs name '${arn.name}' has no end timestamp`,
+                  `ArNS name '${arn.name}' has no end timestamp`,
                 );
                 assert(
                   arn.endTimestamp > Date.now() - twoWeeks,
-                  `ARNs name '${arn.name}' is older than two weeks`,
+                  `ArNS name '${arn.name}' is older than two weeks`,
                 );
               }
               // if permabuy, assert no endTimestamp
               if (arn.type === 'permabuy') {
                 assert(
                   !arn.endTimestamp,
-                  `ARNs name '${arn.name}' has an end timestamp`,
+                  `ArNS name '${arn.name}' has an end timestamp`,
                 );
               }
             }),
@@ -575,7 +612,7 @@ describe('setup', () => {
         );
         assert(
           uniqueNames.size === totalArNSRecords,
-          `Counted total ARNs (${uniqueNames.size}) does not match total ARNs (${totalArNSRecords})`,
+          `Counted total ArNS (${uniqueNames.size}) does not match total ArNS (${totalArNSRecords})`,
         );
       },
     );
