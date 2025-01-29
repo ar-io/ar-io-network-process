@@ -1928,6 +1928,12 @@ end)
 
 addEventingHandler(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", ActionMap.Gateway), function(msg)
 	local gateway = gar.getCompactGateway(msg.Tags.Address or msg.From)
+	-- TODO: add gatewayRewardRatioWeight and observerRewardRatioWeight as gatewayPerformanceRatio and observerPerformanceRatio for backwards compatibility
+	if gateway then
+		gateway.weights.gatewayRewardRatioWeight = gateway.weights.gatewayPerformanceRatio or 0
+		gateway.weights.observerRewardRatioWeight = gateway.weights.observerPerformanceRatio or 0
+	end
+	-- END TODO
 	Send(msg, {
 		Target = msg.From,
 		Action = "Gateway-Notice",

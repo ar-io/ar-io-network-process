@@ -52,6 +52,8 @@ local gar = {}
 --- @field tenureWeight number
 --- @field gatewayPerformanceRatio number
 --- @field observerPerformanceRatio number
+--- @field gatewayRewardRatioWeight number|nil # @deprecated use gatewayPerformanceRatio instead
+--- @field observerRewardRatioWeight number|nil # @deprecated use observerPerformanceRatio instead
 --- @field compositeWeight number
 --- @field normalizedCompositeWeight number
 
@@ -1122,13 +1124,17 @@ function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
 	local gateways = gar.getGateways()
 	local gatewaysArray = {}
 	local cursorField = "gatewayAddress" -- the cursor will be the gateway address
-	for address, record in pairs(gateways) do
+	for address, gateway in pairs(gateways) do
 		--- @diagnostic disable-next-line: inject-field
-		record.gatewayAddress = address
+		gateway.gatewayAddress = address
+		-- TODO: add gatewayRewardRatioWeight and observerRewardRatioWeight as gatewayPerformanceRatio and observerPerformanceRatio for backwards compatibility
+		gateway.weights.gatewayRewardRatioWeight = gateway.weights.gatewayPerformanceRatio or 0
+		gateway.weights.observerRewardRatioWeight = gateway.weights.observerPerformanceRatio or 0
+		-- END TODO
 		-- remove delegates and vaults to avoid sending unbounded arrays, they can be fetched via getPaginatedDelegates and getPaginatedVaults
-		record.delegates = nil
-		record.vaults = nil
-		table.insert(gatewaysArray, record)
+		gateway.delegates = nil
+		gateway.vaults = nil
+		table.insert(gatewaysArray, gateway)
 	end
 
 	return utils.paginateTableWithCursor(gatewaysArray, cursor, cursorField, limit, sortBy, sortOrder)

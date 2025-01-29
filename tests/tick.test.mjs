@@ -580,6 +580,10 @@ describe('Tick', async () => {
         gatewayPerformanceRatio: 1,
         normalizedCompositeWeight: 1,
         observerPerformanceRatio: 1,
+        // TODO: add gatewayRewardRatioWeight and observerRewardRatioWeight as gatewayPerformanceRatio and observerPerformanceRatio for backwards compatibility
+        gatewayRewardRatioWeight: 1,
+        observerRewardRatioWeight: 1,
+        // END TODO
         stakeWeight: 5.5,
         tenureWeight: 4,
       },
