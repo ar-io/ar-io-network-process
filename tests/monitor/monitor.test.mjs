@@ -621,4 +621,59 @@ describe('setup', () => {
       },
     );
   });
+
+  it('should not have any returned names older than two weeks', async () => {
+    const twoWeekMs = 2 * 7 * 24 * 60 * 60 * 1000;
+    const { items: returnedNames } = await io.getArNSReturnedNames({
+      limit: 10000,
+    });
+    await Promise.all(
+      returnedNames.map((returnedName) =>
+        throttle(async () => {
+          assert(returnedName.name, 'Returned name has no name');
+          assert(
+            returnedName.startTimestamp &&
+              returnedName.startTimestamp <= Date.now(),
+            `Returned name ${returnedName.name} has unexpected start timestamp ${returnedName.startTimestamp} (${new Date(returnedName.startTimestamp).toLocaleString()})`,
+          );
+          assert(
+            returnedName.endTimestamp &&
+              returnedName.endTimestamp > Date.now() &&
+              returnedName.endTimestamp ==
+                returnedName.startTimestamp + twoWeekMs,
+            `Returned name ${returnedName.name} has unexpected end timestamp ${returnedName.endTimestamp} (${new Date(returnedName.endTimestamp).toLocaleString()})`,
+          );
+          assert(
+            returnedName.initiator,
+            `Returned name ${returnedName.name} has no initiator`,
+          );
+        }),
+      ),
+    );
+  });
+
+  it('should not have an expired reserved names', async () => {
+    const { items: reservedNames } = await io.getArNSReservedNames({
+      limit: 10_000,
+    });
+    await Promise.all(
+      reservedNames.map((reservedName) =>
+        throttle(async () => {
+          assert(reservedName.name, 'Reserved name has no name');
+          if (reservedName.endTimestamp) {
+            assert(
+              reservedName.endTimestamp > Date.now(),
+              `Reserved name ${reservedName.name} has unexpected end timestamp ${reservedName.endTimestamp} (${new Date(reservedName.endTimestamp).toLocaleString()})`,
+            );
+          }
+          if (reservedName.target) {
+            assert(
+              typeof reservedName.target === 'string',
+              `Reserved name ${reservedName.name} has invalid target: ${reservedName.target}`,
+            );
+          }
+        }),
+      ),
+    );
+  });
 });
