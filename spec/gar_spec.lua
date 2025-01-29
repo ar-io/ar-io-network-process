@@ -53,8 +53,8 @@ local testGateway = {
 	weights = {
 		stakeWeight = 0,
 		tenureWeight = 0,
-		gatewayRewardRatioWeight = 0,
-		observerRewardRatioWeight = 0,
+		gatewayPerformanceRatio = 0,
+		observerPerformanceRatio = 0,
 		compositeWeight = 0,
 		normalizedCompositeWeight = 0,
 	},
@@ -1933,8 +1933,8 @@ describe("gar", function()
 					startTimestamp = 0,
 					stakeWeight = expectedStakeWeight,
 					tenureWeight = expectedTenureWeight,
-					gatewayRewardRatioWeight = expectedGatewayRatioWeight,
-					observerRewardRatioWeight = expectedObserverRatioWeight,
+					gatewayPerformanceRatio = expectedGatewayRatioWeight,
+					observerPerformanceRatio = expectedObserverRatioWeight,
 					compositeWeight = expectedCompositeWeight,
 					normalizedCompositeWeight = 1, -- there is only one gateway
 				},
@@ -2374,9 +2374,9 @@ describe("gar", function()
 			_G.GatewayRegistry[stubRandomAddress] = testGateway
 			_G.GatewayRegistry[stubRandomAddress].weights = {
 				tenureWeight = 0.5,
-				gatewayRewardRatioWeight = 0.85,
+				gatewayPerformanceRatio = 0.85,
 				stakeWeight = 0,
-				observerRewardRatioWeight = 0,
+				observerPerformanceRatio = 0,
 				compositeWeight = 0,
 				normalizedCompositeWeight = 0,
 			}
@@ -2388,9 +2388,9 @@ describe("gar", function()
 			_G.GatewayRegistry[stubRandomAddress] = testGateway
 			_G.GatewayRegistry[stubRandomAddress].weights = {
 				tenureWeight = 1,
-				gatewayRewardRatioWeight = 0.84,
+				gatewayPerformanceRatio = 0.84,
 				stakeWeight = 0,
-				observerRewardRatioWeight = 0,
+				observerPerformanceRatio = 0,
 				compositeWeight = 0,
 				normalizedCompositeWeight = 0,
 			}
@@ -2402,9 +2402,9 @@ describe("gar", function()
 			_G.GatewayRegistry[stubRandomAddress] = testGateway
 			_G.GatewayRegistry[stubRandomAddress].weights = {
 				tenureWeight = 1,
-				gatewayRewardRatioWeight = 0.85,
+				gatewayPerformanceRatio = 0.85,
 				stakeWeight = 0,
-				observerRewardRatioWeight = 0,
+				observerPerformanceRatio = 0,
 				compositeWeight = 0,
 				normalizedCompositeWeight = 0,
 			}

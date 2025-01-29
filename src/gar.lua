@@ -50,8 +50,8 @@ local gar = {}
 --- @class GatewayWeights
 --- @field stakeWeight number
 --- @field tenureWeight number
---- @field gatewayRewardRatioWeight number
---- @field observerRewardRatioWeight number
+--- @field gatewayPerformanceRatio number
+--- @field observerPerformanceRatio number
 --- @field compositeWeight number
 --- @field normalizedCompositeWeight number
 
@@ -184,8 +184,8 @@ function gar.joinNetwork(from, stake, settings, services, observerAddress, timeS
 		weights = {
 			stakeWeight = 0,
 			tenureWeight = 0,
-			gatewayRewardRatioWeight = 0,
-			observerRewardRatioWeight = 0,
+			gatewayPerformanceRatio = 0,
+			observerPerformanceRatio = 0,
 			compositeWeight = 0,
 			normalizedCompositeWeight = 0,
 		},
@@ -738,15 +738,15 @@ function gar.getGatewayWeightsAtTimestamp(gatewayAddresses, timestamp)
 
 			local totalEpochsGatewayPassed = gateway.stats.passedEpochCount or 0
 			local totalEpochsParticipatedIn = gateway.stats.totalEpochCount or 0
-			local gatewayRewardRatioWeight = (1 + totalEpochsGatewayPassed) / (1 + totalEpochsParticipatedIn)
+			local gatewayPerformanceRatio = (1 + totalEpochsGatewayPassed) / (1 + totalEpochsParticipatedIn)
 			local totalEpochsPrescribed = gateway.stats.prescribedEpochCount or 0
 			local totalEpochsSubmitted = gateway.stats.observedEpochCount or 0
-			local observerRewardRatioWeight = (1 + totalEpochsSubmitted) / (1 + totalEpochsPrescribed)
+			local observerPerformanceRatio = (1 + totalEpochsSubmitted) / (1 + totalEpochsPrescribed)
 
 			local compositeWeight = stakeWeightRatio
 				* gatewayTenureWeight
-				* gatewayRewardRatioWeight
-				* observerRewardRatioWeight
+				* gatewayPerformanceRatio
+				* observerPerformanceRatio
 
 			table.insert(weightedObservers, {
 				gatewayAddress = gatewayAddress,
@@ -755,8 +755,8 @@ function gar.getGatewayWeightsAtTimestamp(gatewayAddresses, timestamp)
 				startTimestamp = gateway.startTimestamp,
 				stakeWeight = stakeWeightRatio,
 				tenureWeight = gatewayTenureWeight,
-				gatewayRewardRatioWeight = gatewayRewardRatioWeight,
-				observerRewardRatioWeight = observerRewardRatioWeight,
+				gatewayPerformanceRatio = gatewayPerformanceRatio,
+				observerPerformanceRatio = observerPerformanceRatio,
 				compositeWeight = compositeWeight,
 				normalizedCompositeWeight = nil, -- set later once we have the total composite weight
 			})
@@ -918,16 +918,16 @@ function gar.updateGatewayWeights(weightedGateway)
 	assert(gateway, "Gateway not found")
 	assert(weightedGateway.stakeWeight, "stakeWeight is required")
 	assert(weightedGateway.tenureWeight, "tenureWeight is required")
-	assert(weightedGateway.gatewayRewardRatioWeight, "gatewayRewardRatioWeight is required")
-	assert(weightedGateway.observerRewardRatioWeight, "observerRewardRatioWeight is required")
+	assert(weightedGateway.gatewayPerformanceRatio, "gatewayPerformanceRatio is required")
+	assert(weightedGateway.observerPerformanceRatio, "observerPerformanceRatio is required")
 	assert(weightedGateway.compositeWeight, "compositeWeight is required")
 	assert(weightedGateway.normalizedCompositeWeight, "normalizedCompositeWeight is required")
 
 	gateway.weights = {
 		stakeWeight = weightedGateway.stakeWeight,
 		tenureWeight = weightedGateway.tenureWeight,
-		gatewayRewardRatioWeight = weightedGateway.gatewayRewardRatioWeight,
-		observerRewardRatioWeight = weightedGateway.observerRewardRatioWeight,
+		gatewayPerformanceRatio = weightedGateway.gatewayPerformanceRatio,
+		observerPerformanceRatio = weightedGateway.observerPerformanceRatio,
 		compositeWeight = weightedGateway.compositeWeight,
 		normalizedCompositeWeight = weightedGateway.normalizedCompositeWeight,
 	}
@@ -1341,7 +1341,7 @@ function gar.isEligibleForArNSDiscount(from)
 	end
 
 	local tenureWeight = gateway.weights.tenureWeight or 0
-	local gatewayPerformanceRatio = gateway.weights.gatewayRewardRatioWeight or 0
+	local gatewayPerformanceRatio = gateway.weights.gatewayPerformanceRatio or 0
 
 	return tenureWeight >= constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD
 		and gatewayPerformanceRatio >= constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD
@@ -1493,13 +1493,13 @@ function getStakingProfile(address)
 			function(acc, gatewayAddress, gateway)
 				local totalEpochsGatewayPassed = gateway.stats.passedEpochCount or 0
 				local totalEpochsParticipatedIn = gateway.stats.totalEpochCount or 0
-				local gatewayRewardRatioWeight = (1 + totalEpochsGatewayPassed) / (1 + totalEpochsParticipatedIn)
+				local gatewayPerformanceRatio = (1 + totalEpochsGatewayPassed) / (1 + totalEpochsParticipatedIn)
 				local delegate = utils.deepCopy(gateway.delegates[address])
 				delegate.excessStake = math.max(0, delegate.delegatedStake - gateway.settings.minDelegatedStake)
 				delegate.gatewayAddress = gatewayAddress
 				table.insert(acc, {
 					totalDelegatedStake = gateway.totalDelegatedStake, -- for comparing gw total stake
-					gatewayRewardRatioWeight = gatewayRewardRatioWeight, -- for comparing gw performance
+					gatewayPerformanceRatio = gatewayPerformanceRatio, -- for comparing gw performance
 					delegate = delegate,
 					startTimestamp = gateway.startTimestamp, -- for comparing gw tenure
 				})
@@ -1514,7 +1514,7 @@ function getStakingProfile(address)
 			},
 			{
 				order = "asc",
-				field = "gatewayRewardRatioWeight",
+				field = "gatewayPerformanceRatio",
 			},
 			{
 				order = "desc",
@@ -1608,7 +1608,7 @@ function planMinimumStakesDrawdown(fundingPlan, stakingProfile)
 	stakingProfile = utils.sortTableByFields(stakingProfile, {
 		{
 			order = "asc",
-			field = "gatewayRewardRatioWeight",
+			field = "gatewayPerformanceRatio",
 		},
 		{
 			order = "desc",

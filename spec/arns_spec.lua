@@ -169,7 +169,7 @@ describe("arns", function()
 					_G.GatewayRegistry[testAddress] = testGateway
 					_G.GatewayRegistry[testAddress].weights = {
 						tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
-						gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+						gatewayPerformanceRatio = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 					}
 					local result = gar.isEligibleForArNSDiscount(testAddress)
 					assert.is_true(result)
@@ -450,7 +450,7 @@ describe("arns", function()
 				_G.GatewayRegistry[testAddress] = testGateway
 				_G.GatewayRegistry[testAddress].weights = {
 					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
-					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+					gatewayPerformanceRatio = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 				}
 				assert.is_true(gar.isEligibleForArNSDiscount(testAddress))
 
@@ -632,7 +632,7 @@ describe("arns", function()
 				_G.GatewayRegistry[testAddress] = testGateway
 				_G.GatewayRegistry[testAddress].weights = {
 					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
-					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+					gatewayPerformanceRatio = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 				}
 				local result = gar.isEligibleForArNSDiscount(testAddress)
 				assert.is_true(result)
@@ -900,7 +900,7 @@ describe("arns", function()
 			_G.GatewayRegistry[stubRandomAddress] = testGateway
 			_G.GatewayRegistry[stubRandomAddress].weights = {
 				tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
-				gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+				gatewayPerformanceRatio = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 			}
 			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
 			assert.is_true(result)
@@ -925,7 +925,7 @@ describe("arns", function()
 			_G.GatewayRegistry[stubRandomAddress] = testGateway
 			_G.GatewayRegistry[stubRandomAddress].weights = {
 				tenureWeight = 0.1,
-				gatewayRewardRatioWeight = 0.1,
+				gatewayPerformanceRatio = 0.1,
 			}
 			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
 			assert.is_false(result)
@@ -1407,7 +1407,7 @@ describe("arns", function()
 				_G.GatewayRegistry[stubRandomAddress] = testGateway
 				_G.GatewayRegistry[stubRandomAddress].weights = {
 					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
-					gatewayRewardRatioWeight = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+					gatewayPerformanceRatio = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
 				}
 				_G.NameRegistry.records["upgrade-name"] = {
 					endTimestamp = 1000000,
