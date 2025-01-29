@@ -587,17 +587,15 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	local epochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp - epochs.getSettings().durationMs) -- go back to previous epoch
 	local epoch = epochs.getEpoch(epochIndex)
 	if not epoch then
-		-- TODO: consider throwing an error here instead of silently returning, as this is a critical error and should be fixed
-		print("Unable to distribute rewards for epoch. Epoch not found: " .. epochIndex)
-		return
+		error("Unable to distribute rewards for epoch. Epoch does not exist in epoch registry: " .. epochIndex)
 	end
 
-	--- The epoch was already distributed
+	--- The epoch was already distributed and should be cleaned up
 	--- @cast epoch DistributedEpoch
 	if epoch.distributions.distributedTimestamp then
 		print("Rewards already distributed for epoch. Epoch will be removed from the epoch registry: " .. epochIndex)
 		Epochs[epochIndex] = nil
-		return epoch
+		return nil -- do not return the epoch as it has already been distributed, and we do not want to send redundant epoch-distributed-notices
 	end
 
 	--- Epoch is prescribed, but not eligible for distribution
