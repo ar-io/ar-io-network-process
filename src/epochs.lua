@@ -116,7 +116,8 @@ end
 --- @param epochIndex number The epoch index
 --- @return table<WalletAddress, WalletAddress> # The prescribed observers for the epoch
 function epochs.getPrescribedObserversForEpoch(epochIndex)
-	return epochs.getEpoch(epochIndex).prescribedObservers or {}
+	local epoch = epochs.getEpoch(epochIndex)
+	return epoch and epoch.prescribedObservers or {}
 end
 
 --- Get prescribed observers with weights for epoch
@@ -181,35 +182,40 @@ end
 --- @param epochIndex number The epoch index
 --- @return Observations # The observations for the epoch
 function epochs.getObservationsForEpoch(epochIndex)
-	return epochs.getEpoch(epochIndex).observations or {}
+	local epoch = epochs.getEpoch(epochIndex)
+	return epoch and epoch.observations or {}
 end
 
 --- Gets the distributions for an epoch
 --- @param epochIndex number The epoch index
 --- @return DistributedEpochDistribution | PrescribedEpochDistribution # The distributions for the epoch
 function epochs.getDistributionsForEpoch(epochIndex)
-	return epochs.getEpoch(epochIndex).distributions or {}
+	local epoch = epochs.getEpoch(epochIndex)
+	return epoch and epoch.distributions or {}
 end
 
 --- Gets the prescribed names for an epoch
 --- @param epochIndex number The epoch index
 --- @return string[] # The prescribed names for the epoch
 function epochs.getPrescribedNamesForEpoch(epochIndex)
-	return epochs.getEpoch(epochIndex).prescribedNames or {}
+	local epoch = epochs.getEpoch(epochIndex)
+	return epoch and epoch.prescribedNames or {}
 end
 
 --- Gets the reports for an epoch
 --- @param epochIndex number The epoch index
 --- @return table<WalletAddress, TransactionId> # The reports for the epoch
 function epochs.getReportsForEpoch(epochIndex)
-	return epochs.getEpoch(epochIndex).observations.reports or {}
+	local epoch = epochs.getEpoch(epochIndex)
+	return epoch and epoch.observations.reports or {}
 end
 
 --- Gets the distribution for an epoch
 --- @param epochIndex number The epoch index
 --- @return DistributedEpochDistribution | PrescribedEpochDistribution # The distribution for the epoch
 function epochs.getDistributionForEpoch(epochIndex)
-	return epochs.getEpoch(epochIndex).distributions or {}
+	local epoch = epochs.getEpoch(epochIndex)
+	return epoch and epoch.distributions or {}
 end
 
 --- Computes the prescribed names for an epoch
@@ -374,12 +380,12 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	local prevEpoch = epochs.getEpoch(prevEpochIndex)
 	-- if there is a previous epoch and it has not been distributed, we cannot create a new epoch. once the epoch has been distributed, it will be removed from the epoch registry
 	if prevEpoch and not prevEpoch.distributions.distributedTimestamp then
-		-- silently return
+		-- TODO: consider throwing an error here instead of silently returning
 		print(
 			"Distributions have not occurred for the previous epoch. A new epoch cannot be created until distribution for the previous epoch is complete: "
 				.. prevEpochIndex
 		)
-		return
+		return nil
 	end
 
 	local epochStartTimestamp, epochEndTimestamp, epochDistributionTimestamp =
@@ -589,15 +595,15 @@ function epochs.distributeRewardsForEpoch(currentTimestamp)
 	if not epoch then
 		-- TODO: consider throwing an error here instead of silently returning, as this is a critical error and should be fixed
 		print("Unable to distribute rewards for epoch. Epoch not found: " .. epochIndex)
-		return
+		return nil
 	end
 
-	--- The epoch was already distributed
+	--- The epoch was already distributed and should be cleaned up
 	--- @cast epoch DistributedEpoch
 	if epoch.distributions.distributedTimestamp then
 		print("Rewards already distributed for epoch. Epoch will be removed from the epoch registry: " .. epochIndex)
 		Epochs[epochIndex] = nil
-		return epoch
+		return nil -- do not return the epoch as it has already been distributed, and we do not want to send redundant epoch-distributed-notices
 	end
 
 	--- Epoch is prescribed, but not eligible for distribution
