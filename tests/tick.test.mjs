@@ -427,8 +427,8 @@ describe('Tick', async () => {
           observerAddress: STUB_ADDRESS,
           gatewayAddress: STUB_ADDRESS,
           stakeWeight: 3,
-          gatewayRewardRatioWeight: 1,
-          observerRewardRatioWeight: 1,
+          gatewayPerformanceRatio: 1,
+          observerPerformanceRatio: 1,
           compositeWeight: 12,
           normalizedCompositeWeight: 1,
           tenureWeight: 4,
@@ -577,9 +577,13 @@ describe('Tick', async () => {
       },
       weights: {
         compositeWeight: 22,
-        gatewayRewardRatioWeight: 1,
+        gatewayPerformanceRatio: 1,
         normalizedCompositeWeight: 1,
+        observerPerformanceRatio: 1,
+        // TODO: add gatewayRewardRatioWeight and observerRewardRatioWeight as gatewayPerformanceRatio and observerPerformanceRatio for backwards compatibility
+        gatewayRewardRatioWeight: 1,
         observerRewardRatioWeight: 1,
+        // END TODO
         stakeWeight: 5.5,
         tenureWeight: 4,
       },

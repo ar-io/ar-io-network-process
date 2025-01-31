@@ -115,8 +115,12 @@ describe('GatewayRegistry', async () => {
         weights: {
           stakeWeight: 0,
           tenureWeight: 0,
+          gatewayPerformanceRatio: 0,
+          observerPerformanceRatio: 0,
+          // TODO: add gatewayRewardRatioWeight and observerRewardRatioWeight as gatewayPerformanceRatio and observerPerformanceRatio for backwards compatibility
           gatewayRewardRatioWeight: 0,
           observerRewardRatioWeight: 0,
+          // END TODO
           compositeWeight: 0,
           normalizedCompositeWeight: 0,
         },
@@ -188,8 +192,12 @@ describe('GatewayRegistry', async () => {
         weights: {
           stakeWeight: 0,
           tenureWeight: 0,
+          gatewayPerformanceRatio: 0,
+          observerPerformanceRatio: 0,
+          // TODO: add gatewayRewardRatioWeight and observerRewardRatioWeight as gatewayPerformanceRatio and observerPerformanceRatio for backwards compatibility
           gatewayRewardRatioWeight: 0,
           observerRewardRatioWeight: 0,
+          // END TODO
           compositeWeight: 0,
           normalizedCompositeWeight: 0,
         },
