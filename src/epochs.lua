@@ -138,6 +138,10 @@ function epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 				tenureWeight = gateway.weights.tenureWeight,
 				gatewayPerformanceRatio = gateway.weights.gatewayPerformanceRatio,
 				observerPerformanceRatio = gateway.weights.observerPerformanceRatio,
+				-- TODO: remove these for backwards compatibility - after ar-io-sdk update, remove these
+				gatewayRewardRatioWeight = gateway.weights.gatewayPerformanceRatio,
+				observerRewardRatioWeight = gateway.weights.observerPerformanceRatio,
+				-- END TODO
 				compositeWeight = gateway.weights.compositeWeight,
 				stake = gateway.operatorStake,
 				startTimestamp = gateway.startTimestamp,
