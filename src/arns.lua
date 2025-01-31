@@ -354,12 +354,7 @@ function arns.getProcessIdForRecord(name)
 	return record ~= nil and record.processId or nil
 end
 
---- Gets the active ARNS names between two timestamps
---- @param startTimestamp number The start timestamp
---- @param endTimestamp number The end timestamp
---- @return table<string> The active ARNS names between the two timestamps
-function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
-	local records = arns.getRecords()
+local function getActiveArNSNamesBetweenTimestampsFromRecords(records, startTimestamp, endTimestamp)
 	local activeNames = {}
 	for name, record in pairs(records) do
 		if
@@ -376,6 +371,44 @@ function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
 		end
 	end
 	return activeNames
+end
+
+--- Gets the active ARNS names between two timestamps
+--- @param startTimestamp number The start timestamp
+--- @param endTimestamp number The end timestamp
+--- @return table<string> The active ARNS names between the two timestamps
+function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
+	return getActiveArNSNamesBetweenTimestampsFromRecords(arns.getRecords(), startTimestamp, endTimestamp)
+end
+
+function arns.getActiveArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
+	return getActiveArNSNamesBetweenTimestampsFromRecords(arns.getRecordsUnsafe(), startTimestamp, endTimestamp)
+end
+
+function arns.getTotalActiveArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
+	return #arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
+end
+
+function arns.getTotalReservedNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
+	local reservedNames = arns.getReservedNames()
+	local totalReservedNames = 0
+	for _, reservedName in pairs(reservedNames) do
+		if reservedName.endTimestamp >= startTimestamp and reservedName.endTimestamp <= endTimestamp then
+			totalReservedNames = totalReservedNames + 1
+		end
+	end
+	return totalReservedNames
+end
+
+function arns.getTotalReturnedNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
+	local returnedNames = arns.getReturnedNamesUnsafe()
+	local totalReturnedNames = 0
+	for _, returnedName in pairs(returnedNames) do
+		if returnedName.startTimestamp >= startTimestamp and returnedName.startTimestamp <= endTimestamp then
+			totalReturnedNames = totalReturnedNames + 1
+		end
+	end
+	return totalReturnedNames
 end
 
 --- Gets deep copies of all records

@@ -17,6 +17,12 @@ local epochs = {}
 --- @field startHeight number The start height of the epoch
 --- @field distributionTimestamp number The distribution timestamp of the epoch
 --- @field observations Observations The observations of the epoch
+--- @field arnsStats ArNSStats The ArNS stats for the epoch
+
+--- @class ArNSStats # The ArNS stats
+--- @field totalActiveNames number The total active ArNS names
+--- @field totalReservedNames number The total reserved ArNS names
+--- @field totalReturnedNames number The total returned ArNS names
 
 --- @class PrescribedEpoch : Epoch
 --- @field prescribedObservers table<ObserverAddress, GatewayAddress> The prescribed observers of the epoch
@@ -417,6 +423,20 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 				eligible = eligibleEpochRewards.potentialRewards,
 			},
 		},
+		arnsStats = {
+			totalActiveNames = arns.getTotalActiveArNSNamesBetweenTimestampsUnsafe(
+				epochStartTimestamp,
+				epochEndTimestamp
+			),
+			totalReservedNames = arns.getTotalReservedNamesBetweenTimestampsUnsafe(
+				epochStartTimestamp,
+				epochEndTimestamp
+			),
+			totalReturnedNames = arns.getTotalReturnedNamesBetweenTimestampsUnsafe(
+				epochStartTimestamp,
+				epochEndTimestamp
+			),
+		},
 	}
 	Epochs[epochIndex] = epoch
 	-- update the gateway weights
@@ -765,6 +785,7 @@ function convertPrescribedEpochToDistributedEpoch(epoch, currentTimestamp, distr
 				distributed = distributed or {},
 			},
 		},
+		arnsStats = epoch.arnsStats,
 	}
 end
 

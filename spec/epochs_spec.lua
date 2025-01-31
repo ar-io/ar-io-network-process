@@ -557,6 +557,11 @@ describe("epochs", function()
 						},
 					},
 				},
+				arnsStats = {
+					totalActiveNames = 0,
+					totalReservedNames = 0,
+					totalReturnedNames = 0,
+				},
 			}
 			local result = epochs.createEpoch(timestamp, epochStartBlockHeight, hashchain)
 			assert.are.same(expectation, result)

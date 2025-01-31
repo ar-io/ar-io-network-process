@@ -416,6 +416,11 @@ describe('Tick', async () => {
       startHeight: 1,
       startTimestamp: genesisEpochTimestamp,
       endTimestamp: genesisEpochTimestamp + 24 * 1000 * 60 * 60, // 24 hours - this should match the epoch settings
+      arnsStats: {
+        totalActiveNames: 0,
+        totalReservedNames: 0,
+        totalReturnedNames: 0,
+      },
       distributionTimestamp:
         genesisEpochTimestamp + 24 * 1000 * 60 * 60 + 40 * 60 * 1000, // 24 hours + 40 minutes
       observations: {
@@ -474,6 +479,7 @@ describe('Tick', async () => {
       memory: observation.memory,
       timestamp: distributionTimestamp,
     });
+    console.log('distributionTick', distributionTick);
 
     // assert multiple messages are sent given the tick notice, epoch created notice and epoch distribution notice
     assert.equal(distributionTick.result.Messages.length, 3); // cannot explain why this is 4, i'd expect it to be 3 messages (1 tick notice, 1 epoch created notice, 1 epoch distribution notice)
@@ -505,6 +511,7 @@ describe('Tick', async () => {
     const distributionNoticeData = JSON.parse(
       distributionTick.result.Messages[1].Data,
     );
+    console.log('distributionNoticeData', distributionNoticeData);
     assert.deepStrictEqual(distributionNoticeData, {
       ...epochData,
       distributions: {

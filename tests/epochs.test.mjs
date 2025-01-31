@@ -60,6 +60,11 @@ describe('epochs', () => {
         startHeight: 1,
         distributionTimestamp:
           firstEpochStartTimestamp + epochLength + distributionDelay,
+        arnsStats: {
+          totalActiveNames: 1,
+          totalReservedNames: 0,
+          totalReturnedNames: 0,
+        },
         prescribedObservers: [
           {
             observerAddress: STUB_ADDRESS,
