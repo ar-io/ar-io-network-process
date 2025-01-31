@@ -1928,7 +1928,7 @@ end)
 
 addEventingHandler(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", ActionMap.Gateway), function(msg)
 	local gateway = gar.getCompactGateway(msg.Tags.Address or msg.From)
-	-- TODO: add gatewayRewardRatioWeight and observerRewardRatioWeight as gatewayPerformanceRatio and observerPerformanceRatio for backwards compatibility
+	-- TODO: inject these for backwards compatibility - after ar-io-sdk update, remove these
 	if gateway then
 		gateway.weights.gatewayRewardRatioWeight = gateway.weights.gatewayPerformanceRatio or 0
 		gateway.weights.observerRewardRatioWeight = gateway.weights.observerPerformanceRatio or 0
@@ -2672,20 +2672,27 @@ addEventingHandler("allPaginatedGatewayVaults", utils.hasMatchingTag("Action", "
 end)
 
 -- TODO: handler for posting epoch distribution notices (make sure to remove this once previous epochs are distributed)
-addEventingHandler("postEpochDistributionNotice", utils.hasMatchingTag("Action", "Post-Epochs"), function(msg)
-	-- iterate over epochs and post epoch-distribution-notice for each epoch
-	for epochIndex, _ in pairs(epochs.getEpochs()) do
-		local epoch = epochs.getEpoch(epochIndex)
-		if epoch.distributions.distributedTimestamp then
-			epoch.prescribedObservers = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
-			Send(msg, {
-				Target = msg.From,
-				Action = "Epoch-Distribution-Notice",
-				["Epoch-Index"] = tostring(epochIndex),
-				Data = json.encode(epoch),
-			})
+UpdateGateways = false
+addEventingHandler("updateGatewayAttributes", utils.hasMatchingTag("Action", "Update-Gateway-Attributes"), function()
+	if UpdateGateways then
+		return
+	end
+	--- iterate over all gateways and update their attributes
+	for _, gateway in pairs(gar.getGatewaysUnsafe()) do
+		if gateway.weights.gatewayRewardRatioWeight then
+			-- set the gatewayRewardShareRatio to gatewayPerformanceRatio
+			gateway.weights.gatewayPerformanceRatio = gateway.weights.gatewayRewardRatioWeight
+			-- set the gatewayRewardRatioWeight to observerRewardRatioWeight to nil
+			gateway.weights.gatewayRewardRatioWeight = nil
+		end
+		if gateway.weights.observerRewardRatioWeight then
+			-- set the observerRewardShareRatio to observerPerformanceRatio
+			gateway.weights.observerPerformanceRatio = gateway.weights.observerRewardRatioWeight
+			-- set the observerRewardRatioWeight to nil
+			gateway.weights.observerRewardRatioWeight = nil
 		end
 	end
+	UpdateGateways = true
 end)
 
 return process

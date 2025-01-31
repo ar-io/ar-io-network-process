@@ -52,8 +52,6 @@ local gar = {}
 --- @field tenureWeight number
 --- @field gatewayPerformanceRatio number
 --- @field observerPerformanceRatio number
---- @field gatewayRewardRatioWeight number|nil # @deprecated use gatewayPerformanceRatio instead
---- @field observerRewardRatioWeight number|nil # @deprecated use observerPerformanceRatio instead
 --- @field compositeWeight number
 --- @field normalizedCompositeWeight number
 
@@ -1127,7 +1125,7 @@ function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
 	for address, gateway in pairs(gateways) do
 		--- @diagnostic disable-next-line: inject-field
 		gateway.gatewayAddress = address
-		-- TODO: add gatewayRewardRatioWeight and observerRewardRatioWeight as gatewayPerformanceRatio and observerPerformanceRatio for backwards compatibility
+		-- TODO: inject these for backwards compatibility - after ar-io-sdk update, remove these
 		gateway.weights.gatewayRewardRatioWeight = gateway.weights.gatewayPerformanceRatio or 0
 		gateway.weights.observerRewardRatioWeight = gateway.weights.observerPerformanceRatio or 0
 		-- END TODO
