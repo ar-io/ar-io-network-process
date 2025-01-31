@@ -359,24 +359,19 @@ local function getActiveArNSNamesBetweenTimestampsFromRecords(records, startTime
 	local namesInGracePeriod = {}
 
 	for name, record in pairs(records) do
-		if
-			record.type == "permabuy"
-			or (
-				record.type == "lease"
-				and record.endTimestamp
-				and record.startTimestamp
-				and record.startTimestamp <= startTimestamp
-				and record.endTimestamp >= endTimestamp -- in grace period
-
-			)
-		then
+		if record.type == "permabuy" then
 			table.insert(activeNames, name)
 		elseif
 			record.type == "lease"
 			and record.endTimestamp
-			and record.endTimestamp + constants.gracePeriodMs >= startTimestamp
+			and record.startTimestamp
+			and record.startTimestamp <= startTimestamp
 		then
-			table.insert(namesInGracePeriod, name)
+			if record.endTimestamp >= endTimestamp then
+				table.insert(activeNames, name)
+			elseif record.endTimestamp + constants.gracePeriodMs >= endTimestamp then
+				table.insert(namesInGracePeriod, name)
+			end
 		end
 	end
 	return { activeNames = activeNames, namesInGracePeriod = namesInGracePeriod }

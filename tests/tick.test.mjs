@@ -480,7 +480,6 @@ describe('Tick', async () => {
       memory: observation.memory,
       timestamp: distributionTimestamp,
     });
-    console.log('distributionTick', distributionTick);
 
     // assert multiple messages are sent given the tick notice, epoch created notice and epoch distribution notice
     assert.equal(distributionTick.result.Messages.length, 3); // cannot explain why this is 4, i'd expect it to be 3 messages (1 tick notice, 1 epoch created notice, 1 epoch distribution notice)
@@ -512,7 +511,6 @@ describe('Tick', async () => {
     const distributionNoticeData = JSON.parse(
       distributionTick.result.Messages[1].Data,
     );
-    console.log('distributionNoticeData', distributionNoticeData);
     assert.deepStrictEqual(distributionNoticeData, {
       ...epochData,
       distributions: {
