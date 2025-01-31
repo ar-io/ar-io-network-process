@@ -67,6 +67,10 @@ describe('epochs', () => {
             stakeWeight: 1,
             gatewayPerformanceRatio: 1,
             observerPerformanceRatio: 1,
+            // TODO: remove these for backwards compatibility - after ar-io-sdk update, remove these
+            gatewayRewardRatioWeight: 1,
+            observerRewardRatioWeight: 1,
+            // END TODO
             compositeWeight: 4,
             normalizedCompositeWeight: 1,
             tenureWeight: 4,
@@ -111,6 +115,10 @@ describe('epochs', () => {
           gatewayAddress: STUB_OPERATOR_ADDRESS,
           gatewayPerformanceRatio: 1,
           normalizedCompositeWeight: 1,
+          // TODO: remove these for backwards compatibility - after ar-io-sdk update, remove these
+          gatewayRewardRatioWeight: 1,
+          observerRewardRatioWeight: 1,
+          // END TODO
           observerAddress: STUB_ADDRESS,
           observerPerformanceRatio: 1,
           stakeWeight: 1,

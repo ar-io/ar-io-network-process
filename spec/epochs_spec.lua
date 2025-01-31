@@ -92,6 +92,10 @@ describe("epochs", function()
 					tenureWeight = 1,
 					gatewayPerformanceRatio = 1,
 					observerPerformanceRatio = 1,
+					-- TODO: remove these for backwards compatibility - after ar-io-sdk update, remove these
+					gatewayRewardRatioWeight = 1,
+					observerRewardRatioWeight = 1,
+					-- END TODO
 					compositeWeight = 1,
 					stake = gar.getSettings().operators.minStake,
 					startTimestamp = startTimestamp,
