@@ -21,6 +21,7 @@ local epochs = {}
 
 --- @class ArNSStats # The ArNS stats
 --- @field totalActiveNames number The total active ArNS names
+--- @field totalGracePeriodNames number The total grace period ArNS names
 --- @field totalReservedNames number The total reserved ArNS names
 --- @field totalReturnedNames number The total returned ArNS names
 
@@ -401,6 +402,8 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	local activeGateways = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
 	-- get the max rewards for each participant eligible for the epoch
 	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
+	local arnsNamesTotals =
+		arns.getTotalActiveAndGracePeriodArNSNamesBetweenTimestampsUnsafe(epochStartTimestamp, epochEndTimestamp)
 	--- @type PrescribedEpoch
 	local epoch = {
 		epochIndex = epochIndex,
@@ -424,10 +427,8 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 			},
 		},
 		arnsStats = {
-			totalActiveNames = arns.getTotalActiveArNSNamesBetweenTimestampsUnsafe(
-				epochStartTimestamp,
-				epochEndTimestamp
-			),
+			totalActiveNames = arnsNamesTotals.totalActiveNames,
+			totalGracePeriodNames = arnsNamesTotals.totalGracePeriodNames,
 			totalReservedNames = arns.getTotalReservedNamesBetweenTimestampsUnsafe(
 				epochStartTimestamp,
 				epochEndTimestamp

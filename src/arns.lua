@@ -356,6 +356,8 @@ end
 
 local function getActiveArNSNamesBetweenTimestampsFromRecords(records, startTimestamp, endTimestamp)
 	local activeNames = {}
+	local namesInGracePeriod = {}
+
 	for name, record in pairs(records) do
 		if
 			record.type == "permabuy"
@@ -364,13 +366,20 @@ local function getActiveArNSNamesBetweenTimestampsFromRecords(records, startTime
 				and record.endTimestamp
 				and record.startTimestamp
 				and record.startTimestamp <= startTimestamp
-				and record.endTimestamp >= endTimestamp
+				and record.endTimestamp >= endTimestamp -- in grace period
+
 			)
 		then
 			table.insert(activeNames, name)
+		elseif
+			record.type == "lease"
+			and record.endTimestamp
+			and record.endTimestamp + constants.gracePeriodMs >= startTimestamp
+		then
+			table.insert(namesInGracePeriod, name)
 		end
 	end
-	return activeNames
+	return { activeNames = activeNames, namesInGracePeriod = namesInGracePeriod }
 end
 
 --- Gets the active ARNS names between two timestamps
@@ -378,19 +387,19 @@ end
 --- @param endTimestamp number The end timestamp
 --- @return table<string> The active ARNS names between the two timestamps
 function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
-	return getActiveArNSNamesBetweenTimestampsFromRecords(arns.getRecords(), startTimestamp, endTimestamp)
+	return getActiveArNSNamesBetweenTimestampsFromRecords(arns.getRecords(), startTimestamp, endTimestamp).activeNames
 end
 
-function arns.getActiveArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
-	return getActiveArNSNamesBetweenTimestampsFromRecords(arns.getRecordsUnsafe(), startTimestamp, endTimestamp)
-end
-
-function arns.getTotalActiveArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
-	return #arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
+function arns.getTotalActiveAndGracePeriodArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
+	local totals = getActiveArNSNamesBetweenTimestampsFromRecords(arns.getRecordsUnsafe(), startTimestamp, endTimestamp)
+	return {
+		totalActiveNames = #totals.activeNames,
+		totalGracePeriodNames = #totals.namesInGracePeriod,
+	}
 end
 
 function arns.getTotalReservedNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
-	local reservedNames = arns.getReservedNames()
+	local reservedNames = arns.getReservedNamesUnsafe()
 	local totalReservedNames = 0
 	for _, reservedName in pairs(reservedNames) do
 		if reservedName.endTimestamp >= startTimestamp and reservedName.endTimestamp <= endTimestamp then

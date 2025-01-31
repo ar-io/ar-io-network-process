@@ -559,6 +559,7 @@ describe("epochs", function()
 				},
 				arnsStats = {
 					totalActiveNames = 0,
+					totalGracePeriodNames = 0,
 					totalReservedNames = 0,
 					totalReturnedNames = 0,
 				},
