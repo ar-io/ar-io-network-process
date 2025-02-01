@@ -365,22 +365,17 @@ function primaryNames.prunePrimaryNameRequests(timestamp)
 		return prunedNameRequests
 	end
 
-	local minNextEndTimestamp
+	-- reset the next prune timestamp, below will populate it with the next prune timestamp minimum
+	NextPrimaryNamesPruneTimestamp = nil
+
 	for initiator, request in pairs(primaryNames.getUnsafePrimaryNameRequests()) do
 		if request.endTimestamp <= timestamp then
 			PrimaryNames.requests[initiator] = nil
 			prunedNameRequests[initiator] = request
 		else
-			minNextEndTimestamp = math.min(minNextEndTimestamp or request.endTimestamp, request.endTimestamp)
+			primaryNames.scheduleNextPrimaryNamesPruning(request.endTimestamp)
 		end
 	end
-
-	-- Reset the pruning timestamp
-	NextPrimaryNamesPruneTimestamp = nil
-	if minNextEndTimestamp then
-		primaryNames.scheduleNextPrimaryNamesPruning(minNextEndTimestamp)
-	end
-
 	return prunedNameRequests
 end
 

@@ -977,10 +977,9 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 		return prunedRecords, newGracePeriodRecords
 	end
 
-	--- @type Timestamp|nil
-	local minNextEndTimestamp
+	-- identify any records that are leases and that have expired, account for a two week grace period in seconds
+	NextRecordsPruneTimestamp = nil
 
-	-- identify any records that are leases and that have expired, account for a one week grace period in seconds
 	for name, record in pairs(arns.getRecords()) do
 		if arns.recordExpired(record, currentTimestamp) then
 			prunedRecords[name] = record
@@ -992,16 +991,8 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 			-- Make sure we prune when the grace period is over
 			arns.scheduleNextRecordsPrune(record.endTimestamp + constants.gracePeriodMs)
 		elseif record.endTimestamp then
-			-- find the next prune timestamp
-			--- @diagnostic disable-next-line: param-type-mismatch
-			minNextEndTimestamp = math.min(minNextEndTimestamp or record.endTimestamp, record.endTimestamp)
+			arns.scheduleNextRecordsPrune(record.endTimestamp)
 		end
-	end
-
-	-- Reset the next pruning timestamp now that pruning has completed
-	NextRecordsPruneTimestamp = nil
-	if minNextEndTimestamp then
-		arns.scheduleNextRecordsPrune(minNextEndTimestamp)
 	end
 	return prunedRecords, newGracePeriodRecords
 end
@@ -1016,20 +1007,16 @@ function arns.pruneReturnedNames(currentTimestamp)
 		return prunedReturnedNames
 	end
 
-	local minNextEndTimestamp
+	-- reset the next prune timestamp, below will populate it with the next prune timestamp minimum
+	NextReturnedNamesPruneTimestamp = nil
+
 	for name, returnedName in pairs(arns.getReturnedNamesUnsafe()) do
 		local endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod
 		if currentTimestamp >= endTimestamp then
 			prunedReturnedNames[name] = arns.removeReturnedName(name)
 		else
-			minNextEndTimestamp = math.min(minNextEndTimestamp or endTimestamp, endTimestamp)
+			arns.scheduleNextReturnedNamesPrune(endTimestamp)
 		end
-	end
-
-	-- Reset the next pruning timestamp now that pruning has completed
-	NextReturnedNamesPruneTimestamp = nil
-	if minNextEndTimestamp then
-		arns.scheduleNextReturnedNamesPrune(minNextEndTimestamp)
 	end
 	return prunedReturnedNames
 end

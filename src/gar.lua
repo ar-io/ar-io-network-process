@@ -992,8 +992,9 @@ function gar.pruneGateways(currentTimestamp, msgId)
 		return result
 	end
 
-	--- @type Timestamp|nil
-	local minNextEndTimestamp
+	-- reset the next prune timestamp, below will populate it with the next prune timestamp minimum
+	NextGatewaysPruneTimestamp = nil
+
 	local uniqueDelegators = {}
 	for gatewayAddress, gateway in pairs(gateways) do
 		if gateway then
@@ -1076,20 +1077,12 @@ function gar.pruneGateways(currentTimestamp, msgId)
 							table.insert(result.prunedGateways, gatewayAddress)
 						else
 							-- find the next prune timestamp
-							minNextEndTimestamp =
-								--- @diagnostic disable-next-line: param-type-mismatch
-								math.min(minNextEndTimestamp or gateway.endTimestamp, gateway.endTimestamp)
+							gar.scheduleNextGatewaysPruning(minNextEndTimestamp)
 						end
 					end
 				end
 			end
 		end
-	end
-
-	-- Reset the next pruning timestamp now that pruning has completed
-	NextGatewaysPruneTimestamp = nil
-	if minNextEndTimestamp then
-		gar.scheduleNextGatewaysPruning(minNextEndTimestamp)
 	end
 
 	result.gatewayObjectTallies = gatewayObjectTallies
@@ -1802,25 +1795,20 @@ function gar.pruneRedelegationFeeData(currentTimestamp)
 		return delegatorsWithFeesReset
 	end
 
-	local minNextEndTimestamp = nil
 	local pruningThreshold = currentTimestamp - constants.redelegationFeeResetIntervalMs
+
+	-- reset the next prune timestamp, below will populate it with the next prune timestamp minimum
+	NextRedelegationsPruneTimestamp = nil
 
 	Redelegations = utils.reduce(gar.getRedelgationsUnsafe(), function(acc, delegateAddress, redelegationData)
 		if redelegationData.timestamp > pruningThreshold then
 			acc[delegateAddress] = redelegationData
-			local eligibleForPruneAt = redelegationData.timestamp + constants.redelegationFeeResetIntervalMs
-			minNextEndTimestamp = math.min(minNextEndTimestamp or eligibleForPruneAt, eligibleForPruneAt)
+			gar.scheduleNextRedelegationsPruning(redelegationData.timestamp + constants.redelegationFeeResetIntervalMs)
 		else
 			table.insert(delegatorsWithFeesReset, delegateAddress)
 		end
 		return acc
 	end, {})
-
-	-- Reset the next pruning timestamp
-	NextRedelegationsPruneTimestamp = nil
-	if minNextEndTimestamp then
-		gar.scheduleNextRedelegationsPruning(minNextEndTimestamp)
-	end
 
 	return delegatorsWithFeesReset
 end
