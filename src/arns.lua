@@ -980,7 +980,7 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 	-- identify any records that are leases and that have expired, account for a two week grace period in seconds
 	NextRecordsPruneTimestamp = nil
 
-	for name, record in pairs(arns.getRecords()) do
+	for name, record in pairs(arns.getRecordsUnsafe()) do
 		if arns.recordExpired(record, currentTimestamp) then
 			prunedRecords[name] = record
 			NameRegistry.records[name] = nil
