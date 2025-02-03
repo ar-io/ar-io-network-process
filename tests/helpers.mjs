@@ -865,6 +865,52 @@ export const tick = async ({
   };
 };
 
+export const getInfo = async ({ memory, timestamp }) => {
+  const nameResult = await handle({
+    options: {
+      Tags: [{ name: 'Action', value: 'Info' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  assertNoResultError(nameResult);
+  return {
+    memory: nameResult.Memory,
+    result: nameResult,
+  };
+};
+
+export const getRecord = async ({
+  memory,
+  timestamp = STUB_TIMESTAMP,
+  name,
+}) => {
+  const nameResult = await handle({
+    options: {
+      Tags: [
+        { name: 'Action', value: 'Record' },
+        { name: 'Name', value: name },
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  assertNoResultError(nameResult);
+  return JSON.parse(nameResult.Messages[0].Data);
+};
+
+export const getPruningTimestamps = async ({ memory, timestamp }) => {
+  const nameResult = await handle({
+    options: {
+      Tags: [{ name: 'Action', value: 'Pruning-Timestamps' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  assertNoResultError(nameResult);
+  return JSON.parse(nameResult.Messages[0].Data);
+};
+
 export const getEpoch = async ({
   memory,
   timestamp = STUB_TIMESTAMP,

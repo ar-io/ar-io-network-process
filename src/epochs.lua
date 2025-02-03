@@ -782,8 +782,9 @@ function epochs.pruneEpochs(timestamp)
 		return prunedEpochIndexes
 	end
 
-	--- Reset the next pruning timestamp
+	-- reset the next prune timestamp, below will populate it with the next prune timestamp minimum
 	NextEpochsPruneTimestamp = nil
+
 	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)
 	local cutoffEpochIndex = currentEpochIndex - 1 -- keep the two most recent epochs, on distribution the previous epoch will remove itself
 	local unsafeEpochs = epochs.getEpochsUnsafe()
@@ -796,12 +797,16 @@ function epochs.pruneEpochs(timestamp)
 		else
 			local _, endTimestamp = epochs.getEpochTimestampsForIndex(nextEpochIndex)
 			if endTimestamp >= timestamp then
-				NextEpochsPruneTimestamp = math.min(NextEpochsPruneTimestamp or endTimestamp, endTimestamp)
+				epochs.scheduleNextEpochsPrune(endTimestamp)
 			end
 		end
 		nextEpochIndex = next(unsafeEpochs, nextEpochIndex)
 	end
 	return prunedEpochIndexes
+end
+
+function epochs.scheduleNextEpochsPrune(timestamp)
+	NextEpochsPruneTimestamp = math.min(NextEpochsPruneTimestamp or timestamp, timestamp)
 end
 
 function epochs.nextEpochsPruneTimestamp()

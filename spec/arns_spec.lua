@@ -1026,13 +1026,60 @@ describe("arns", function()
 	end)
 
 	describe("pruneRecords", function()
-		it("should prune records older than the grace period", function()
-			local currentTimestamp = 2000000000
+		it(
+			"should prune records older than the grace period and update the `NextRecordsPruneTimestamp` to the minimum record end timestamp plus grace period",
+			function()
+				local currentTimestamp = 2000000000
 
-			_G.NameRegistry = {
-				returned = {},
-				reserved = {},
-				records = {
+				_G.NameRegistry = {
+					returned = {},
+					reserved = {},
+					records = {
+						["active-record"] = {
+							endTimestamp = 2001000000, -- far in the future
+							processId = "active-process-id",
+							purchasePrice = 600000000,
+							startTimestamp = 0,
+							type = "lease",
+							undernameLimit = 10,
+						},
+						["active-record-2"] = {
+							endTimestamp = 10005000000, -- far in the future
+							processId = "active-process-id-2",
+							purchasePrice = 600000000,
+							startTimestamp = 0,
+							type = "lease",
+							undernameLimit = 10,
+						},
+						["expired-record"] = {
+							endTimestamp = 790399999, -- expired and past the grace period
+							processId = "expired-process-id",
+							purchasePrice = 400000000,
+							startTimestamp = 0,
+							type = "lease",
+							undernameLimit = 5,
+						},
+						["grace-period-record"] = {
+							endTimestamp = currentTimestamp - constants.gracePeriodMs + 10, -- expired, but within grace period
+							processId = "grace-process-id",
+							purchasePrice = 500000000,
+							startTimestamp = 0,
+							type = "lease",
+							undernameLimit = 8,
+						},
+						["permabuy-record"] = {
+							endTimestamp = nil,
+							processId = "permabuy-process-id",
+							purchasePrice = 600000000,
+							startTimestamp = 0,
+							type = "permabuy",
+							undernameLimit = 10,
+						},
+					},
+				}
+				local prunedRecords, newGracePeriodRecords =
+					arns.pruneRecords(currentTimestamp, _G.LastGracePeriodEntryEndTimestamp)
+				assert.are.same({
 					["active-record"] = {
 						endTimestamp = 2001000000, -- far in the future
 						processId = "active-process-id",
@@ -1041,13 +1088,13 @@ describe("arns", function()
 						type = "lease",
 						undernameLimit = 10,
 					},
-					["expired-record"] = {
-						endTimestamp = 790399999, -- expired and past the grace period
-						processId = "expired-process-id",
-						purchasePrice = 400000000,
+					["active-record-2"] = {
+						endTimestamp = 10005000000, -- very far in the future
+						processId = "active-process-id-2",
+						purchasePrice = 600000000,
 						startTimestamp = 0,
 						type = "lease",
-						undernameLimit = 5,
+						undernameLimit = 10,
 					},
 					["grace-period-record"] = {
 						endTimestamp = currentTimestamp - constants.gracePeriodMs + 10, -- expired, but within grace period
@@ -1065,100 +1112,87 @@ describe("arns", function()
 						type = "permabuy",
 						undernameLimit = 10,
 					},
-				},
-			}
-			local prunedRecords, newGracePeriodRecords = arns.pruneRecords(currentTimestamp)
-			assert.are.same({
-				["active-record"] = {
-					endTimestamp = currentTimestamp + 1000000, -- far in the future
-					processId = "active-process-id",
-					purchasePrice = 600000000,
-					startTimestamp = 0,
-					type = "lease",
-					undernameLimit = 10,
-				},
-				["grace-period-record"] = {
-					endTimestamp = currentTimestamp - constants.gracePeriodMs + 10, -- expired, but within grace period
-					processId = "grace-process-id",
-					purchasePrice = 500000000,
-					startTimestamp = 0,
-					type = "lease",
-					undernameLimit = 8,
-				},
-				["permabuy-record"] = {
-					endTimestamp = nil,
-					processId = "permabuy-process-id",
-					purchasePrice = 600000000,
-					startTimestamp = 0,
-					type = "permabuy",
-					undernameLimit = 10,
-				},
-			}, _G.NameRegistry.records)
-			assert.are.same({
-				["expired-record"] = {
-					endTimestamp = currentTimestamp - constants.gracePeriodMs - 1, -- expired and past the grace period
-					processId = "expired-process-id",
-					purchasePrice = 400000000,
-					startTimestamp = 0,
-					type = "lease",
-					undernameLimit = 5,
-				},
-			}, prunedRecords)
-			assert.are.same({
-				["grace-period-record"] = {
-					endTimestamp = currentTimestamp - constants.gracePeriodMs + 10, -- expired, but within grace period
-					processId = "grace-process-id",
-					purchasePrice = 500000000,
-					startTimestamp = 0,
-					type = "lease",
-					undernameLimit = 8,
-				},
-			}, newGracePeriodRecords)
+				}, _G.NameRegistry.records)
+				assert.are.same({
+					["expired-record"] = {
+						endTimestamp = currentTimestamp - constants.gracePeriodMs - 1, -- expired and past the grace period
+						processId = "expired-process-id",
+						purchasePrice = 400000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 5,
+					},
+				}, prunedRecords)
+				assert.are.same({
+					["grace-period-record"] = {
+						endTimestamp = currentTimestamp - constants.gracePeriodMs + 10, -- expired, but within grace period
+						processId = "grace-process-id",
+						purchasePrice = 500000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 8,
+					},
+				}, newGracePeriodRecords)
 
-			-- advance time, run again, and ensure the grace period record is not in the grace period list again
-			local gracePeriodRecordEndTimestamp = currentTimestamp - constants.gracePeriodMs + 10
-			currentTimestamp = currentTimestamp + constants.gracePeriodMs + 1
-			prunedRecords, newGracePeriodRecords = arns.pruneRecords(currentTimestamp, gracePeriodRecordEndTimestamp)
-			assert.are.same({
-				["active-record"] = {
-					endTimestamp = 2001000000,
-					processId = "active-process-id",
-					purchasePrice = 600000000,
-					startTimestamp = 0,
-					type = "lease",
-					undernameLimit = 10,
-				},
-				["permabuy-record"] = {
-					endTimestamp = nil,
-					processId = "permabuy-process-id",
-					purchasePrice = 600000000,
-					startTimestamp = 0,
-					type = "permabuy",
-					undernameLimit = 10,
-				},
-			}, _G.NameRegistry.records)
-			assert.are.same({
-				["grace-period-record"] = {
-					endTimestamp = 790400010,
-					processId = "grace-process-id",
-					purchasePrice = 500000000,
-					startTimestamp = 0,
-					type = "lease",
-					undernameLimit = 8,
-				},
-			}, prunedRecords)
-			-- active record has entered grace period
-			assert.are.same({
-				["active-record"] = {
-					endTimestamp = 2001000000,
-					processId = "active-process-id",
-					purchasePrice = 600000000,
-					startTimestamp = 0,
-					type = "lease",
-					undernameLimit = 10,
-				},
-			}, newGracePeriodRecords)
-		end)
+				-- advance time, run again, and ensure the grace period record is not in the grace period list again
+				local gracePeriodRecordEndTimestamp = currentTimestamp - constants.gracePeriodMs + 10
+				currentTimestamp = currentTimestamp + constants.gracePeriodMs + 1
+				prunedRecords, newGracePeriodRecords =
+					arns.pruneRecords(currentTimestamp, gracePeriodRecordEndTimestamp)
+				assert.are.same({
+					["active-record"] = {
+						endTimestamp = 2001000000,
+						processId = "active-process-id",
+						purchasePrice = 600000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 10,
+					},
+					["active-record-2"] = {
+						endTimestamp = 10005000000, -- very far in the future
+						processId = "active-process-id-2",
+						purchasePrice = 600000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 10,
+					},
+					["permabuy-record"] = {
+						endTimestamp = nil,
+						processId = "permabuy-process-id",
+						purchasePrice = 600000000,
+						startTimestamp = 0,
+						type = "permabuy",
+						undernameLimit = 10,
+					},
+				}, _G.NameRegistry.records)
+				assert.are.same({
+					["grace-period-record"] = {
+						endTimestamp = 790400010,
+						processId = "grace-process-id",
+						purchasePrice = 500000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 8,
+					},
+				}, prunedRecords)
+				-- active record has entered grace period
+				assert.are.same({
+					["active-record"] = {
+						endTimestamp = 2001000000,
+						processId = "active-process-id",
+						purchasePrice = 600000000,
+						startTimestamp = 0,
+						type = "lease",
+						undernameLimit = 10,
+					},
+				}, newGracePeriodRecords)
+				-- ensure the next prune timestamp is updated to the grace period record end timestamp
+				assert.are.equal(
+					_G.NameRegistry.records["active-record"].endTimestamp + constants.twoWeeksMs,
+					_G.NextRecordsPruneTimestamp
+				)
+			end
+		)
 
 		it("should skip pruning when possible", function()
 			local currentTimestamp = 2000000000
@@ -1178,7 +1212,8 @@ describe("arns", function()
 					},
 				},
 			}
-			local prunedRecords, newGracePeriodRecords = arns.pruneRecords(currentTimestamp)
+			local prunedRecords, newGracePeriodRecords =
+				arns.pruneRecords(currentTimestamp, _G.LastGracePeriodEntryEndTimestamp)
 			assert.are.same({
 				-- escaped pruning due to the forced invariance
 				["expired-record"] = {

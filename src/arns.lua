@@ -150,7 +150,6 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 	-- Transfer tokens to the protocol balance
 	balances.increaseBalance(ao.id, rewardForProtocol)
 	arns.addRecord(name, newRecord)
-
 	demand.tallyNamePurchase(totalFee)
 	return {
 		record = arns.getRecord(name),
@@ -977,31 +976,26 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 		return prunedRecords, newGracePeriodRecords
 	end
 
-	--- @type Timestamp|nil
-	local minNextEndTimestamp
+	-- identify any records that are leases and that have expired, account for a two week grace period in seconds
+	NextRecordsPruneTimestamp = nil
 
-	-- identify any records that are leases and that have expired, account for a one week grace period in seconds
-	for name, record in pairs(arns.getRecords()) do
+	-- note: use unsafe to avoid copying all the records, but be careful not to modify the records directly here
+	for name, record in pairs(arns.getRecordsUnsafe()) do
 		if arns.recordExpired(record, currentTimestamp) then
-			prunedRecords[name] = record
-			NameRegistry.records[name] = nil
+			print("Pruning record " .. name .. " because it has expired")
+			prunedRecords[name] = arns.removeRecord(name)
 		elseif arns.recordInGracePeriod(record, currentTimestamp) then
 			if record.endTimestamp > lastGracePeriodEntryEndTimestamp then
+				print(
+					"Adding record " .. name .. " to new grace period records because it has entered its grace period"
+				)
 				newGracePeriodRecords[name] = record
 			end
 			-- Make sure we prune when the grace period is over
 			arns.scheduleNextRecordsPrune(record.endTimestamp + constants.gracePeriodMs)
 		elseif record.endTimestamp then
-			-- find the next prune timestamp
-			--- @diagnostic disable-next-line: param-type-mismatch
-			minNextEndTimestamp = math.min(minNextEndTimestamp or record.endTimestamp, record.endTimestamp)
+			arns.scheduleNextRecordsPrune(record.endTimestamp)
 		end
-	end
-
-	-- Reset the next pruning timestamp now that pruning has completed
-	NextRecordsPruneTimestamp = nil
-	if minNextEndTimestamp then
-		arns.scheduleNextRecordsPrune(minNextEndTimestamp)
 	end
 	return prunedRecords, newGracePeriodRecords
 end
@@ -1016,20 +1010,17 @@ function arns.pruneReturnedNames(currentTimestamp)
 		return prunedReturnedNames
 	end
 
-	local minNextEndTimestamp
+	-- reset the next prune timestamp, below will populate it with the next prune timestamp minimum
+	NextReturnedNamesPruneTimestamp = nil
+
+	-- note: use unsafe to avoid copying all the returned names, but be careful not to modify the returned names directly here
 	for name, returnedName in pairs(arns.getReturnedNamesUnsafe()) do
 		local endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod
 		if currentTimestamp >= endTimestamp then
 			prunedReturnedNames[name] = arns.removeReturnedName(name)
 		else
-			minNextEndTimestamp = math.min(minNextEndTimestamp or endTimestamp, endTimestamp)
+			arns.scheduleNextReturnedNamesPrune(endTimestamp)
 		end
-	end
-
-	-- Reset the next pruning timestamp now that pruning has completed
-	NextReturnedNamesPruneTimestamp = nil
-	if minNextEndTimestamp then
-		arns.scheduleNextReturnedNamesPrune(minNextEndTimestamp)
 	end
 	return prunedReturnedNames
 end
@@ -1039,7 +1030,9 @@ end
 --- @return ReservedName[] prunedReservedNames - the pruned reserved names
 function arns.pruneReservedNames(currentTimestamp)
 	local prunedReserved = {}
-	for name, details in pairs(arns.getReservedNames()) do
+
+	-- note: use unsafe to avoid copying all the reserved names, but be careful not to modify the reserved names directly here
+	for name, details in pairs(arns.getReservedNamesUnsafe()) do
 		if details.endTimestamp and details.endTimestamp <= currentTimestamp then
 			prunedReserved[name] = arns.removeReservedName(name)
 		end
