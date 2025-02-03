@@ -150,7 +150,6 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 	-- Transfer tokens to the protocol balance
 	balances.increaseBalance(ao.id, rewardForProtocol)
 	arns.addRecord(name, newRecord)
-
 	demand.tallyNamePurchase(totalFee)
 	return {
 		record = arns.getRecord(name),
@@ -1075,7 +1074,10 @@ end
 
 --- @param timestamp Timestamp
 function arns.scheduleNextRecordsPrune(timestamp)
+	local currentNextPruneRecordsTimestamp = NextRecordsPruneTimestamp or 0
+	print("Current next prune records timestamp: " .. currentNextPruneRecordsTimestamp)
 	NextRecordsPruneTimestamp = math.min(NextRecordsPruneTimestamp or timestamp, timestamp)
+	print("Updated next prune records timestamp to " .. NextRecordsPruneTimestamp)
 end
 
 --- @param timestamp Timestamp
