@@ -873,7 +873,6 @@ export const getInfo = async ({ memory, timestamp }) => {
     },
     memory,
   });
-  console.log(nameResult);
   assertNoResultError(nameResult);
   return {
     memory: nameResult.Memory,
