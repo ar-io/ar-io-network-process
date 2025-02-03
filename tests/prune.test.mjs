@@ -12,16 +12,18 @@
  * - Validate the global pruning timestamp is updated to the next records prune timestamp
  */
 import { strict as assert } from 'node:assert';
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 import {
   getRecord,
   startMemory,
   buyRecord,
   getPruningTimestamps,
-  tick,
   getInfo,
   parseEventsFromResult,
+  transfer,
+  totalTokenSupply,
 } from './helpers.mjs';
+import { STUB_ADDRESS } from '../tools/constants.mjs';
 
 const STUB_TIMESTAMP = 1706814747000; // Jan 1 2024
 const oneYearMs = 365 * 24 * 60 * 60 * 1000;
@@ -30,17 +32,31 @@ const twoWeeksMs = 14 * 24 * 60 * 60 * 1000;
 describe('ARNS Record Pruning', () => {
   let sharedMemory = startMemory;
 
+  // give stub address tokens
+  before(async () => {
+    const { Memory: totalTokenSupplyMemory } = await totalTokenSupply({
+      memory: startMemory,
+    });
+
+    const transferMemory = await transfer({
+      recipient: STUB_ADDRESS,
+      quantity: 1_000_000_000_000,
+      memory: totalTokenSupplyMemory,
+    });
+    sharedMemory = transferMemory;
+  });
+
   it('should prune expired records after grace period', async () => {
     // Purchase 5 records with different expiration years
     const names = ['name1', 'name2', 'name3', 'name4', 'name5'];
-    const years = [1, 2, 3, 4, 5];
 
-    for (let i = 0; i < names.length; i++) {
+    for (const [idx, name] of names.entries()) {
       const purchase = await buyRecord({
+        from: STUB_ADDRESS,
         memory: sharedMemory,
         timestamp: STUB_TIMESTAMP,
-        name: names[i],
-        years: years[i],
+        name,
+        years: idx + 1,
         type: 'lease',
       });
       sharedMemory = purchase.memory;

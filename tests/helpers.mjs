@@ -67,7 +67,7 @@ export function assertNoResultError(result) {
     (tag) => tag.name === 'Error',
   );
   assert.strictEqual(errorTag, undefined);
-  // assertValidSupplyEventData(result);
+  assertValidSupplyEventData(result);
 }
 
 export function parseEventsFromResult(result) {
