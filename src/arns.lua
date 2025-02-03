@@ -354,42 +354,50 @@ function arns.getProcessIdForRecord(name)
 	return record ~= nil and record.processId or nil
 end
 
-local function getActiveArNSNamesBetweenTimestampsFromRecords(records, startTimestamp, endTimestamp)
-	local activeNames = {}
-	local namesInGracePeriod = {}
-
-	for name, record in pairs(records) do
-		if record.type == "permabuy" then
-			table.insert(activeNames, name)
-		elseif
-			record.type == "lease"
-			and record.endTimestamp
-			and record.startTimestamp
-			and record.startTimestamp <= startTimestamp
-		then
-			if record.endTimestamp >= endTimestamp then
-				table.insert(activeNames, name)
-			elseif record.endTimestamp + constants.gracePeriodMs >= endTimestamp then
-				table.insert(namesInGracePeriod, name)
-			end
-		end
-	end
-	return { activeNames = activeNames, namesInGracePeriod = namesInGracePeriod }
-end
-
 --- Gets the active ARNS names between two timestamps
 --- @param startTimestamp number The start timestamp
 --- @param endTimestamp number The end timestamp
 --- @return table<string> The active ARNS names between the two timestamps
 function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
-	return getActiveArNSNamesBetweenTimestampsFromRecords(arns.getRecordsUnsafe(), startTimestamp, endTimestamp).activeNames
+	local records = arns.getRecordsUnsafe()
+	local activeNames = {}
+	for name, record in pairs(records) do
+		if
+			record.type == "permabuy"
+			or (
+				record.type == "lease"
+				and record.endTimestamp
+				and record.startTimestamp
+				and record.startTimestamp <= startTimestamp
+				and record.endTimestamp >= endTimestamp
+			)
+		then
+			table.insert(activeNames, name)
+		end
+	end
+	return activeNames
 end
 
-function arns.getTotalActiveAndGracePeriodArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
-	local totals = getActiveArNSNamesBetweenTimestampsFromRecords(arns.getRecordsUnsafe(), startTimestamp, endTimestamp)
+function arns.getTotalArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
+	local totalActiveNames = 0
+	local totalGracePeriodNames = 0
+	local records = arns.getRecordsUnsafe()
+
+	for _, record in pairs(records) do
+		if record.type == "permabuy" then
+			totalActiveNames = totalActiveNames + 1
+		elseif record.type == "lease" and record.endTimestamp then
+			if record.startTimestamp <= startTimestamp and record.endTimestamp >= endTimestamp then
+				totalActiveNames = totalActiveNames + 1
+			elseif record.endTimestamp + constants.gracePeriodMs >= endTimestamp then
+				totalGracePeriodNames = totalGracePeriodNames + 1
+			end
+		end
+	end
+
 	return {
-		totalActiveNames = #totals.activeNames,
-		totalGracePeriodNames = #totals.namesInGracePeriod,
+		totalActiveNames = totalActiveNames,
+		totalGracePeriodNames = totalGracePeriodNames,
 	}
 end
 

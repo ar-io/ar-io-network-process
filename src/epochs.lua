@@ -402,8 +402,7 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	local activeGateways = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
 	-- get the max rewards for each participant eligible for the epoch
 	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
-	local arnsNamesTotals =
-		arns.getTotalActiveAndGracePeriodArNSNamesBetweenTimestampsUnsafe(epochStartTimestamp, epochEndTimestamp)
+	local arnsNamesTotals = arns.getTotalArNSNamesBetweenTimestampsUnsafe(epochStartTimestamp, epochEndTimestamp)
 	--- @type PrescribedEpoch
 	local epoch = {
 		epochIndex = epochIndex,
