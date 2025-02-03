@@ -2328,10 +2328,6 @@ describe("gar", function()
 			local gateway2Copy = utils.deepCopy(gateway2)
 			gateway2Copy.delegates = nil
 			gateway2Copy.vaults = nil
-			-- TODO: add gatewayRewardRatioWeight and observerRewardRatioWeight as gatewayPerformanceRatio and observerPerformanceRatio for backwards compatibility
-			gateway2Copy.weights.gatewayRewardRatioWeight = gateway2Copy.weights.gatewayPerformanceRatio or 0
-			gateway2Copy.weights.observerRewardRatioWeight = gateway2Copy.weights.observerPerformanceRatio or 0
-			-- END TODO
 			assert.are.same({
 				limit = 1,
 				sortBy = "startTimestamp",
@@ -2348,10 +2344,6 @@ describe("gar", function()
 			local gateway1Copy = utils.deepCopy(gateway1)
 			gateway1Copy.delegates = nil
 			gateway1Copy.vaults = nil
-			-- TODO: add gatewayRewardRatioWeight and observerRewardRatioWeight as gatewayPerformanceRatio and observerPerformanceRatio for backwards compatibility
-			gateway1Copy.weights.gatewayRewardRatioWeight = gateway1Copy.weights.gatewayPerformanceRatio or 0
-			gateway1Copy.weights.observerRewardRatioWeight = gateway1Copy.weights.observerPerformanceRatio or 0
-			-- END TODO
 			assert.are.same({
 				limit = 1,
 				sortBy = "startTimestamp",

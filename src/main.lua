@@ -1929,12 +1929,6 @@ end)
 
 addEventingHandler(ActionMap.Gateway, Handlers.utils.hasMatchingTag("Action", ActionMap.Gateway), function(msg)
 	local gateway = gar.getCompactGateway(msg.Tags.Address or msg.From)
-	-- TODO: inject these for backwards compatibility - after ar-io-sdk update, remove these
-	if gateway then
-		gateway.weights.gatewayRewardRatioWeight = gateway.weights.gatewayPerformanceRatio or 0
-		gateway.weights.observerRewardRatioWeight = gateway.weights.observerPerformanceRatio or 0
-	end
-	-- END TODO
 	Send(msg, {
 		Target = msg.From,
 		Action = "Gateway-Notice",
@@ -2670,30 +2664,6 @@ addEventingHandler("allPaginatedGatewayVaults", utils.hasMatchingTag("Action", "
 	local page = utils.parsePaginationTags(msg)
 	local result = gar.getPaginatedVaultsFromAllGateways(page.cursor, page.limit, page.sortBy, page.sortOrder)
 	Send(msg, { Target = msg.From, Action = "All-Gateway-Vaults-Notice", Data = json.encode(result) })
-end)
-
--- TODO: handler for posting epoch distribution notices (make sure to remove this once previous epochs are distributed)
-UpdateGateways = false
-addEventingHandler("updateGatewayAttributes", utils.hasMatchingTag("Action", "Update-Gateway-Attributes"), function()
-	if UpdateGateways then
-		return
-	end
-	--- iterate over all gateways and update their attributes
-	for _, gateway in pairs(gar.getGatewaysUnsafe()) do
-		if gateway.weights.gatewayRewardRatioWeight then
-			-- set the gatewayRewardShareRatio to gatewayPerformanceRatio
-			gateway.weights.gatewayPerformanceRatio = gateway.weights.gatewayRewardRatioWeight
-			-- set the gatewayRewardRatioWeight to observerRewardRatioWeight to nil
-			gateway.weights.gatewayRewardRatioWeight = nil
-		end
-		if gateway.weights.observerRewardRatioWeight then
-			-- set the observerRewardShareRatio to observerPerformanceRatio
-			gateway.weights.observerPerformanceRatio = gateway.weights.observerRewardRatioWeight
-			-- set the observerRewardRatioWeight to nil
-			gateway.weights.observerRewardRatioWeight = nil
-		end
-	end
-	UpdateGateways = true
 end)
 
 return process
