@@ -796,7 +796,9 @@ function epochs.pruneEpochs(timestamp)
 			Epochs[nextEpochIndex] = nil
 		else
 			local _, endTimestamp = epochs.getEpochTimestampsForIndex(nextEpochIndex)
-			epochs.scheduleNextEpochsPrune(endTimestamp)
+			if endTimestamp >= timestamp then
+				epochs.scheduleNextEpochsPrune(endTimestamp)
+			end
 		end
 		nextEpochIndex = next(unsafeEpochs, nextEpochIndex)
 	end
