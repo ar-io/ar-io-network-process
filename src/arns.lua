@@ -378,7 +378,7 @@ function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
 	return activeNames
 end
 
-function arns.getTotalArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
+local function getTotalArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
 	local totalActiveNames = 0
 	local totalGracePeriodNames = 0
 	local records = arns.getRecordsUnsafe()
@@ -401,7 +401,7 @@ function arns.getTotalArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimest
 	}
 end
 
-function arns.getTotalReservedNamesBetweenTimestampsUnsafe(_, endTimestamp)
+local function getTotalReservedNamesBetweenTimestampsUnsafe(_, endTimestamp)
 	local reservedNames = arns.getReservedNamesUnsafe()
 	local totalReservedNames = 0
 	for _, reservedName in pairs(reservedNames) do
@@ -412,7 +412,7 @@ function arns.getTotalReservedNamesBetweenTimestampsUnsafe(_, endTimestamp)
 	return totalReservedNames
 end
 
-function arns.getTotalReturnedNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
+local function getTotalReturnedNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
 	local returnedNames = arns.getReturnedNamesUnsafe()
 	local totalReturnedNames = 0
 	local returnedNameEndTimestamp = startTimestamp + constants.returnedNamePeriod
@@ -423,6 +423,17 @@ function arns.getTotalReturnedNamesBetweenTimestampsUnsafe(startTimestamp, endTi
 		end
 	end
 	return totalReturnedNames
+end
+
+function arns.getArNSStatsBetweenTimestamps(startTimestamp, endTimestamp)
+	local totalNames = getTotalArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
+
+	return {
+		totalActiveNames = totalNames.totalActiveNames,
+		totalGracePeriodNames = totalNames.totalGracePeriodNames,
+		totalReservedNames = getTotalReservedNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp),
+		totalReturnedNames = getTotalReturnedNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp),
+	}
 end
 
 --- Gets deep copies of all records

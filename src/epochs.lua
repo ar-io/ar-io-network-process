@@ -402,7 +402,7 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	local activeGateways = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
 	-- get the max rewards for each participant eligible for the epoch
 	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
-	local arnsNamesTotals = arns.getTotalArNSNamesBetweenTimestampsUnsafe(epochStartTimestamp, epochEndTimestamp)
+	local arnsStatsForEpoch = arns.getArNSStatsBetweenTimestamps(epochStartTimestamp, epochEndTimestamp)
 	--- @type PrescribedEpoch
 	local epoch = {
 		epochIndex = epochIndex,
@@ -425,18 +425,7 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 				eligible = eligibleEpochRewards.potentialRewards,
 			},
 		},
-		arnsStats = {
-			totalActiveNames = arnsNamesTotals.totalActiveNames,
-			totalGracePeriodNames = arnsNamesTotals.totalGracePeriodNames,
-			totalReservedNames = arns.getTotalReservedNamesBetweenTimestampsUnsafe(
-				epochStartTimestamp,
-				epochEndTimestamp
-			),
-			totalReturnedNames = arns.getTotalReturnedNamesBetweenTimestampsUnsafe(
-				epochStartTimestamp,
-				epochEndTimestamp
-			),
-		},
+		arnsStats = arnsStatsForEpoch,
 	}
 	Epochs[epochIndex] = epoch
 	-- update the gateway weights
