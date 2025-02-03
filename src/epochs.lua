@@ -40,8 +40,8 @@ local epochs = {}
 --- @field observerAddress string The observer address
 --- @field stakeWeight number The stake weight
 --- @field tenureWeight number The tenure weight
---- @field gatewayRewardRatioWeight number The gateway reward ratio weight
---- @field observerRewardRatioWeight number The observer reward ratio weight
+--- @field gatewayPerformanceRatio number The gateway reward ratio weight
+--- @field observerPerformanceRatio number The observer reward ratio weight
 --- @field compositeWeight number The composite weight
 --- @field normalizedCompositeWeight number The normalized composite weight
 
@@ -136,8 +136,12 @@ function epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 				normalizedCompositeWeight = gateway.weights.normalizedCompositeWeight,
 				stakeWeight = gateway.weights.stakeWeight,
 				tenureWeight = gateway.weights.tenureWeight,
-				gatewayRewardRatioWeight = gateway.weights.gatewayRewardRatioWeight,
-				observerRewardRatioWeight = gateway.weights.observerRewardRatioWeight,
+				gatewayPerformanceRatio = gateway.weights.gatewayPerformanceRatio,
+				observerPerformanceRatio = gateway.weights.observerPerformanceRatio,
+				-- TODO: remove these for backwards compatibility - after ar-io-sdk update, remove these
+				gatewayRewardRatioWeight = gateway.weights.gatewayPerformanceRatio,
+				observerRewardRatioWeight = gateway.weights.observerPerformanceRatio,
+				-- END TODO
 				compositeWeight = gateway.weights.compositeWeight,
 				stake = gateway.operatorStake,
 				startTimestamp = gateway.startTimestamp,

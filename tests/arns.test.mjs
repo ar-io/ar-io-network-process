@@ -1631,7 +1631,7 @@ describe('ArNS', async () => {
         'Gateway should have a tenure weight greater than or equal to 1',
       );
       assert(
-        gatewayData.weights.gatewayRewardRatioWeight >= 1,
+        gatewayData.weights.gatewayPerformanceRatio >= 1,
         'Gateway should have a gateway reward ratio weight greater than or equal to 1',
       );
 

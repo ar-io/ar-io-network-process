@@ -4,7 +4,7 @@ local demand = require("demand")
 local gar = require("gar")
 
 --- @class TickResult
---- @field maybeDistributedEpoch Epoch | nil The distributed epoch
+--- @field maybeDistributedEpoch DistributedEpoch | nil The distributed epoch
 --- @field maybeNewEpoch Epoch | nil The new epoch
 --- @field maybeDemandFactor number | nil The demand factor
 --- @field pruneGatewaysResult PruneGatewaysResult The prune gateways result

@@ -53,8 +53,8 @@ local testGateway = {
 	weights = {
 		stakeWeight = 0,
 		tenureWeight = 0,
-		gatewayRewardRatioWeight = 0,
-		observerRewardRatioWeight = 0,
+		gatewayPerformanceRatio = 0,
+		observerPerformanceRatio = 0,
 		compositeWeight = 0,
 		normalizedCompositeWeight = 0,
 	},
@@ -1933,8 +1933,8 @@ describe("gar", function()
 					startTimestamp = 0,
 					stakeWeight = expectedStakeWeight,
 					tenureWeight = expectedTenureWeight,
-					gatewayRewardRatioWeight = expectedGatewayRatioWeight,
-					observerRewardRatioWeight = expectedObserverRatioWeight,
+					gatewayPerformanceRatio = expectedGatewayRatioWeight,
+					observerPerformanceRatio = expectedObserverRatioWeight,
 					compositeWeight = expectedCompositeWeight,
 					normalizedCompositeWeight = 1, -- there is only one gateway
 				},
@@ -2328,6 +2328,10 @@ describe("gar", function()
 			local gateway2Copy = utils.deepCopy(gateway2)
 			gateway2Copy.delegates = nil
 			gateway2Copy.vaults = nil
+			-- TODO: add gatewayRewardRatioWeight and observerRewardRatioWeight as gatewayPerformanceRatio and observerPerformanceRatio for backwards compatibility
+			gateway2Copy.weights.gatewayRewardRatioWeight = gateway2Copy.weights.gatewayPerformanceRatio or 0
+			gateway2Copy.weights.observerRewardRatioWeight = gateway2Copy.weights.observerPerformanceRatio or 0
+			-- END TODO
 			assert.are.same({
 				limit = 1,
 				sortBy = "startTimestamp",
@@ -2344,6 +2348,10 @@ describe("gar", function()
 			local gateway1Copy = utils.deepCopy(gateway1)
 			gateway1Copy.delegates = nil
 			gateway1Copy.vaults = nil
+			-- TODO: add gatewayRewardRatioWeight and observerRewardRatioWeight as gatewayPerformanceRatio and observerPerformanceRatio for backwards compatibility
+			gateway1Copy.weights.gatewayRewardRatioWeight = gateway1Copy.weights.gatewayPerformanceRatio or 0
+			gateway1Copy.weights.observerRewardRatioWeight = gateway1Copy.weights.observerPerformanceRatio or 0
+			-- END TODO
 			assert.are.same({
 				limit = 1,
 				sortBy = "startTimestamp",
@@ -2374,9 +2382,9 @@ describe("gar", function()
 			_G.GatewayRegistry[stubRandomAddress] = testGateway
 			_G.GatewayRegistry[stubRandomAddress].weights = {
 				tenureWeight = 0.5,
-				gatewayRewardRatioWeight = 0.85,
+				gatewayPerformanceRatio = 0.85,
 				stakeWeight = 0,
-				observerRewardRatioWeight = 0,
+				observerPerformanceRatio = 0,
 				compositeWeight = 0,
 				normalizedCompositeWeight = 0,
 			}
@@ -2388,9 +2396,9 @@ describe("gar", function()
 			_G.GatewayRegistry[stubRandomAddress] = testGateway
 			_G.GatewayRegistry[stubRandomAddress].weights = {
 				tenureWeight = 1,
-				gatewayRewardRatioWeight = 0.84,
+				gatewayPerformanceRatio = 0.84,
 				stakeWeight = 0,
-				observerRewardRatioWeight = 0,
+				observerPerformanceRatio = 0,
 				compositeWeight = 0,
 				normalizedCompositeWeight = 0,
 			}
@@ -2402,9 +2410,9 @@ describe("gar", function()
 			_G.GatewayRegistry[stubRandomAddress] = testGateway
 			_G.GatewayRegistry[stubRandomAddress].weights = {
 				tenureWeight = 1,
-				gatewayRewardRatioWeight = 0.85,
+				gatewayPerformanceRatio = 0.85,
 				stakeWeight = 0,
-				observerRewardRatioWeight = 0,
+				observerPerformanceRatio = 0,
 				compositeWeight = 0,
 				normalizedCompositeWeight = 0,
 			}
