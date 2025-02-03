@@ -86,16 +86,16 @@ describe('ARNS Record Pruning', () => {
     sharedMemory = infoResult.memory;
 
     // parse the output event data to validate the name was pruned
-    // const [eventOutput] = parseEventsFromResult(infoResult.result);
-    // const prunedRecordsCount = eventOutput['Pruned-Records-Count'];
-    // assert.equal(prunedRecordsCount, 1, 'Expected 1 record to be pruned');
-    // const prunedRecords = eventOutput['Pruned-Records'];
-    // assert.equal(prunedRecords.length, 1, 'Expected 1 record to be pruned');
-    // assert.equal(
-    //   prunedRecords[0],
-    //   names[0],
-    //   'Expected the first record to be pruned',
-    // );
+    const [eventOutput] = parseEventsFromResult(infoResult.result);
+    const prunedRecordsCount = eventOutput['Pruned-Records-Count'];
+    assert.equal(prunedRecordsCount, 1, 'Expected 1 record to be pruned');
+    const prunedRecords = eventOutput['Pruned-Records'];
+    assert.equal(prunedRecords.length, 1, 'Expected 1 record to be pruned');
+    assert.equal(
+      prunedRecords[0],
+      names[0],
+      'Expected the first record to be pruned',
+    );
 
     // check the pruning timestamp is updated after the tick
     const { records: updatedRecordsPruningTimestamp } =

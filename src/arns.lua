@@ -979,12 +979,16 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 	-- identify any records that are leases and that have expired, account for a two week grace period in seconds
 	NextRecordsPruneTimestamp = nil
 
+	-- note: use unsafe to avoid copying all the records, but be careful not to modify the records directly here
 	for name, record in pairs(arns.getRecordsUnsafe()) do
 		if arns.recordExpired(record, currentTimestamp) then
-			prunedRecords[name] = record
-			NameRegistry.records[name] = nil
+			print("Pruning record " .. name .. " because it has expired")
+			prunedRecords[name] = arns.removeRecord(name)
 		elseif arns.recordInGracePeriod(record, currentTimestamp) then
 			if record.endTimestamp > lastGracePeriodEntryEndTimestamp then
+				print(
+					"Adding record " .. name .. " to new grace period records because it has entered it's grace period"
+				)
 				newGracePeriodRecords[name] = record
 			end
 			-- Make sure we prune when the grace period is over
@@ -1009,6 +1013,7 @@ function arns.pruneReturnedNames(currentTimestamp)
 	-- reset the next prune timestamp, below will populate it with the next prune timestamp minimum
 	NextReturnedNamesPruneTimestamp = nil
 
+	-- note: use unsafe to avoid copying all the returned names, but be careful not to modify the returned names directly here
 	for name, returnedName in pairs(arns.getReturnedNamesUnsafe()) do
 		local endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod
 		if currentTimestamp >= endTimestamp then
@@ -1025,7 +1030,9 @@ end
 --- @return ReservedName[] prunedReservedNames - the pruned reserved names
 function arns.pruneReservedNames(currentTimestamp)
 	local prunedReserved = {}
-	for name, details in pairs(arns.getReservedNames()) do
+
+	-- note: use unsafe to avoid copying all the reserved names, but be careful not to modify the reserved names directly here
+	for name, details in pairs(arns.getReservedNamesUnsafe()) do
 		if details.endTimestamp and details.endTimestamp <= currentTimestamp then
 			prunedReserved[name] = arns.removeReservedName(name)
 		end
@@ -1074,10 +1081,7 @@ end
 
 --- @param timestamp Timestamp
 function arns.scheduleNextRecordsPrune(timestamp)
-	local currentNextPruneRecordsTimestamp = NextRecordsPruneTimestamp or 0
-	print("Current next prune records timestamp: " .. currentNextPruneRecordsTimestamp)
 	NextRecordsPruneTimestamp = math.min(NextRecordsPruneTimestamp or timestamp, timestamp)
-	print("Updated next prune records timestamp to " .. NextRecordsPruneTimestamp)
 end
 
 --- @param timestamp Timestamp
