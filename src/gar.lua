@@ -1007,7 +1007,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 					result.gatewayStakeReturned = result.gatewayStakeReturned + vault.balance
 				else
 					-- find the next prune timestamp
-					minNextEndTimestamp = math.min(minNextEndTimestamp or vault.endTimestamp, vault.endTimestamp)
+					gar.scheduleNextGatewaysPruning(vault.endTimestamp)
 					gatewayObjectTallies.numGatewayVaults = gatewayObjectTallies.numGatewayVaults + 1
 				end
 			end
@@ -1022,7 +1022,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 						result.delegateStakeReturned = result.delegateStakeReturned + vault.balance
 					else
 						-- find the next prune timestamp
-						minNextEndTimestamp = math.min(minNextEndTimestamp or vault.endTimestamp, vault.endTimestamp)
+						gar.scheduleNextGatewaysPruning(gateway.endTimestamp)
 						gatewayObjectTallies.numDelegateVaults = gatewayObjectTallies.numDelegateVaults + 1
 					end
 				end
@@ -1077,7 +1077,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 							table.insert(result.prunedGateways, gatewayAddress)
 						else
 							-- find the next prune timestamp
-							gar.scheduleNextGatewaysPruning(minNextEndTimestamp)
+							gar.scheduleNextGatewaysPruning(gateway.endTimestamp)
 						end
 					end
 				end
