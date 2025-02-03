@@ -520,6 +520,7 @@ end, function(msg)
 	}
 
 	if msg.Tags["Force-Prune"] then
+		print("Force prune provided, resetting all prune timestamps")
 		gar.scheduleNextGatewaysPruning(0)
 		gar.scheduleNextRedelegationsPruning(0)
 		arns.scheduleNextReturnedNamesPrune(0)
