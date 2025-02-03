@@ -987,7 +987,7 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 		elseif arns.recordInGracePeriod(record, currentTimestamp) then
 			if record.endTimestamp > lastGracePeriodEntryEndTimestamp then
 				print(
-					"Adding record " .. name .. " to new grace period records because it has entered it's grace period"
+					"Adding record " .. name .. " to new grace period records because it has entered its grace period"
 				)
 				newGracePeriodRecords[name] = record
 			end
