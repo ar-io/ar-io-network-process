@@ -458,6 +458,14 @@ describe("epochs", function()
 	end)
 
 	describe("createEpoch", function()
+		local settings = epochs.getSettings()
+		local epochIndex = 1
+		local epochStartTimestamp = settings.epochZeroStartTimestamp + settings.durationMs
+		local timestamp = epochStartTimestamp
+		local epochEndTimestamp = epochStartTimestamp + settings.durationMs
+		local epochDistributionTimestamp = epochEndTimestamp + settings.distributionDelayMs
+		local epochStartBlockHeight = 0
+
 		it("should create a new epoch for the given timestamp if all previous epochs have been distributed", function()
 			_G.Epochs = {}
 			_G.GatewayRegistry = {
@@ -517,13 +525,7 @@ describe("epochs", function()
 					},
 				},
 			}
-			local settings = epochs.getSettings()
-			local epochIndex = 1
-			local epochStartTimestamp = settings.epochZeroStartTimestamp + settings.durationMs
-			local timestamp = epochStartTimestamp
-			local epochEndTimestamp = epochStartTimestamp + settings.durationMs
-			local epochDistributionTimestamp = epochEndTimestamp + settings.distributionDelayMs
-			local epochStartBlockHeight = 0
+
 			local expectedEligibleRewards = math.floor(protocolBalance * constants.minimumRewardRate)
 			local expectedTotalGatewayReward = math.floor(expectedEligibleRewards * 0.90)
 			local expectedTotalObserverReward = math.floor(expectedEligibleRewards * 0.10)
@@ -585,6 +587,64 @@ describe("epochs", function()
 				compositeWeight = 0,
 				normalizedCompositeWeight = 0,
 			}, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-2"].weights)
+		end)
+
+		it("should count arns stat totals for the given epoch", function()
+			local oneYearMs = 60 * 1000 * 60 * 24 * 365
+			local recordTimestamp = timestamp
+			local endTimestamp = startTimestamp + oneYearMs
+			_G.Epochs = {}
+			_G.NameRegistry.records = {
+				["test-record-1"] = {
+					startTimestamp = recordTimestamp,
+					type = "permabuy",
+					purchasePrice = 0,
+					undernameLimit = 10,
+				},
+				["test-record-2"] = {
+					startTimestamp = recordTimestamp,
+					endTimestamp = endTimestamp,
+					type = "lease",
+					purchasePrice = 0,
+					undernameLimit = 10,
+				},
+				["this-is-a-record-in-grace-period"] = {
+					startTimestamp = recordTimestamp,
+					endTimestamp = epochEndTimestamp - 1,
+					type = "lease",
+					purchasePrice = 0,
+					undernameLimit = 10,
+				},
+			}
+			_G.NameRegistry.returned = {
+				["this-is-a-record-in-returned"] = {
+					name = "this-is-a-record-in-returned",
+					initiator = "test-this-is-valid-arweave-wallet-address-1",
+					startTimestamp = recordTimestamp,
+				},
+			}
+			_G.NameRegistry.reserved = {
+				["this-is-a-record-in-reserved"] = {
+					name = "this-is-a-record-in-reserved",
+					target = "test-this-is-valid-arweave-wallet-address-1",
+					endTimestamp = endTimestamp,
+				},
+				["this-is-another-record-in-reserved"] = {
+					name = "this-is-another-record-in-returned",
+					target = "test-this-is-valid-arweave-wallet-address-1",
+					endTimestamp = endTimestamp,
+				},
+			}
+
+			local result = epochs.createEpoch(recordTimestamp, epochStartBlockHeight, hashchain)
+
+			-- Check arnsStats are counted as expected
+			assert.are.same({
+				totalActiveNames = 2,
+				totalGracePeriodNames = 1,
+				totalReservedNames = 2,
+				totalReturnedNames = 1,
+			}, result.arnsStats)
 		end)
 	end)
 

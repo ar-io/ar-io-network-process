@@ -393,11 +393,11 @@ function arns.getTotalActiveAndGracePeriodArNSNamesBetweenTimestampsUnsafe(start
 	}
 end
 
-function arns.getTotalReservedNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
+function arns.getTotalReservedNamesBetweenTimestampsUnsafe(_, endTimestamp)
 	local reservedNames = arns.getReservedNamesUnsafe()
 	local totalReservedNames = 0
 	for _, reservedName in pairs(reservedNames) do
-		if reservedName.endTimestamp >= startTimestamp and reservedName.endTimestamp <= endTimestamp then
+		if endTimestamp <= reservedName.endTimestamp then
 			totalReservedNames = totalReservedNames + 1
 		end
 	end
@@ -407,8 +407,10 @@ end
 function arns.getTotalReturnedNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
 	local returnedNames = arns.getReturnedNamesUnsafe()
 	local totalReturnedNames = 0
+	local returnedNameEndTimestamp = startTimestamp + constants.returnedNamePeriod
+
 	for _, returnedName in pairs(returnedNames) do
-		if returnedName.startTimestamp >= startTimestamp and returnedName.startTimestamp <= endTimestamp then
+		if startTimestamp >= returnedName.startTimestamp and endTimestamp <= returnedNameEndTimestamp then
 			totalReturnedNames = totalReturnedNames + 1
 		end
 	end
