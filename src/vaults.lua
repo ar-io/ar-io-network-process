@@ -233,8 +233,10 @@ function vaults.pruneVaults(currentTimestamp)
 
 	local allVaults = vaults.getVaults()
 	local prunedVaults = {}
-	--- @type Timestamp|nil
-	local minNextEndTimestamp
+
+	-- reset the next prune timestamp, below will populate it with the next prune timestamp minimum
+	NextBalanceVaultsPruneTimestamp = nil
+
 	for owner, ownersVaults in pairs(allVaults) do
 		for id, nestedVault in pairs(ownersVaults) do
 			if currentTimestamp >= nestedVault.endTimestamp then
@@ -242,19 +244,10 @@ function vaults.pruneVaults(currentTimestamp)
 				ownersVaults[id] = nil
 				prunedVaults[id] = nestedVault
 			else
-				--- find the next prune timestamp
-				minNextEndTimestamp =
-					math.min(minNextEndTimestamp or nestedVault.endTimestamp, nestedVault.endTimestamp)
+				vaults.scheduleNextVaultsPruning(nestedVault.endTimestamp)
 			end
 		end
 	end
-
-	-- Reset the pruning timestamp
-	NextBalanceVaultsPruneTimestamp = nil
-	if minNextEndTimestamp then
-		vaults.scheduleNextVaultsPruning(minNextEndTimestamp)
-	end
-
 	-- set the vaults to the updated vaults
 	Vaults = allVaults
 	return prunedVaults

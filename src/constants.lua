@@ -53,9 +53,9 @@ constants.ARNS_NAME_DOES_NOT_EXIST_MESSAGE = "Name not found in the ArNS Registr
 constants.UNDERNAME_LEASE_FEE_PERCENTAGE = 0.001
 constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE = 0.005
 constants.PRIMARY_NAME_REQUEST_COST = constants.ARIOToMARIO(10) -- 10 ARIO
-constants.gracePeriodMs = constants.defaultEpochDurationMs * 14 -- 14 epochs
+constants.gracePeriodMs = constants.twoWeeksMs
 constants.maxLeaseLengthYears = 5
-constants.returnedNamePeriod = constants.defaultEpochDurationMs * 14 -- 14 epochs
+constants.returnedNamePeriod = constants.twoWeeksMs
 constants.returnedNameMaxMultiplier = 50 -- Freshly returned names will have a multiplier of 50x
 
 constants.ARNS_DISCOUNT_PERCENTAGE = 0.2
