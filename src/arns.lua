@@ -382,7 +382,7 @@ end
 --- @param endTimestamp number The end timestamp
 --- @return table<string> The active ARNS names between the two timestamps
 function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
-	return getActiveArNSNamesBetweenTimestampsFromRecords(arns.getRecords(), startTimestamp, endTimestamp).activeNames
+	return getActiveArNSNamesBetweenTimestampsFromRecords(arns.getRecordsUnsafe(), startTimestamp, endTimestamp).activeNames
 end
 
 function arns.getTotalActiveAndGracePeriodArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
