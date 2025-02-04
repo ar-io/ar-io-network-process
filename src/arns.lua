@@ -405,7 +405,7 @@ local function getTotalReservedNamesBetweenTimestampsUnsafe(_, endTimestamp)
 	local reservedNames = arns.getReservedNamesUnsafe()
 	local totalReservedNames = 0
 	for _, reservedName in pairs(reservedNames) do
-		if endTimestamp <= reservedName.endTimestamp then
+		if not reservedName.endTimestamp or endTimestamp <= reservedName.endTimestamp then
 			totalReservedNames = totalReservedNames + 1
 		end
 	end
