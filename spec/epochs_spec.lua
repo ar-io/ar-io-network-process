@@ -608,6 +608,7 @@ describe("epochs", function()
 					purchasePrice = 0,
 					undernameLimit = 10,
 				},
+				-- active at the beginning of the epoch, but will go into grace period during the epoch, so next epoch will be count it in grace period
 				["this-is-a-record-in-grace-period"] = {
 					startTimestamp = recordTimestamp,
 					endTimestamp = epochEndTimestamp - 1,
@@ -640,8 +641,8 @@ describe("epochs", function()
 
 			-- Check arnsStats are counted as expected
 			assert.are.same({
-				totalActiveNames = 2,
-				totalGracePeriodNames = 1,
+				totalActiveNames = 3,
+				totalGracePeriodNames = 0,
 				totalReservedNames = 2,
 				totalReturnedNames = 1,
 			}, result.arnsStats)

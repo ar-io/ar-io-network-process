@@ -1231,10 +1231,9 @@ describe("arns", function()
 		end)
 	end)
 
-	describe("getArNSStatsBetweenTimestamps", function()
+	describe("getArNSStatsAtTimestamp", function()
 		it("should return the correct ArNS stats", function()
 			local currentTimestamp = constants.gracePeriodMs
-			local endTimestamp = currentTimestamp + 1000000
 			_G.NameRegistry = {
 				returned = {
 					["returned-record"] = {
@@ -1263,7 +1262,7 @@ describe("arns", function()
 					["active-record"] = {
 						startTimestamp = 0,
 						type = "lease",
-						endTimestamp = endTimestamp * 2,
+						endTimestamp = currentTimestamp * 2,
 					},
 					-- this should not be counted as an active name since it's expired
 					["expired-record"] = {
@@ -1275,21 +1274,22 @@ describe("arns", function()
 					["future-record"] = {
 						startTimestamp = currentTimestamp + 1,
 						type = "lease",
-						endTimestamp = endTimestamp * 2,
+						endTimestamp = currentTimestamp * 2,
 					},
 					["permabuy-record"] = {
 						startTimestamp = 0,
 						type = "permabuy",
 						endTimestamp = nil,
 					},
+					-- record is in the grace period at the current timestamp
 					["grace-period-record"] = {
 						startTimestamp = 0,
 						type = "lease",
-						endTimestamp = endTimestamp - constants.gracePeriodMs,
+						endTimestamp = currentTimestamp - constants.gracePeriodMs + 1,
 					},
 				},
 			}
-			local arnsStats = arns.getArNSStatsBetweenTimestamps(currentTimestamp, endTimestamp)
+			local arnsStats = arns.getArNSStatsAtTimestamp(currentTimestamp)
 			assert.are.equal(2, arnsStats.totalActiveNames)
 			assert.are.equal(1, arnsStats.totalGracePeriodNames)
 			assert.are.equal(2, arnsStats.totalReservedNames)

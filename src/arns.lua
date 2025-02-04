@@ -378,7 +378,10 @@ function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
 	return activeNames
 end
 
-local function getTotalArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
+--- Gets the total number of ARNS names and their status before a specific timestamp
+--- @param timestamp number The timestamp to check
+--- @return table The total number of ARNS names between the two timestamps
+local function getRecordsStatsAtTimestamp(timestamp)
 	local totalActiveNames = 0
 	local totalGracePeriodNames = 0
 	local records = arns.getRecordsUnsafe()
@@ -387,14 +390,9 @@ local function getTotalArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimes
 		if record.type == "permabuy" then
 			totalActiveNames = totalActiveNames + 1
 		elseif record.type == "lease" and record.endTimestamp then
-			-- record is active for the entire period between the two timestamps
-			if record.startTimestamp <= startTimestamp and record.endTimestamp >= endTimestamp then
+			if arns.recordIsActive(record, timestamp) then
 				totalActiveNames = totalActiveNames + 1
-			elseif
-				-- record is in the grace period for the entire period between the two timestamps
-				record.endTimestamp >= startTimestamp
-				and record.endTimestamp + constants.gracePeriodMs >= endTimestamp
-			then
+			elseif arns.recordInGracePeriod(record, timestamp) then
 				totalGracePeriodNames = totalGracePeriodNames + 1
 			end
 		end
@@ -406,42 +404,50 @@ local function getTotalArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimes
 	}
 end
 
-local function getTotalReservedNamesBetweenTimestampsUnsafe(_, endTimestamp)
+--- Gets the total number of reserved names that are active before a specific timestamp
+--- @param timestamp number The timestamp to check
+--- @return number # The total number of reserved names before the timestamp
+local function getReservedNamesAtTimestamp(timestamp)
 	local reservedNames = arns.getReservedNamesUnsafe()
 	local totalReservedNames = 0
 	for _, reservedName in pairs(reservedNames) do
 		-- reserved name is active between the start and end timestamps
-		if not reservedName.endTimestamp or reservedName.endTimestamp >= endTimestamp then
+		if not reservedName.endTimestamp or reservedName.endTimestamp >= timestamp then
 			totalReservedNames = totalReservedNames + 1
 		end
 	end
 	return totalReservedNames
 end
 
-local function getTotalReturnedNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
+--- Gets the total number of returned names that are active before a specific timestamp
+--- @param timestamp number The timestamp to check
+--- @return number # The total number of returned names before the timestamp
+local function getReturnedNamesAtTimestamp(timestamp)
 	local returnedNames = arns.getReturnedNamesUnsafe()
 	local totalReturnedNames = 0
 
 	for _, returnedName in pairs(returnedNames) do
 		-- returned name is active between the start and end timestamps
-		if
-			returnedName.startTimestamp <= startTimestamp
-			and returnedName.startTimestamp + constants.returnedNamePeriod >= endTimestamp
-		then
+		if returnedName.startTimestamp + constants.returnedNamePeriod >= timestamp then
 			totalReturnedNames = totalReturnedNames + 1
 		end
 	end
 	return totalReturnedNames
 end
 
-function arns.getArNSStatsBetweenTimestamps(startTimestamp, endTimestamp)
-	local totalNames = getTotalArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
+--- Gets the ARNS stats at a specific timestamp
+--- @param timestamp number The timestamp to check
+--- @return table # The ARNS stats at the timestamp
+function arns.getArNSStatsAtTimestamp(timestamp)
+	local totalNames = getRecordsStatsAtTimestamp(timestamp)
+	local totalReservedNames = getReservedNamesAtTimestamp(timestamp)
+	local totalReturnedNames = getReturnedNamesAtTimestamp(timestamp)
 
 	return {
 		totalActiveNames = totalNames.totalActiveNames,
 		totalGracePeriodNames = totalNames.totalGracePeriodNames,
-		totalReservedNames = getTotalReservedNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp),
-		totalReturnedNames = getTotalReturnedNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp),
+		totalReservedNames = totalReservedNames,
+		totalReturnedNames = totalReturnedNames,
 	}
 end
 
@@ -934,7 +940,11 @@ function arns.recordIsActive(record, currentTimestamp)
 		return true
 	end
 
-	return record.endTimestamp and record.endTimestamp >= currentTimestamp
+	-- record starts before the current timestamp and ends after the current timestamp
+	return record.startTimestamp
+		and record.startTimestamp <= currentTimestamp
+		and record.endTimestamp
+		and record.endTimestamp >= currentTimestamp
 end
 
 --- Asserts that a record is valid for increasing the undername limit
