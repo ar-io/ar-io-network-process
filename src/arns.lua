@@ -387,12 +387,12 @@ local function getTotalArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimes
 		if record.type == "permabuy" then
 			totalActiveNames = totalActiveNames + 1
 		elseif record.type == "lease" and record.endTimestamp then
-			-- record is active between the start and end timestamps
+			-- record is active for the entire period between the two timestamps
 			if record.startTimestamp <= startTimestamp and record.endTimestamp >= endTimestamp then
 				totalActiveNames = totalActiveNames + 1
 			elseif
-				-- record is in the grace period between the start and end timestamps
-				record.startTimestamp <= startTimestamp
+				-- record is in the grace period for the entire period between the two timestamps
+				record.endTimestamp >= startTimestamp
 				and record.endTimestamp + constants.gracePeriodMs >= endTimestamp
 			then
 				totalGracePeriodNames = totalGracePeriodNames + 1
