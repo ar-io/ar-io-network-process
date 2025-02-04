@@ -24,6 +24,7 @@ describe("Primary Names", function()
 		it("should fail if the caller does not have a balance", function()
 			_G.NameRegistry.records = {
 				["test"] = {
+					startTimestamp = 0,
 					processId = "base-name-owner",
 					type = "lease",
 					endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
@@ -120,6 +121,7 @@ describe("Primary Names", function()
 				}
 				_G.NameRegistry.records = {
 					["test"] = {
+						startTimestamp = 0,
 						processId = "processId",
 						type = "lease",
 						endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,

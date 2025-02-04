@@ -1118,10 +1118,6 @@ function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
 	for address, gateway in pairs(gateways) do
 		--- @diagnostic disable-next-line: inject-field
 		gateway.gatewayAddress = address
-		-- TODO: inject these for backwards compatibility - after ar-io-sdk update, remove these
-		gateway.weights.gatewayRewardRatioWeight = gateway.weights.gatewayPerformanceRatio or 0
-		gateway.weights.observerRewardRatioWeight = gateway.weights.observerPerformanceRatio or 0
-		-- END TODO
 		-- remove delegates and vaults to avoid sending unbounded arrays, they can be fetched via getPaginatedDelegates and getPaginatedVaults
 		gateway.delegates = nil
 		gateway.vaults = nil

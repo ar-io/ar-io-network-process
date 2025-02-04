@@ -359,23 +359,85 @@ end
 --- @param endTimestamp number The end timestamp
 --- @return table<string> The active ARNS names between the two timestamps
 function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
-	local records = arns.getRecords()
+	local records = arns.getRecordsUnsafe()
 	local activeNames = {}
 	for name, record in pairs(records) do
-		if
-			record.type == "permabuy"
-			or (
-				record.type == "lease"
-				and record.endTimestamp
-				and record.startTimestamp
-				and record.startTimestamp <= startTimestamp
-				and record.endTimestamp >= endTimestamp
-			)
-		then
+		if arns.recordIsActive(record, startTimestamp) and arns.recordIsActive(record, endTimestamp) then
 			table.insert(activeNames, name)
 		end
 	end
 	return activeNames
+end
+
+--- Gets the total number of ARNS names and their status before a specific timestamp
+--- @param timestamp number The timestamp to check
+--- @return table The total number of ARNS names between the two timestamps
+local function getRecordsStatsAtTimestamp(timestamp)
+	local totalActiveNames = 0
+	local totalGracePeriodNames = 0
+	local records = arns.getRecordsUnsafe()
+
+	for _, record in pairs(records) do
+		if record.type == "permabuy" then
+			totalActiveNames = totalActiveNames + 1
+		elseif record.type == "lease" and record.endTimestamp then
+			if arns.recordIsActive(record, timestamp) then
+				totalActiveNames = totalActiveNames + 1
+			elseif arns.recordInGracePeriod(record, timestamp) then
+				totalGracePeriodNames = totalGracePeriodNames + 1
+			end
+		end
+	end
+
+	return {
+		totalActiveNames = totalActiveNames,
+		totalGracePeriodNames = totalGracePeriodNames,
+	}
+end
+
+--- Gets the total number of reserved names that are active before a specific timestamp
+--- @param timestamp number The timestamp to check
+--- @return number # The total number of reserved names before the timestamp
+local function getReservedNamesAtTimestamp(timestamp)
+	local reservedNames = arns.getReservedNamesUnsafe()
+	local totalReservedNames = 0
+	for _, reservedName in pairs(reservedNames) do
+		if not reservedName.endTimestamp or reservedName.endTimestamp >= timestamp then
+			totalReservedNames = totalReservedNames + 1
+		end
+	end
+	return totalReservedNames
+end
+
+--- Gets the total number of returned names that are active before a specific timestamp
+--- @param timestamp number The timestamp to check
+--- @return number # The total number of returned names before the timestamp
+local function getReturnedNamesAtTimestamp(timestamp)
+	local returnedNames = arns.getReturnedNamesUnsafe()
+	local totalReturnedNames = 0
+
+	for _, returnedName in pairs(returnedNames) do
+		if returnedName.startTimestamp + constants.returnedNamePeriod >= timestamp then
+			totalReturnedNames = totalReturnedNames + 1
+		end
+	end
+	return totalReturnedNames
+end
+
+--- Gets the ARNS stats at a specific timestamp
+--- @param timestamp number The timestamp to check
+--- @return ArNSStats # The ARNS stats at the timestamp
+function arns.getArNSStatsAtTimestamp(timestamp)
+	local totalNames = getRecordsStatsAtTimestamp(timestamp)
+	local totalReservedNames = getReservedNamesAtTimestamp(timestamp)
+	local totalReturnedNames = getReturnedNamesAtTimestamp(timestamp)
+
+	return {
+		totalActiveNames = totalNames.totalActiveNames,
+		totalGracePeriodNames = totalNames.totalGracePeriodNames,
+		totalReservedNames = totalReservedNames,
+		totalReturnedNames = totalReturnedNames,
+	}
 end
 
 --- Gets deep copies of all records
@@ -559,7 +621,7 @@ function arns.assertValidBuyRecord(name, years, purchaseType, processId, allowUn
 end
 
 --- Asserts that a record is valid for extending the lease
---- @param record table The record to check
+--- @param record StoredRecord The record to check
 --- @param currentTimestamp number The current timestamp
 --- @param years number The number of years to check
 function arns.assertValidExtendLease(record, currentTimestamp, years)
@@ -571,7 +633,7 @@ function arns.assertValidExtendLease(record, currentTimestamp, years)
 end
 
 --- Calculates the maximum allowed years extension for a record
---- @param record table The record to check
+--- @param record StoredRecord The record to check
 --- @param currentTimestamp number The current timestamp
 --- @return number The maximum allowed years extension for the record
 function arns.getMaxAllowedYearsExtensionForRecord(record, currentTimestamp)
@@ -775,7 +837,7 @@ function arns.getTokenCostAndFundingPlanForIntent(
 end
 
 --- Asserts that a name is valid for upgrading
---- @param record table The record to check
+--- @param record StoredRecord The record to check
 --- @param currentTimestamp number The current timestamp
 function arns.assertValidUpgradeName(record, currentTimestamp)
 	assert(record.type ~= "permabuy", "Name is permanently owned")
@@ -835,43 +897,49 @@ function arns.upgradeRecord(from, name, currentTimestamp, msgId, fundFrom)
 end
 
 --- Checks if a record is in the grace period
---- @param record table The record to check
---- @param currentTimestamp number The current timestamp
---- @return boolean True if the record is in the grace period, false otherwise (active or expired)
-function arns.recordInGracePeriod(record, currentTimestamp)
+--- @param record StoredRecord The record to check
+--- @param timestamp number The timestamp to check
+--- @return boolean isInGracePeriod True if the record is in the grace period, false otherwise (active or expired)
+function arns.recordInGracePeriod(record, timestamp)
 	return record.endTimestamp
-		and record.endTimestamp < currentTimestamp
-		and record.endTimestamp + constants.gracePeriodMs > currentTimestamp
+			and record.endTimestamp < timestamp
+			and record.endTimestamp + constants.gracePeriodMs > timestamp
+		or false
 end
 
 --- Checks if a record is expired
---- @param record table The record to check
---- @param currentTimestamp number The current timestamp
---- @return boolean True if the record is expired, false otherwise (active or in grace period)
-function arns.recordExpired(record, currentTimestamp)
+--- @param record StoredRecord The record to check
+--- @param timestamp number The timestamp to check
+--- @return boolean isExpired True if the record is expired, false otherwise (active or in grace period)
+function arns.recordExpired(record, timestamp)
 	if record.type == "permabuy" then
 		return false
 	end
-	local isActive = arns.recordIsActive(record, currentTimestamp)
-	local inGracePeriod = arns.recordInGracePeriod(record, currentTimestamp)
+	local isActive = arns.recordIsActive(record, timestamp)
+	local inGracePeriod = arns.recordInGracePeriod(record, timestamp)
 	local expired = not isActive and not inGracePeriod
 	return expired
 end
 
 --- Checks if a record is active
---- @param record table The record to check
---- @param currentTimestamp number The current timestamp
---- @return boolean True if the record is active, false otherwise (expired or in grace period)
-function arns.recordIsActive(record, currentTimestamp)
+--- @param record StoredRecord The record to check
+--- @param timestamp number The timestamp to check
+--- @return boolean isActive True if the record is active, false otherwise (expired or in grace period)
+function arns.recordIsActive(record, timestamp)
 	if record.type == "permabuy" then
 		return true
 	end
 
-	return record.endTimestamp and record.endTimestamp >= currentTimestamp
+	-- record starts before the current timestamp and ends after the current timestamp
+	return record.startTimestamp
+			and record.startTimestamp <= timestamp
+			and record.endTimestamp
+			and record.endTimestamp >= timestamp
+		or false
 end
 
 --- Asserts that a record is valid for increasing the undername limit
---- @param record table The record to check
+--- @param record StoredRecord The record to check
 --- @param qty number The quantity to check
 --- @param currentTimestamp number The current timestamp
 function arns.assertValidIncreaseUndername(record, qty, currentTimestamp)

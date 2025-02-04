@@ -1231,6 +1231,72 @@ describe("arns", function()
 		end)
 	end)
 
+	describe("getArNSStatsAtTimestamp", function()
+		it("should return the correct ArNS stats", function()
+			local currentTimestamp = constants.gracePeriodMs
+			_G.NameRegistry = {
+				returned = {
+					["returned-record"] = {
+						name = "returned-record",
+						startTimestamp = currentTimestamp - 1,
+					},
+					-- this should not be counted as a returned name since it's expired
+					["expired-returned"] = {
+						name = "expired-returned",
+						startTimestamp = currentTimestamp - constants.returnedNamePeriod - 1,
+					},
+				},
+				reserved = {
+					["reserved-record"] = {
+						endTimestamp = 2000000000,
+					},
+					-- this should not be counted as a reserved name since it's expired
+					["expired-reserved"] = {
+						endTimestamp = 0,
+					},
+					["permabuy-reserved"] = {
+						target = "some-wallet-address",
+					},
+				},
+				records = {
+					["active-record"] = {
+						startTimestamp = 0,
+						type = "lease",
+						endTimestamp = currentTimestamp * 2,
+					},
+					-- this should not be counted as an active name since it's expired
+					["expired-record"] = {
+						startTimestamp = 0,
+						type = "lease",
+						endTimestamp = 0,
+					},
+					-- this should not be counted as an active name since it starts after the current timestamp
+					["future-record"] = {
+						startTimestamp = currentTimestamp + 1,
+						type = "lease",
+						endTimestamp = currentTimestamp * 2,
+					},
+					["permabuy-record"] = {
+						startTimestamp = 0,
+						type = "permabuy",
+						endTimestamp = nil,
+					},
+					-- record is in the grace period at the current timestamp
+					["grace-period-record"] = {
+						startTimestamp = 0,
+						type = "lease",
+						endTimestamp = currentTimestamp - constants.gracePeriodMs + 1,
+					},
+				},
+			}
+			local arnsStats = arns.getArNSStatsAtTimestamp(currentTimestamp)
+			assert.are.equal(2, arnsStats.totalActiveNames)
+			assert.are.equal(1, arnsStats.totalGracePeriodNames)
+			assert.are.equal(2, arnsStats.totalReservedNames)
+			assert.are.equal(1, arnsStats.totalReturnedNames)
+		end)
+	end)
+
 	describe("pruneReservedNames", function()
 		it("should remove expired reserved names", function()
 			local currentTimestamp = 1000000

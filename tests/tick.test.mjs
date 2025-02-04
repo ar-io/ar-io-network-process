@@ -416,6 +416,12 @@ describe('Tick', async () => {
       startHeight: 1,
       startTimestamp: genesisEpochTimestamp,
       endTimestamp: genesisEpochTimestamp + 24 * 1000 * 60 * 60, // 24 hours - this should match the epoch settings
+      arnsStats: {
+        totalActiveNames: 0,
+        totalGracePeriodNames: 0,
+        totalReservedNames: 0,
+        totalReturnedNames: 0,
+      },
       distributionTimestamp:
         genesisEpochTimestamp + 24 * 1000 * 60 * 60 + 40 * 60 * 1000, // 24 hours + 40 minutes
       observations: {
@@ -429,10 +435,6 @@ describe('Tick', async () => {
           stakeWeight: 3,
           gatewayPerformanceRatio: 1,
           observerPerformanceRatio: 1,
-          // TODO: remove these for backwards compatibility - after ar-io-sdk update, remove these
-          gatewayRewardRatioWeight: 1,
-          observerRewardRatioWeight: 1,
-          // END TODO
           compositeWeight: 12,
           normalizedCompositeWeight: 1,
           tenureWeight: 4,
@@ -584,10 +586,6 @@ describe('Tick', async () => {
         gatewayPerformanceRatio: 1,
         normalizedCompositeWeight: 1,
         observerPerformanceRatio: 1,
-        // TODO: add gatewayRewardRatioWeight and observerRewardRatioWeight as gatewayPerformanceRatio and observerPerformanceRatio for backwards compatibility
-        gatewayRewardRatioWeight: 1,
-        observerRewardRatioWeight: 1,
-        // END TODO
         stakeWeight: 5.5,
         tenureWeight: 4,
       },

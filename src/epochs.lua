@@ -17,6 +17,13 @@ local epochs = {}
 --- @field startHeight number The start height of the epoch
 --- @field distributionTimestamp number The distribution timestamp of the epoch
 --- @field observations Observations The observations of the epoch
+--- @field arnsStats ArNSStats The ArNS stats for the epoch
+
+--- @class ArNSStats # The ArNS stats for an epoch
+--- @field totalActiveNames number The total active ArNS names
+--- @field totalGracePeriodNames number The total grace period ArNS names
+--- @field totalReservedNames number The total reserved ArNS names
+--- @field totalReturnedNames number The total returned ArNS names
 
 --- @class PrescribedEpoch : Epoch
 --- @field prescribedObservers table<ObserverAddress, GatewayAddress> The prescribed observers of the epoch
@@ -138,10 +145,6 @@ function epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 				tenureWeight = gateway.weights.tenureWeight,
 				gatewayPerformanceRatio = gateway.weights.gatewayPerformanceRatio,
 				observerPerformanceRatio = gateway.weights.observerPerformanceRatio,
-				-- TODO: remove these for backwards compatibility - after ar-io-sdk update, remove these
-				gatewayRewardRatioWeight = gateway.weights.gatewayPerformanceRatio,
-				observerRewardRatioWeight = gateway.weights.observerPerformanceRatio,
-				-- END TODO
 				compositeWeight = gateway.weights.compositeWeight,
 				stake = gateway.operatorStake,
 				startTimestamp = gateway.startTimestamp,
@@ -399,6 +402,8 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	local activeGateways = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
 	-- get the max rewards for each participant eligible for the epoch
 	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
+	-- snapshot the ARNS stats at the beginning of the epoch, does not account for any names that are created or expire during the epoch
+	local arnsStatsAtEpochStart = arns.getArNSStatsAtTimestamp(epochStartTimestamp)
 	--- @type PrescribedEpoch
 	local epoch = {
 		epochIndex = epochIndex,
@@ -421,6 +426,7 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 				eligible = eligibleEpochRewards.potentialRewards,
 			},
 		},
+		arnsStats = arnsStatsAtEpochStart,
 	}
 	Epochs[epochIndex] = epoch
 	-- update the gateway weights
@@ -769,6 +775,7 @@ function convertPrescribedEpochToDistributedEpoch(epoch, currentTimestamp, distr
 				distributed = distributed or {},
 			},
 		},
+		arnsStats = epoch.arnsStats,
 	}
 end
 
