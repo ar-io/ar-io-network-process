@@ -387,9 +387,11 @@ local function getTotalArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimes
 		if record.type == "permabuy" then
 			totalActiveNames = totalActiveNames + 1
 		elseif record.type == "lease" and record.endTimestamp then
+			-- record is active between the start and end timestamps
 			if record.startTimestamp <= startTimestamp and record.endTimestamp >= endTimestamp then
 				totalActiveNames = totalActiveNames + 1
 			elseif
+				-- record is in the grace period between the start and end timestamps
 				record.startTimestamp <= startTimestamp
 				and record.endTimestamp + constants.gracePeriodMs >= endTimestamp
 			then
@@ -408,7 +410,8 @@ local function getTotalReservedNamesBetweenTimestampsUnsafe(_, endTimestamp)
 	local reservedNames = arns.getReservedNamesUnsafe()
 	local totalReservedNames = 0
 	for _, reservedName in pairs(reservedNames) do
-		if not reservedName.endTimestamp or endTimestamp <= reservedName.endTimestamp then
+		-- reserved name is active between the start and end timestamps
+		if not reservedName.endTimestamp or reservedName.endTimestamp >= endTimestamp then
 			totalReservedNames = totalReservedNames + 1
 		end
 	end
@@ -420,8 +423,11 @@ local function getTotalReturnedNamesBetweenTimestampsUnsafe(startTimestamp, endT
 	local totalReturnedNames = 0
 
 	for _, returnedName in pairs(returnedNames) do
-		local returnedNameEndTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod
-		if returnedName.startTimestamp <= startTimestamp and returnedNameEndTimestamp >= endTimestamp then
+		-- returned name is active between the start and end timestamps
+		if
+			returnedName.startTimestamp <= startTimestamp
+			and returnedName.startTimestamp + constants.returnedNamePeriod >= endTimestamp
+		then
 			totalReturnedNames = totalReturnedNames + 1
 		end
 	end
