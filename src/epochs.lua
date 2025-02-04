@@ -17,6 +17,13 @@ local epochs = {}
 --- @field startHeight number The start height of the epoch
 --- @field distributionTimestamp number The distribution timestamp of the epoch
 --- @field observations Observations The observations of the epoch
+--- @field arnsStats ArNSStats The ArNS stats for the epoch
+
+--- @class ArNSStats # The ArNS stats
+--- @field totalActiveNames number The total active ArNS names
+--- @field totalGracePeriodNames number The total grace period ArNS names
+--- @field totalReservedNames number The total reserved ArNS names
+--- @field totalReturnedNames number The total returned ArNS names
 
 --- @class PrescribedEpoch : Epoch
 --- @field prescribedObservers table<ObserverAddress, GatewayAddress> The prescribed observers of the epoch
@@ -395,6 +402,7 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	local activeGateways = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
 	-- get the max rewards for each participant eligible for the epoch
 	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
+	local arnsStatsForEpoch = arns.getArNSStatsBetweenTimestamps(epochStartTimestamp, epochEndTimestamp)
 	--- @type PrescribedEpoch
 	local epoch = {
 		epochIndex = epochIndex,
@@ -417,6 +425,7 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 				eligible = eligibleEpochRewards.potentialRewards,
 			},
 		},
+		arnsStats = arnsStatsForEpoch,
 	}
 	Epochs[epochIndex] = epoch
 	-- update the gateway weights
@@ -765,6 +774,7 @@ function convertPrescribedEpochToDistributedEpoch(epoch, currentTimestamp, distr
 				distributed = distributed or {},
 			},
 		},
+		arnsStats = epoch.arnsStats,
 	}
 end
 

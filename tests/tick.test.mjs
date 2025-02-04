@@ -416,6 +416,12 @@ describe('Tick', async () => {
       startHeight: 1,
       startTimestamp: genesisEpochTimestamp,
       endTimestamp: genesisEpochTimestamp + 24 * 1000 * 60 * 60, // 24 hours - this should match the epoch settings
+      arnsStats: {
+        totalActiveNames: 0,
+        totalGracePeriodNames: 0,
+        totalReservedNames: 0,
+        totalReturnedNames: 0,
+      },
       distributionTimestamp:
         genesisEpochTimestamp + 24 * 1000 * 60 * 60 + 40 * 60 * 1000, // 24 hours + 40 minutes
       observations: {

@@ -359,7 +359,7 @@ end
 --- @param endTimestamp number The end timestamp
 --- @return table<string> The active ARNS names between the two timestamps
 function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
-	local records = arns.getRecords()
+	local records = arns.getRecordsUnsafe()
 	local activeNames = {}
 	for name, record in pairs(records) do
 		if
@@ -376,6 +376,64 @@ function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
 		end
 	end
 	return activeNames
+end
+
+local function getTotalArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
+	local totalActiveNames = 0
+	local totalGracePeriodNames = 0
+	local records = arns.getRecordsUnsafe()
+
+	for _, record in pairs(records) do
+		if record.type == "permabuy" then
+			totalActiveNames = totalActiveNames + 1
+		elseif record.type == "lease" and record.endTimestamp then
+			if record.startTimestamp <= startTimestamp and record.endTimestamp >= endTimestamp then
+				totalActiveNames = totalActiveNames + 1
+			elseif record.endTimestamp + constants.gracePeriodMs >= endTimestamp then
+				totalGracePeriodNames = totalGracePeriodNames + 1
+			end
+		end
+	end
+
+	return {
+		totalActiveNames = totalActiveNames,
+		totalGracePeriodNames = totalGracePeriodNames,
+	}
+end
+
+local function getTotalReservedNamesBetweenTimestampsUnsafe(_, endTimestamp)
+	local reservedNames = arns.getReservedNamesUnsafe()
+	local totalReservedNames = 0
+	for _, reservedName in pairs(reservedNames) do
+		if endTimestamp <= reservedName.endTimestamp then
+			totalReservedNames = totalReservedNames + 1
+		end
+	end
+	return totalReservedNames
+end
+
+local function getTotalReturnedNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
+	local returnedNames = arns.getReturnedNamesUnsafe()
+	local totalReturnedNames = 0
+	local returnedNameEndTimestamp = startTimestamp + constants.returnedNamePeriod
+
+	for _, returnedName in pairs(returnedNames) do
+		if startTimestamp >= returnedName.startTimestamp and endTimestamp <= returnedNameEndTimestamp then
+			totalReturnedNames = totalReturnedNames + 1
+		end
+	end
+	return totalReturnedNames
+end
+
+function arns.getArNSStatsBetweenTimestamps(startTimestamp, endTimestamp)
+	local totalNames = getTotalArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
+
+	return {
+		totalActiveNames = totalNames.totalActiveNames,
+		totalGracePeriodNames = totalNames.totalGracePeriodNames,
+		totalReservedNames = getTotalReservedNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp),
+		totalReturnedNames = getTotalReturnedNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp),
+	}
 end
 
 --- Gets deep copies of all records
