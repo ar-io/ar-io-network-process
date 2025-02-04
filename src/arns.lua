@@ -389,7 +389,10 @@ local function getTotalArNSNamesBetweenTimestampsUnsafe(startTimestamp, endTimes
 		elseif record.type == "lease" and record.endTimestamp then
 			if record.startTimestamp <= startTimestamp and record.endTimestamp >= endTimestamp then
 				totalActiveNames = totalActiveNames + 1
-			elseif record.endTimestamp + constants.gracePeriodMs >= endTimestamp then
+			elseif
+				record.startTimestamp <= startTimestamp
+				and record.endTimestamp + constants.gracePeriodMs >= endTimestamp
+			then
 				totalGracePeriodNames = totalGracePeriodNames + 1
 			end
 		end
@@ -415,10 +418,10 @@ end
 local function getTotalReturnedNamesBetweenTimestampsUnsafe(startTimestamp, endTimestamp)
 	local returnedNames = arns.getReturnedNamesUnsafe()
 	local totalReturnedNames = 0
-	local returnedNameEndTimestamp = startTimestamp + constants.returnedNamePeriod
 
 	for _, returnedName in pairs(returnedNames) do
-		if startTimestamp >= returnedName.startTimestamp and endTimestamp <= returnedNameEndTimestamp then
+		local returnedNameEndTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod
+		if returnedName.startTimestamp <= startTimestamp and returnedNameEndTimestamp >= endTimestamp then
 			totalReturnedNames = totalReturnedNames + 1
 		end
 	end
