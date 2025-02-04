@@ -19,7 +19,7 @@ local epochs = {}
 --- @field observations Observations The observations of the epoch
 --- @field arnsStats ArNSStats The ArNS stats for the epoch
 
---- @class ArNSStats # The ArNS stats
+--- @class ArNSStats # The ArNS stats for an epoch
 --- @field totalActiveNames number The total active ArNS names
 --- @field totalGracePeriodNames number The total grace period ArNS names
 --- @field totalReservedNames number The total reserved ArNS names
@@ -402,7 +402,8 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 	local activeGateways = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
 	-- get the max rewards for each participant eligible for the epoch
 	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
-	local arnsStatsForEpoch = arns.getArNSStatsBetweenTimestamps(epochStartTimestamp, epochEndTimestamp)
+	-- snapshot the ARNS stats at the beginning of the epoch, does not account for any names that are created or expire during the epoch
+	local arnsStatsAtEpochStart = arns.getArNSStatsAtTimestamp(epochStartTimestamp)
 	--- @type PrescribedEpoch
 	local epoch = {
 		epochIndex = epochIndex,
@@ -425,7 +426,7 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 				eligible = eligibleEpochRewards.potentialRewards,
 			},
 		},
-		arnsStats = arnsStatsForEpoch,
+		arnsStats = arnsStatsAtEpochStart,
 	}
 	Epochs[epochIndex] = epoch
 	-- update the gateway weights
