@@ -362,16 +362,7 @@ function arns.getActiveArNSNamesBetweenTimestamps(startTimestamp, endTimestamp)
 	local records = arns.getRecordsUnsafe()
 	local activeNames = {}
 	for name, record in pairs(records) do
-		if
-			record.type == "permabuy"
-			or (
-				record.type == "lease"
-				and record.endTimestamp
-				and record.startTimestamp
-				and record.startTimestamp <= startTimestamp
-				and record.endTimestamp >= endTimestamp
-			)
-		then
+		if arns.recordIsActive(record, startTimestamp) and arns.recordIsActive(record, endTimestamp) then
 			table.insert(activeNames, name)
 		end
 	end
