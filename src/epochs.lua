@@ -19,7 +19,7 @@ local epochs = {}
 --- @field observations Observations The observations of the epoch
 --- @field arnsStats ArNSStats The ArNS stats for the epoch
 
---- @class ArNSStats # The ArNS stats
+--- @class ArNSStats # The ArNS stats for an epoch
 --- @field totalActiveNames number The total active ArNS names
 --- @field totalGracePeriodNames number The total grace period ArNS names
 --- @field totalReservedNames number The total reserved ArNS names
