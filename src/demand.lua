@@ -132,19 +132,17 @@ end
 
 --- Updates the demand factor and returns the updated demand factor
 --- @param timestamp number The current timestamp
---- @return number # The demand factor, updated if necessary
+--- @return number | nil # The demand factor, updated if necessary, nil if no update is necessary
 function demand.updateDemandFactor(timestamp)
 	if not demand.shouldUpdateDemandFactor(timestamp) then
-		print("Not updating demand factor")
-		return demand.getDemandFactor()
+		return nil
 	end
 
 	local settings = demand.getSettings()
 
 	-- check that we have settings
 	if not settings then
-		print("No settings found")
-		return demand.getDemandFactor()
+		return nil
 	end
 
 	if demand.isDemandIncreasing() then
