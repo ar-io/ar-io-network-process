@@ -366,6 +366,58 @@ function epochs.getEpochIndexForTimestamp(timestamp)
 	return epochIndex
 end
 
+--- Prescribes an epoch
+--- @param timestamp number The timestamp
+--- @param hashchain string The hashchain
+--- @return PrescribedEpoch|nil # The prescribed epoch, or nil if an epoch already exists for the index
+function epochs.prescribeEpoch(timestamp, hashchain)
+	assert(type(timestamp) == "number", "Timestamp must be a number")
+	assert(type(hashchain) == "string", "Hashchain must be a string")
+
+	local epochIndex = epochs.getEpochIndexForTimestamp(timestamp)
+	local epoch = epochs.getEpoch(epochIndex)
+
+	if not epoch then
+		-- create the epoch so we can prescribe it
+		error("Unable to prescribe epoch. Epoch not found for index: " .. epochIndex)
+	end
+
+	local prevEpochIndex = epochIndex - 1
+	local prevEpoch = epochs.getEpoch(prevEpochIndex)
+	-- if there is a previous epoch and it has not been distributed, we cannot create a new epoch. once the epoch has been distributed, it will be removed from the epoch registry
+	if prevEpoch and not prevEpoch.distributions.distributedTimestamp then
+		print(
+			"Distributions have not occurred for the previous epoch. A new epoch cannot be prescribed until distribution for the previous epoch is complete: "
+				.. prevEpochIndex
+		)
+		return nil
+	end
+
+	-- if already prescribed, return the epoch
+	if epoch.prescribedObservers and epoch.prescribedNames then
+		--- @cast epoch PrescribedEpoch
+		return nil
+	end
+
+	--- @cast epoch PrescribedEpoch
+
+	-- get the max rewards for each participant eligible for the epoch
+	local prescribedObservers = epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
+	local prescribedNames = epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
+
+	epoch.prescribedObservers = prescribedObservers
+	epoch.prescribedNames = prescribedNames
+
+	-- now that we have the eligible rewards, we can set them in the epoch
+	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
+	epoch.distributions.rewards.eligible = eligibleEpochRewards.potentialRewards
+	epoch.distributions.totalEligibleRewards = eligibleEpochRewards.totalEligibleRewards
+	epoch.distributions.totalEligibleGatewayReward = eligibleEpochRewards.perGatewayReward
+	epoch.distributions.totalEligibleObserverReward = eligibleEpochRewards.perObserverReward
+
+	return epoch
+end
+
 --- Creates a new epoch and updates the gateway weights
 --- @param timestamp number The timestamp in milliseconds
 --- @param blockHeight number The block height
@@ -383,58 +435,32 @@ function epochs.createEpoch(timestamp, blockHeight, hashchain)
 		return nil -- do not return the existing epoch to prevent sending redundant epoch-created-notices
 	end
 
-	local prevEpochIndex = epochIndex - 1
-	local prevEpoch = epochs.getEpoch(prevEpochIndex)
-	-- if there is a previous epoch and it has not been distributed, we cannot create a new epoch. once the epoch has been distributed, it will be removed from the epoch registry
-	if prevEpoch and not prevEpoch.distributions.distributedTimestamp then
-		-- TODO: consider throwing an error here instead of silently returning
-		print(
-			"Distributions have not occurred for the previous epoch. A new epoch cannot be created until distribution for the previous epoch is complete: "
-				.. prevEpochIndex
-		)
-		return nil
-	end
-
 	local epochStartTimestamp, epochEndTimestamp, epochDistributionTimestamp =
 		epochs.getEpochTimestampsForIndex(epochIndex)
-	local prescribedObservers, weightedGateways = epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
-	local prescribedNames = epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
 	local activeGateways = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
-	-- get the max rewards for each participant eligible for the epoch
-	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
 	-- snapshot the ARNS stats at the beginning of the epoch, does not account for any names that are created or expire during the epoch
 	local arnsStatsAtEpochStart = arns.getArNSStatsAtTimestamp(epochStartTimestamp)
-	--- @type PrescribedEpoch
+	--- @type Epoch
 	local epoch = {
 		epochIndex = epochIndex,
 		startTimestamp = epochStartTimestamp,
 		endTimestamp = epochEndTimestamp,
 		startHeight = blockHeight,
 		distributionTimestamp = epochDistributionTimestamp,
-		prescribedObservers = prescribedObservers,
-		prescribedNames = prescribedNames,
+		-- these will be set when the epoch is prescribed
+		prescribedObservers = {},
+		prescribedNames = {},
 		observations = {
 			failureSummaries = {},
 			reports = {},
 		},
 		distributions = {
 			totalEligibleGateways = utils.lengthOfTable(activeGateways),
-			totalEligibleRewards = eligibleEpochRewards.totalEligibleRewards,
-			totalEligibleGatewayReward = eligibleEpochRewards.perGatewayReward,
-			totalEligibleObserverReward = eligibleEpochRewards.perObserverReward,
-			rewards = {
-				eligible = eligibleEpochRewards.potentialRewards,
-			},
+			-- remaining fields will be set when the epoch is prescribed
 		},
 		arnsStats = arnsStatsAtEpochStart,
 	}
 	Epochs[epochIndex] = epoch
-	-- update the gateway weights
-	if weightedGateways then
-		for _, weightedGateway in ipairs(weightedGateways) do
-			gar.updateGatewayWeights(weightedGateway)
-		end
-	end
 
 	-- Force schedule a pruning JIC
 	NextEpochsPruneTimestamp = NextEpochsPruneTimestamp or 0

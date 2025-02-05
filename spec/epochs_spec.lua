@@ -457,6 +457,8 @@ describe("epochs", function()
 		end)
 	end)
 
+	describe("prescribeEpoch", function() end)
+
 	describe("createEpoch", function()
 		local settings = epochs.getSettings()
 		local epochIndex = 1

@@ -4,8 +4,9 @@ local demand = require("demand")
 local gar = require("gar")
 
 --- @class TickResult
---- @field maybeDistributedEpoch DistributedEpoch | nil The distributed epoch
 --- @field maybeNewEpoch Epoch | nil The new epoch
+--- @field maybePrescribedEpoch PrescribedEpoch | nil The prescribed epoch
+--- @field maybeDistributedEpoch DistributedEpoch | nil The distributed epoch
 --- @field maybeDemandFactor number | nil The demand factor
 --- @field pruneGatewaysResult PruneGatewaysResult The prune gateways result
 
@@ -24,11 +25,14 @@ function tick.tickEpoch(timestamp, blockHeight, hashchain, msgId)
 	local pruneGatewaysResult = gar.pruneGateways(timestamp, msgId)
 	-- now create the new epoch with the current message hashchain and block height
 	local newEpoch = epochs.createEpoch(timestamp, blockHeight, hashchain)
+	-- prescribe the epoch if it is not already prescribed
+	local prescribedEpoch = epochs.prescribeEpoch(timestamp, hashchain)
 	return {
 		maybeDistributedEpoch = distributedEpoch,
 		maybeNewEpoch = newEpoch,
 		maybeDemandFactor = demandFactor,
 		pruneGatewaysResult = pruneGatewaysResult,
+		maybePrescribedEpoch = prescribedEpoch,
 	}
 end
 
