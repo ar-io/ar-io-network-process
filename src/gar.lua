@@ -912,6 +912,18 @@ function gar.updateGatewayStats(address, gateway, stats)
 	return gateway
 end
 
+--- Updates the weights for all active gateways. This is usually called every epoch.
+--- @param timestamp number The timestamp to update the weights at
+function gar.updateAllActiveGatewayWeights(timestamp)
+	local weightedGateways =
+		gar.getGatewayWeightsAtTimestamp(gar.getActiveGatewaysBeforeTimestamp(timestamp), timestamp)
+	for _, weightedGateway in ipairs(weightedGateways) do
+		gar.updateGatewayWeights(weightedGateway)
+	end
+end
+
+--- Updates the weights for a gateway
+--- @param weightedGateway WeightedGateway The weighted gateway to update the weights for
 function gar.updateGatewayWeights(weightedGateway)
 	local address = weightedGateway.gatewayAddress
 	local gateway = gar.getGateway(address)

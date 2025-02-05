@@ -364,32 +364,30 @@ describe('Tick', async () => {
 
     const genesisEpochTimestamp = epochSettings.epochZeroStartTimestamp;
     // now tick to create the first epoch after the epoch start timestamp
-    const createEpochTimestamp = genesisEpochTimestamp + 1;
-    const newEpochTick = await tick({
+    const createNewEpochTimestamp = genesisEpochTimestamp + 1;
+    const { result: newEpochTick, memory: newEpochTickMemory } = await tick({
       memory: newDelegateResult.Memory,
-      timestamp: createEpochTimestamp,
+      timestamp: createNewEpochTimestamp,
       forcePrune: true,
     });
 
     // should only have one message with a tick notice, the epoch distribution notice is sent separately
-    assert.equal(newEpochTick.result.Messages.length, 2);
+    assert.equal(newEpochTick.Messages.length, 2);
     assert.equal(
-      newEpochTick.result.Messages[0].Tags.find((tag) => tag.name === 'Action')
-        .value,
+      newEpochTick.Messages[0].Tags.find((tag) => tag.name === 'Action').value,
       'Epoch-Created-Notice',
     );
     assert.equal(
-      newEpochTick.result.Messages[1].Tags.find((tag) => tag.name === 'Action')
-        .value,
+      newEpochTick.Messages[1].Tags.find((tag) => tag.name === 'Action').value,
       'Tick-Notice',
     );
 
-    const createdEpochData = JSON.parse(newEpochTick.result.Messages[0].Data);
+    const createdEpochData = JSON.parse(newEpochTick.Messages[0].Data);
 
     // assert the new epoch is created
     const epochData = await getEpoch({
-      memory: newEpochTick.memory,
-      timestamp: createEpochTimestamp,
+      memory: newEpochTickMemory,
+      timestamp: createNewEpochTimestamp,
     });
 
     // get the epoch timestamp and assert it is in 24 hours
@@ -405,12 +403,9 @@ describe('Tick', async () => {
     // assert the epoch data is correct
     assert.deepStrictEqual(createdEpochData, {
       ...epochData,
-      prescribedObservers: {
-        // in state we store just the address maps, not the full weights
-        [STUB_ADDRESS]: STUB_ADDRESS,
-      },
+      prescribedObservers: [],
     });
-    // assert the returned epoch data is correct and contains the full weights of the prescribed observer
+    // assert the returned epoch data is an empty epoch with no prescribed observers
     assert.deepStrictEqual(epochData, {
       epochIndex: 0,
       startHeight: 1,
@@ -428,21 +423,51 @@ describe('Tick', async () => {
         failureSummaries: [],
         reports: [],
       },
+      prescribedObservers: [],
+      prescribedNames: [], // no names in the network
+      distributions: [],
+    });
+
+    const prescribedEpochTimestamp =
+      createNewEpochTimestamp + epochSettings.distributionDelayMs;
+
+    // now tick to get the prescribed observers and names for the epoch
+    const prescribedObserversAndNamesTick = await tick({
+      memory: newEpochTick.memory,
+      timestamp: createNewEpochTimestamp + epochSettings.distributionDelayMs,
+    });
+
+    // assert that epoch-prescribed-notice is sent
+    assert.equal(prescribedObserversAndNamesTick.Messages.length, 2);
+    assert.equal(
+      prescribedObserversAndNamesTick.Messages[0].Tags.find(
+        (tag) => tag.name === 'Action',
+      ).value,
+      'Epoch-Prescribed-Notice',
+    );
+
+    const prescribedEpochData = await getEpoch({
+      memory: prescribedObserversAndNamesTick.memory,
+      timestamp: prescribedEpochTimestamp,
+    });
+
+    // assert the epoch data is correct
+    assert.deepStrictEqual(prescribedEpochData, {
+      ...epochData,
       prescribedObservers: [
         {
           observerAddress: STUB_ADDRESS,
           gatewayAddress: STUB_ADDRESS,
+          stake: INITIAL_OPERATOR_STAKE,
           stakeWeight: 3,
+          compositeWeight: 12,
           gatewayPerformanceRatio: 1,
           observerPerformanceRatio: 1,
-          compositeWeight: 12,
           normalizedCompositeWeight: 1,
           tenureWeight: 4,
-          stake: INITIAL_OPERATOR_STAKE,
           startTimestamp: STUB_TIMESTAMP,
         },
       ],
-      prescribedNames: [], // no names in the network
       distributions: {
         totalEligibleGateways: 1,
         totalEligibleRewards: totalEligibleRewards,
@@ -463,7 +488,7 @@ describe('Tick', async () => {
 
     // have the gateway submit an observation
     const reportTxId = 'report-tx-id-'.padEnd(43, '1');
-    const observationTimestamp = createEpochTimestamp + 7 * 1000 * 60 * 60; // 7 hours after the epoch start timestamp
+    const observationTimestamp = prescribedEpochTimestamp + 7 * 1000 * 60 * 60; // 7 hours after the epoch is prescribed
     const observation = await saveObservations({
       memory: newEpochTick.memory,
       timestamp: observationTimestamp,

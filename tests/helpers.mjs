@@ -11,6 +11,7 @@ import {
   validGatewayTags,
   STUB_PROCESS_ID,
   INITIAL_OPERATOR_STAKE,
+  STUB_BLOCK_HEIGHT,
 } from '../tools/constants.mjs';
 
 const initialOperatorStake = 100_000_000_000;
@@ -45,8 +46,10 @@ export async function handle({
   memory = startMemory,
   shouldAssertNoResultError = true,
   timestamp = STUB_TIMESTAMP,
+  blockHeight = STUB_BLOCK_HEIGHT,
 }) {
   options.Timestamp ??= timestamp;
+  options['Block-Height'] ??= blockHeight;
 
   const result = await originalHandle(
     memory,
@@ -850,11 +853,13 @@ export const tick = async ({
   memory,
   timestamp = STUB_TIMESTAMP,
   forcePrune = false,
+  blockHeight,
 }) => {
   const tickResult = await handle({
     options: {
       Tags: [{ name: 'Action', value: 'Tick' }],
       Timestamp: timestamp,
+      'Block-Height': blockHeight,
       ...(forcePrune ? { name: 'Force-Prune', value: 'true' } : {}),
     },
     memory,
@@ -878,6 +883,18 @@ export const getInfo = async ({ memory, timestamp }) => {
     memory: nameResult.Memory,
     result: nameResult,
   };
+};
+
+export const getGateways = async ({ memory, timestamp }) => {
+  const gatewaysResult = await handle({
+    options: {
+      Tags: [{ name: 'Action', value: 'Gateways' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  assertNoResultError(gatewaysResult);
+  return JSON.parse(gatewaysResult.Messages[0].Data);
 };
 
 export const getRecord = async ({
