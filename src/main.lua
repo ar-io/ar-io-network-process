@@ -22,10 +22,11 @@ Vaults = Vaults or {}
 GatewayRegistry = GatewayRegistry or {}
 NameRegistry = NameRegistry or {}
 Epochs = Epochs or {}
+
+-- last known timestamps used to validate behavior to perform on new messages
+LastCreatedEpochIndex = LastCreatedEpochIndex or -1
 LastDistributedEpochIndex = LastDistributedEpochIndex or -1
--- TODO: can remove LastTickedEpochIndex once LastCreatedEpochIndex is properly set to LastTickedEpochIndex on devnet/testnet
-LastTickedEpochIndex = LastTickedEpochIndex or -1
-LastCreatedEpochIndex = LastCreatedEpochIndex or LastTickedEpochIndex or -1
+LastPrescribedEpochIndex = LastPrescribedEpochIndex or -1
 LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
 LastKnownMessageTimestamp = LastKnownMessageTimestamp or 0
 LastKnownMessageId = LastKnownMessageId or ""
@@ -1781,7 +1782,20 @@ end, function(msg)
 		-- TODO: if we are significantly behind, we should not prescribed any observers or names, or decrement any gateways for failure
 		local tickResult = tick.tickEpoch(msg.Timestamp, blockHeight, hashchain, msgId)
 		print("Ticked epoch " .. i)
+		if tickResult.maybeDemandFactor ~= nil then
+			print("Updated demand factor for epoch " .. tickResult.maybeDemandFactor)
+			table.insert(newDemandFactors, tickResult.maybeDemandFactor)
+			Send(msg, {
+				Target = msg.From,
+				Action = "Updated-Demand-Factor-Notice",
+				Data = json.encode(tickResult.maybeDemandFactor),
+			})
+		end
+		if tickResult.pruneGatewaysResult ~= nil then
+			table.insert(newPruneGatewaysResults, tickResult.pruneGatewaysResult)
+		end
 		if tickResult.maybeNewEpoch ~= nil then
+			print("Created epoch " .. tickResult.maybeNewEpoch.epochIndex)
 			LastCreatedEpochIndex = tickResult.maybeNewEpoch.epochIndex
 			table.insert(newEpochIndexes, tickResult.maybeNewEpoch.epochIndex)
 			Send(msg, {
@@ -1791,12 +1805,15 @@ end, function(msg)
 				Data = json.encode(tickResult.maybeNewEpoch),
 			})
 		end
-		if tickResult.maybeDemandFactor ~= nil then
-			print("Updated demand factor for epoch " .. tickResult.maybeDemandFactor)
-			table.insert(newDemandFactors, tickResult.maybeDemandFactor)
-		end
-		if tickResult.pruneGatewaysResult ~= nil then
-			table.insert(newPruneGatewaysResults, tickResult.pruneGatewaysResult)
+		if tickResult.maybePrescribedEpoch ~= nil then
+			print("Prescribed epoch " .. tickResult.maybePrescribedEpoch.epochIndex)
+			LastPrescribedEpochIndex = tickResult.maybePrescribedEpoch.epochIndex
+			Send(msg, {
+				Target = msg.From,
+				Action = "Epoch-Prescribed-Notice",
+				["Epoch-Index"] = tostring(tickResult.maybePrescribedEpoch.epochIndex),
+				Data = json.encode(tickResult.maybePrescribedEpoch),
+			})
 		end
 		if tickResult.maybeDistributedEpoch ~= nil then
 			print("Distributed rewards for epoch " .. tickResult.maybeDistributedEpoch.epochIndex)
