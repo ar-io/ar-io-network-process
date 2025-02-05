@@ -1781,15 +1781,8 @@ end, function(msg)
 		print("Ticking epoch " .. i)
 		-- TODO: if we are significantly behind, we should not prescribed any observers or names, or decrement any gateways for failure
 		local tickResult = tick.tickEpoch(msg.Timestamp, blockHeight, hashchain, msgId)
-		print("Ticked epoch " .. i)
 		if tickResult.maybeDemandFactor ~= nil then
-			print("Updated demand factor for epoch " .. tickResult.maybeDemandFactor)
 			table.insert(newDemandFactors, tickResult.maybeDemandFactor)
-			Send(msg, {
-				Target = msg.From,
-				Action = "Updated-Demand-Factor-Notice",
-				Data = json.encode(tickResult.maybeDemandFactor),
-			})
 		end
 		if tickResult.pruneGatewaysResult ~= nil then
 			table.insert(newPruneGatewaysResults, tickResult.pruneGatewaysResult)

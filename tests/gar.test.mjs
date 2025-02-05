@@ -1676,9 +1676,11 @@ describe('GatewayRegistry', async () => {
         observerAddress,
       });
 
-      // create the first epoch, this will setup the epoch and prescribe the observer to the gateway
+      // create the first epoch, this will setup the epoch and prescribe the observer
       const { result: createFirstEpoch } = await tick({
-        timestamp: epochSettings.epochZeroStartTimestamp,
+        timestamp:
+          epochSettings.epochZeroStartTimestamp +
+          epochSettings.distributionDelayMs,
         memory: addGatewayMemory,
       });
 
@@ -1686,7 +1688,7 @@ describe('GatewayRegistry', async () => {
       observationTimestamp =
         epochSettings.epochZeroStartTimestamp + epochSettings.durationMs / 2;
 
-      // get the epoch that was created
+      // get the epoch distributions for the first epoch
       const {
         totalEligibleObserverReward,
         totalEligibleGatewayReward,
@@ -1695,7 +1697,9 @@ describe('GatewayRegistry', async () => {
         rewards,
       } = await getEpochDistributions({
         memory: createFirstEpoch.Memory,
-        timestamp: epochSettings.epochZeroStartTimestamp,
+        timestamp:
+          epochSettings.epochZeroStartTimestamp +
+          epochSettings.distributionDelayMs,
       });
 
       // assert the eligible distributions are correct
@@ -1719,7 +1723,9 @@ describe('GatewayRegistry', async () => {
       // assert the joined gateway is prescribed to the observer
       const prescribedObservers = await getPrescribedObservers({
         memory: createFirstEpoch.Memory,
-        timestamp: epochSettings.epochZeroStartTimestamp,
+        timestamp:
+          epochSettings.epochZeroStartTimestamp +
+          epochSettings.distributionDelayMs,
       });
 
       // assert both gateways were prescribed for the first epoch
