@@ -489,6 +489,11 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 			local errorWithEvent = tostring(resultOrError) .. "\n" .. errorEvent:toJSON()
 			error(errorWithEvent, 0) -- 0 ensures not to include this line number in the error message
 		end
+
+		msg.ioEvent:addField("Handler-Memory-KiB-Used", collectgarbage("count"), false)
+		collectgarbage("collect")
+		msg.ioEvent:addField("Final-Memory-KiB-Used", collectgarbage("count"), false)
+
 		if printEvent then
 			msg.ioEvent:printEvent()
 		end
