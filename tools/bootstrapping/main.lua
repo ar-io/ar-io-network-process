@@ -1,7 +1,16 @@
+Balances = {}
+
 Handlers.add("info", "Info", function(msg)
 	msg.reply({
 		Target = msg.From,
 		["Memory-KiB-Used"] = tostring(collectgarbage("count")),
+	})
+end)
+
+Handlers.add("getBalances", "Balances", function(msg)
+	msg.reply({
+		Target = msg.From,
+		Balances = json.encode(Balances),
 	})
 end)
 
