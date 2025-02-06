@@ -117,7 +117,7 @@ describe("Primary Names", function()
 			"should create a primary name request and transfer the cost from the initiator to the protocol balance",
 			function()
 				_G.Balances = {
-					["user-requesting-primary-name"] = 821917,
+					["user-requesting-primary-name"] = 10000000,
 				}
 				_G.NameRegistry.records = {
 					["test"] = {
@@ -142,17 +142,17 @@ describe("Primary Names", function()
 					baseNameOwner = "processId",
 					fundingPlan = {
 						address = "user-requesting-primary-name",
-						balance = 821917,
+						balance = 10000000,
 						shortfall = 0,
 						stakes = {},
 					},
 					fundingResult = {
 						newWithdrawVaults = {},
-						totalFunded = 821917,
+						totalFunded = 10000000,
 					},
 				}, primaryNameRequest)
 				assert.are.equal(0, _G.Balances["user-requesting-primary-name"])
-				assert.are.equal(821917, _G.Balances[ao.id])
+				assert.are.equal(10000000, _G.Balances[ao.id])
 			end
 		)
 	end)

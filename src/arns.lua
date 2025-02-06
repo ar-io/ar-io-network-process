@@ -757,13 +757,10 @@ function arns.getTokenCost(intendedAction)
 		arns.assertValidUpgradeName(record, currentTimestamp)
 		tokenCost = arns.calculatePermabuyFee(baseFee, demand.getDemandFactor())
 	elseif intent == "Primary-Name-Request" then
+		-- primary name requests cost the same as a 1 undername
 		assert(record, "Name is not registered")
 		assert(currentTimestamp, "Timestamp is required")
-		local yearsRemaining = constants.PERMABUY_LEASE_FEE_LENGTH
-		if record.type == "lease" then
-			yearsRemaining = arns.calculateYearsBetweenTimestamps(currentTimestamp, record.endTimestamp)
-		end
-		tokenCost = arns.calculateUndernameCost(baseFee, 1, record.type, yearsRemaining, demand.getDemandFactor())
+		tokenCost = arns.calculateUndernameCost(baseFee, 1, record.type, demand.getDemandFactor())
 	else
 		error("Invalid intent: " .. intent)
 	end
