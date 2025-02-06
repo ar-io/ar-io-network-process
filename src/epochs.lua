@@ -440,16 +440,16 @@ function epochs.createNewEpoch(timestamp, blockHeight)
 	assert(type(timestamp) == "number", "Timestamp must be a number")
 	assert(type(blockHeight) == "number", "Block height must be a number")
 
-	local epochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	if epochs.getEpoch(epochIndex) then
-		print("Epoch already exists for index, skipping creation: " .. epochIndex)
-		return nil -- do not return the existing epoch to prevent sending redundant epoch-created-notices
-	end
-
 	-- if before the epoch zero start timestamp, return nil
 	if timestamp < epochs.getSettings().epochZeroStartTimestamp then
 		print("Genesis epoch will start at: " .. epochs.getSettings().epochZeroStartTimestamp)
 		return nil
+	end
+
+	local epochIndex = epochs.getEpochIndexForTimestamp(timestamp)
+	if epochs.getEpoch(epochIndex) then
+		print("Epoch already exists for index, skipping creation: " .. epochIndex)
+		return nil -- do not return the existing epoch to prevent sending redundant epoch-created-notices
 	end
 
 	local epochStartTimestamp, epochEndTimestamp, epochDistributionTimestamp =
