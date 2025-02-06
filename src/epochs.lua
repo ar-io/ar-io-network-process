@@ -391,7 +391,8 @@ function epochs.prescribeCurrentEpoch(timestamp, hashchain)
 
 	local prevEpochIndex = epochIndex - 1
 	local prevEpoch = epochs.getEpoch(prevEpochIndex)
-	-- if there is a previous epoch and it has not been distributed, we cannot create a new epoch. once the epoch has been distributed, it will be removed from the epoch registry
+
+	-- if there is a previous epoch and it has not been distributed, we cannot create a new epoch as the distributions will impact gateway stake weights and performance ratios
 	if prevEpoch and not prevEpoch.distributions.distributedTimestamp then
 		print(
 			"Distributions have not occurred for the previous epoch. A new epoch cannot be prescribed until distribution for the previous epoch is complete: "
@@ -400,19 +401,18 @@ function epochs.prescribeCurrentEpoch(timestamp, hashchain)
 		return nil
 	end
 
+	-- if the epoch cannot be prescribed before distribution for the previous epoch, return nil
 	if timestamp < epoch.startTimestamp + epochs.getSettings().distributionDelayMs then
 		print("Epoch cannot be prescribed before distribution for the previous epoch: " .. prevEpochIndex)
 		return nil
 	end
 
-	-- if already prescribed return nil
+	-- use the hashchain to check if the epoch has already been prescribed, if so return nil
 	if epoch.hashchain then
 		--- @cast epoch PrescribedEpoch
 		print("Epoch already prescribed, skipping prescription: " .. epochIndex)
 		return nil
 	end
-
-	print("Epoch not yet prescribed, prescribing: " .. require("json").encode(epoch))
 
 	-- get the max rewards for each participant eligible for the epoch
 	local prescribedObservers = epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
