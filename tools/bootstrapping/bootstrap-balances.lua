@@ -1,3 +1,4 @@
+Balances = Balances or {}
 Balances["s8NAmtPbz1doqBB2t8uphgHWPSzeYF17rKd51z289Yo"] = 80235328989540
 Balances["9Bp7VpBXvnr6Y6a0ivq0XmkC2cldOuNcyBaLtIHQO0W"] = 96000558492103
 Balances["WeTdVmaEKldbJSSLnwh2OK0wumI9VGPhGidwQ54eJCu"] = 60060078055565
