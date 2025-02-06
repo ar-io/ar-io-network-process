@@ -130,7 +130,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 		type = purchaseType,
 		undernameLimit = constants.DEFAULT_UNDERNAME_COUNT,
 		purchasePrice = totalFee,
-		endTimestamp = purchaseType == "lease" and timestamp + constants.oneYearMs * years or nil,
+		endTimestamp = purchaseType == "lease" and timestamp + constants.yearsToMs(years) or nil,
 	}
 
 	-- Register the leased or permanently owned name
@@ -254,7 +254,7 @@ function arns.extendLease(from, name, years, currentTimestamp, msgId, fundFrom)
 	assert(fundingResult.totalFunded == totalFee, "Funding plan application failed")
 
 	-- modify the record with the new end timestamp
-	arns.modifyRecordEndTimestamp(name, record.endTimestamp + constants.oneYearMs * years)
+	arns.modifyRecordEndTimestamp(name, record.endTimestamp + constants.yearsToMs(years))
 
 	-- Transfer tokens to the protocol balance
 	balances.increaseBalance(ao.id, totalFee)
@@ -502,7 +502,7 @@ end
 function arns.modifyRecordEndTimestamp(name, newEndTimestamp)
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
-	local maxLeaseLength = constants.maxLeaseLengthYears * constants.oneYearMs
+	local maxLeaseLength = constants.maxLeaseLengthYears * constants.yearsToMs(1)
 	local maxEndTimestamp = record.startTimestamp + maxLeaseLength
 	assert(newEndTimestamp <= maxEndTimestamp, "Cannot extend lease beyond 5 years")
 	NameRegistry.records[name].endTimestamp = newEndTimestamp
@@ -574,7 +574,7 @@ end
 --- @param endTimestamp number The end timestamp
 --- @return number yearsBetweenTimestamps - the number of years between the two timestamps
 function arns.calculateYearsBetweenTimestamps(startTimestamp, endTimestamp)
-	local yearsRemainingFloat = (endTimestamp - startTimestamp) / constants.oneYearMs
+	local yearsRemainingFloat = (endTimestamp - startTimestamp) / constants.yearsToMs(1)
 	return yearsRemainingFloat
 end
 
@@ -646,7 +646,7 @@ function arns.getMaxAllowedYearsExtensionForRecord(record, currentTimestamp)
 	end
 
 	-- TODO: should we put this as the ceiling? or should we allow people to extend as soon as it is purchased
-	local yearsRemainingOnLease = math.ceil((record.endTimestamp - currentTimestamp) / constants.oneYearMs)
+	local yearsRemainingOnLease = math.ceil((record.endTimestamp - currentTimestamp) / constants.yearsToMs(1))
 
 	-- a number between 0 and 5 (MAX_YEARS)
 	return constants.maxLeaseLengthYears - yearsRemainingOnLease

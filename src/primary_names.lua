@@ -99,7 +99,7 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 	local request = {
 		name = name,
 		startTimestamp = timestamp,
-		endTimestamp = timestamp + constants.oneWeekMs,
+		endTimestamp = timestamp + constants.daysToMs(7),
 	}
 
 	--- if the initiator is base name owner, then just set the primary name and return

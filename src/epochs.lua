@@ -87,7 +87,7 @@ EpochSettings = EpochSettings
 		maxObservers = 50,
 		epochZeroStartTimestamp = 1719900000000, -- July 9th, 00:00:00 UTC
 		durationMs = constants.defaultEpochDurationMs, -- 24 hours
-		distributionDelayMs = 60 * 1000 * 40, -- 40 minutes (~ 20 arweave blocks)
+		distributionDelayMs = constants.distributionDelayMs, -- 40 minutes (~ 20 arweave blocks)
 	}
 
 --- @type Timestamp|nil

@@ -100,19 +100,19 @@ GatewayRegistrySettings = {
 	observers = {
 		maxPerEpoch = 50,
 		tenureWeightDays = 180,
-		tenureWeightPeriod = 180 * 24 * 60 * 60 * 1000, -- approximately 180 days
+		tenureWeightPeriod = constants.daysToMs(180), -- 180 days in ms
 		maxTenureWeight = 4,
 	},
 	operators = {
 		minStake = constants.ARIOToMARIO(10000), -- 10,000 ARIO
-		withdrawLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days to lower operator stake
-		leaveLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days that balance will be vaulted
+		withdrawLengthMs = constants.daysToMs(90), -- 90 days to lower operator stake
+		leaveLengthMs = constants.daysToMs(90), -- 90 days that balance will be vaulted
 		failedEpochCountMax = 30, -- number of epochs failed before marked as leaving
-		failedEpochSlashRate = 0.2, -- 20% of stake is returned to protocol balance
+		failedEpochSlashRate = 1, -- 100% of the minimum operator stake is returned to protocol balance, rest is vaulted
 	},
 	delegates = {
 		minStake = constants.ARIOToMARIO(10), -- 10 ARIO
-		withdrawLengthMs = 90 * 24 * 60 * 60 * 1000, -- 90 days
+		withdrawLengthMs = constants.daysToMs(90), -- 90 days
 	},
 }
 
@@ -1054,7 +1054,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				and garSettings ~= nil
 				and gateway.stats.failedConsecutiveEpochs >= garSettings.operators.failedEpochCountMax
 			then
-				-- slash 20% of the minimum operator stake and return the rest to the protocol balance, then mark the gateway as leaving
+				-- slash the minimum operator stake and return it to the protocol balance; mark the gateway as leaving which will vault remaining stake
 				local slashableOperatorStake = math.min(gateway.operatorStake, garSettings.operators.minStake)
 				local slashAmount = math.floor(slashableOperatorStake * garSettings.operators.failedEpochSlashRate)
 				result.delegateStakeWithdrawing = result.delegateStakeWithdrawing + gateway.totalDelegatedStake
