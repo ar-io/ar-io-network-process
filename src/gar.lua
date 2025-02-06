@@ -1054,7 +1054,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 				and garSettings ~= nil
 				and gateway.stats.failedConsecutiveEpochs >= garSettings.operators.failedEpochCountMax
 			then
-				-- slash the minimum operator stake and return it to the protocol balance, mark the gateway as leaving which will vault and remaining stake
+				-- slash the minimum operator stake and return it to the protocol balance; mark the gateway as leaving which will vault remaining stake
 				local slashableOperatorStake = math.min(gateway.operatorStake, garSettings.operators.minStake)
 				local slashAmount = math.floor(slashableOperatorStake * garSettings.operators.failedEpochSlashRate)
 				result.delegateStakeWithdrawing = result.delegateStakeWithdrawing + gateway.totalDelegatedStake
