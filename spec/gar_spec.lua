@@ -1984,7 +1984,7 @@ describe("gar", function()
 						startTimestamp = currentTimestamp - 100,
 						endTimestamp = 0, -- Not expired, but failedConsecutiveEpochs is 30
 						status = "joined",
-						operatorStake = minOperatorStake + 10000, -- will slash 20% of the min operator stake
+						operatorStake = minOperatorStake + 10000, -- will slash 100% of the min operator stake
 						vaults = {},
 						delegates = {},
 						stats = {
@@ -1998,7 +1998,8 @@ describe("gar", function()
 				-- Call pruneGateways
 				local protocolBalanceBefore = _G.Balances[ao.id] or 0
 				local result = gar.pruneGateways(currentTimestamp, msgId)
-				local expectedSlashedStake = math.floor(minOperatorStake * 0.2)
+				local expectedSlashedStake = minOperatorStake -- the full operator stake should be slashed
+				local expectedRemainingStake = 10000 -- the remaining stake should be the operator stake minus the slashed stake plus the remaining stake
 				assert.are.same({
 					prunedGateways = { "address1" },
 					slashedGateways = {
@@ -2008,7 +2009,7 @@ describe("gar", function()
 					delegateStakeReturned = 0,
 					gatewayStakeReturned = 0,
 					delegateStakeWithdrawing = 0,
-					gatewayStakeWithdrawing = 8000010000,
+					gatewayStakeWithdrawing = expectedRemainingStake,
 					gatewayObjectTallies = {
 						numDelegateVaults = 0,
 						numDelegatesVaulting = 0,
@@ -2022,11 +2023,10 @@ describe("gar", function()
 					},
 				}, result)
 
-				local expectedRemainingStake = math.floor(minOperatorStake * 0.8) + 10000
 				assert.is_nil(_G.GatewayRegistry["address1"]) -- removed
 				assert.is_not_nil(_G.GatewayRegistry["address2"]) -- not removed
 				assert.is_not_nil(_G.GatewayRegistry["address3"]) -- not removed
-				-- Check that gateway 3's operator stake is slashed by 20% and the remaining stake is vaulted
+				-- Check that gateway 3's operator stake is slashed by 100% and the remaining stake is vaulted
 				assert.are.equal("leaving", _G.GatewayRegistry["address3"].status)
 				assert.are.equal(0, _G.GatewayRegistry["address3"].operatorStake)
 				assert.are.same({
