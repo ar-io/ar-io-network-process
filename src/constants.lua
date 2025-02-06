@@ -1,9 +1,13 @@
 local constants = {}
 
+-- @alias mARIO number
+-- intentionally not exposed so all callers use ARIOToMARIO for consistency
+local mARIO_PER_ARIO = 1000000
+
 --- @param ARIO number
 --- @return mARIO mARIO the amount of mario for the given ARIO
 function constants.ARIOToMARIO(ARIO)
-	return ARIO * 1000000
+	return ARIO * mARIO_PER_ARIO
 end
 
 --- @param days number
