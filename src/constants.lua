@@ -1,43 +1,39 @@
 local constants = {}
 
-constants.oneYearSeconds = 60 * 60 * 24 * 365
-constants.thirtyDaysSeconds = 60 * 60 * 24 * 30
-
-constants.oneMinuteMs = 1000 * 60
-constants.oneHourMs = 1000 * 60 * 60
-constants.oneDayMs = constants.oneHourMs * 24
-constants.oneWeekMs = constants.oneDayMs * 7
-constants.twoWeeksMs = constants.oneWeekMs * 2
-constants.oneYearMs = 31536000 * 1000
-
-constants.mARIOPerARIO = 1000000
-
 --- @param ARIO number
---- @return mARIO
+--- @return mARIO mARIO the amount of mario for the given ARIO
 function constants.ARIOToMARIO(ARIO)
-	return ARIO * constants.mARIOPerARIO
+	return ARIO * 1000000
 end
 
 --- @param days number
 --- @return number milliseconds the number of days in milliseconds
 function constants.daysToMs(days)
-	return days * constants.oneDayMs
+	return days * constants.hoursToMs(24)
 end
 
 --- @param minutes number
 --- @return number milliseconds the number of minutes in milliseconds
 function constants.minutesToMs(minutes)
-	return minutes * constants.oneMinuteMs
+	return minutes * constants.secondsToMs(60)
+end
+
+function constants.secondsToMs(seconds)
+	return seconds * 1000
 end
 
 --- @param years number
 --- @return number milliseconds the number of years in milliseconds
 function constants.yearsToMs(years)
-	return years * constants.oneYearMs
+	return years * constants.daysToMs(365)
+end
+
+function constants.hoursToMs(hours)
+	return hours * constants.minutesToMs(60)
 end
 
 -- EPOCHS
-constants.defaultEpochDurationMs = constants.oneDayMs
+constants.defaultEpochDurationMs = constants.daysToMs(1)
 constants.distributionDelayMs = constants.minutesToMs(40) -- 40 minutes
 constants.maximumRewardRate = 0.001
 constants.minimumRewardRate = 0.0005
@@ -51,8 +47,8 @@ constants.DEFAULT_UNDERNAME_COUNT = 10
 constants.totalTokenSupply = constants.ARIOToMARIO(1000000000) -- 1 billion tokens
 constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.10 -- the minimum penalty rate for an expedited withdrawal (10% of the amount being withdrawn)
 constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE = 0.50 -- the maximum penalty rate for an expedited withdrawal (50% of the amount being withdrawn)
-constants.minimumWithdrawalAmount = constants.mARIOPerARIO -- the minimum amount that can be withdrawn from the GAR
-constants.redelegationFeeResetIntervalMs = constants.defaultEpochDurationMs * 7 -- 7 epochs
+constants.minimumWithdrawalAmount = constants.ARIOToMARIO(1) -- the minimum amount that can be withdrawn from the GAR
+constants.redelegationFeeResetIntervalMs = constants.daysToMs(7) -- 7 days
 constants.maxDelegateRewardShareRatio = 95 -- 95% of rewards can be shared with delegates
 
 -- ARNS
@@ -73,7 +69,7 @@ constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE = 0.005
 constants.PRIMARY_NAME_REQUEST_COST = constants.ARIOToMARIO(10) -- 10 ARIO
 constants.gracePeriodMs = constants.daysToMs(14)
 constants.maxLeaseLengthYears = 5
-constants.returnedNamePeriod = constants.twoWeeksMs
+constants.returnedNamePeriod = constants.daysToMs(14)
 constants.returnedNameMaxMultiplier = 50 -- Freshly returned names will have a multiplier of 50x
 
 constants.ARNS_DISCOUNT_PERCENTAGE = 0.2
@@ -84,7 +80,7 @@ constants.ARNS_DISCOUNT_NAME = "ArNS Discount"
 -- DEMAND
 constants.demandSettings = {
 	movingAvgPeriodCount = 7,
-	periodLengthMs = constants.oneDayMs, -- one day
+	periodLengthMs = constants.daysToMs(1), -- one day
 	demandFactorBaseValue = 1,
 	demandFactorMin = 0.5,
 	demandFactorUpAdjustment = 0.05,

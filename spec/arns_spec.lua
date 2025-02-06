@@ -144,7 +144,7 @@ describe("arns", function()
 						undernameLimit = 10,
 						processId = testProcessId,
 						startTimestamp = 0,
-						endTimestamp = timestamp + constants.oneYearMs * 1,
+						endTimestamp = timestamp + constants.yearsToMs(1),
 					}, result.record)
 					assert.are.same({
 						["test-name"] = {
@@ -153,7 +153,7 @@ describe("arns", function()
 							undernameLimit = 10,
 							processId = testProcessId,
 							startTimestamp = 0,
-							endTimestamp = timestamp + constants.oneYearMs * 1,
+							endTimestamp = timestamp + constants.yearsToMs(1),
 						},
 					}, _G.NameRegistry.records)
 					assert.are.equal(startBalance - 600000000, _G.Balances[testAddress])
@@ -186,7 +186,7 @@ describe("arns", function()
 						undernameLimit = 10,
 						processId = testProcessId,
 						startTimestamp = 0,
-						endTimestamp = timestamp + constants.oneYearMs * 1,
+						endTimestamp = timestamp + constants.yearsToMs(1),
 					}, buyRecordResult.record)
 					assert.are.same({
 						["test-name"] = {
@@ -195,7 +195,7 @@ describe("arns", function()
 							undernameLimit = 10,
 							processId = testProcessId,
 							startTimestamp = 0,
-							endTimestamp = timestamp + constants.oneYearMs * 1,
+							endTimestamp = timestamp + constants.yearsToMs(1),
 						},
 					}, _G.NameRegistry.records)
 					assert.are.equal(startBalance - discountTotal, _G.Balances[testAddress])
@@ -217,7 +217,7 @@ describe("arns", function()
 						undernameLimit = 10,
 						processId = testProcessId,
 						startTimestamp = 0,
-						endTimestamp = timestamp + constants.oneYearMs,
+						endTimestamp = timestamp + constants.yearsToMs(1),
 					}, result.record)
 					assert.are.same({
 						purchasePrice = 600000000,
@@ -225,7 +225,7 @@ describe("arns", function()
 						undernameLimit = 10,
 						processId = testProcessId,
 						startTimestamp = 0,
-						endTimestamp = timestamp + constants.oneYearMs,
+						endTimestamp = timestamp + constants.yearsToMs(1),
 					}, arns.getRecord("test-name"))
 
 					assert.is.equal(
@@ -259,7 +259,7 @@ describe("arns", function()
 
 			it("should throw an error if the record already exists [" .. addressType .. "]", function()
 				local existingRecord = {
-					endTimestamp = timestamp + constants.oneYearMs,
+					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
 					purchasePrice = 600000000,
 					startTimestamp = 0,
@@ -297,7 +297,7 @@ describe("arns", function()
 				}
 				local result = arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId)
 				local expectation = {
-					endTimestamp = timestamp + constants.oneYearMs,
+					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
 					purchasePrice = 600000000,
 					startTimestamp = 0,
@@ -335,7 +335,7 @@ describe("arns", function()
 						arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId, "msd-id")
 					local expectedPrice = math.floor(600000000 * constants.returnedNameMaxMultiplier)
 					local expectation = {
-						endTimestamp = timestamp + constants.oneYearMs,
+						endTimestamp = timestamp + constants.yearsToMs(1),
 						processId = testProcessId,
 						purchasePrice = expectedPrice,
 						startTimestamp = 0,
@@ -372,7 +372,7 @@ describe("arns", function()
 			--  throw an error on insufficient balance
 			it("should throw an error on insufficient balance [" .. addressType .. "]", function()
 				_G.NameRegistry.records["test-name"] = {
-					endTimestamp = timestamp + constants.oneYearMs,
+					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
 					purchasePrice = 600000000,
 					startTimestamp = 0,
@@ -387,7 +387,7 @@ describe("arns", function()
 
 			it("should throw an error if the name is in the grace period [" .. addressType .. "]", function()
 				_G.NameRegistry.records["test-name"] = {
-					endTimestamp = timestamp + constants.oneYearMs,
+					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
 					purchasePrice = 600000000,
 					startTimestamp = 0,
@@ -399,7 +399,7 @@ describe("arns", function()
 					testAddress,
 					"test-name",
 					1,
-					timestamp + constants.oneYearMs + 1,
+					timestamp + constants.yearsToMs(1) + 1,
 					"msg-id",
 					"balance"
 				)
@@ -409,7 +409,7 @@ describe("arns", function()
 
 			it("should increase the undername count and properly deduct balance [" .. addressType .. "]", function()
 				_G.NameRegistry.records["test-name"] = {
-					endTimestamp = timestamp + constants.oneYearMs,
+					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
 					purchasePrice = 600000000,
 					startTimestamp = 0,
@@ -420,7 +420,7 @@ describe("arns", function()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
 				local result = arns.increaseundernameLimit(testAddress, "test-name", 50, timestamp, "msg-id")
 				local expectation = {
-					endTimestamp = timestamp + constants.oneYearMs,
+					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
 					purchasePrice = 600000000,
 					startTimestamp = 0,
@@ -455,7 +455,7 @@ describe("arns", function()
 				assert.is_true(gar.isEligibleForArNSDiscount(testAddress))
 
 				_G.NameRegistry.records["test-name"] = {
-					endTimestamp = timestamp + constants.oneYearMs,
+					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
 					purchasePrice = 600000000,
 					startTimestamp = 0,
@@ -466,7 +466,7 @@ describe("arns", function()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
 				local result = arns.increaseundernameLimit(testAddress, "test-name", 50, timestamp)
 				local expectation = {
-					endTimestamp = timestamp + constants.oneYearMs,
+					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
 					purchasePrice = 600000000,
 					startTimestamp = 0,
@@ -506,7 +506,7 @@ describe("arns", function()
 				"should throw an error if the lease is expired and beyond the grace period [" .. addressType .. "]",
 				function()
 					_G.NameRegistry.records["test-name"] = {
-						endTimestamp = timestamp + constants.oneYearMs,
+						endTimestamp = timestamp + constants.yearsToMs(1),
 						processId = testProcessId,
 						purchasePrice = 600000000,
 						startTimestamp = 0,
@@ -518,7 +518,7 @@ describe("arns", function()
 						testAddress,
 						"test-name",
 						1,
-						timestamp + constants.oneYearMs + constants.gracePeriodMs + 1
+						timestamp + constants.yearsToMs(1) + constants.gracePeriodMs + 1
 					)
 					assert.is_false(status)
 					assert.match("Name is expired", error)
@@ -542,7 +542,7 @@ describe("arns", function()
 			-- throw an error of insufficient balance
 			it("should throw an error on insufficient balance [" .. addressType .. "]", function()
 				_G.NameRegistry.records["test-name"] = {
-					endTimestamp = timestamp + constants.oneYearMs,
+					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
 					purchasePrice = 600000000,
 					startTimestamp = 0,
@@ -558,7 +558,7 @@ describe("arns", function()
 			it("should allow extension for existing lease up to 5 years [" .. addressType .. "]", function()
 				_G.NameRegistry.records["test-name"] = {
 					-- 1 year lease
-					endTimestamp = timestamp + constants.oneYearMs,
+					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
 					purchasePrice = 600000000,
 					startTimestamp = 0,
@@ -569,7 +569,7 @@ describe("arns", function()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
 				local result = arns.extendLease(testAddress, "test-name", 4, timestamp)
 				assert.are.same({
-					endTimestamp = timestamp + constants.oneYearMs * 5,
+					endTimestamp = timestamp + constants.yearsToMs(5),
 					processId = testProcessId,
 					purchasePrice = 600000000,
 					startTimestamp = 0,
@@ -578,7 +578,7 @@ describe("arns", function()
 				}, result.record)
 				assert.are.same({
 					["test-name"] = {
-						endTimestamp = timestamp + constants.oneYearMs * 5,
+						endTimestamp = timestamp + constants.yearsToMs(5),
 						processId = testProcessId,
 						purchasePrice = 600000000,
 						startTimestamp = 0,
@@ -616,7 +616,7 @@ describe("arns", function()
 			it("should throw an error when trying to extend beyond 5 years [" .. addressType .. "]", function()
 				_G.NameRegistry.records["test-name"] = {
 					-- 1 year lease
-					endTimestamp = timestamp + constants.oneYearMs,
+					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
 					purchasePrice = 600000000,
 					startTimestamp = 0,
@@ -639,7 +639,7 @@ describe("arns", function()
 
 				_G.NameRegistry.records["test-name"] = {
 					-- 1 year lease
-					endTimestamp = timestamp + constants.oneYearMs,
+					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
 					purchasePrice = 600000000,
 					startTimestamp = 0,
@@ -650,7 +650,7 @@ describe("arns", function()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
 				local extendLeaseResult = arns.extendLease(testAddress, "test-name", 4, timestamp)
 				assert.are.same({
-					endTimestamp = timestamp + constants.oneYearMs * 5,
+					endTimestamp = timestamp + constants.yearsToMs(5),
 					processId = testProcessId,
 					purchasePrice = 600000000,
 					startTimestamp = 0,
@@ -659,7 +659,7 @@ describe("arns", function()
 				}, extendLeaseResult.record)
 				assert.are.same({
 					["test-name"] = {
-						endTimestamp = timestamp + constants.oneYearMs * 5,
+						endTimestamp = timestamp + constants.yearsToMs(5),
 						processId = testProcessId,
 						purchasePrice = 600000000,
 						startTimestamp = 0,
@@ -706,7 +706,7 @@ describe("arns", function()
 			it("should successfully reassign a name to a new owner", function()
 				-- Setup initial record
 				_G.NameRegistry.records["test-name"] = {
-					endTimestamp = timestamp + constants.oneYearMs,
+					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
 					purchasePrice = 600000000,
 					startTimestamp = 0,
@@ -731,7 +731,7 @@ describe("arns", function()
 			it("should throw an error if the reassigner is not the current owner", function()
 				-- Setup initial record
 				_G.NameRegistry.records["test-name"] = {
-					endTimestamp = timestamp + constants.oneYearMs,
+					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
 					purchasePrice = 600000000,
 					startTimestamp = 0,
@@ -830,7 +830,7 @@ describe("arns", function()
 		end)
 		it("should return the correct token cost for increasing undername limit", function()
 			_G.NameRegistry.records["test-name"] = {
-				endTimestamp = constants.oneYearMs,
+				endTimestamp = constants.yearsToMs(1),
 				processId = testProcessId,
 				purchasePrice = 600000000,
 				startTimestamp = 0,
@@ -846,14 +846,14 @@ describe("arns", function()
 				intent = "Increase-Undername-Limit",
 				quantity = 5,
 				name = "test-name",
-				currentTimestamp = constants.oneYearMs / 2,
+				currentTimestamp = constants.yearsToMs(1) / 2,
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
 			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
 		end)
 		it("should return the token cost for extending a lease", function()
 			_G.NameRegistry.records["test-name"] = {
-				endTimestamp = timestamp + constants.oneYearMs,
+				endTimestamp = timestamp + constants.yearsToMs(1),
 				processId = testProcessId,
 				purchasePrice = 600000000,
 				startTimestamp = 0,
@@ -868,7 +868,7 @@ describe("arns", function()
 				intent = "Extend-Lease",
 				years = 2,
 				name = "test-name",
-				currentTimestamp = timestamp + constants.oneYearMs,
+				currentTimestamp = timestamp + constants.yearsToMs(1),
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
 			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
@@ -1000,7 +1000,7 @@ describe("arns", function()
 				intent = "Extend-Lease",
 				years = 2,
 				name = "test-name",
-				currentTimestamp = timestamp + constants.oneYearMs,
+				currentTimestamp = timestamp + constants.yearsToMs(1),
 			})
 			assert.is_false(status)
 			assert.match("Name is permanently owned and cannot be extended", error)
@@ -1188,7 +1188,7 @@ describe("arns", function()
 				}, newGracePeriodRecords)
 				-- ensure the next prune timestamp is updated to the grace period record end timestamp
 				assert.are.equal(
-					_G.NameRegistry.records["active-record"].endTimestamp + constants.twoWeeksMs,
+					_G.NameRegistry.records["active-record"].endTimestamp + constants.daysToMs(14),
 					_G.NextRecordsPruneTimestamp
 				)
 			end
