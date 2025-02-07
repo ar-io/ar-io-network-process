@@ -760,7 +760,8 @@ function arns.getTokenCost(intendedAction)
 		-- primary name requests cost the same as a 1 undername
 		assert(record, "Name is not registered")
 		assert(currentTimestamp, "Timestamp is required")
-		tokenCost = arns.calculateUndernameCost(baseFee, 1, record.type, demand.getDemandFactor())
+		local primaryRequestBaseFee = demand.baseFeeForNameLength(constants.PRIMARY_NAME_REQUEST_DEFAULT_NAME_LENGTH)
+		tokenCost = arns.calculateUndernameCost(primaryRequestBaseFee, 1, record.type, demand.getDemandFactor())
 	else
 		error("Invalid intent: " .. intent)
 	end
