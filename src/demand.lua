@@ -33,18 +33,7 @@ DemandFactor = DemandFactor
 --- @field demandFactorDownAdjustment number The adjustment to the demand factor when it is decreasing
 --- @field stepDownThreshold number The threshold for the number of consecutive periods with the minimum demand factor before adjusting the demand factor
 --- @field criteria 'revenue' | 'purchases' The criteria to use for determining if the demand is increasing
-DemandFactorSettings = DemandFactorSettings
-	or {
-		periodZeroStartTimestamp = 1722837600000, -- 08/05/2024 @ 12:00am (UTC)
-		movingAvgPeriodCount = 7,
-		periodLengthMs = constants.daysToMs(1), -- one day in milliseconds
-		demandFactorBaseValue = 1,
-		demandFactorMin = 0.5,
-		demandFactorUpAdjustment = 0.05, -- 5%
-		demandFactorDownAdjustment = 0.015, -- 1.5%
-		stepDownThreshold = 3,
-		criteria = "revenue",
-	}
+DemandFactorSettings = DemandFactorSettings or constants.DEFAULT_DEMAND_FACTOR_SETTINGS
 
 --- Tally a name purchase
 --- @param qty number The quantity of the purchase

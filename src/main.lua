@@ -7,15 +7,15 @@ local ARIOEvent = require("ario_event")
 Name = Name or "Testnet ARIO"
 Ticker = Ticker or "tARIO"
 Logo = Logo or "qUjrTmHdVjXX4D6rU6Fik02bUOzWkOR6oOqUg39g4-s"
-Denomination = 6
+Denomination = constants.DENOMINATION
 DemandFactor = DemandFactor or {}
 Owner = Owner or ao.env.Process.Owner
 Protocol = Protocol or ao.env.Process.Id
 Balances = Balances or {}
 if not Balances[Protocol] then -- initialize the balance for the process id
 	Balances = {
-		[Protocol] = math.floor(constants.ARIOToMARIO(50000000)), -- 50M ARIO
-		[Owner] = math.floor(constants.totalTokenSupply - (constants.ARIOToMARIO(50000000))), -- 950M ARIO
+		[Protocol] = constants.DEFAULT_PROTOCOL_BALANCE, -- 50M ARIO
+		[Owner] = math.floor(constants.TOTAL_TOKEN_SUPPLY - constants.DEFAULT_PROTOCOL_BALANCE), -- 950M ARIO
 	}
 end
 Vaults = Vaults or {}

@@ -77,13 +77,7 @@ local epochs = {}
 --- @field rewards DistributedEpochRewards The rewards for the epoch, including eligible and distributed rewards
 
 Epochs = Epochs or {}
-EpochSettings = EpochSettings
-	or {
-		prescribedNameCount = 2,
-		maxObservers = 50,
-		epochZeroStartTimestamp = 1719900000000, -- July 9th, 00:00:00 UTC
-		durationMs = constants.defaultEpochDurationMs, -- 24 hours
-	}
+EpochSettings = EpochSettings or constants.DEFAULT_EPOCH_SETTINGS
 
 --- Gets an epoch by index
 --- @param epochIndex number The epoch index
