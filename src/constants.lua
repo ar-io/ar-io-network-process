@@ -75,7 +75,7 @@ constants.gracePeriodMs = constants.daysToMs(14)
 constants.maxLeaseLengthYears = 5
 constants.returnedNamePeriod = constants.daysToMs(14)
 constants.returnedNameMaxMultiplier = 50 -- Freshly returned names will have a multiplier of 50x
-
+constants.PRIMARY_NAME_REQUEST_DEFAULT_NAME_LENGTH = 51 -- primary name requests cost the same as a single undername on a 51 character name
 constants.ARNS_DISCOUNT_PERCENTAGE = 0.2
 constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD = 0.5
 constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD = 0.85

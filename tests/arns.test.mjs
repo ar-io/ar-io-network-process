@@ -585,46 +585,55 @@ describe('ArNS', async () => {
 
     it('should return the correct cost of creating a primary name request', async () => {
       const memory = await transfer({
-        quantity: 1000000000,
+        quantity: 400_000_000,
         memory: sharedMemory,
+        recipient: STUB_ADDRESS,
       });
-      const { memory: buyMemory } = await buyRecord({
-        from: STUB_ADDRESS,
-        memory,
-        name: 'test-name',
-        processId: ''.padEnd(43, 'a'),
-      });
-      const result = await handle({
-        options: {
-          Tags: [
-            { name: 'Action', value: 'Token-Cost' },
-            { name: 'Intent', value: 'Primary-Name-Request' },
-            { name: 'Name', value: 'test-name' },
-          ],
-          Timestamp: STUB_TIMESTAMP,
-        },
+      let buyNameMemory = memory;
+      // primary names should cost the same as an undername on a 51 character name, so buy both a 9 character name and a 51 character name and compare the primary name cost for *any* name length against the increase undername limit cost
+      for (const name of ['test-name', ''.padEnd(51, 'a')]) {
+        const { memory: buyMemory } = await buyRecord({
+          from: STUB_ADDRESS,
+          memory: buyNameMemory,
+          name: name,
+          processId: ''.padEnd(43, 'a'),
+        });
+        buyNameMemory = buyMemory;
+      }
 
-        memory: buyMemory,
-      });
-      assertNoResultError(result);
-      const tokenCost = JSON.parse(result.Messages[0].Data);
-      assert.equal(tokenCost, 500000);
-
-      // assert is same as 1 undername
+      // get the cost of increasing the undername limit for a 51 character name
       const undernameResult = await handle({
         options: {
           Tags: [
             { name: 'Action', value: 'Token-Cost' },
             { name: 'Intent', value: 'Increase-Undername-Limit' },
-            { name: 'Name', value: 'test-name' },
+            { name: 'Name', value: ''.padEnd(51, 'a') },
             { name: 'Quantity', value: '1' },
           ],
           Timestamp: STUB_TIMESTAMP,
         },
-        memory: buyMemory,
+        memory: buyNameMemory,
       });
       const undernameTokenCost = JSON.parse(undernameResult.Messages[0].Data);
-      assert.equal(undernameTokenCost, tokenCost);
+
+      // check the costs for both primary names, they should be the same as the undername limit cost for a 51 character name
+      for (const name of ['test-name', ''.padEnd(51, 'a')]) {
+        const primaryNameRequestResult = await handle({
+          options: {
+            Tags: [
+              { name: 'Action', value: 'Token-Cost' },
+              { name: 'Intent', value: 'Primary-Name-Request' },
+              { name: 'Name', value: name },
+            ],
+            Timestamp: STUB_TIMESTAMP,
+          },
+          memory: buyNameMemory,
+        });
+        const primaryNameCost = JSON.parse(
+          primaryNameRequestResult.Messages[0].Data,
+        );
+        assert.equal(primaryNameCost, undernameTokenCost);
+      }
       sharedMemory = undernameResult.Memory;
     });
   });
