@@ -901,7 +901,7 @@ describe("epochs", function()
 
 			-- confirm the updated epoch values
 			assert.are.equal(expectedTotalDistribution, distributions.totalDistributedRewards)
-			assert.are.equal(epoch.distributionTimestamp, distributions.distributedTimestamp)
+			assert.are.equal(epoch.endTimestamp, distributions.distributedTimestamp)
 
 			assert.are.same({
 				--- gateway 1 did not earn any rewards, so it should not be in the distributed table
@@ -976,7 +976,8 @@ describe("epochs", function()
 				-- marks the epoch as distributed
 				_G.Epochs[epochIndex].distributions.distributedTimestamp = 1704092400115
 				local epoch = epochs.getEpoch(epochIndex)
-				local distributedEpoch = epochs.distributeLastEpoch(epoch.distributionTimestamp)
+				assert(epoch, "Epoch not found")
+				local distributedEpoch = epochs.distributeLastEpoch(epoch.endTimestamp)
 				assert.is_nil(distributedEpoch)
 				assert.is_nil(_G.Epochs[epochIndex])
 			end
@@ -1003,7 +1004,6 @@ describe("epochs", function()
 					epochIndex = i,
 					startTimestamp = 1704092400000,
 					endTimestamp = 1704092400100,
-					distributionTimestamp = 1704092400115,
 				}
 			end
 			startingEpochs = utils.deepCopy(_G.Epochs)
