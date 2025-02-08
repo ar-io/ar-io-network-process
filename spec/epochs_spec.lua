@@ -567,7 +567,7 @@ describe("epochs", function()
 			}
 		end)
 
-		it("should create a new epoch and all initial data should be empty", function()
+		it("should create and prescribe the new epoch, and update gateway weights with computed weights", function()
 			local expectedEligibleGateways = 1
 			local expectedEligibleRewards = math.floor(protocolBalance * constants.minimumRewardRate)
 			local expectedTotalGatewayReward = math.floor(expectedEligibleRewards * 0.90)
@@ -619,6 +619,36 @@ describe("epochs", function()
 			table.sort(result.prescribedNames)
 			assert.are.same(expectation, result)
 			assert.are.same(expectation, epochs.getEpoch(epochIndex))
+			-- confirm the gateway weights were updated
+			assert.are.same({
+				stakeWeight = 1,
+				tenureWeight = 4,
+				gatewayPerformanceRatio = 1,
+				observerPerformanceRatio = 1,
+				compositeWeight = 4,
+				normalizedCompositeWeight = 1,
+			}, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].weights)
+			-- confirm the leaving gateway weights were not updated
+			assert.are.same({
+				stakeWeight = 0,
+				tenureWeight = 0,
+				gatewayPerformanceRatio = 0,
+				observerPerformanceRatio = 0,
+				compositeWeight = 0,
+				normalizedCompositeWeight = 0,
+			}, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-2"].weights)
+		end)
+
+		it("should count arns stat totals for the given epoch", function()
+			local result = epochs.createAndPrescribeNewEpoch(epochStartTimestamp, epochStartBlockHeight, hashchain)
+
+			-- Check arnsStats are counted as expected
+			assert.are.same({
+				totalActiveNames = 3,
+				totalGracePeriodNames = 0,
+				totalReservedNames = 2,
+				totalReturnedNames = 1,
+			}, result.arnsStats)
 		end)
 	end)
 

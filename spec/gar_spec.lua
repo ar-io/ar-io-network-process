@@ -381,7 +381,6 @@ describe("gar", function()
 				startTimestamp
 			)
 			assert.is_false(status)
-			assert(error, "Expected error")
 			assert.match("services contains an invalid key", error)
 		end)
 		it("should fail to join the network with invalid bundler keys", function()
@@ -544,7 +543,7 @@ describe("gar", function()
 				stubGatewayAddress,
 				startTimestamp
 			)
-			assert(result)
+			assert.is_not_nil(result)
 			assert.are.same({
 				allowDelegatedStaking = false,
 				delegateRewardShareRatio = 0,
@@ -983,7 +982,7 @@ describe("gar", function()
 				stubMessageId
 			)
 			assert.is_false(status)
-			assert(err, "Expected error")
+			assert.is_not_nil(err)
 			assert.matches("Gateway is leaving the network and cannot be updated", err)
 		end)
 
@@ -1028,7 +1027,7 @@ describe("gar", function()
 					stubMessageId
 				)
 				assert.is_false(status)
-				assert(err, "Expected error")
+				assert.is_not_nil(err)
 				assert.matches("delegateRewardShareRatio must be an integer between 0 and 95", err)
 			end
 		)
@@ -1049,7 +1048,7 @@ describe("gar", function()
 				stubMessageId
 			)
 			assert.is_false(status)
-			assert(err, "Expected error")
+			assert.is_not_nil(err)
 			assert.matches("Gateway not found", err)
 		end)
 	end)
@@ -1376,7 +1375,7 @@ describe("gar", function()
 				stubMessageId
 			)
 			assert.is_false(status)
-			assert(err, "Expected error")
+			assert.is_not_nil(err)
 			assert.matches(
 				"Remaining delegated stake must be greater than the minimum delegated stake. Adjust the amount or withdraw all stake.",
 				err
@@ -1833,7 +1832,7 @@ describe("gar", function()
 					currentTimestamp
 				)
 				assert.is_false(status)
-				assert(err, "Expected error")
+				assert.is_not_nil(err)
 				assert.matches("Vault not found", err)
 			end)
 
@@ -1849,7 +1848,7 @@ describe("gar", function()
 					currentTimestamp
 				)
 				assert.is_false(status)
-				assert(err, "Expected error")
+				assert.is_not_nil(err)
 				assert.matches("Gateway not found", err)
 			end)
 		end)
@@ -2025,8 +2024,8 @@ describe("gar", function()
 				}, result)
 
 				assert.is_nil(_G.GatewayRegistry["address1"]) -- removed
-				assert(_G.GatewayRegistry["address2"]) -- not removed
-				assert(_G.GatewayRegistry["address3"]) -- not removed
+				assert.is_not_nil(_G.GatewayRegistry["address2"]) -- not removed
+				assert.is_not_nil(_G.GatewayRegistry["address3"]) -- not removed
 				-- Check that gateway 3's operator stake is slashed by 100% and the remaining stake is vaulted
 				assert.are.equal("leaving", _G.GatewayRegistry["address3"].status)
 				assert.are.equal(0, _G.GatewayRegistry["address3"].operatorStake)
@@ -2089,7 +2088,7 @@ describe("gar", function()
 				gatewayStakeWithdrawing = 0,
 			}, result)
 
-			assert(_G.GatewayRegistry["address2"]) -- not changed
+			assert.is_not_nil(_G.GatewayRegistry["address2"]) -- not changed
 			assert.are.equal(protocolBalanceBefore, _G.Balances[ao.id])
 		end)
 	end)
@@ -2124,7 +2123,7 @@ describe("gar", function()
 				"some-previous-withdrawal-id"
 			)
 			assert.is_false(status)
-			assert(err, "Expected error")
+			assert.is_not_nil(err)
 			assert.matches("Gateway is leaving the network and cannot cancel withdrawals.", err)
 		end)
 		it("should not cancel a gateway withdrawal if the vault id is not found", function()
@@ -2137,7 +2136,7 @@ describe("gar", function()
 				"some-non-existent-withdrawal-id"
 			)
 			assert.is_false(status)
-			assert(err, "Expected error")
+			assert.is_not_nil(err)
 			assert.matches("Vault not found", err)
 		end)
 		it("should cancel a delegate withdrawal", function()
@@ -2193,7 +2192,7 @@ describe("gar", function()
 			local status, err =
 				pcall(gar.cancelGatewayWithdrawal, stubRandomAddress, stubGatewayAddress, "some-previous-withdrawal-id")
 			assert.is_false(status)
-			assert(err, "Expected error")
+			assert.is_not_nil(err)
 			assert.matches("Gateway does not allow staking", err)
 			assert.are.same({
 				delegatedStake = 0,
@@ -2214,7 +2213,7 @@ describe("gar", function()
 			local status, err =
 				pcall(gar.cancelGatewayWithdrawal, stubRandomAddress, stubGatewayAddress, "some-previous-withdrawal-id")
 			assert.is_false(status)
-			assert(err, "Expected error")
+			assert.is_not_nil(err)
 			assert.matches("Delegate not found", err)
 		end)
 		it("should not cancel a delegate withdrawal if the withdrawal is not found", function()
@@ -2228,7 +2227,7 @@ describe("gar", function()
 			local status, err =
 				pcall(gar.cancelGatewayWithdrawal, stubRandomAddress, stubGatewayAddress, "some-previous-withdrawal-id")
 			assert.is_false(status)
-			assert(err, "Expected error")
+			assert.is_not_nil(err)
 			assert.matches("Vault not found", err)
 		end)
 		it("should not cancel a delegate withdrawal if the gateway is leaving", function()
@@ -2249,16 +2248,15 @@ describe("gar", function()
 			local status, err =
 				pcall(gar.cancelGatewayWithdrawal, stubRandomAddress, stubGatewayAddress, "some-previous-withdrawal-id")
 			assert.is_false(status)
-			assert(err, "Expected error")
+			assert.is_not_nil(err)
 			assert.matches("Gateway is leaving the network and cannot cancel withdrawals.", err)
 		end)
 		it("should not cancel a delegate withdrawal if the gateway is not found", function()
 			_G.GatewayRegistry[stubGatewayAddress] = nil
 			local status, err =
 				pcall(gar.cancelGatewayWithdrawal, stubRandomAddress, stubGatewayAddress, "some-previous-withdrawal-id")
-			assert(err, "Expected error")
 			assert.is_false(status)
-			assert(err, "Expected error")
+			assert.is_not_nil(err)
 			assert.matches("Gateway not found", err)
 		end)
 	end)
