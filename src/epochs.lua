@@ -362,78 +362,15 @@ function epochs.getEpochIndexForTimestamp(timestamp)
 	return epochIndex
 end
 
---- Prescribes an epoch
---- @param timestamp number The timestamp
---- @param hashchain string The hashchain
---- @return PrescribedEpoch|nil # The prescribed epoch, or nil if an epoch already exists for the index
-function epochs.prescribeCurrentEpoch(timestamp, hashchain)
-	assert(type(timestamp) == "number", "Timestamp must be a number")
-	assert(type(hashchain) == "string", "Hashchain must be a string")
-
-	local epochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	local epoch = epochs.getEpoch(epochIndex)
-
-	if epochIndex < 0 then
-		-- silently ignore - Distribution can only occur after the epoch has ended
-		print("Genesis epoch has not started yet")
-		return nil
-	end
-
-	if not epoch then
-		-- create the epoch so we can prescribe it
-		error("Unable to prescribe epoch. Epoch not found for index: " .. epochIndex)
-	end
-
-	local prevEpochIndex = epochIndex - 1
-	local prevEpoch = epochs.getEpoch(prevEpochIndex)
-
-	-- if there is a previous epoch and it has not been distributed, we cannot create a new epoch as the distributions will impact gateway stake weights and performance ratios
-	if prevEpoch and not prevEpoch.distributions.distributedTimestamp then
-		print(
-			"Distributions have not occurred for the previous epoch. A new epoch cannot be prescribed until distribution for the previous epoch is complete: "
-				.. prevEpochIndex
-		)
-		return nil
-	end
-
-	-- if the epoch cannot be prescribed before it's start timestamp
-	if timestamp < epoch.startTimestamp then
-		print("Epoch cannot be prescribed before distribution for the previous epoch: " .. prevEpochIndex)
-		return nil
-	end
-
-	-- use the hashchain to check if the epoch has already been prescribed, if so return nil
-	if epoch.hashchain then
-		--- @cast epoch PrescribedEpoch
-		print("Epoch already prescribed, skipping prescription: " .. epochIndex)
-		return nil
-	end
-
-	-- get the max rewards for each participant eligible for the epoch
-	local prescribedObservers = epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
-	local prescribedNames = epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
-	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
-
-	local prescribedEpoch = convertCreatedEpochToPrescribedEpoch(
-		epoch,
-		hashchain,
-		eligibleEpochRewards,
-		prescribedObservers,
-		prescribedNames
-	)
-
-	Epochs[epochIndex] = prescribedEpoch
-
-	return prescribedEpoch
-end
-
 --- Creates a new epoch and updates the gateway weights
 --- @param timestamp number The timestamp in milliseconds
 --- @param blockHeight number The block height
+--- @param hashchain string The hashchain
 --- @return Epoch|nil # The created epoch, or nil if an epoch already exists for the index
-function epochs.createNewEpoch(timestamp, blockHeight)
+function epochs.createAndPrescribeNewEpoch(timestamp, blockHeight, hashchain)
 	assert(type(timestamp) == "number", "Timestamp must be a number")
 	assert(type(blockHeight) == "number", "Block height must be a number")
+	assert(type(hashchain) == "string", "Hashchain must be a string")
 
 	-- if before the epoch zero start timestamp, return nil
 	if timestamp < epochs.getSettings().epochZeroStartTimestamp then
@@ -447,16 +384,36 @@ function epochs.createNewEpoch(timestamp, blockHeight)
 		return nil -- do not return the existing epoch to prevent sending redundant epoch-created-notices
 	end
 
+	-- get the max rewards for each participant eligible for the epoch
+	local prescribedObservers = epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
+	local prescribedNames = epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
+	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
 	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 	-- snapshot the ARNS stats at the beginning of the epoch, does not account for any names that are created or expire during the epoch
 	local arnsStatsAtEpochStart = arns.getArNSStatsAtTimestamp(epochStartTimestamp)
 	--- @type Epoch
 	local epoch = {
+		hashchain = hashchain,
 		epochIndex = epochIndex,
 		startTimestamp = epochStartTimestamp,
 		endTimestamp = epochEndTimestamp,
 		startHeight = blockHeight,
 		arnsStats = arnsStatsAtEpochStart,
+		prescribedObservers = prescribedObservers,
+		prescribedNames = prescribedNames,
+		observations = {
+			failureSummaries = {},
+			reports = {},
+		},
+		distributions = {
+			totalEligibleRewards = eligibleEpochRewards.totalEligibleRewards,
+			totalEligibleGatewayReward = eligibleEpochRewards.perGatewayReward,
+			totalEligibleObserverReward = eligibleEpochRewards.perObserverReward,
+			totalEligibleGateways = eligibleEpochRewards.totalEligibleGateways,
+			rewards = {
+				eligible = eligibleEpochRewards.potentialRewards,
+			},
+		},
 	}
 	Epochs[epochIndex] = epoch
 
@@ -819,45 +776,6 @@ function convertPrescribedEpochToDistributedEpoch(epoch, currentTimestamp, distr
 			},
 		},
 		arnsStats = epoch.arnsStats,
-	}
-end
-
---- Creates a prescribed epoch from a created epoch
---- @param epoch Epoch # The created epoch
---- @param hashchain string # The hashchain
---- @param eligibleEpochRewards ComputedRewards # The eligible rewards for the epoch
---- @param prescribedObservers table<GatewayAddress, ObserverAddress> # The prescribed observers for the epoch
---- @param prescribedNames string[] # The prescribed names for the epoch
---- @return PrescribedEpoch # The prescribed epoch
-function convertCreatedEpochToPrescribedEpoch(
-	epoch,
-	hashchain,
-	eligibleEpochRewards,
-	prescribedObservers,
-	prescribedNames
-)
-	return {
-		hashchain = hashchain,
-		epochIndex = epoch.epochIndex,
-		startTimestamp = epoch.startTimestamp,
-		endTimestamp = epoch.endTimestamp,
-		startHeight = epoch.startHeight,
-		arnsStats = epoch.arnsStats,
-		prescribedObservers = prescribedObservers,
-		prescribedNames = prescribedNames,
-		observations = {
-			failureSummaries = {},
-			reports = {},
-		},
-		distributions = {
-			totalEligibleRewards = eligibleEpochRewards.totalEligibleRewards,
-			totalEligibleGatewayReward = eligibleEpochRewards.perGatewayReward,
-			totalEligibleObserverReward = eligibleEpochRewards.perObserverReward,
-			totalEligibleGateways = eligibleEpochRewards.totalEligibleGateways,
-			rewards = {
-				eligible = eligibleEpochRewards.potentialRewards,
-			},
-		},
 	}
 end
 

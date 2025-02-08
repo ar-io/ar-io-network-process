@@ -380,7 +380,7 @@ describe("vaults", function()
 
 			-- Check results
 			assert.is_nil(_G.Vaults["owner1"]["msgId1"])
-			assert.is_not_nil(_G.Vaults["owner1"]["msgId2"])
+			assert(_G.Vaults["owner1"]["msgId2"])
 			assert.is_nil(_G.Vaults["owner2"]["msgId3"])
 			assert.are.equal(_G.NextBalanceVaultsPruneTimestamp, currentTimestamp + 1000)
 
