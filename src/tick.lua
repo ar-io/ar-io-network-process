@@ -3,7 +3,7 @@ local epochs = require("epochs")
 local gar = require("gar")
 
 --- @class TickResult
---- @field maybeNewEpoch Epoch | nil The new epoch
+--- @field maybeNewEpoch PrescribedEpoch | nil The new epoch
 --- @field maybePrescribedEpoch PrescribedEpoch | nil The prescribed epoch
 --- @field maybeDistributedEpoch DistributedEpoch | nil The distributed epoch
 --- @field maybeDemandFactor number | nil The demand factor

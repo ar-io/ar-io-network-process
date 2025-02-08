@@ -24,7 +24,7 @@ NameRegistry = NameRegistry or {}
 Epochs = Epochs or {}
 
 -- last known timestamps used to validate behavior to perform on new messages
-LastCreatedEpochIndex = LastCreatedEpochIndex or -1
+LastCreatedEpochIndex = LastCreatedEpochIndex or -1 -- TODO: consider making epochs 1 indexed and start at 0
 LastDistributedEpochIndex = LastDistributedEpochIndex or -1
 LastPrescribedEpochIndex = LastPrescribedEpochIndex or -1
 LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
@@ -59,7 +59,6 @@ local ActionMap = {
 	DemandFactorInfo = "Demand-Factor-Info",
 	DemandFactorSettings = "Demand-Factor-Settings",
 	-- EPOCH READ APIS
-	Epochs = "Epochs",
 	Epoch = "Epoch",
 	EpochSettings = "Epoch-Settings",
 	PrescribedObservers = "Epoch-Prescribed-Observers",
@@ -537,7 +536,6 @@ end, function(msg)
 
 	print("Pruning state at timestamp: " .. msg.Timestamp)
 	local prunedStateResult = prune.pruneState(msg.Timestamp, msg.Id, LastGracePeriodEntryEndTimestamp)
-
 	if prunedStateResult then
 		local prunedRecordsCount = utils.lengthOfTable(prunedStateResult.prunedRecords or {})
 		if prunedRecordsCount > 0 then
@@ -1757,16 +1755,6 @@ end, function(msg)
 	msg.ioEvent:addField("Last-Distributed-Epoch-Index", lastDistributedEpochIndex)
 	msg.ioEvent:addField("Target-Current-Epoch-Index", targetCurrentEpochIndex)
 
-	-- if the timestamp is before the genesis epoch start timestamp, do nothing
-	if msg.Timestamp < epochs.getSettings().epochZeroStartTimestamp then
-		Send(msg, {
-			Target = msg.From,
-			Action = "Tick-Notice", -- TODO: this may be better as a "Genesis-Epoch-Not-Started-Notice"
-			Data = json.encode("Genesis epoch has not started yet."),
-		})
-		return
-	end
-
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
 	local distributedEpochIndexes = {}
 	local newEpochIndexes = {}
@@ -1790,7 +1778,6 @@ end, function(msg)
 
 	--- tick to the newest epoch, and stub out any epochs that are not yet created
 	for i = lastCreatedEpochIndex, targetCurrentEpochIndex do
-		print("Ticking epoch " .. i)
 		-- TODO: if we are significantly behind, we should not prescribed any observers or names, or decrement any gateways for failure
 		local tickResult = tick.tickEpoch(msg.Timestamp, blockHeight, hashchain, msgId)
 		if tickResult.pruneGatewaysResult ~= nil then
@@ -1822,6 +1809,7 @@ end, function(msg)
 				Data = json.encode(tickResult.maybeDistributedEpoch),
 			})
 		end
+		print("Successfully ticked epoch " .. i)
 	end
 	if #distributedEpochIndexes > 0 then
 		msg.ioEvent:addField("Distributed-Epoch-Indexes", distributedEpochIndexes)
@@ -2022,27 +2010,6 @@ addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epo
 		epoch.prescribedObservers = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 	end
 	Send(msg, { Target = msg.From, Action = "Epoch-Notice", Data = json.encode(epoch) })
-end)
-
-addEventingHandler(ActionMap.Epochs, utils.hasMatchingTag("Action", ActionMap.Epochs), function(msg)
-	local allEpochs = epochs.getEpochs()
-
-	-- the json encoder will error on a table with numeric keys that don't start at 1.
-	-- at genesis, epochs will start indexing at 0 and within 2 epochs will continue indexing
-	-- from 2 (and so on as epochs continue to be pruned), so work around that by sorting the
-	-- epoch index keys and inserting the epochs in order into a fresh array
-	local keys = {}
-	for key in pairs(allEpochs) do
-		table.insert(keys, key)
-	end
-	table.sort(keys)
-
-	local sortedEpochs = {}
-	for _, key in ipairs(keys) do
-		table.insert(sortedEpochs, allEpochs[key])
-	end
-
-	Send(msg, { Target = msg.From, Action = "Epochs-Notice", Data = json.encode(sortedEpochs) })
 end)
 
 addEventingHandler(

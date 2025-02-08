@@ -10,25 +10,23 @@ local epochs = {}
 --- @alias DelegateAddress string
 --- @alias TransactionId string
 
---- @class Epoch
+--- @class PrescribedEpoch
+--- @field hashchain string The hashchain of the epoch
 --- @field epochIndex number The index of the epoch
 --- @field startTimestamp number The start timestamp of the epoch
 --- @field endTimestamp number The end timestamp of the epoch
 --- @field startHeight number The start height of the epoch
 --- @field arnsStats ArNSStats The ArNS stats for the epoch
+--- @field prescribedObservers table<ObserverAddress, GatewayAddress> The prescribed observers of the epoch
+--- @field prescribedNames string[] The prescribed names of the epoch
+--- @field distributions PrescribedEpochDistribution The distributions of the epoch
+--- @field observations Observations The observations of the epoch
 
 --- @class ArNSStats # The ArNS stats for an epoch
 --- @field totalActiveNames number The total active ArNS names
 --- @field totalGracePeriodNames number The total grace period ArNS names
 --- @field totalReservedNames number The total reserved ArNS names
 --- @field totalReturnedNames number The total returned ArNS names
-
---- @class PrescribedEpoch : Epoch
---- @field hashchain string The hashchain of the epoch
---- @field prescribedObservers table<ObserverAddress, GatewayAddress> The prescribed observers of the epoch
---- @field prescribedNames string[] The prescribed names of the epoch
---- @field distributions PrescribedEpochDistribution The distributions of the epoch
---- @field observations Observations The observations of the epoch
 
 --- @class DistributedEpoch : PrescribedEpoch
 --- @field distributions DistributedEpochDistribution The rewards of the epoch
@@ -91,20 +89,20 @@ EpochSettings = EpochSettings
 NextEpochsPruneTimestamp = NextEpochsPruneTimestamp or 0
 
 --- Gets a deep copy of all the epochs
---- @return table<number, Epoch> # A deep copy of the epochs indexed by their epoch index
+--- @return table<number, PrescribedEpoch | DistributedEpoch> # A deep copy of the epochs indexed by their epoch index
 function epochs.getEpochs()
 	return utils.deepCopy(Epochs) or {}
 end
 
 --- Gets all the epochs
---- @return table<number, Epoch> # The epochs indexed by their epoch index
+--- @return table<number, PrescribedEpoch | DistributedEpoch> # The epochs indexed by their epoch index
 function epochs.getEpochsUnsafe()
 	return Epochs or {}
 end
 
 --- Gets an epoch by index
 --- @param epochIndex number The epoch index
---- @return Epoch | PrescribedEpoch | DistributedEpoch | nil # The prescribed epoch
+--- @return  PrescribedEpoch | DistributedEpoch | nil # The prescribed epoch
 function epochs.getEpoch(epochIndex)
 	local epoch = utils.deepCopy(Epochs[epochIndex]) or nil
 	return epoch
@@ -366,7 +364,7 @@ end
 --- @param timestamp number The timestamp in milliseconds
 --- @param blockHeight number The block height
 --- @param hashchain string The hashchain
---- @return Epoch|nil # The created epoch, or nil if an epoch already exists for the index
+--- @return PrescribedEpoch | nil # The created epoch, or nil if an epoch already exists for the index
 function epochs.createAndPrescribeNewEpoch(timestamp, blockHeight, hashchain)
 	assert(type(timestamp) == "number", "Timestamp must be a number")
 	assert(type(blockHeight) == "number", "Block height must be a number")
@@ -385,13 +383,19 @@ function epochs.createAndPrescribeNewEpoch(timestamp, blockHeight, hashchain)
 	end
 
 	-- get the max rewards for each participant eligible for the epoch
-	local prescribedObservers = epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
+	local prescribedObservers, updatedGatewaysWithWeights =
+		epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	local prescribedNames = epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
 	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
 	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
-	-- snapshot the ARNS stats at the beginning of the epoch, does not account for any names that are created or expire during the epoch
 	local arnsStatsAtEpochStart = arns.getArNSStatsAtTimestamp(epochStartTimestamp)
-	--- @type Epoch
+
+	-- update gateway weights for every new epoch, so its clear why the prescribed observers are selected
+	for _, weightedGateway in ipairs(updatedGatewaysWithWeights) do
+		gar.updateGatewayWeights(weightedGateway)
+	end
+
+	--- @type PrescribedEpoch
 	local epoch = {
 		hashchain = hashchain,
 		epochIndex = epochIndex,
@@ -419,9 +423,6 @@ function epochs.createAndPrescribeNewEpoch(timestamp, blockHeight, hashchain)
 
 	-- Force schedule a pruning JIC
 	NextEpochsPruneTimestamp = NextEpochsPruneTimestamp or 0
-
-	-- update the weights for all active gateways
-	gar.updateAllActiveGatewayWeights(timestamp)
 
 	return epoch
 end
@@ -602,7 +603,7 @@ function epochs.distributeLastEpoch(currentTimestamp)
 
 	if not previousEpoch then
 		-- TODO: consider throwing an error here instead of silently returning, as this is a critical error and should be fixed
-		print("Rewards already distributed for epoch." .. previousEpochIndex)
+		print("Epoch " .. previousEpochIndex .. " not found in state. Skipping distribution.")
 		return nil
 	end
 
@@ -781,7 +782,7 @@ end
 
 --- Prunes epochs older than the cutoff epoch index
 --- @param timestamp number The timestamp to prune epochs older than
---- @return Epoch[] # The pruned epochs
+--- @return DistributedEpoch[] # The pruned epochs
 function epochs.pruneEpochs(timestamp)
 	local prunedEpochIndexes = {}
 	if not NextEpochsPruneTimestamp or timestamp < NextEpochsPruneTimestamp then
