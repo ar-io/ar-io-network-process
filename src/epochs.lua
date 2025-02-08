@@ -15,8 +15,6 @@ local epochs = {}
 --- @field startTimestamp number The start timestamp of the epoch
 --- @field endTimestamp number The end timestamp of the epoch
 --- @field startHeight number The start height of the epoch
---- @field distributionTimestamp number The distribution timestamp of the epoch
---- @field observations Observations The observations of the epoch
 --- @field arnsStats ArNSStats The ArNS stats for the epoch
 
 --- @class ArNSStats # The ArNS stats for an epoch
@@ -30,10 +28,10 @@ local epochs = {}
 --- @field prescribedObservers table<ObserverAddress, GatewayAddress> The prescribed observers of the epoch
 --- @field prescribedNames string[] The prescribed names of the epoch
 --- @field distributions PrescribedEpochDistribution The distributions of the epoch
+--- @field observations Observations The observations of the epoch
 
 --- @class DistributedEpoch : PrescribedEpoch
 --- @field distributions DistributedEpochDistribution The rewards of the epoch
---- @field prescribedObservers WeightedGateway[] The prescribed observers of the epoch
 
 --- @class EpochSettings
 --- @field prescribedNameCount number The number of prescribed names
@@ -41,7 +39,6 @@ local epochs = {}
 --- @field maxObservers number The maximum number of observers
 --- @field epochZeroStartTimestamp number The start timestamp of epoch zero
 --- @field durationMs number The duration of an epoch in milliseconds
---- @field distributionDelayMs number The distribution delay in milliseconds
 
 --- @class WeightedGateway
 --- @field gatewayAddress string The gateway address
@@ -88,7 +85,6 @@ EpochSettings = EpochSettings
 		maxObservers = 50,
 		epochZeroStartTimestamp = 1719900000000, -- July 9th, 00:00:00 UTC
 		durationMs = constants.defaultEpochDurationMs, -- 24 hours
-		distributionDelayMs = constants.distributionDelayMs, -- 40 minutes (~ 20 arweave blocks)
 	}
 
 --- @type Timestamp|nil
@@ -347,13 +343,12 @@ end
 
 --- Gets the epoch timestamps for an epoch index
 --- @param epochIndex number The epoch index
---- @return number, number, number # 	The epoch start timestamp, epoch end timestamp, and epoch distribution timestamp
+--- @return number, number # 	The epoch start timestamp, epoch end timestamp, and epoch distribution timestamp
 function epochs.getEpochTimestampsForIndex(epochIndex)
 	local epochStartTimestamp = epochs.getSettings().epochZeroStartTimestamp
 		+ epochs.getSettings().durationMs * epochIndex
 	local epochEndTimestamp = epochStartTimestamp + epochs.getSettings().durationMs
-	local epochDistributionTimestamp = epochEndTimestamp + epochs.getSettings().distributionDelayMs
-	return epochStartTimestamp, epochEndTimestamp, epochDistributionTimestamp
+	return epochStartTimestamp, epochEndTimestamp
 end
 
 --- Gets the epoch index for a given timestamp
@@ -401,8 +396,8 @@ function epochs.prescribeCurrentEpoch(timestamp, hashchain)
 		return nil
 	end
 
-	-- if the epoch cannot be prescribed before distribution for the previous epoch, return nil
-	if timestamp < epoch.startTimestamp + epochs.getSettings().distributionDelayMs then
+	-- if the epoch cannot be prescribed before it's start timestamp
+	if timestamp < epoch.startTimestamp then
 		print("Epoch cannot be prescribed before distribution for the previous epoch: " .. prevEpochIndex)
 		return nil
 	end
@@ -452,8 +447,7 @@ function epochs.createNewEpoch(timestamp, blockHeight)
 		return nil -- do not return the existing epoch to prevent sending redundant epoch-created-notices
 	end
 
-	local epochStartTimestamp, epochEndTimestamp, epochDistributionTimestamp =
-		epochs.getEpochTimestampsForIndex(epochIndex)
+	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 	-- snapshot the ARNS stats at the beginning of the epoch, does not account for any names that are created or expire during the epoch
 	local arnsStatsAtEpochStart = arns.getArNSStatsAtTimestamp(epochStartTimestamp)
 	--- @type Epoch
@@ -462,14 +456,6 @@ function epochs.createNewEpoch(timestamp, blockHeight)
 		startTimestamp = epochStartTimestamp,
 		endTimestamp = epochEndTimestamp,
 		startHeight = blockHeight,
-		distributionTimestamp = epochDistributionTimestamp,
-		prescribedObservers = {},
-		prescribedNames = {},
-		observations = {
-			failureSummaries = {}, -- TODO: ideally this is encoded as an empty object, consider adding a helper function to encode empty objects
-			reports = {}, -- TODO: ideally this is encoded as an empty object, consider adding a helper function to encode empty objects
-		},
-		distributions = {}, -- TODO: ideally this is encoded as an empty object, consider adding a helper function to encode empty objects
 		arnsStats = arnsStatsAtEpochStart,
 	}
 	Epochs[epochIndex] = epoch
@@ -487,9 +473,10 @@ end
 --- @param observerAddress string The observer address
 --- @param reportTxId string The report transaction ID
 --- @param failedGatewayAddresses table<GatewayAddress> The failed gateway addresses
+--- @param epochIndex number The epoch index
 --- @param timestamp number The timestamp
 --- @return Observations # The updated observations for the epoch
-function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddresses, timestamp)
+function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddresses, epochIndex, timestamp)
 	-- Note: one of the only places we use arweave addresses, as the protocol requires the report to be stored on arweave. This would be a significant change to OIP if changed.
 	assert(utils.isValidArweaveAddress(reportTxId), "Report transaction ID is not a valid address")
 	assert(utils.isValidAddress(observerAddress, true), "Observer address is not a valid address") -- allow unsafe addresses for observer address
@@ -497,15 +484,19 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	for _, address in ipairs(failedGatewayAddresses) do
 		assert(utils.isValidAddress(address, true), "Failed gateway address is not a valid address") -- allow unsafe addresses for failed gateway addresses
 	end
+	assert(epochIndex >= 0, "Epoch index must be greater than or equal to 0")
 	assert(type(timestamp) == "number", "Timestamp is required")
 
-	local epochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	local epochStartTimestamp, _, epochDistributionTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
+	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 
 	-- avoid observations before the previous epoch distribution has occurred, as distributions affect weights of the current epoch
 	assert(
-		timestamp >= epochStartTimestamp + epochs.getSettings().distributionDelayMs,
-		"Observations for the current epoch cannot be submitted before: " .. epochDistributionTimestamp
+		timestamp > epochStartTimestamp,
+		"Observations for epoch " .. epochIndex .. " cannot be submitted before " .. epochStartTimestamp
+	)
+	assert(
+		timestamp < epochEndTimestamp,
+		"Observations for epoch " .. epochIndex .. " cannot be submitted after " .. epochEndTimestamp
 	)
 
 	local prescribedObserversLookup = epochs.getPrescribedObserversForEpoch(epochIndex)
@@ -669,14 +660,6 @@ function epochs.distributeLastEpoch(currentTimestamp)
 		return nil -- do not return the epoch as it has already been distributed, and we do not want to send redundant epoch-distributed-notices
 	end
 
-	--- Epoch is prescribed, but not eligible for distribution
-	--- @cast previousEpoch PrescribedEpoch
-	if currentTimestamp < previousEpoch.distributionTimestamp then
-		-- silently ignore - Distribution can only occur after the epoch has ended
-		print("Distribution can only occur after the epoch has ended")
-		return nil
-	end
-
 	local eligibleGatewaysForEpoch = previousEpoch.distributions.rewards.eligible or {}
 	local prescribedObserversLookup = previousEpoch.prescribedObservers or {}
 	local totalEligibleObserverReward = previousEpoch.distributions.totalEligibleObserverReward or 0
@@ -820,7 +803,6 @@ function convertPrescribedEpochToDistributedEpoch(epoch, currentTimestamp, distr
 		startTimestamp = epoch.startTimestamp,
 		endTimestamp = epoch.endTimestamp,
 		startHeight = epoch.startHeight,
-		distributionTimestamp = epoch.distributionTimestamp,
 		prescribedObservers = prescribedObservers,
 		prescribedNames = epoch.prescribedNames,
 		observations = epoch.observations,
@@ -860,11 +842,13 @@ function convertCreatedEpochToPrescribedEpoch(
 		startTimestamp = epoch.startTimestamp,
 		endTimestamp = epoch.endTimestamp,
 		startHeight = epoch.startHeight,
-		distributionTimestamp = epoch.distributionTimestamp,
+		arnsStats = epoch.arnsStats,
 		prescribedObservers = prescribedObservers,
 		prescribedNames = prescribedNames,
-		observations = epoch.observations,
-		arnsStats = epoch.arnsStats,
+		observations = {
+			failureSummaries = {},
+			reports = {},
+		},
 		distributions = {
 			totalEligibleRewards = eligibleEpochRewards.totalEligibleRewards,
 			totalEligibleGatewayReward = eligibleEpochRewards.perGatewayReward,

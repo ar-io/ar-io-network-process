@@ -1,6 +1,5 @@
 local tick = {}
 local epochs = require("epochs")
-local demand = require("demand")
 local gar = require("gar")
 
 --- @class TickResult
@@ -17,8 +16,6 @@ local gar = require("gar")
 --- @param msgId string The message ID
 --- @return TickResult # The ticked epoch
 function tick.tickEpoch(timestamp, blockHeight, hashchain, msgId)
-	-- update demand factor if necessary
-	local demandFactor = demand.updateDemandFactor(timestamp)
 	-- distribute rewards for the epoch and increments stats for gateways, this closes the epoch if the timestamp is greater than the epochs required distribution timestamp
 	local distributedEpoch = epochs.distributeLastEpoch(timestamp)
 	-- prune any gateway that has hit the failed 30 consecutive epoch threshold after the epoch has been distributed
@@ -30,7 +27,6 @@ function tick.tickEpoch(timestamp, blockHeight, hashchain, msgId)
 	return {
 		maybeDistributedEpoch = distributedEpoch,
 		maybeNewEpoch = newEpoch,
-		maybeDemandFactor = demandFactor,
 		pruneGatewaysResult = pruneGatewaysResult,
 		maybePrescribedEpoch = prescribedEpoch,
 	}
