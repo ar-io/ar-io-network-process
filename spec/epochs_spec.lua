@@ -458,12 +458,11 @@ describe("epochs", function()
 	describe("createNewEpoch", function()
 		local epochIndex = 1
 		local epochStartTimestamp = _G.EpochSettings.epochZeroStartTimestamp + _G.EpochSettings.durationMs
-		local timestamp = epochStartTimestamp
 		local epochEndTimestamp = epochStartTimestamp + _G.EpochSettings.durationMs
 		local epochStartBlockHeight = 0
 		local oneYearMs = 60 * 1000 * 60 * 24 * 365
-		local recordTimestamp = timestamp
-		local endTimestamp = startTimestamp + oneYearMs
+		local recordTimestamp = epochStartTimestamp
+		local endTimestamp = epochStartTimestamp + oneYearMs
 
 		before_each(function()
 			_G.Epochs = {}
@@ -507,43 +506,6 @@ describe("epochs", function()
 					name = "this-is-another-record-in-returned",
 					target = "test-this-is-valid-arweave-wallet-address-1",
 					endTimestamp = endTimestamp,
-				},
-			}
-		end)
-
-		it("should create a new epoch and all initial data should be empty", function()
-			local expectation = {
-				startTimestamp = epochStartTimestamp,
-				endTimestamp = epochEndTimestamp,
-				epochIndex = epochIndex,
-				startHeight = 0,
-				arnsStats = {
-					totalActiveNames = 3,
-					totalGracePeriodNames = 0,
-					totalReservedNames = 2,
-					totalReturnedNames = 1,
-				},
-			}
-			local result = epochs.createNewEpoch(timestamp, epochStartBlockHeight)
-			assert.are.same(expectation, result)
-			assert.are.same(expectation, epochs.getEpoch(epochIndex))
-		end)
-	end)
-
-	describe("prescribeCurrentEpoch", function()
-		it("should prescribe an epoch that has not been prescribed yet", function()
-			local epochStartTimestamp = _G.EpochSettings.epochZeroStartTimestamp
-			local epochPrescribedTimestamp = epochStartTimestamp
-			local epochStartBlockHeight = 0
-			_G.Epochs = {}
-			_G.NameRegistry = {
-				records = {
-					["prescribed-name"] = {
-						startTimestamp = 0,
-						type = "permabuy",
-						purchasePrice = 0,
-						undernameLimit = 10,
-					},
 				},
 			}
 			_G.GatewayRegistry = {
@@ -603,12 +565,9 @@ describe("epochs", function()
 					},
 				},
 			}
-			-- the epoch must be created before prescribing it
-			local createdEpoch = epochs.createNewEpoch(epochStartTimestamp, epochStartBlockHeight)
+		end)
 
-			if not createdEpoch then
-				error("Epoch not created")
-			end
+		it("should create a new epoch and all initial data should be empty", function()
 			local expectedEligibleGateways = 1
 			local expectedEligibleRewards = math.floor(protocolBalance * constants.minimumRewardRate)
 			local expectedTotalGatewayReward = math.floor(expectedEligibleRewards * 0.90)
@@ -617,22 +576,26 @@ describe("epochs", function()
 			local expectedPerObserverReward = math.floor(expectedTotalObserverReward / 1) -- only one prescribed observer
 			local expectation = {
 				hashchain = hashchain,
-				startTimestamp = createdEpoch.startTimestamp,
-				endTimestamp = createdEpoch.endTimestamp,
-				epochIndex = createdEpoch.epochIndex,
-				startHeight = createdEpoch.startHeight,
+				startTimestamp = epochStartTimestamp,
+				endTimestamp = epochEndTimestamp,
+				epochIndex = epochIndex,
+				startHeight = epochStartBlockHeight,
 				observations = {
 					failureSummaries = {},
 					reports = {},
 				},
-				arnsStats = createdEpoch.arnsStats,
-
-				--- validate all the new fields are set
+				arnsStats = {
+					totalActiveNames = 3,
+					totalGracePeriodNames = 0,
+					totalReturnedNames = 1,
+					totalReservedNames = 2,
+				},
 				prescribedObservers = {
 					["test-this-is-valid-arweave-wallet-address-1"] = "test-this-is-valid-arweave-wallet-address-1",
 				},
 				prescribedNames = {
-					"prescribed-name",
+					"test-record-1",
+					"test-record-2",
 				},
 				distributions = {
 					totalEligibleGateways = expectedEligibleGateways,
@@ -649,8 +612,13 @@ describe("epochs", function()
 					},
 				},
 			}
-			local result = epochs.prescribeCurrentEpoch(epochPrescribedTimestamp, hashchain)
+			local result = epochs.createAndPrescribeNewEpoch(epochStartTimestamp, epochStartBlockHeight, hashchain)
+			assert(result, "Expected epoch to be created")
+			-- sort the prescribed names to avoid lua array comparison issues
+			table.sort(expectation.prescribedNames)
+			table.sort(result.prescribedNames)
 			assert.are.same(expectation, result)
+			assert.are.same(expectation, epochs.getEpoch(epochIndex))
 		end)
 	end)
 
@@ -785,7 +753,7 @@ describe("epochs", function()
 
 			-- validate the distribution of rewards for the epoch
 			local distributedEpoch = epochs.distributeLastEpoch(epoch.endTimestamp)
-			assert.is_not_nil(distributedEpoch)
+			assert(distributedEpoch)
 
 			-- validate the epoch is removed from the epoch table after distribution
 			assert.is_nil(_G.Epochs[epochIndex])

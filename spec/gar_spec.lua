@@ -544,7 +544,7 @@ describe("gar", function()
 				stubGatewayAddress,
 				startTimestamp
 			)
-			assert.is_not_nil(result)
+			assert(result)
 			assert.are.same({
 				allowDelegatedStaking = false,
 				delegateRewardShareRatio = 0,
@@ -2025,8 +2025,8 @@ describe("gar", function()
 				}, result)
 
 				assert.is_nil(_G.GatewayRegistry["address1"]) -- removed
-				assert.is_not_nil(_G.GatewayRegistry["address2"]) -- not removed
-				assert.is_not_nil(_G.GatewayRegistry["address3"]) -- not removed
+				assert(_G.GatewayRegistry["address2"]) -- not removed
+				assert(_G.GatewayRegistry["address3"]) -- not removed
 				-- Check that gateway 3's operator stake is slashed by 100% and the remaining stake is vaulted
 				assert.are.equal("leaving", _G.GatewayRegistry["address3"].status)
 				assert.are.equal(0, _G.GatewayRegistry["address3"].operatorStake)
@@ -2089,7 +2089,7 @@ describe("gar", function()
 				gatewayStakeWithdrawing = 0,
 			}, result)
 
-			assert.is_not_nil(_G.GatewayRegistry["address2"]) -- not changed
+			assert(_G.GatewayRegistry["address2"]) -- not changed
 			assert.are.equal(protocolBalanceBefore, _G.Balances[ao.id])
 		end)
 	end)
