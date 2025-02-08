@@ -721,7 +721,8 @@ function gar.getGatewayWeightsAtTimestamp(gatewayAddresses, timestamp)
 
 	-- Iterate over gateways to calculate weights
 	for _, gatewayAddress in pairs(gatewayAddresses) do
-		local gateway = gar.getGateway(gatewayAddress)
+		-- okay to use unsafe here as we are not modifying the gateway, just computing the weights
+		local gateway = gar.getGatewayUnsafe(gatewayAddress)
 		if gateway then
 			local totalStake = gateway.operatorStake + gateway.totalDelegatedStake -- 100 - no cap to this
 			local stakeWeightRatio = totalStake / gar.getSettings().operators.minStake -- this is always greater than 1 as the minOperatorStake is always less than the stake
@@ -910,16 +911,6 @@ function gar.updateGatewayStats(address, gateway, stats)
 	end
 
 	return gateway
-end
-
---- Updates the weights for all active gateways. This is usually called every epoch.
---- @param timestamp number The timestamp to update the weights at
-function gar.updateAllActiveGatewayWeights(timestamp)
-	local weightedGateways =
-		gar.getGatewayWeightsAtTimestamp(gar.getActiveGatewaysBeforeTimestamp(timestamp), timestamp)
-	for _, weightedGateway in ipairs(weightedGateways) do
-		gar.updateGatewayWeights(weightedGateway)
-	end
 end
 
 --- Updates the weights for a gateway

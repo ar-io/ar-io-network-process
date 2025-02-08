@@ -227,15 +227,6 @@ describe('epochs', () => {
           timestamp:
             epochSettings.epochZeroStartTimestamp + epochSettings.durationMs,
         });
-        const expectedTenureWeight = 4;
-        const expectedStakeWeight =
-          (INITIAL_OPERATOR_STAKE + 16875675000) / INITIAL_OPERATOR_STAKE;
-        const expectedObserverPerformanceRatio = 0.5; // they didn't observe the first epoch, so their performance ratio is 0.5 at the start of the second epoch (we add 1 to the performance ratio to avoid division by zero)
-        const expectedCompositeWeight =
-          expectedStakeWeight *
-          expectedObserverPerformanceRatio *
-          expectedTenureWeight;
-        const expectedStakeAfterReward = INITIAL_OPERATOR_STAKE + 16875675000;
         assert.deepStrictEqual(secondEpoch, {
           epochIndex: 1,
           hashchain: 'hashchain-'.padEnd(43, 'g'),
@@ -261,13 +252,13 @@ describe('epochs', () => {
             {
               observerAddress: STUB_ADDRESS,
               gatewayAddress: STUB_OPERATOR_ADDRESS,
-              stakeWeight: expectedStakeWeight,
+              stakeWeight: 2.6875675,
               gatewayPerformanceRatio: 1,
-              observerPerformanceRatio: expectedObserverPerformanceRatio, // they didn't observe the first epoch, so their performance ratio is 0.5 at the start of the second epoch (we add 1 to the performance ratio to avoid division by zero)
-              compositeWeight: expectedCompositeWeight,
+              observerPerformanceRatio: 0.5,
+              compositeWeight: 5.375135,
               normalizedCompositeWeight: 1,
-              tenureWeight: expectedTenureWeight,
-              stake: expectedStakeAfterReward, // includes the new reward from the previous epoch
+              tenureWeight: 4,
+              stake: INITIAL_OPERATOR_STAKE + 16875675000, // includes the new reward from the previous epoch
               startTimestamp: 0,
             },
           ],

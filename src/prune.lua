@@ -42,6 +42,7 @@ function prune.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 	local pruneGatewaysResult = gar.pruneGateways(timestamp, msgId)
 	local delegatorsWithFeeReset = gar.pruneRedelegationFeeData(timestamp)
 	local prunedEpochs = epochs.pruneEpochs(timestamp)
+
 	return {
 		prunedRecords = prunedRecords,
 		newGracePeriodRecords = newGracePeriodRecords,
