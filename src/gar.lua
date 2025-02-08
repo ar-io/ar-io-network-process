@@ -700,7 +700,10 @@ function gar.isGatewayActiveBeforeTimestamp(startTimestamp, gateway)
 	return didStartBeforeEpoch and isNotLeaving
 end
 
-function gar.getActiveGatewaysBeforeTimestamp(startTimestamp)
+--- Returns the addresses of the gateways that are active before a given timestamp
+--- @param startTimestamp number The timestamp to check if the gateways are active before
+--- @return WalletAddress[] # The addresses of the active gateways
+function gar.getActiveGatewayAddressesBeforeTimestamp(startTimestamp)
 	local activeGatewayAddresses = {}
 	-- use pairs as gateways is a map
 	for address, gateway in pairs(gar.getGatewaysUnsafe()) do
@@ -917,7 +920,8 @@ end
 --- @param weightedGateway WeightedGateway The weighted gateway to update the weights for
 function gar.updateGatewayWeights(weightedGateway)
 	local address = weightedGateway.gatewayAddress
-	local gateway = gar.getGateway(address)
+	-- by using the unsafe getGateway we avoid the need to update the GatewayRegistry global variable
+	local gateway = gar.getGatewayUnsafe(address)
 	assert(gateway, "Gateway not found")
 	assert(weightedGateway.stakeWeight, "stakeWeight is required")
 	assert(weightedGateway.tenureWeight, "tenureWeight is required")
@@ -934,7 +938,6 @@ function gar.updateGatewayWeights(weightedGateway)
 		compositeWeight = weightedGateway.compositeWeight,
 		normalizedCompositeWeight = weightedGateway.normalizedCompositeWeight,
 	}
-	GatewayRegistry[address] = gateway
 end
 
 function gar.addGateway(address, gateway)

@@ -75,7 +75,7 @@ describe('epochs', () => {
           timestamp: epochSettings.epochZeroStartTimestamp,
         });
         assert.deepStrictEqual(epoch, {
-          epochIndex: 0,
+          epochIndex: 1,
           hashchain: STUB_HASH_CHAIN,
           startTimestamp: epochSettings.epochZeroStartTimestamp,
           endTimestamp:
@@ -217,7 +217,7 @@ describe('epochs', () => {
             epochSettings.epochZeroStartTimestamp +
             epochSettings.durationMs +
             1,
-          epochIndex: 0, // try and get the pruned epoch by epoch index even though it has been pruned
+          epochIndex: 1, // try and get the pruned epoch by epoch index even though it has been pruned
         });
         assert.deepStrictEqual(prunedEpoch, null);
 
@@ -228,7 +228,7 @@ describe('epochs', () => {
             epochSettings.epochZeroStartTimestamp + epochSettings.durationMs,
         });
         assert.deepStrictEqual(secondEpoch, {
-          epochIndex: 1,
+          epochIndex: 2,
           hashchain: 'hashchain-'.padEnd(43, 'g'),
           startTimestamp:
             epochSettings.epochZeroStartTimestamp + epochSettings.durationMs,
