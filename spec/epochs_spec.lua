@@ -1,6 +1,5 @@
 local epochs = require("epochs")
 local gar = require("gar")
-local utils = require("utils")
 local constants = require("constants")
 local testSettings = {
 	fqdn = "test.com",
@@ -23,10 +22,9 @@ describe("epochs", function()
 			["test-this-is-valid-arweave-wallet-address-1"] = 500000000,
 		}
 		_G.Epochs = {
-			[0] = {
+			[1] = {
 				startTimestamp = 1704092400000,
 				endTimestamp = 1704092400100,
-				distributionTimestamp = 1704092400115,
 				prescribedObservers = {},
 				distributions = {},
 				observations = {
@@ -78,10 +76,12 @@ describe("epochs", function()
 					compositeWeight = 1,
 				},
 			}
-			_G.Epochs[0].prescribedObservers = {
-				["observerAddress"] = "test-this-is-valid-arweave-wallet-address-1",
+			_G.Epochs[1] = {
+				prescribedObservers = {
+					["observerAddress"] = "test-this-is-valid-arweave-wallet-address-1",
+				},
 			}
-			local epochIndex = 0
+			local epochIndex = 1
 			local expectation = {
 				{
 					observerAddress = "observerAddress",
@@ -133,7 +133,7 @@ describe("epochs", function()
 			local expectation = {
 				["observerAddress"] = "test-this-is-valid-arweave-wallet-address-1",
 			}
-			local prescribedObserverMap = epochs.computePrescribedObserversForEpoch(0, hashchain)
+			local prescribedObserverMap = epochs.computePrescribedObserversForEpoch(1, hashchain)
 			assert.are.same(expectation, prescribedObserverMap)
 		end)
 
@@ -180,7 +180,7 @@ describe("epochs", function()
 				["observer-address-1"] = "observer1",
 				["observer-address-3"] = "observer3",
 			}
-			local prescribedObserverMap = epochs.computePrescribedObserversForEpoch(0, testHashchain)
+			local prescribedObserverMap = epochs.computePrescribedObserversForEpoch(1, testHashchain)
 			assert.are.same(expectation, prescribedObserverMap)
 		end)
 	end)
@@ -206,7 +206,7 @@ describe("epochs", function()
 				},
 			}
 			local expectation = { "arns-name-two", "arns-name-one" }
-			local status, result = pcall(epochs.computePrescribedNamesForEpoch, 0, hashchain)
+			local status, result = pcall(epochs.computePrescribedNamesForEpoch, 1, hashchain)
 			assert.is_true(status)
 			assert.are.equal(2, #result)
 			assert.are.same(expectation, result)
@@ -256,7 +256,7 @@ describe("epochs", function()
 			}
 			local expectation =
 				{ "arns-name-five", "arns-name-four", "arns-name-one", "arns-name-three", "arns-name-two" }
-			local status, result = pcall(epochs.computePrescribedNamesForEpoch, 0, hashchain)
+			local status, result = pcall(epochs.computePrescribedNamesForEpoch, 1, hashchain)
 			assert.is_true(status)
 			assert.are.equal(5, #result)
 			assert.are.same(expectation, result)
@@ -271,10 +271,10 @@ describe("epochs", function()
 			local failedGateways = {
 				"test-this-is-valid-arweave-wallet-address-1",
 			}
-			local status, error = pcall(epochs.saveObservations, observer, reportTxId, failedGateways, 0, timestamp)
+			local status, error = pcall(epochs.saveObservations, observer, reportTxId, failedGateways, 1, timestamp)
 			assert.is_false(status)
 			assert.match(
-				"Observations for epoch 0 cannot be submitted before " .. _G.EpochSettings.epochZeroStartTimestamp,
+				"Observations for epoch 1 must be submitted after " .. _G.EpochSettings.epochZeroStartTimestamp,
 				error
 			)
 		end)
@@ -285,10 +285,12 @@ describe("epochs", function()
 			local failedGateways = {
 				"test-this-is-valid-arweave-wallet-address-1",
 			}
-			_G.Epochs[0].prescribedObservers = {
-				["test-this-is-valid-arweave-observer-address-1"] = "test-this-is-valid-arweave-gateway-address-1",
+			_G.Epochs[1] = {
+				prescribedObservers = {
+					["test-this-is-valid-arweave-observer-address-1"] = "test-this-is-valid-arweave-gateway-address-1",
+				},
 			}
-			local status, error = pcall(epochs.saveObservations, observer, reportTxId, failedGateways, 0, timestamp)
+			local status, error = pcall(epochs.saveObservations, observer, reportTxId, failedGateways, 1, timestamp)
 			assert.is_false(status)
 			assert.match("Caller is not a prescribed observer for the current epoch.", error)
 		end)
@@ -409,14 +411,16 @@ describe("epochs", function()
 						},
 					},
 				}
-				_G.Epochs[0].prescribedObservers = {
-					["test-this-is-valid-arweave-observer-address-2"] = "test-this-is-valid-arweave-wallet-address-2",
+				_G.Epochs[1] = {
+					prescribedObservers = {
+						["test-this-is-valid-arweave-observer-address-2"] = "test-this-is-valid-arweave-wallet-address-2",
+					},
 				}
 				local failedGateways = {
 					"test-this-is-valid-arweave-wallet-address-1",
 					"test-this-is-valid-arweave-wallet-address-3",
 				}
-				local result = epochs.saveObservations(observer, reportTxId, failedGateways, 0, timestamp)
+				local result = epochs.saveObservations(observer, reportTxId, failedGateways, 1, timestamp)
 				assert.are.same(result, {
 					reports = {
 						[observer] = reportTxId,
@@ -431,7 +435,7 @@ describe("epochs", function()
 
 	describe("getPrescribedObserversForEpoch", function()
 		it("should return the prescribed observers for the epoch", function()
-			local epochIndex = 0
+			local epochIndex = 1
 			local expectation = {}
 			local result = epochs.getPrescribedObserversForEpoch(epochIndex)
 			assert.are.same(result, expectation)
@@ -442,22 +446,22 @@ describe("epochs", function()
 		it("should return the epoch index for the given timestamp", function()
 			local timestamp = epochs.getSettings().epochZeroStartTimestamp + epochs.getSettings().durationMs + 1
 			local result = epochs.getEpochIndexForTimestamp(timestamp)
-			assert.are.equal(result, 1)
+			assert.are.equal(result, 2)
 		end)
 	end)
 
 	describe("getEpochTimestampsForIndex", function()
 		it("should return the epoch timestamps for the given epoch index", function()
-			local epochIndex = 0
+			local epochIndex = 1
 			local expectation = { 1704092400000, 1704092400100 }
 			local result = { epochs.getEpochTimestampsForIndex(epochIndex) }
 			assert.are.same(result, expectation)
 		end)
 	end)
 
-	describe("createNewEpoch", function()
+	describe("createAndPrescribeNewEpoch", function()
 		local epochIndex = 1
-		local epochStartTimestamp = _G.EpochSettings.epochZeroStartTimestamp + _G.EpochSettings.durationMs
+		local epochStartTimestamp = _G.EpochSettings.epochZeroStartTimestamp
 		local epochEndTimestamp = epochStartTimestamp + _G.EpochSettings.durationMs
 		local epochStartBlockHeight = 0
 		local oneYearMs = 60 * 1000 * 60 * 24 * 365
@@ -652,11 +656,11 @@ describe("epochs", function()
 		end)
 	end)
 
-	describe("distributeLastEpoch", function()
+	describe("distributeEpoch", function()
 		before_each(function()
 			-- adds a fully prescribed epoch to the epoch registry, with 5 gateways and 5 observers and observations
-			_G.Epochs[0] = {
-				epochIndex = 0,
+			_G.Epochs[1] = {
+				epochIndex = 1,
 				observations = {
 					failureSummaries = {
 						["test-this-is-valid-arweave-wallet-address-1"] = {
@@ -732,7 +736,7 @@ describe("epochs", function()
 		it("should distribute rewards for the epoch, auto staking for delegates", function()
 			local originalOperatorStake = gar.getSettings().operators.minStake
 			local originalDelegateStake = 100000000
-			local epochIndex = 0
+			local epochIndex = 1
 			for i = 1, 6 do
 				local gateway = {
 					operatorStake = originalOperatorStake,
@@ -782,7 +786,7 @@ describe("epochs", function()
 			local expectedObserverReward = epoch.distributions.totalEligibleObserverReward
 
 			-- validate the distribution of rewards for the epoch
-			local distributedEpoch = epochs.distributeLastEpoch(epoch.endTimestamp)
+			local distributedEpoch = epochs.distributeEpoch(epoch.epochIndex, epoch.endTimestamp)
 			assert(distributedEpoch)
 
 			-- validate the epoch is removed from the epoch table after distribution
@@ -970,69 +974,29 @@ describe("epochs", function()
 		it(
 			"should return nil if the epoch has already been distributed and remove it from the epoch registry",
 			function()
-				local epochIndex = 0
+				local epochIndex = 1
 				-- marks the epoch as distributed
-				_G.Epochs[epochIndex].distributions.distributedTimestamp = 1704092400115
+				_G.Epochs[epochIndex] = {
+					epochIndex = epochIndex,
+					distributions = {
+						distributedTimestamp = 1704092400115,
+					},
+				}
 				local epoch = epochs.getEpoch(epochIndex)
 				assert(epoch, "Epoch not found")
-				local distributedEpoch = epochs.distributeLastEpoch(epoch.endTimestamp)
+				local distributedEpoch = epochs.distributeEpoch(epoch.epochIndex, epoch.endTimestamp)
 				assert.is_nil(distributedEpoch)
 				assert.is_nil(_G.Epochs[epochIndex])
 			end
 		)
 
 		it("should return nil if the epoch does not exist in the epoch registry", function()
-			local epochIndex = 0
+			local epochIndex = 1
 			local epoch = epochs.getEpoch(epochIndex)
 			assert(epoch, "Epoch not found")
 			-- remove the epoch from the epoch registry
 			_G.Epochs[epochIndex] = nil
-			assert.is_nil(epochs.distributeLastEpoch(epoch.endTimestamp))
-		end)
-	end)
-
-	-- prune epochs
-	describe("pruneEpochs", function()
-		local startingEpochs
-		before_each(function()
-			_G.Epochs = {}
-			-- add 20 epochs
-			for i = 0, 20 do
-				_G.Epochs[i] = {
-					epochIndex = i,
-					startTimestamp = 1704092400000,
-					endTimestamp = 1704092400100,
-				}
-			end
-			startingEpochs = utils.deepCopy(_G.Epochs)
-		end)
-
-		it(
-			"should prune any epochs older than the current epoch and previous epoch, until distribution occurs",
-			function()
-				local currentTimestamp = epochs.getSettings().epochZeroStartTimestamp
-					+ epochs.getSettings().durationMs * 20
-					+ 1
-				-- prune epochs, keeping on the current epoch and the previous one
-				epochs.pruneEpochs(currentTimestamp)
-				assert.are.equal(2, utils.lengthOfTable(_G.Epochs))
-				assert.are.same({
-					[19] = _G.Epochs[19],
-					[20] = _G.Epochs[20],
-				}, _G.Epochs)
-			end
-		)
-
-		it("should skip pruning when unnecessary", function()
-			local currentTimestamp = epochs.getSettings().epochZeroStartTimestamp
-				+ epochs.getSettings().durationMs * 20
-				+ 1
-			_G.NextEpochsPruneTimestamp = currentTimestamp + 1
-			-- prune epochs
-			local result = epochs.pruneEpochs(currentTimestamp)
-			assert.are.same({}, result)
-			assert.are.same(startingEpochs, _G.Epochs)
-			assert.are.equal(currentTimestamp + 1, _G.NextEpochsPruneTimestamp)
+			assert.is_nil(epochs.distributeEpoch(epoch.epochIndex, epoch.endTimestamp))
 		end)
 	end)
 

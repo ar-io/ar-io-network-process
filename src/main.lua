@@ -23,10 +23,9 @@ GatewayRegistry = GatewayRegistry or {}
 NameRegistry = NameRegistry or {}
 Epochs = Epochs or {}
 
--- last known timestamps used to validate behavior to perform on new messages
-LastCreatedEpochIndex = LastCreatedEpochIndex or -1 -- TODO: consider making epochs 1 indexed and start at 0
-LastDistributedEpochIndex = LastDistributedEpochIndex or -1
-LastPrescribedEpochIndex = LastPrescribedEpochIndex or -1
+-- last known variables in the state, these help control tick, prune, and distribute behavior
+LastCreatedEpochIndex = LastCreatedEpochIndex or 0
+LastDistributedEpochIndex = LastDistributedEpochIndex or 0
 LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
 LastKnownMessageTimestamp = LastKnownMessageTimestamp or 0
 LastKnownMessageId = LastKnownMessageId or ""
@@ -365,7 +364,6 @@ end
 --- @param ioEvent ARIOEvent
 local function addNextPruneTimestampsData(ioEvent)
 	ioEvent:addField("Next-Returned-Names-Prune-Timestamp", arns.nextReturnedNamesPruneTimestamp())
-	ioEvent:addField("Next-Epochs-Prune-Timestamp", epochs.nextEpochsPruneTimestamp())
 	ioEvent:addField("Next-Records-Prune-Timestamp", arns.nextRecordsPruneTimestamp())
 	ioEvent:addField("Next-Vaults-Prune-Timestamp", vaults.nextVaultsPruneTimestamp())
 	ioEvent:addField("Next-Gateways-Prune-Timestamp", gar.nextGatewaysPruneTimestamp())
@@ -382,9 +380,7 @@ local function addNextPruneTimestampsResults(ioEvent, prunedStateResult)
 	-- If anything meaningful was pruned, collect the next prune timestamps
 	if
 		next(prunedStateResult.prunedReturnedNames)
-		or next(prunedStateResult.prunedEpochs)
 		or next(prunedStateResult.prunedPrimaryNameRequests)
-		or next(prunedStateResult.prunedEpochs)
 		or next(prunedStateResult.prunedRecords)
 		or next(pruneGatewaysResult.prunedGateways)
 		or next(prunedStateResult.delegatorsWithFeeReset)
@@ -580,11 +576,6 @@ end, function(msg)
 				LastKnownLockedSupply = LastKnownLockedSupply - vault.balance
 				LastKnownCirculatingSupply = LastKnownCirculatingSupply + vault.balance
 			end
-		end
-		local prunedEpochsCount = utils.lengthOfTable(prunedStateResult.prunedEpochs or {})
-		if prunedEpochsCount > 0 then
-			msg.ioEvent:addField("Pruned-Epochs", prunedStateResult.prunedEpochs)
-			msg.ioEvent:addField("Pruned-Epochs-Count", prunedEpochsCount)
 		end
 
 		local pruneGatewaysResult = prunedStateResult.pruneGatewaysResult or {}
@@ -1628,7 +1619,11 @@ end)
 addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
 	local reportTxId = msg.Tags["Report-Tx-Id"]
 	local failedGateways = utils.splitAndTrimString(msg.Tags["Failed-Gateways"], ",")
-	local epochIndex = msg.Tags["Epoch-Index"]
+	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
+	assert(
+		epochIndex and epochIndex > 0 and utils.isInteger(epochIndex),
+		"Epoch index is required. Must be a number greater than 0."
+	)
 	assert(utils.isValidArweaveAddress(reportTxId), "Invalid report tx id. Must be a valid Arweave address.")
 	for _, gateway in ipairs(failedGateways) do
 		assert(utils.isValidAddress(gateway, true), "Invalid failed gateway address: " .. gateway)
@@ -1763,8 +1758,6 @@ end, function(msg)
 	local tickedRewardDistributions = {}
 	local totalTickedRewardsDistributed = 0
 
-	print("Ticking from " .. lastCreatedEpochIndex .. " to " .. targetCurrentEpochIndex)
-
 	-- tick the demand factor
 	local demandFactor = demand.updateDemandFactor(msg.Timestamp)
 	if demandFactor ~= nil then
@@ -1776,10 +1769,16 @@ end, function(msg)
 		})
 	end
 
-	--- tick to the newest epoch, and stub out any epochs that are not yet created
-	for i = lastCreatedEpochIndex, targetCurrentEpochIndex do
-		-- TODO: if we are significantly behind, we should not prescribed any observers or names, or decrement any gateways for failure
-		local tickResult = tick.tickEpoch(msg.Timestamp, blockHeight, hashchain, msgId)
+	--[[
+		Tick up to the target epoch index, this will create new epochs and distribute rewards for existing epochs
+		This should never fall behind, but in the case it does, it will create the epochs and distribute rewards for the epochs
+		accordingly. It should finish at the target epoch index - which is computed based on the message timestamp
+	]]
+	--
+	print("Ticking from " .. lastCreatedEpochIndex .. " to " .. targetCurrentEpochIndex)
+	for epochIndexToTick = lastCreatedEpochIndex, targetCurrentEpochIndex do
+		print("The epoch index to tick is: " .. epochIndexToTick)
+		local tickResult = tick.tickEpoch(msg.Timestamp, blockHeight, hashchain, msgId, epochIndexToTick)
 		if tickResult.pruneGatewaysResult ~= nil then
 			table.insert(newPruneGatewaysResults, tickResult.pruneGatewaysResult)
 		end
@@ -1809,7 +1808,6 @@ end, function(msg)
 				Data = json.encode(tickResult.maybeDistributedEpoch),
 			})
 		end
-		print("Successfully ticked epoch " .. i)
 	end
 	if #distributedEpochIndexes > 0 then
 		msg.ioEvent:addField("Distributed-Epoch-Indexes", distributedEpochIndexes)
@@ -1818,9 +1816,10 @@ end, function(msg)
 		msg.ioEvent:addField("New-Epoch-Indexes", newEpochIndexes)
 		-- Only print the prescribed observers of the newest epoch
 		local newestEpoch = epochs.getEpoch(math.max(table.unpack(newEpochIndexes)))
-		local prescribedObserverAddresses = utils.map(newestEpoch.prescribedObservers, function(_, observer)
-			return observer.gatewayAddress
-		end)
+		local prescribedObserverAddresses = newestEpoch
+			and utils.map(newestEpoch.prescribedObservers, function(_, observer)
+				return observer.gatewayAddress
+			end)
 		msg.ioEvent:addField("Prescribed-Observers", prescribedObserverAddresses)
 	end
 	if #newDemandFactors > 0 then
@@ -2625,7 +2624,6 @@ addEventingHandler("getPruningTimestamps", utils.hasMatchingTag("Action", "Pruni
 		Action = "Pruning-Timestamps-Notice",
 		Data = json.encode({
 			returnedNames = arns.nextReturnedNamesPruneTimestamp(),
-			epochs = epochs.nextEpochsPruneTimestamp(),
 			gateways = gar.nextGatewaysPruneTimestamp(),
 			primaryNames = primaryNames.nextPrimaryNamesPruneTimestamp(),
 			records = arns.nextRecordsPruneTimestamp(),

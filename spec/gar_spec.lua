@@ -78,7 +78,7 @@ describe("gar", function()
 			[stubGatewayAddress] = minOperatorStake,
 		}
 		_G.Epochs = {
-			[0] = {
+			[1] = {
 				startTimestamp = 0,
 				endTimestamp = 100,
 				prescribedObservers = {},
@@ -2261,7 +2261,7 @@ describe("gar", function()
 		end)
 	end)
 
-	-- describe("getActiveGatewaysBeforeTimestamp", function()
+	-- describe("getActiveGatewayAddressesBeforeTimestamp", function()
 	-- 	it("should return all active gateways before the timestamp", function()
 	-- 		local timestamp = 1704092400100
 	-- 		_G.GatewayRegistry = {
@@ -2283,7 +2283,7 @@ describe("gar", function()
 	-- 				status = "leaving",
 	-- 			},
 	-- 		}
-	-- 		local result = gar.getActiveGatewaysBeforeTimestamp(timestamp)
+	-- 		local result = gar.getActiveGatewayAddressesBeforeTimestamp(timestamp)
 	-- 		-- assert both gateways are returned, in no particular ordering
 	-- 		assert.is_true(utils.isSubset(result, {
 	-- 			[stubGatewayAddress] = testGateway,

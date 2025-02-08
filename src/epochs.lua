@@ -85,20 +85,13 @@ EpochSettings = EpochSettings
 		durationMs = constants.defaultEpochDurationMs, -- 24 hours
 	}
 
---- @type Timestamp|nil
-NextEpochsPruneTimestamp = NextEpochsPruneTimestamp or 0
-
---- TODO: consider removing this handler and prune function below, epochs should manage their own lifecycle
---- Gets all the epochs
---- @return table<number, PrescribedEpoch> # Only one prescribed epoch should be stored in state at any given time
-function epochs.getEpochsUnsafe()
-	return Epochs or {}
-end
-
 --- Gets an epoch by index
 --- @param epochIndex number The epoch index
 --- @return  PrescribedEpoch | nil # The prescribed epoch
 function epochs.getEpoch(epochIndex)
+	if epochIndex < 1 then
+		return nil
+	end
 	local epoch = utils.deepCopy(Epochs[epochIndex]) or nil
 	return epoch
 end
@@ -113,6 +106,9 @@ end
 --- @param epochIndex number The epoch index
 --- @return table<WalletAddress, WalletAddress> # The prescribed observers for the epoch
 function epochs.getPrescribedObserversForEpoch(epochIndex)
+	if epochIndex < 1 then
+		return {}
+	end
 	local epoch = epochs.getEpoch(epochIndex)
 	return epoch and epoch.prescribedObservers or {}
 end
@@ -166,6 +162,9 @@ end
 --- @param epochIndex number The epoch index
 --- @return DistributedEpochRewards # The distributed rewards for the epoch
 function epochs.getDistributedRewardsForEpoch(epochIndex)
+	if epochIndex < 1 then
+		return {}
+	end
 	local epoch = epochs.getEpoch(epochIndex)
 	local distributed = epoch
 			and epoch.distributions
@@ -179,6 +178,9 @@ end
 --- @param epochIndex number The epoch index
 --- @return Observations # The observations for the epoch
 function epochs.getObservationsForEpoch(epochIndex)
+	if epochIndex < 1 then
+		return {}
+	end
 	local epoch = epochs.getEpoch(epochIndex)
 	return epoch and epoch.observations or {}
 end
@@ -187,6 +189,9 @@ end
 --- @param epochIndex number The epoch index
 --- @return DistributedEpochDistribution | PrescribedEpochDistribution # The distributions for the epoch
 function epochs.getDistributionsForEpoch(epochIndex)
+	if epochIndex < 1 then
+		return {}
+	end
 	local epoch = epochs.getEpoch(epochIndex)
 	return epoch and epoch.distributions or {}
 end
@@ -195,6 +200,9 @@ end
 --- @param epochIndex number The epoch index
 --- @return string[] # The prescribed names for the epoch
 function epochs.getPrescribedNamesForEpoch(epochIndex)
+	if epochIndex < 1 then
+		return {}
+	end
 	local epoch = epochs.getEpoch(epochIndex)
 	return epoch and epoch.prescribedNames or {}
 end
@@ -203,6 +211,9 @@ end
 --- @param epochIndex number The epoch index
 --- @return table<WalletAddress, TransactionId> # The reports for the epoch
 function epochs.getReportsForEpoch(epochIndex)
+	if epochIndex < 1 then
+		return {}
+	end
 	local epoch = epochs.getEpoch(epochIndex)
 	return epoch and epoch.observations.reports or {}
 end
@@ -211,6 +222,9 @@ end
 --- @param epochIndex number The epoch index
 --- @return DistributedEpochDistribution | PrescribedEpochDistribution # The distribution for the epoch
 function epochs.getDistributionForEpoch(epochIndex)
+	if epochIndex < 1 then
+		return {}
+	end
 	local epoch = epochs.getEpoch(epochIndex)
 	return epoch and epoch.distributions or {}
 end
@@ -220,6 +234,9 @@ end
 --- @param hashchain string The hashchain
 --- @return string[] # The prescribed names for the epoch
 function epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
+	if epochIndex < 1 then
+		return {}
+	end
 	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 	local activeArNSNames = arns.getActiveArNSNamesBetweenTimestamps(epochStartTimestamp, epochEndTimestamp)
 
@@ -271,11 +288,11 @@ end
 --- @param hashchain string The hashchain
 --- @return table<WalletAddress, WalletAddress>, WeightedGateway[] # The prescribed observers for the epoch, and all the gateways with weights
 function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
-	assert(epochIndex >= 0, "Epoch index must be greater than or equal to 0")
+	assert(epochIndex > 0, "Epoch index must be greater than or equal to 0")
 	assert(type(hashchain) == "string", "Hashchain must be a string")
 
 	local epochStartTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
-	local activeGatewayAddresses = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
+	local activeGatewayAddresses = gar.getActiveGatewayAddressesBeforeTimestamp(epochStartTimestamp)
 	local weightedGateways = gar.getGatewayWeightsAtTimestamp(activeGatewayAddresses, epochStartTimestamp)
 
 	-- Filter out any observers that could have a normalized composite weight of 0
@@ -334,44 +351,47 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	return prescribedObserversLookup, weightedGateways
 end
 
---- Gets the epoch timestamps for an epoch index
+--- Gets the epoch timestamps for an epoch index. Epochs are 1-indexed so we subtract 1 to get the correct timestamp
 --- @param epochIndex number The epoch index
---- @return number, number # 	The epoch start timestamp, epoch end timestamp, and epoch distribution timestamp
+--- @return number, number # 	The epoch start timestamp, epoch end timestamp
 function epochs.getEpochTimestampsForIndex(epochIndex)
+	if epochIndex < 1 then
+		return 0, 0
+	end
 	local epochStartTimestamp = epochs.getSettings().epochZeroStartTimestamp
-		+ epochs.getSettings().durationMs * epochIndex
+		+ epochs.getSettings().durationMs * (epochIndex - 1)
 	local epochEndTimestamp = epochStartTimestamp + epochs.getSettings().durationMs
 	return epochStartTimestamp, epochEndTimestamp
 end
 
---- Gets the epoch index for a given timestamp
+--- Gets the epoch index for a given timestamp. Epochs are 1-indexed so we add 1 to the result
 --- @param timestamp number The timestamp
 --- @return number # 	The epoch index
 function epochs.getEpochIndexForTimestamp(timestamp)
 	local timestampInMS = utils.checkAndConvertTimestampToMs(timestamp)
 	local epochZeroStartTimestamp = epochs.getSettings().epochZeroStartTimestamp
 	local epochLengthMs = epochs.getSettings().durationMs
-	local epochIndex = math.floor((timestampInMS - epochZeroStartTimestamp) / epochLengthMs)
+	local epochIndex = math.floor((timestampInMS - epochZeroStartTimestamp) / epochLengthMs) + 1
 	return epochIndex
 end
 
 --- Creates a new epoch and updates the gateway weights
---- @param timestamp number The timestamp in milliseconds
---- @param blockHeight number The block height
---- @param hashchain string The hashchain
+--- @param currentTimestamp number The current timestamp in milliseconds
+--- @param currentBlockHeight number The current block height
+--- @param currentHashchain string The current hashchain
 --- @return PrescribedEpoch | nil # The created epoch, or nil if an epoch already exists for the index
-function epochs.createAndPrescribeNewEpoch(timestamp, blockHeight, hashchain)
-	assert(type(timestamp) == "number", "Timestamp must be a number")
-	assert(type(blockHeight) == "number", "Block height must be a number")
-	assert(type(hashchain) == "string", "Hashchain must be a string")
+function epochs.createAndPrescribeNewEpoch(currentTimestamp, currentBlockHeight, currentHashchain)
+	assert(type(currentTimestamp) == "number", "Timestamp must be a number")
+	assert(type(currentBlockHeight) == "number", "Block height must be a number")
+	assert(type(currentHashchain) == "string", "Hashchain must be a string")
 
 	-- if before the epoch zero start timestamp, return nil
-	if timestamp < epochs.getSettings().epochZeroStartTimestamp then
+	if currentTimestamp < epochs.getSettings().epochZeroStartTimestamp then
 		print("Genesis epoch will start at: " .. epochs.getSettings().epochZeroStartTimestamp)
 		return nil
 	end
 
-	local epochIndex = epochs.getEpochIndexForTimestamp(timestamp)
+	local epochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp)
 	if epochs.getEpoch(epochIndex) then
 		print("Epoch already exists for index, skipping creation: " .. epochIndex)
 		return nil -- do not return the existing epoch to prevent sending redundant epoch-created-notices
@@ -379,10 +399,14 @@ function epochs.createAndPrescribeNewEpoch(timestamp, blockHeight, hashchain)
 
 	-- get the max rewards for each participant eligible for the epoch
 	local prescribedObservers, updatedGatewaysWithWeights =
-		epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
-	local prescribedNames = epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
+		epochs.computePrescribedObserversForEpoch(epochIndex, currentHashchain)
+	local prescribedNames = epochs.computePrescribedNamesForEpoch(epochIndex, currentHashchain)
 	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
 	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
+
+	assert(epochStartTimestamp, "Epoch start timestamp is required")
+	assert(epochEndTimestamp, "Epoch end timestamp is required")
+
 	local arnsStatsAtEpochStart = arns.getArNSStatsAtTimestamp(epochStartTimestamp)
 
 	-- update gateway weights for every new epoch, so its clear why the prescribed observers are selected
@@ -392,11 +416,11 @@ function epochs.createAndPrescribeNewEpoch(timestamp, blockHeight, hashchain)
 
 	--- @type PrescribedEpoch
 	local epoch = {
-		hashchain = hashchain,
+		hashchain = currentHashchain,
 		epochIndex = epochIndex,
 		startTimestamp = epochStartTimestamp,
 		endTimestamp = epochEndTimestamp,
-		startHeight = blockHeight,
+		startHeight = currentBlockHeight,
 		arnsStats = arnsStatsAtEpochStart,
 		prescribedObservers = prescribedObservers,
 		prescribedNames = prescribedNames,
@@ -416,9 +440,6 @@ function epochs.createAndPrescribeNewEpoch(timestamp, blockHeight, hashchain)
 	}
 	Epochs[epochIndex] = epoch
 
-	-- Force schedule a pruning JIC
-	NextEpochsPruneTimestamp = NextEpochsPruneTimestamp or 0
-
 	return epoch
 end
 
@@ -427,9 +448,9 @@ end
 --- @param reportTxId string The report transaction ID
 --- @param failedGatewayAddresses table<GatewayAddress> The failed gateway addresses
 --- @param epochIndex number The epoch index
---- @param timestamp number The timestamp
+--- @param currentTimestamp number The current timestamp
 --- @return Observations # The updated observations for the epoch
-function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddresses, epochIndex, timestamp)
+function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddresses, epochIndex, currentTimestamp)
 	-- Note: one of the only places we use arweave addresses, as the protocol requires the report to be stored on arweave. This would be a significant change to OIP if changed.
 	assert(utils.isValidArweaveAddress(reportTxId), "Report transaction ID is not a valid address")
 	assert(utils.isValidAddress(observerAddress, true), "Observer address is not a valid address") -- allow unsafe addresses for observer address
@@ -437,19 +458,19 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	for _, address in ipairs(failedGatewayAddresses) do
 		assert(utils.isValidAddress(address, true), "Failed gateway address is not a valid address") -- allow unsafe addresses for failed gateway addresses
 	end
-	assert(epochIndex >= 0, "Epoch index must be greater than or equal to 0")
-	assert(type(timestamp) == "number", "Timestamp is required")
+	assert(epochIndex > 0, "Epoch index must be greater than 0")
+	assert(type(currentTimestamp) == "number", "Timestamp is required")
 
 	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 
 	-- avoid observations before the previous epoch distribution has occurred, as distributions affect weights of the current epoch
 	assert(
-		timestamp > epochStartTimestamp,
-		"Observations for epoch " .. epochIndex .. " cannot be submitted before " .. epochStartTimestamp
+		currentTimestamp > epochStartTimestamp,
+		"Observations for epoch " .. epochIndex .. " must be submitted after " .. epochStartTimestamp
 	)
 	assert(
-		timestamp < epochEndTimestamp,
-		"Observations for epoch " .. epochIndex .. " cannot be submitted after " .. epochEndTimestamp
+		currentTimestamp < epochEndTimestamp,
+		"Observations for epoch " .. epochIndex .. " must be submitted before " .. epochEndTimestamp
 	)
 
 	local prescribedObserversLookup = epochs.getPrescribedObserversForEpoch(epochIndex)
@@ -461,6 +482,7 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	local observingGateway = gar.getGateway(gatewayAddressForObserver)
 	assert(observingGateway, "The associated gateway not found in the registry.")
 
+	-- TODO: this could be unsafe to avoid copying the epoch on every observation
 	local epoch = epochs.getEpoch(epochIndex)
 	assert(epoch, "Unable to save observation. Epoch not found for index: " .. epochIndex)
 
@@ -523,8 +545,17 @@ end
 --- @param prescribedObserversLookup table<WalletAddress, WalletAddress> The prescribed observers for the epoch
 --- @return ComputedRewards # The total eligible rewards
 function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObserversLookup)
+	if epochIndex < 1 then
+		return {
+			totalEligibleGateways = 0,
+			totalEligibleRewards = 0,
+			perGatewayReward = 0,
+			perObserverReward = 0,
+			potentialRewards = {},
+		}
+	end
 	local epochStartTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
-	local activeGatewayAddresses = gar.getActiveGatewaysBeforeTimestamp(epochStartTimestamp)
+	local activeGatewayAddresses = gar.getActiveGatewayAddressesBeforeTimestamp(epochStartTimestamp)
 	local protocolBalance = balances.getBalance(ao.id)
 	local rewardRate = epochs.getRewardRateForEpoch(epochIndex)
 	local totalEligibleRewards = math.floor(protocolBalance * rewardRate)
@@ -584,17 +615,15 @@ end
 --- 2. Allocate 95% of the rewards for passed gateways, 5% for observers - based on total gateways during the epoch and # of prescribed observers
 --- 3. Distribute the rewards to the gateways and observers
 --- 4. Increment the epoch stats for the gateways
---- @param currentTimestamp number The current timestamp
+--- @param previousEpochIndex number The previous epoch index
 --- @return DistributedEpoch | nil # The updated epoch with the distributed rewards, or nil if no rewards were distributed
-function epochs.distributeLastEpoch(currentTimestamp)
-	local previousEpochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp - epochs.getSettings().durationMs) -- go back to previous epoch
-	local previousEpoch = epochs.getEpoch(previousEpochIndex)
-
-	if previousEpochIndex < 0 then
+function epochs.distributeEpoch(previousEpochIndex, currentTimestamp)
+	if previousEpochIndex < 1 then
 		-- silently ignore - Distribution can only occur after the epoch has ended
-		print("Genesis epoch has not started yet")
 		return nil
 	end
+
+	local previousEpoch = epochs.getEpoch(previousEpochIndex)
 
 	if not previousEpoch then
 		-- TODO: consider throwing an error here instead of silently returning, as this is a critical error and should be fixed
@@ -612,6 +641,8 @@ function epochs.distributeLastEpoch(currentTimestamp)
 		Epochs[previousEpochIndex] = nil
 		return nil -- do not return the epoch as it has already been distributed, and we do not want to send redundant epoch-distributed-notices
 	end
+
+	print("Distributing epoch: " .. previousEpochIndex)
 
 	local eligibleGatewaysForEpoch = previousEpoch.distributions.rewards.eligible or {}
 	local prescribedObserversLookup = previousEpoch.prescribedObservers or {}
@@ -773,40 +804,6 @@ function convertPrescribedEpochToDistributedEpoch(epoch, currentTimestamp, distr
 		},
 		arnsStats = epoch.arnsStats,
 	}
-end
-
---- TODO: consider removing this, epochs should manage their own lifecycle and not require prune
---- Prunes epochs older than the cutoff epoch index
---- @param timestamp number The timestamp to prune epochs older than
---- @return DistributedEpoch[] # The pruned epochs
-function epochs.pruneEpochs(timestamp)
-	local prunedEpochIndexes = {}
-	if not NextEpochsPruneTimestamp or timestamp < NextEpochsPruneTimestamp then
-		-- No known pruning work to do
-		return prunedEpochIndexes
-	end
-
-	-- reset the next prune timestamp, below will populate it with the next prune timestamp minimum
-	NextEpochsPruneTimestamp = nil
-
-	local currentEpochIndex = epochs.getEpochIndexForTimestamp(timestamp)
-	local cutoffEpochIndex = currentEpochIndex - 1 -- keep the two most recent epochs, on distribution the previous epoch will remove itself
-	local unsafeEpochs = epochs.getEpochsUnsafe()
-	local nextEpochIndex = next(unsafeEpochs)
-	while nextEpochIndex do
-		if nextEpochIndex < cutoffEpochIndex then
-			table.insert(prunedEpochIndexes, nextEpochIndex)
-			-- Safe to assign to nil during next() iteration
-			Epochs[nextEpochIndex] = nil
-		else
-			local _, endTimestamp = epochs.getEpochTimestampsForIndex(nextEpochIndex)
-			if endTimestamp >= timestamp then
-				epochs.scheduleNextEpochsPrune(endTimestamp)
-			end
-		end
-		nextEpochIndex = next(unsafeEpochs, nextEpochIndex)
-	end
-	return prunedEpochIndexes
 end
 
 function epochs.scheduleNextEpochsPrune(timestamp)

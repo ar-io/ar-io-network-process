@@ -401,7 +401,7 @@ describe('Tick', async () => {
     // assert the returned epoch data is an empty epoch with no prescribed observers
     assert.deepStrictEqual(epochData, {
       hashchain: 'hashchain-'.padEnd(43, '1'),
-      epochIndex: 0,
+      epochIndex: 1,
       startHeight: 1,
       startTimestamp: epochSettings.epochZeroStartTimestamp,
       endTimestamp: epochSettings.epochZeroStartTimestamp + 24 * 1000 * 60 * 60, // 24 hours - this should match the epoch settings
@@ -457,7 +457,7 @@ describe('Tick', async () => {
       timestamp: observationTimestamp,
       from: STUB_ADDRESS,
       reportTxId,
-      epochIndex: 0,
+      epochIndex: 1,
     });
 
     // now jump ahead to the end of the epoch and tick
@@ -482,7 +482,7 @@ describe('Tick', async () => {
     assert.ok(createdMessage, 'Epoch created notice should be sent');
     assert.equal(
       createdMessage.Tags.find((t) => t.name === 'Epoch-Index').value,
-      '1',
+      '2',
     );
 
     // last epoch is distributed
@@ -491,10 +491,11 @@ describe('Tick', async () => {
         m.Tags.find((t) => t.name === 'Action').value ===
         'Epoch-Distribution-Notice',
     );
+
     assert.ok(distributionMessage, 'Epoch distribution notice should be sent');
     assert.equal(
       distributionMessage.Tags.find((t) => t.name === 'Epoch-Index').value,
-      '0',
+      '1',
     );
 
     // resulting tick notice is sent
@@ -532,7 +533,7 @@ describe('Tick', async () => {
       memory: distributionMemory,
       timestamp: distributionTimestamp,
     });
-    assert.equal(newEpoch.epochIndex, 1);
+    assert.equal(newEpoch.epochIndex, 2);
 
     // assert the gateway stakes were updated and match the distributed rewards
     const gateway = await getGateway({
@@ -596,7 +597,7 @@ describe('Tick', async () => {
     const prunedEpoch = await getEpoch({
       memory: distributionMemory,
       timestamp: distributionTimestamp,
-      epochIndex: 0,
+      epochIndex: 1,
     });
     assert.equal(prunedEpoch, undefined);
     sharedMemory = distributionMemory;
