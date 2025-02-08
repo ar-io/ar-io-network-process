@@ -88,21 +88,16 @@ EpochSettings = EpochSettings
 --- @type Timestamp|nil
 NextEpochsPruneTimestamp = NextEpochsPruneTimestamp or 0
 
---- Gets a deep copy of all the epochs
---- @return table<number, PrescribedEpoch | DistributedEpoch> # A deep copy of the epochs indexed by their epoch index
-function epochs.getEpochs()
-	return utils.deepCopy(Epochs) or {}
-end
-
+--- TODO: consider removing this handler and prune function below, epochs should manage their own lifecycle
 --- Gets all the epochs
---- @return table<number, PrescribedEpoch | DistributedEpoch> # The epochs indexed by their epoch index
+--- @return table<number, PrescribedEpoch> # Only one prescribed epoch should be stored in state at any given time
 function epochs.getEpochsUnsafe()
 	return Epochs or {}
 end
 
 --- Gets an epoch by index
 --- @param epochIndex number The epoch index
---- @return  PrescribedEpoch | DistributedEpoch | nil # The prescribed epoch
+--- @return  PrescribedEpoch | nil # The prescribed epoch
 function epochs.getEpoch(epochIndex)
 	local epoch = utils.deepCopy(Epochs[epochIndex]) or nil
 	return epoch
@@ -780,6 +775,7 @@ function convertPrescribedEpochToDistributedEpoch(epoch, currentTimestamp, distr
 	}
 end
 
+--- TODO: consider removing this, epochs should manage their own lifecycle and not require prune
 --- Prunes epochs older than the cutoff epoch index
 --- @param timestamp number The timestamp to prune epochs older than
 --- @return DistributedEpoch[] # The pruned epochs
