@@ -12,6 +12,7 @@ import {
   STUB_PROCESS_ID,
   INITIAL_OPERATOR_STAKE,
   STUB_BLOCK_HEIGHT,
+  STUB_HASH_CHAIN,
 } from '../tools/constants.mjs';
 
 const initialOperatorStake = 100_000_000_000;
@@ -47,10 +48,11 @@ export async function handle({
   shouldAssertNoResultError = true,
   timestamp = STUB_TIMESTAMP,
   blockHeight = STUB_BLOCK_HEIGHT,
+  hashchain = STUB_HASH_CHAIN,
 }) {
   options.Timestamp ??= timestamp;
   options['Block-Height'] ??= blockHeight;
-
+  options['Hash-Chain'] ??= hashchain;
   const result = await originalHandle(
     memory,
     {
@@ -810,6 +812,7 @@ export const saveObservations = async ({
   shouldAssertNoResultError = true,
   failedGateways = 'failed-gateway-'.padEnd(43, 'e'),
   reportTxId = 'report-tx-id-'.padEnd(43, 'f'),
+  epochIndex = 0,
   memory = startMemory,
 }) => {
   const result = await handle({
@@ -820,6 +823,7 @@ export const saveObservations = async ({
         { name: 'Action', value: 'Save-Observations' },
         { name: 'Report-Tx-Id', value: reportTxId },
         { name: 'Failed-Gateways', value: failedGateways },
+        { name: 'Epoch-Index', value: epochIndex },
       ],
       Timestamp: timestamp,
     },
@@ -852,12 +856,14 @@ export const tick = async ({
   timestamp = STUB_TIMESTAMP,
   forcePrune = false,
   blockHeight,
+  hashchain,
 }) => {
   const tickResult = await handle({
     options: {
       Tags: [{ name: 'Action', value: 'Tick' }],
       Timestamp: timestamp,
       'Block-Height': blockHeight,
+      'Hash-Chain': hashchain,
       ...(forcePrune ? { name: 'Force-Prune', value: 'true' } : {}),
     },
     memory,

@@ -1775,7 +1775,7 @@ describe('ArNS', async () => {
         const resultData = JSON.parse(result.Messages[0].Data);
         assert.deepEqual(resultData.returnedNameDetails, {
           initiator: PROCESS_ID,
-          basePrice: 4687500,
+          basePrice: 630000000,
           premiumMultiplier: 50,
           startTimestamp: 1752734400001,
           endTimestamp: 1753944000001,

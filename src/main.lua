@@ -1630,12 +1630,13 @@ end)
 addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
 	local reportTxId = msg.Tags["Report-Tx-Id"]
 	local failedGateways = utils.splitAndTrimString(msg.Tags["Failed-Gateways"], ",")
+	local epochIndex = msg.Tags["Epoch-Index"]
 	assert(utils.isValidArweaveAddress(reportTxId), "Invalid report tx id. Must be a valid Arweave address.")
 	for _, gateway in ipairs(failedGateways) do
 		assert(utils.isValidAddress(gateway, true), "Invalid failed gateway address: " .. gateway)
 	end
 
-	local observations = epochs.saveObservations(msg.From, reportTxId, failedGateways, msg.Timestamp)
+	local observations = epochs.saveObservations(msg.From, reportTxId, failedGateways, epochIndex, msg.Timestamp)
 	if observations ~= nil then
 		local failureSummariesCount = utils.lengthOfTable(observations.failureSummaries or {})
 		if failureSummariesCount > 0 then
@@ -1776,14 +1777,22 @@ end, function(msg)
 
 	print("Ticking from " .. lastCreatedEpochIndex .. " to " .. targetCurrentEpochIndex)
 
+	-- tick the demand factor
+	local demandFactor = demand.updateDemandFactor(msg.Timestamp)
+	if demandFactor ~= nil then
+		table.insert(newDemandFactors, demandFactor)
+		Send(msg, {
+			Target = msg.From,
+			Action = "Demand-Factor-Updated-Notice",
+			Data = tostring(demandFactor),
+		})
+	end
+
 	--- tick to the newest epoch, and stub out any epochs that are not yet created
 	for i = lastCreatedEpochIndex, targetCurrentEpochIndex do
 		print("Ticking epoch " .. i)
 		-- TODO: if we are significantly behind, we should not prescribed any observers or names, or decrement any gateways for failure
 		local tickResult = tick.tickEpoch(msg.Timestamp, blockHeight, hashchain, msgId)
-		if tickResult.maybeDemandFactor ~= nil then
-			table.insert(newDemandFactors, tickResult.maybeDemandFactor)
-		end
 		if tickResult.pruneGatewaysResult ~= nil then
 			table.insert(newPruneGatewaysResults, tickResult.pruneGatewaysResult)
 		end
@@ -1796,16 +1805,6 @@ end, function(msg)
 				Action = "Epoch-Created-Notice",
 				["Epoch-Index"] = tostring(tickResult.maybeNewEpoch.epochIndex),
 				Data = json.encode(tickResult.maybeNewEpoch),
-			})
-		end
-		if tickResult.maybePrescribedEpoch ~= nil then
-			print("Prescribed epoch " .. tickResult.maybePrescribedEpoch.epochIndex)
-			LastPrescribedEpochIndex = tickResult.maybePrescribedEpoch.epochIndex
-			Send(msg, {
-				Target = msg.From,
-				Action = "Epoch-Prescribed-Notice",
-				["Epoch-Index"] = tostring(tickResult.maybePrescribedEpoch.epochIndex),
-				Data = json.encode(tickResult.maybePrescribedEpoch),
 			})
 		end
 		if tickResult.maybeDistributedEpoch ~= nil then
