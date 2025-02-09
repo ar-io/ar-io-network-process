@@ -1619,7 +1619,9 @@ end)
 addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
 	local reportTxId = msg.Tags["Report-Tx-Id"]
 	local failedGateways = utils.splitAndTrimString(msg.Tags["Failed-Gateways"], ",")
+	-- observers provide AR-IO-Epoch-Index, so check both
 	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
+		or msg.Tags["AR-IO-Epoch-Index"] and tonumber(msg.Tags["AR-IO-Epoch-Index"])
 	assert(
 		epochIndex and epochIndex >= 0 and utils.isInteger(epochIndex),
 		"Epoch index is required. Must be a number greater than 0."
