@@ -643,9 +643,8 @@ function epochs.distributeEpoch(epochIndexToDistribute, currentTimestamp)
 	end
 
 	-- ensure we are not distributing the current epoch, that can only happen
-	local currentEpochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp)
-	if currentEpochIndex == epochIndexToDistribute then
-		print("Epoch is not ready to be distributed, skipping distribution: " .. epochIndexToDistribute)
+	if currentTimestamp < epochToDistribute.endTimestamp then
+		print("Epoch will be distributed after the current timestamp: " .. epochToDistribute.endTimestamp)
 		return nil
 	end
 
