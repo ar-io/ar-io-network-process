@@ -409,7 +409,7 @@ function epochs.createAndPrescribeNewEpoch(currentTimestamp, currentBlockHeight,
 	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(currentEpochIndex)
 	local arnsStatsAtEpochStart = arns.getArNSStatsAtTimestamp(epochStartTimestamp)
 
-	-- update gateway weights for every new epoch, so its clear why the prescribed observers are selected
+	-- always update the gateway weights to the latest computed weights when we create a new epoch
 	for _, weightedGateway in ipairs(updatedGatewaysWithWeights) do
 		gar.updateGatewayWeights(weightedGateway)
 	end
