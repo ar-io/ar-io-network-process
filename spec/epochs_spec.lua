@@ -21,18 +21,7 @@ describe("epochs", function()
 			[ao.id] = protocolBalance,
 			["test-this-is-valid-arweave-wallet-address-1"] = 500000000,
 		}
-		_G.Epochs = {
-			[1] = {
-				startTimestamp = 1704092400000,
-				endTimestamp = 1704092400100,
-				prescribedObservers = {},
-				distributions = {},
-				observations = {
-					failureSummaries = {},
-					reports = {},
-				},
-			},
-		}
+		_G.Epochs = {}
 		_G.GatewayRegistry = {}
 		_G.NameRegistry = {
 			records = {},
