@@ -1777,7 +1777,6 @@ end, function(msg)
 	--
 	print("Ticking from " .. lastCreatedEpochIndex .. " to " .. targetCurrentEpochIndex)
 	for epochIndexToTick = lastCreatedEpochIndex, targetCurrentEpochIndex do
-		print("The epoch index to tick is: " .. epochIndexToTick)
 		local tickResult = tick.tickEpoch(msg.Timestamp, blockHeight, hashchain, msgId, epochIndexToTick)
 		if tickResult.pruneGatewaysResult ~= nil then
 			table.insert(newPruneGatewaysResults, tickResult.pruneGatewaysResult)

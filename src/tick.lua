@@ -25,18 +25,13 @@ function tick.tickEpoch(currentTimestamp, currentBlockHeight, currentHashchain, 
 			maybeDistributedEpoch = nil,
 		}
 	end
-	local currentEpochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp)
-	local distributedEpoch = nil
-	local pruneGatewaysResult = nil
-	-- if the epoch index to tick is less than the current epoch index, distribute the rewards for the epoch and prune the gateways that failed after it, then we create the new one
-	if epochIndexToTick < currentEpochIndex then
-		-- distribute rewards for the epoch and increments stats for gateways, this closes the epoch if the timestamp is greater than the epochs required distribution timestamp
-		distributedEpoch = epochs.distributeEpoch(epochIndexToTick, currentTimestamp)
-		-- prune any gateway that has hit the failed 30 consecutive epoch threshold after the epoch has been distributed
-		pruneGatewaysResult = gar.pruneGateways(currentTimestamp, currentMsgId)
-	end
+	-- distribute rewards for the epoch and increments stats for gateways, this closes the epoch if the timestamp is greater than the epochs required distribution timestamp
+	local distributedEpoch = epochs.distributeEpoch(epochIndexToTick, currentTimestamp)
+	-- prune any gateway that has hit the failed 30 consecutive epoch threshold after the epoch has been distributed
+	local pruneGatewaysResult = gar.pruneGateways(currentTimestamp, currentMsgId)
 	-- now create the new epoch with the current message hashchain and block height
-	local newPrescribedEpoch = epochs.createAndPrescribeNewEpoch(currentTimestamp, currentBlockHeight, currentHashchain)
+	local newPrescribedEpoch =
+		epochs.createAndPrescribeNewEpoch(currentTimestamp, currentBlockHeight, currentHashchain, epochIndexToTick)
 	return {
 		maybeDistributedEpoch = distributedEpoch,
 		maybeNewEpoch = newPrescribedEpoch,
