@@ -30,8 +30,7 @@ function tick.tickEpoch(currentTimestamp, currentBlockHeight, currentHashchain, 
 	-- prune any gateway that has hit the failed 30 consecutive epoch threshold after the epoch has been distributed
 	local pruneGatewaysResult = gar.pruneGateways(currentTimestamp, currentMsgId)
 	-- now create the new epoch with the current message hashchain and block height
-	local newPrescribedEpoch =
-		epochs.createAndPrescribeNewEpoch(currentTimestamp, currentBlockHeight, currentHashchain, epochIndexToTick)
+	local newPrescribedEpoch = epochs.createAndPrescribeNewEpoch(currentTimestamp, currentBlockHeight, currentHashchain)
 	return {
 		maybeDistributedEpoch = distributedEpoch,
 		maybeNewEpoch = newPrescribedEpoch,
