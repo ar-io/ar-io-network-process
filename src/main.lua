@@ -22,10 +22,10 @@ Vaults = Vaults or {}
 GatewayRegistry = GatewayRegistry or {}
 NameRegistry = NameRegistry or {}
 Epochs = Epochs or {}
-LastDistributedEpochIndex = LastDistributedEpochIndex or -1
--- TODO: can remove LastTickedEpochIndex once LastCreatedEpochIndex is properly set to LastTickedEpochIndex on devnet/testnet
-LastTickedEpochIndex = LastTickedEpochIndex or -1
-LastCreatedEpochIndex = LastCreatedEpochIndex or LastTickedEpochIndex or -1
+
+-- last known variables in the state, these help control tick, prune, and distribute behavior
+LastCreatedEpochIndex = LastCreatedEpochIndex or -1 -- TODO: we will move to a 1-based index in a separate PR
+LastDistributedEpochIndex = LastDistributedEpochIndex or 0
 LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
 LastKnownMessageTimestamp = LastKnownMessageTimestamp or 0
 LastKnownMessageId = LastKnownMessageId or ""
@@ -58,7 +58,6 @@ local ActionMap = {
 	DemandFactorInfo = "Demand-Factor-Info",
 	DemandFactorSettings = "Demand-Factor-Settings",
 	-- EPOCH READ APIS
-	Epochs = "Epochs",
 	Epoch = "Epoch",
 	EpochSettings = "Epoch-Settings",
 	PrescribedObservers = "Epoch-Prescribed-Observers",
@@ -365,7 +364,6 @@ end
 --- @param ioEvent ARIOEvent
 local function addNextPruneTimestampsData(ioEvent)
 	ioEvent:addField("Next-Returned-Names-Prune-Timestamp", arns.nextReturnedNamesPruneTimestamp())
-	ioEvent:addField("Next-Epochs-Prune-Timestamp", epochs.nextEpochsPruneTimestamp())
 	ioEvent:addField("Next-Records-Prune-Timestamp", arns.nextRecordsPruneTimestamp())
 	ioEvent:addField("Next-Vaults-Prune-Timestamp", vaults.nextVaultsPruneTimestamp())
 	ioEvent:addField("Next-Gateways-Prune-Timestamp", gar.nextGatewaysPruneTimestamp())
@@ -382,9 +380,7 @@ local function addNextPruneTimestampsResults(ioEvent, prunedStateResult)
 	-- If anything meaningful was pruned, collect the next prune timestamps
 	if
 		next(prunedStateResult.prunedReturnedNames)
-		or next(prunedStateResult.prunedEpochs)
 		or next(prunedStateResult.prunedPrimaryNameRequests)
-		or next(prunedStateResult.prunedEpochs)
 		or next(prunedStateResult.prunedRecords)
 		or next(pruneGatewaysResult.prunedGateways)
 		or next(prunedStateResult.delegatorsWithFeeReset)
@@ -536,7 +532,6 @@ end, function(msg)
 
 	print("Pruning state at timestamp: " .. msg.Timestamp)
 	local prunedStateResult = prune.pruneState(msg.Timestamp, msg.Id, LastGracePeriodEntryEndTimestamp)
-
 	if prunedStateResult then
 		local prunedRecordsCount = utils.lengthOfTable(prunedStateResult.prunedRecords or {})
 		if prunedRecordsCount > 0 then
@@ -581,11 +576,6 @@ end, function(msg)
 				LastKnownLockedSupply = LastKnownLockedSupply - vault.balance
 				LastKnownCirculatingSupply = LastKnownCirculatingSupply + vault.balance
 			end
-		end
-		local prunedEpochsCount = utils.lengthOfTable(prunedStateResult.prunedEpochs or {})
-		if prunedEpochsCount > 0 then
-			msg.ioEvent:addField("Pruned-Epochs", prunedStateResult.prunedEpochs)
-			msg.ioEvent:addField("Pruned-Epochs-Count", prunedEpochsCount)
 		end
 
 		local pruneGatewaysResult = prunedStateResult.pruneGatewaysResult or {}
@@ -1629,12 +1619,19 @@ end)
 addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
 	local reportTxId = msg.Tags["Report-Tx-Id"]
 	local failedGateways = utils.splitAndTrimString(msg.Tags["Failed-Gateways"], ",")
+	-- observers provide AR-IO-Epoch-Index, so check both
+	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
+		or msg.Tags["AR-IO-Epoch-Index"] and tonumber(msg.Tags["AR-IO-Epoch-Index"])
+	assert(
+		epochIndex and epochIndex >= 0 and utils.isInteger(epochIndex),
+		"Epoch index is required. Must be a number greater than 0."
+	)
 	assert(utils.isValidArweaveAddress(reportTxId), "Invalid report tx id. Must be a valid Arweave address.")
 	for _, gateway in ipairs(failedGateways) do
 		assert(utils.isValidAddress(gateway, true), "Invalid failed gateway address: " .. gateway)
 	end
 
-	local observations = epochs.saveObservations(msg.From, reportTxId, failedGateways, msg.Timestamp)
+	local observations = epochs.saveObservations(msg.From, reportTxId, failedGateways, epochIndex, msg.Timestamp)
 	if observations ~= nil then
 		local failureSummariesCount = utils.lengthOfTable(observations.failureSummaries or {})
 		if failureSummariesCount > 0 then
@@ -1755,16 +1752,6 @@ end, function(msg)
 	msg.ioEvent:addField("Last-Distributed-Epoch-Index", lastDistributedEpochIndex)
 	msg.ioEvent:addField("Target-Current-Epoch-Index", targetCurrentEpochIndex)
 
-	-- if the timestamp is before the genesis epoch start timestamp, do nothing
-	if msg.Timestamp < epochs.getSettings().epochZeroStartTimestamp then
-		Send(msg, {
-			Target = msg.From,
-			Action = "Tick-Notice", -- TODO: this may be better as a "Genesis-Epoch-Not-Started-Notice"
-			Data = json.encode("Genesis epoch has not started yet."),
-		})
-		return
-	end
-
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
 	local distributedEpochIndexes = {}
 	local newEpochIndexes = {}
@@ -1773,15 +1760,31 @@ end, function(msg)
 	local tickedRewardDistributions = {}
 	local totalTickedRewardsDistributed = 0
 
-	print("Ticking from " .. lastCreatedEpochIndex .. " to " .. targetCurrentEpochIndex)
+	-- tick the demand factor
+	local demandFactor = demand.updateDemandFactor(msg.Timestamp)
+	if demandFactor ~= nil then
+		table.insert(newDemandFactors, demandFactor)
+		Send(msg, {
+			Target = msg.From,
+			Action = "Demand-Factor-Updated-Notice",
+			Data = tostring(demandFactor),
+		})
+	end
 
-	--- tick to the newest epoch, and stub out any epochs that are not yet created
-	for i = lastCreatedEpochIndex, targetCurrentEpochIndex do
-		print("Ticking epoch " .. i)
-		-- TODO: if we are significantly behind, we should not prescribed any observers or names, or decrement any gateways for failure
-		local tickResult = tick.tickEpoch(msg.Timestamp, blockHeight, hashchain, msgId)
-		print("Ticked epoch " .. i)
+	--[[
+		Tick up to the target epoch index, this will create new epochs and distribute rewards for existing epochs
+		This should never fall behind, but in the case it does, it will create the epochs and distribute rewards for the epochs
+		accordingly. It should finish at the target epoch index - which is computed based on the message timestamp
+	]]
+	--
+	print("Ticking from " .. lastCreatedEpochIndex .. " to " .. targetCurrentEpochIndex)
+	for epochIndexToTick = lastCreatedEpochIndex, targetCurrentEpochIndex do
+		local tickResult = tick.tickEpoch(msg.Timestamp, blockHeight, hashchain, msgId, epochIndexToTick)
+		if tickResult.pruneGatewaysResult ~= nil then
+			table.insert(newPruneGatewaysResults, tickResult.pruneGatewaysResult)
+		end
 		if tickResult.maybeNewEpoch ~= nil then
+			print("Created epoch " .. tickResult.maybeNewEpoch.epochIndex)
 			LastCreatedEpochIndex = tickResult.maybeNewEpoch.epochIndex
 			table.insert(newEpochIndexes, tickResult.maybeNewEpoch.epochIndex)
 			Send(msg, {
@@ -1790,13 +1793,6 @@ end, function(msg)
 				["Epoch-Index"] = tostring(tickResult.maybeNewEpoch.epochIndex),
 				Data = json.encode(tickResult.maybeNewEpoch),
 			})
-		end
-		if tickResult.maybeDemandFactor ~= nil then
-			print("Updated demand factor for epoch " .. tickResult.maybeDemandFactor)
-			table.insert(newDemandFactors, tickResult.maybeDemandFactor)
-		end
-		if tickResult.pruneGatewaysResult ~= nil then
-			table.insert(newPruneGatewaysResults, tickResult.pruneGatewaysResult)
 		end
 		if tickResult.maybeDistributedEpoch ~= nil then
 			print("Distributed rewards for epoch " .. tickResult.maybeDistributedEpoch.epochIndex)
@@ -1821,9 +1817,10 @@ end, function(msg)
 		msg.ioEvent:addField("New-Epoch-Indexes", newEpochIndexes)
 		-- Only print the prescribed observers of the newest epoch
 		local newestEpoch = epochs.getEpoch(math.max(table.unpack(newEpochIndexes)))
-		local prescribedObserverAddresses = utils.map(newestEpoch.prescribedObservers, function(_, observer)
-			return observer.gatewayAddress
-		end)
+		local prescribedObserverAddresses = newestEpoch
+			and utils.map(newestEpoch.prescribedObservers, function(_, observer)
+				return observer.gatewayAddress
+			end)
 		msg.ioEvent:addField("Prescribed-Observers", prescribedObserverAddresses)
 	end
 	if #newDemandFactors > 0 then
@@ -2013,27 +2010,6 @@ addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epo
 		epoch.prescribedObservers = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 	end
 	Send(msg, { Target = msg.From, Action = "Epoch-Notice", Data = json.encode(epoch) })
-end)
-
-addEventingHandler(ActionMap.Epochs, utils.hasMatchingTag("Action", ActionMap.Epochs), function(msg)
-	local allEpochs = epochs.getEpochs()
-
-	-- the json encoder will error on a table with numeric keys that don't start at 1.
-	-- at genesis, epochs will start indexing at 0 and within 2 epochs will continue indexing
-	-- from 2 (and so on as epochs continue to be pruned), so work around that by sorting the
-	-- epoch index keys and inserting the epochs in order into a fresh array
-	local keys = {}
-	for key in pairs(allEpochs) do
-		table.insert(keys, key)
-	end
-	table.sort(keys)
-
-	local sortedEpochs = {}
-	for _, key in ipairs(keys) do
-		table.insert(sortedEpochs, allEpochs[key])
-	end
-
-	Send(msg, { Target = msg.From, Action = "Epochs-Notice", Data = json.encode(sortedEpochs) })
 end)
 
 addEventingHandler(
@@ -2649,7 +2625,6 @@ addEventingHandler("getPruningTimestamps", utils.hasMatchingTag("Action", "Pruni
 		Action = "Pruning-Timestamps-Notice",
 		Data = json.encode({
 			returnedNames = arns.nextReturnedNamesPruneTimestamp(),
-			epochs = epochs.nextEpochsPruneTimestamp(),
 			gateways = gar.nextGatewaysPruneTimestamp(),
 			primaryNames = primaryNames.nextPrimaryNamesPruneTimestamp(),
 			records = arns.nextRecordsPruneTimestamp(),

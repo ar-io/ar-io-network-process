@@ -1601,7 +1601,7 @@ describe('ArNS', async () => {
 
     const firstEpochTimestamp = 1719900000000;
     const afterDistributionTimestamp =
-      firstEpochTimestamp + 1000 * 60 * 60 * 24 + 1000 * 60 * 40;
+      firstEpochTimestamp + 1000 * 60 * 60 * 24;
 
     let arnsDiscountMemory;
     before(async () => {
@@ -1773,12 +1773,12 @@ describe('ArNS', async () => {
         });
 
         const resultData = JSON.parse(result.Messages[0].Data);
-        assert.deepEqual(resultData.returnedNameDetails, {
+        assert.deepStrictEqual(resultData.returnedNameDetails, {
           initiator: PROCESS_ID,
-          basePrice: 4687500,
+          basePrice: 630000000,
           premiumMultiplier: 50,
-          startTimestamp: 1752734400001,
-          endTimestamp: 1753944000001,
+          startTimestamp: 1752732000001,
+          endTimestamp: 1753941600001,
           name: 'great-name',
         });
       });

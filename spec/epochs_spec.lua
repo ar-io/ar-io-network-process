@@ -1,6 +1,5 @@
 local epochs = require("epochs")
 local gar = require("gar")
-local utils = require("utils")
 local constants = require("constants")
 local testSettings = {
 	fqdn = "test.com",
@@ -22,19 +21,7 @@ describe("epochs", function()
 			[ao.id] = protocolBalance,
 			["test-this-is-valid-arweave-wallet-address-1"] = 500000000,
 		}
-		_G.Epochs = {
-			[0] = {
-				startTimestamp = 1704092400000,
-				endTimestamp = 1704092400100,
-				distributionTimestamp = 1704092400115,
-				prescribedObservers = {},
-				distributions = {},
-				observations = {
-					failureSummaries = {},
-					reports = {},
-				},
-			},
-		}
+		_G.Epochs = {}
 		_G.GatewayRegistry = {}
 		_G.NameRegistry = {
 			records = {},
@@ -45,7 +32,6 @@ describe("epochs", function()
 			maxObservers = 5,
 			epochZeroStartTimestamp = 1704092400000, -- 2024-01-01T00:00:00.000Z
 			durationMs = 100,
-			distributionDelayMs = 15,
 			rewardPercentage = 0.0025, -- 0.25%
 		}
 	end)
@@ -79,8 +65,10 @@ describe("epochs", function()
 					compositeWeight = 1,
 				},
 			}
-			_G.Epochs[0].prescribedObservers = {
-				["observerAddress"] = "test-this-is-valid-arweave-wallet-address-1",
+			_G.Epochs[0] = {
+				prescribedObservers = {
+					["observerAddress"] = "test-this-is-valid-arweave-wallet-address-1",
+				},
 			}
 			local epochIndex = 0
 			local expectation = {
@@ -134,7 +122,7 @@ describe("epochs", function()
 			local expectation = {
 				["observerAddress"] = "test-this-is-valid-arweave-wallet-address-1",
 			}
-			local prescribedObserverMap = epochs.computePrescribedObserversForEpoch(0, hashchain)
+			local prescribedObserverMap = epochs.computePrescribedObserversForEpoch(1, hashchain)
 			assert.are.same(expectation, prescribedObserverMap)
 		end)
 
@@ -144,7 +132,6 @@ describe("epochs", function()
 				maxObservers = 2, -- limit to 2 observers
 				epochZeroStartTimestamp = startTimestamp,
 				durationMs = 60 * 1000 * 60 * 24, -- 24 hours
-				distributionDelayMs = 60 * 1000 * 2 * 15, -- 15 blocks
 			}
 			for i = 1, 3 do
 				local gateway = {
@@ -182,7 +169,7 @@ describe("epochs", function()
 				["observer-address-1"] = "observer1",
 				["observer-address-3"] = "observer3",
 			}
-			local prescribedObserverMap = epochs.computePrescribedObserversForEpoch(0, testHashchain)
+			local prescribedObserverMap = epochs.computePrescribedObserversForEpoch(1, testHashchain)
 			assert.are.same(expectation, prescribedObserverMap)
 		end)
 	end)
@@ -208,7 +195,7 @@ describe("epochs", function()
 				},
 			}
 			local expectation = { "arns-name-two", "arns-name-one" }
-			local status, result = pcall(epochs.computePrescribedNamesForEpoch, 0, hashchain)
+			local status, result = pcall(epochs.computePrescribedNamesForEpoch, 1, hashchain)
 			assert.is_true(status)
 			assert.are.equal(2, #result)
 			assert.are.same(expectation, result)
@@ -258,7 +245,7 @@ describe("epochs", function()
 			}
 			local expectation =
 				{ "arns-name-five", "arns-name-four", "arns-name-one", "arns-name-three", "arns-name-two" }
-			local status, result = pcall(epochs.computePrescribedNamesForEpoch, 0, hashchain)
+			local status, result = pcall(epochs.computePrescribedNamesForEpoch, 1, hashchain)
 			assert.is_true(status)
 			assert.are.equal(5, #result)
 			assert.are.same(expectation, result)
@@ -269,27 +256,30 @@ describe("epochs", function()
 		it("should throw an error when saving observation too early in the epoch", function()
 			local observer = "test-this-is-valid-arweave-wallet-address-2"
 			local reportTxId = "test-this-very-valid-observations-report-tx"
-			local settings = epochs.getSettings()
-			local timestamp = settings.epochZeroStartTimestamp + settings.distributionDelayMs - 1
+			local timestamp = _G.EpochSettings.epochZeroStartTimestamp - 1
 			local failedGateways = {
 				"test-this-is-valid-arweave-wallet-address-1",
 			}
-			local status, error = pcall(epochs.saveObservations, observer, reportTxId, failedGateways, timestamp)
+			local status, error = pcall(epochs.saveObservations, observer, reportTxId, failedGateways, 0, timestamp)
 			assert.is_false(status)
-			assert.match("Observations for the current epoch cannot be submitted before", error)
+			assert.match(
+				"Observations for epoch 0 must be submitted after " .. _G.EpochSettings.epochZeroStartTimestamp,
+				error
+			)
 		end)
 		it("should throw an error if the caller is not prescribed", function()
 			local observer = "test-this-is-valid-arweave-observer-address-2"
 			local reportTxId = "test-this-very-valid-observations-report-tx"
-			local settings = epochs.getSettings()
-			local timestamp = settings.epochZeroStartTimestamp + settings.distributionDelayMs + 1
+			local timestamp = _G.EpochSettings.epochZeroStartTimestamp + 1
 			local failedGateways = {
 				"test-this-is-valid-arweave-wallet-address-1",
 			}
-			_G.Epochs[0].prescribedObservers = {
-				["test-this-is-valid-arweave-observer-address-1"] = "test-this-is-valid-arweave-gateway-address-1",
+			_G.Epochs[0] = {
+				prescribedObservers = {
+					["test-this-is-valid-arweave-observer-address-1"] = "test-this-is-valid-arweave-gateway-address-1",
+				},
 			}
-			local status, error = pcall(epochs.saveObservations, observer, reportTxId, failedGateways, timestamp)
+			local status, error = pcall(epochs.saveObservations, observer, reportTxId, failedGateways, 0, timestamp)
 			assert.is_false(status)
 			assert.match("Caller is not a prescribed observer for the current epoch.", error)
 		end)
@@ -298,8 +288,7 @@ describe("epochs", function()
 			function()
 				local observer = "test-this-is-valid-arweave-observer-address-2"
 				local reportTxId = "test-this-very-valid-observations-report-tx"
-				local settings = epochs.getSettings()
-				local timestamp = settings.epochZeroStartTimestamp + settings.distributionDelayMs + 1
+				local timestamp = _G.EpochSettings.epochZeroStartTimestamp + 1
 				_G.GatewayRegistry = {
 					["test-this-is-valid-arweave-wallet-address-1"] = {
 						operatorStake = gar.getSettings().operators.minStake,
@@ -411,14 +400,16 @@ describe("epochs", function()
 						},
 					},
 				}
-				_G.Epochs[0].prescribedObservers = {
-					["test-this-is-valid-arweave-observer-address-2"] = "test-this-is-valid-arweave-wallet-address-2",
+				_G.Epochs[0] = {
+					prescribedObservers = {
+						["test-this-is-valid-arweave-observer-address-2"] = "test-this-is-valid-arweave-wallet-address-2",
+					},
 				}
 				local failedGateways = {
 					"test-this-is-valid-arweave-wallet-address-1",
 					"test-this-is-valid-arweave-wallet-address-3",
 				}
-				local result = epochs.saveObservations(observer, reportTxId, failedGateways, timestamp)
+				local result = epochs.saveObservations(observer, reportTxId, failedGateways, 0, timestamp)
 				assert.are.same(result, {
 					reports = {
 						[observer] = reportTxId,
@@ -451,148 +442,22 @@ describe("epochs", function()
 	describe("getEpochTimestampsForIndex", function()
 		it("should return the epoch timestamps for the given epoch index", function()
 			local epochIndex = 0
-			local expectation = { 1704092400000, 1704092400100, 1704092400115 }
+			local expectation = { 1704092400000, 1704092400100 }
 			local result = { epochs.getEpochTimestampsForIndex(epochIndex) }
 			assert.are.same(result, expectation)
 		end)
 	end)
 
-	describe("createEpoch", function()
-		local settings = epochs.getSettings()
-		local epochIndex = 1
-		local epochStartTimestamp = settings.epochZeroStartTimestamp + settings.durationMs
-		local timestamp = epochStartTimestamp
-		local epochEndTimestamp = epochStartTimestamp + settings.durationMs
-		local epochDistributionTimestamp = epochEndTimestamp + settings.distributionDelayMs
+	describe("createAndPrescribeNewEpoch", function()
+		local epochIndex = 0
+		local epochStartTimestamp = _G.EpochSettings.epochZeroStartTimestamp
+		local epochEndTimestamp = epochStartTimestamp + _G.EpochSettings.durationMs
 		local epochStartBlockHeight = 0
+		local oneYearMs = 60 * 1000 * 60 * 24 * 365
+		local recordTimestamp = epochStartTimestamp
+		local endTimestamp = epochStartTimestamp + oneYearMs
 
-		it("should create a new epoch for the given timestamp if all previous epochs have been distributed", function()
-			_G.Epochs = {}
-			_G.GatewayRegistry = {
-				["test-this-is-valid-arweave-wallet-address-1"] = {
-					operatorStake = gar.getSettings().operators.minStake,
-					totalDelegatedStake = 0,
-					vaults = {},
-					delegates = {},
-					startTimestamp = 0,
-					stats = {
-						prescribedEpochCount = 0,
-						observedEpochCount = 0,
-						totalEpochCount = 0,
-						passedEpochCount = 0,
-						failedEpochCount = 0,
-						failedConsecutiveEpochs = 0,
-						passedConsecutiveEpochs = 0,
-					},
-					settings = testSettings,
-					status = "joined",
-					observerAddress = "test-this-is-valid-arweave-wallet-address-1",
-					weights = {
-						stakeWeight = 0,
-						tenureWeight = 0,
-						gatewayPerformanceRatio = 0,
-						observerPerformanceRatio = 0,
-						compositeWeight = 0,
-						normalizedCompositeWeight = 0,
-					},
-				},
-				-- not eligible for rewards as it is leaving, so it should not be included in the eligible gateways count
-				["test-this-is-valid-arweave-wallet-address-2"] = {
-					operatorStake = gar.getSettings().operators.minStake,
-					totalDelegatedStake = 0,
-					vaults = {},
-					delegates = {},
-					startTimestamp = 0,
-					stats = {
-						prescribedEpochCount = 0,
-						observedEpochCount = 0,
-						totalEpochCount = 0,
-						passedEpochCount = 0,
-						failedEpochCount = 0,
-						failedConsecutiveEpochs = 0,
-						passedConsecutiveEpochs = 0,
-					},
-					settings = testSettings,
-					status = "leaving",
-					observerAddress = "test-this-is-valid-arweave-wallet-address-1",
-					weights = {
-						stakeWeight = 0,
-						tenureWeight = 0,
-						gatewayPerformanceRatio = 0,
-						observerPerformanceRatio = 0,
-						compositeWeight = 0,
-						normalizedCompositeWeight = 0,
-					},
-				},
-			}
-
-			local expectedEligibleRewards = math.floor(protocolBalance * constants.minimumRewardRate)
-			local expectedTotalGatewayReward = math.floor(expectedEligibleRewards * 0.90)
-			local expectedTotalObserverReward = math.floor(expectedEligibleRewards * 0.10)
-			local expectedPerGatewayReward = math.floor(expectedTotalGatewayReward / 1) -- only one gateway in the registry
-			local expectedPerObserverReward = math.floor(expectedTotalObserverReward / 1) -- only one prescribed observer
-			local expectation = {
-				startTimestamp = epochStartTimestamp,
-				endTimestamp = epochEndTimestamp,
-				epochIndex = epochIndex,
-				startHeight = 0,
-				distributionTimestamp = epochDistributionTimestamp,
-				observations = {
-					failureSummaries = {},
-					reports = {},
-				},
-				prescribedObservers = {
-					["test-this-is-valid-arweave-wallet-address-1"] = "test-this-is-valid-arweave-wallet-address-1",
-				},
-				prescribedNames = {},
-				distributions = {
-					totalEligibleGateways = 1,
-					totalEligibleRewards = expectedEligibleRewards,
-					totalEligibleGatewayReward = expectedTotalGatewayReward,
-					totalEligibleObserverReward = expectedTotalObserverReward,
-					rewards = {
-						eligible = {
-							["test-this-is-valid-arweave-wallet-address-1"] = {
-								operatorReward = expectedPerGatewayReward + expectedPerObserverReward,
-								delegateRewards = {}, -- no delegates
-							},
-						},
-					},
-				},
-				arnsStats = {
-					totalActiveNames = 0,
-					totalGracePeriodNames = 0,
-					totalReservedNames = 0,
-					totalReturnedNames = 0,
-				},
-			}
-			local result = epochs.createEpoch(timestamp, epochStartBlockHeight, hashchain)
-			assert.are.same(expectation, result)
-			assert.are.same(expectation, epochs.getEpoch(epochIndex))
-			-- confirm the gateway weights were updated
-			assert.are.same({
-				stakeWeight = 1,
-				tenureWeight = 4,
-				gatewayPerformanceRatio = 1,
-				observerPerformanceRatio = 1,
-				compositeWeight = 4,
-				normalizedCompositeWeight = 1,
-			}, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].weights)
-			-- confirm the leaving gateway weights were not updated
-			assert.are.same({
-				stakeWeight = 0,
-				tenureWeight = 0,
-				gatewayPerformanceRatio = 0,
-				observerPerformanceRatio = 0,
-				compositeWeight = 0,
-				normalizedCompositeWeight = 0,
-			}, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-2"].weights)
-		end)
-
-		it("should count arns stat totals for the given epoch", function()
-			local oneYearMs = 60 * 1000 * 60 * 24 * 365
-			local recordTimestamp = timestamp
-			local endTimestamp = startTimestamp + oneYearMs
+		before_each(function()
 			_G.Epochs = {}
 			_G.NameRegistry.records = {
 				["test-record-1"] = {
@@ -636,8 +501,139 @@ describe("epochs", function()
 					endTimestamp = endTimestamp,
 				},
 			}
+			_G.GatewayRegistry = {
+				["test-this-is-valid-arweave-wallet-address-1"] = {
+					operatorStake = gar.getSettings().operators.minStake,
+					totalDelegatedStake = 0,
+					vaults = {},
+					delegates = {},
+					startTimestamp = 0,
+					stats = {
+						prescribedEpochCount = 0,
+						observedEpochCount = 0,
+						totalEpochCount = 0,
+						passedEpochCount = 0,
+						failedEpochCount = 0,
+						failedConsecutiveEpochs = 0,
+						passedConsecutiveEpochs = 0,
+					},
+					settings = testSettings,
+					status = "joined",
+					observerAddress = "test-this-is-valid-arweave-wallet-address-1",
+					weights = {
+						stakeWeight = 0,
+						tenureWeight = 0,
+						gatewayPerformanceRatio = 0,
+						observerPerformanceRatio = 0,
+						compositeWeight = 0,
+						normalizedCompositeWeight = 0,
+					},
+				},
+				-- not eligible to be prescribed as it is leaving, so it should not be included in the eligible gateways count either
+				["test-this-is-valid-arweave-wallet-address-2"] = {
+					operatorStake = gar.getSettings().operators.minStake,
+					totalDelegatedStake = 0,
+					vaults = {},
+					delegates = {},
+					startTimestamp = 0,
+					stats = {
+						prescribedEpochCount = 0,
+						observedEpochCount = 0,
+						totalEpochCount = 0,
+						passedEpochCount = 0,
+						failedEpochCount = 0,
+						failedConsecutiveEpochs = 0,
+						passedConsecutiveEpochs = 0,
+					},
+					settings = testSettings,
+					status = "leaving",
+					observerAddress = "test-this-is-valid-arweave-wallet-address-1",
+					weights = {
+						stakeWeight = 0,
+						tenureWeight = 0,
+						gatewayPerformanceRatio = 0,
+						observerPerformanceRatio = 0,
+						compositeWeight = 0,
+						normalizedCompositeWeight = 0,
+					},
+				},
+			}
+		end)
 
-			local result = epochs.createEpoch(recordTimestamp, epochStartBlockHeight, hashchain)
+		it("should create and prescribe the new epoch, and update gateway weights with computed weights", function()
+			local expectedEligibleGateways = 1
+			local expectedEligibleRewards = math.floor(protocolBalance * constants.minimumRewardRate)
+			local expectedTotalGatewayReward = math.floor(expectedEligibleRewards * 0.90)
+			local expectedTotalObserverReward = math.floor(expectedEligibleRewards * 0.10)
+			local expectedPerGatewayReward = math.floor(expectedTotalGatewayReward / 1) -- only one gateway in the registry
+			local expectedPerObserverReward = math.floor(expectedTotalObserverReward / 1) -- only one prescribed observer
+			local expectation = {
+				hashchain = hashchain,
+				startTimestamp = epochStartTimestamp,
+				endTimestamp = epochEndTimestamp,
+				epochIndex = epochIndex,
+				startHeight = epochStartBlockHeight,
+				observations = {
+					failureSummaries = {},
+					reports = {},
+				},
+				arnsStats = {
+					totalActiveNames = 3,
+					totalGracePeriodNames = 0,
+					totalReturnedNames = 1,
+					totalReservedNames = 2,
+				},
+				prescribedObservers = {
+					["test-this-is-valid-arweave-wallet-address-1"] = "test-this-is-valid-arweave-wallet-address-1",
+				},
+				prescribedNames = {
+					"test-record-1",
+					"test-record-2",
+				},
+				distributions = {
+					totalEligibleGateways = expectedEligibleGateways,
+					totalEligibleRewards = expectedEligibleRewards,
+					totalEligibleGatewayReward = expectedTotalGatewayReward,
+					totalEligibleObserverReward = expectedTotalObserverReward,
+					rewards = {
+						eligible = {
+							["test-this-is-valid-arweave-wallet-address-1"] = {
+								operatorReward = expectedPerGatewayReward + expectedPerObserverReward,
+								delegateRewards = {}, -- no delegates
+							},
+						},
+					},
+				},
+			}
+			local result = epochs.createAndPrescribeNewEpoch(epochStartTimestamp, epochStartBlockHeight, hashchain)
+			assert(result, "Expected epoch to be created")
+			-- sort the prescribed names to avoid lua array comparison issues
+			table.sort(expectation.prescribedNames)
+			table.sort(result.prescribedNames)
+			assert.are.same(expectation, result)
+			assert.are.same(expectation, epochs.getEpoch(epochIndex))
+			-- confirm the gateway weights were updated
+			assert.are.same({
+				stakeWeight = 1,
+				tenureWeight = 4,
+				gatewayPerformanceRatio = 1,
+				observerPerformanceRatio = 1,
+				compositeWeight = 4,
+				normalizedCompositeWeight = 1,
+			}, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-1"].weights)
+			-- confirm the leaving gateway weights were not updated
+			assert.are.same({
+				stakeWeight = 0,
+				tenureWeight = 0,
+				gatewayPerformanceRatio = 0,
+				observerPerformanceRatio = 0,
+				compositeWeight = 0,
+				normalizedCompositeWeight = 0,
+			}, _G.GatewayRegistry["test-this-is-valid-arweave-wallet-address-2"].weights)
+		end)
+
+		it("should count arns stat totals for the given epoch", function()
+			local result = epochs.createAndPrescribeNewEpoch(epochStartTimestamp, epochStartBlockHeight, hashchain)
 
 			-- Check arnsStats are counted as expected
 			assert.are.same({
@@ -649,7 +645,7 @@ describe("epochs", function()
 		end)
 	end)
 
-	describe("distributeRewardsForEpoch", function()
+	describe("distributeEpoch", function()
 		before_each(function()
 			-- adds a fully prescribed epoch to the epoch registry, with 5 gateways and 5 observers and observations
 			_G.Epochs[0] = {
@@ -774,12 +770,13 @@ describe("epochs", function()
 			-- clear the balances for the gateways
 			_G.Balances["test-this-is-valid-arweave-wallet-address-1"] = 0
 			local epoch = epochs.getEpoch(epochIndex)
+			assert(epoch, "Epoch not found")
 			local expectedGatewayReward = epoch.distributions.totalEligibleGatewayReward
 			local expectedObserverReward = epoch.distributions.totalEligibleObserverReward
 
 			-- validate the distribution of rewards for the epoch
-			local distributedEpoch = epochs.distributeRewardsForEpoch(epoch.distributionTimestamp)
-			assert.is_not_nil(distributedEpoch)
+			local distributedEpoch = epochs.distributeEpoch(epoch.epochIndex, epoch.endTimestamp)
+			assert(distributedEpoch)
 
 			-- validate the epoch is removed from the epoch table after distribution
 			assert.is_nil(_G.Epochs[epochIndex])
@@ -895,7 +892,7 @@ describe("epochs", function()
 
 			-- confirm the updated epoch values
 			assert.are.equal(expectedTotalDistribution, distributions.totalDistributedRewards)
-			assert.are.equal(epoch.distributionTimestamp, distributions.distributedTimestamp)
+			assert.are.equal(epoch.endTimestamp, distributions.distributedTimestamp)
 
 			assert.are.same({
 				--- gateway 1 did not earn any rewards, so it should not be in the distributed table
@@ -968,9 +965,15 @@ describe("epochs", function()
 			function()
 				local epochIndex = 0
 				-- marks the epoch as distributed
-				_G.Epochs[epochIndex].distributions.distributedTimestamp = 1704092400115
+				_G.Epochs[epochIndex] = {
+					epochIndex = epochIndex,
+					distributions = {
+						distributedTimestamp = 1704092400115,
+					},
+				}
 				local epoch = epochs.getEpoch(epochIndex)
-				local distributedEpoch = epochs.distributeRewardsForEpoch(epoch.distributionTimestamp)
+				assert(epoch, "Epoch not found")
+				local distributedEpoch = epochs.distributeEpoch(epoch.epochIndex, epoch.endTimestamp)
 				assert.is_nil(distributedEpoch)
 				assert.is_nil(_G.Epochs[epochIndex])
 			end
@@ -979,55 +982,10 @@ describe("epochs", function()
 		it("should return nil if the epoch does not exist in the epoch registry", function()
 			local epochIndex = 0
 			local epoch = epochs.getEpoch(epochIndex)
+			assert(epoch, "Epoch not found")
 			-- remove the epoch from the epoch registry
 			_G.Epochs[epochIndex] = nil
-			assert.is_nil(epochs.distributeRewardsForEpoch(epoch.distributionTimestamp))
-		end)
-	end)
-
-	-- prune epochs
-	describe("pruneEpochs", function()
-		local startingEpochs
-		before_each(function()
-			_G.Epochs = {}
-			-- add 20 epochs
-			for i = 0, 20 do
-				_G.Epochs[i] = {
-					epochIndex = i,
-					startTimestamp = 1704092400000,
-					endTimestamp = 1704092400100,
-					distributionTimestamp = 1704092400115,
-				}
-			end
-			startingEpochs = utils.deepCopy(_G.Epochs)
-		end)
-
-		it(
-			"should prune any epochs older than the current epoch and previous epoch, until distribution occurs",
-			function()
-				local currentTimestamp = epochs.getSettings().epochZeroStartTimestamp
-					+ epochs.getSettings().durationMs * 20
-					+ 1
-				-- prune epochs, keeping on the current epoch and the previous one
-				epochs.pruneEpochs(currentTimestamp)
-				assert.are.equal(2, utils.lengthOfTable(_G.Epochs))
-				assert.are.same({
-					[19] = _G.Epochs[19],
-					[20] = _G.Epochs[20],
-				}, _G.Epochs)
-			end
-		)
-
-		it("should skip pruning when unnecessary", function()
-			local currentTimestamp = epochs.getSettings().epochZeroStartTimestamp
-				+ epochs.getSettings().durationMs * 20
-				+ 1
-			_G.NextEpochsPruneTimestamp = currentTimestamp + 1
-			-- prune epochs
-			local result = epochs.pruneEpochs(currentTimestamp)
-			assert.are.same({}, result)
-			assert.are.same(startingEpochs, _G.Epochs)
-			assert.are.equal(currentTimestamp + 1, _G.NextEpochsPruneTimestamp)
+			assert.is_nil(epochs.distributeEpoch(epoch.epochIndex, epoch.endTimestamp))
 		end)
 	end)
 

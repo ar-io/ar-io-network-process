@@ -20,12 +20,10 @@ import {
   decreaseOperatorStake,
   saveObservations,
   genesisEpochTimestamp,
-  distributionDelay,
   epochLength,
   totalTokenSupply,
   tick,
   getEpochSettings,
-  getEpoch,
   getEpochDistributions,
   getPrescribedObservers,
 } from './helpers.mjs';
@@ -1737,6 +1735,7 @@ describe('GatewayRegistry', async () => {
         from: observerAddress,
         failedGateways,
         reportTxId,
+        epochIndex: 0,
         timestamp: observationTimestamp,
         memory: gatewayMemory,
       });
@@ -1757,6 +1756,7 @@ describe('GatewayRegistry', async () => {
         from: invalidObserver,
         failedGateways,
         reportTxId,
+        epochIndex: 0,
         timestamp: observationTimestamp,
         memory: gatewayMemory,
         shouldAssertNoResultError: false,
@@ -1776,6 +1776,7 @@ describe('GatewayRegistry', async () => {
         from: observerAddress,
         failedGateways,
         reportTxId: 'invalid-report-tx-id',
+        epochIndex: 0,
         timestamp: observationTimestamp,
         memory: gatewayMemory,
         shouldAssertNoResultError: false,
@@ -1793,6 +1794,7 @@ describe('GatewayRegistry', async () => {
         from: observerAddress,
         failedGateways: 'failed-gateway,is,good,strings?....',
         reportTxId,
+        epochIndex: 0,
         timestamp: observationTimestamp,
         memory: gatewayMemory,
         shouldAssertNoResultError: false,
@@ -1804,12 +1806,13 @@ describe('GatewayRegistry', async () => {
       );
     });
 
-    it('should fail to save an observation after the epoch has completed', async () => {
+    it('should fail to save an observation after before the epoch has started', async () => {
       const { result } = await saveObservations({
         from: observerAddress,
         failedGateways,
         reportTxId,
-        timestamp: genesisEpochTimestamp + epochLength,
+        epochIndex: 0,
+        timestamp: epochSettings.epochZeroStartTimestamp - 1,
         memory: gatewayMemory,
         shouldAssertNoResultError: false,
       });
@@ -1817,7 +1820,27 @@ describe('GatewayRegistry', async () => {
       assert.equal(result.Messages.length, 1);
       assert.ok(
         result.Messages[0].Data.includes(
-          'Observations for the current epoch cannot be submitted before: 1720075200000',
+          `Observations for epoch 0 must be submitted after ${epochSettings.epochZeroStartTimestamp}`,
+        ),
+      );
+    });
+
+    it('should fail to save an observation after the epoch has ended', async () => {
+      const { result } = await saveObservations({
+        from: observerAddress,
+        failedGateways,
+        reportTxId,
+        epochIndex: 0,
+        timestamp:
+          epochSettings.epochZeroStartTimestamp + epochSettings.durationMs + 1,
+        memory: gatewayMemory,
+        shouldAssertNoResultError: false,
+      });
+
+      assert.equal(result.Messages.length, 1);
+      assert.ok(
+        result.Messages[0].Data.includes(
+          `Observations for epoch 0 must be submitted before ${epochSettings.epochZeroStartTimestamp + epochSettings.durationMs}`,
         ),
       );
     });
