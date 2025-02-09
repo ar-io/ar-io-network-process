@@ -1735,7 +1735,7 @@ describe('GatewayRegistry', async () => {
         from: observerAddress,
         failedGateways,
         reportTxId,
-        epochIndex: 1,
+        epochIndex: 0,
         timestamp: observationTimestamp,
         memory: gatewayMemory,
       });
@@ -1756,7 +1756,7 @@ describe('GatewayRegistry', async () => {
         from: invalidObserver,
         failedGateways,
         reportTxId,
-        epochIndex: 1,
+        epochIndex: 0,
         timestamp: observationTimestamp,
         memory: gatewayMemory,
         shouldAssertNoResultError: false,
@@ -1776,7 +1776,7 @@ describe('GatewayRegistry', async () => {
         from: observerAddress,
         failedGateways,
         reportTxId: 'invalid-report-tx-id',
-        epochIndex: 1,
+        epochIndex: 0,
         timestamp: observationTimestamp,
         memory: gatewayMemory,
         shouldAssertNoResultError: false,
@@ -1794,7 +1794,7 @@ describe('GatewayRegistry', async () => {
         from: observerAddress,
         failedGateways: 'failed-gateway,is,good,strings?....',
         reportTxId,
-        epochIndex: 1,
+        epochIndex: 0,
         timestamp: observationTimestamp,
         memory: gatewayMemory,
         shouldAssertNoResultError: false,
@@ -1811,17 +1811,16 @@ describe('GatewayRegistry', async () => {
         from: observerAddress,
         failedGateways,
         reportTxId,
-        epochIndex: 1,
+        epochIndex: 0,
         timestamp: epochSettings.epochZeroStartTimestamp - 1,
         memory: gatewayMemory,
         shouldAssertNoResultError: false,
       });
 
-      console.log(result.Messages[0].Data);
       assert.equal(result.Messages.length, 1);
       assert.ok(
         result.Messages[0].Data.includes(
-          `Observations for epoch 1 must be submitted after ${epochSettings.epochZeroStartTimestamp}`,
+          `Observations for epoch 0 must be submitted after ${epochSettings.epochZeroStartTimestamp}`,
         ),
       );
     });
@@ -1831,7 +1830,7 @@ describe('GatewayRegistry', async () => {
         from: observerAddress,
         failedGateways,
         reportTxId,
-        epochIndex: 1,
+        epochIndex: 0,
         timestamp:
           epochSettings.epochZeroStartTimestamp + epochSettings.durationMs + 1,
         memory: gatewayMemory,
@@ -1841,7 +1840,7 @@ describe('GatewayRegistry', async () => {
       assert.equal(result.Messages.length, 1);
       assert.ok(
         result.Messages[0].Data.includes(
-          `Observations for epoch 1 must be submitted before ${epochSettings.epochZeroStartTimestamp + epochSettings.durationMs}`,
+          `Observations for epoch 0 must be submitted before ${epochSettings.epochZeroStartTimestamp + epochSettings.durationMs}`,
         ),
       );
     });

@@ -297,7 +297,7 @@ describe('setup', () => {
         distributions,
         observations,
       } = currentEpoch;
-      assert(epochIndex > 0, 'Epoch index is not valid');
+      assert(epochIndex >= 0, 'Epoch index is not valid');
       assert(distributions, 'Distributions are not valid');
       assert(observations, 'Observations are not valid');
       assert(

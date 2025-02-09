@@ -24,7 +24,7 @@ NameRegistry = NameRegistry or {}
 Epochs = Epochs or {}
 
 -- last known variables in the state, these help control tick, prune, and distribute behavior
-LastCreatedEpochIndex = LastCreatedEpochIndex or 0
+LastCreatedEpochIndex = LastCreatedEpochIndex or -1 -- TODO: we will move to a 1-based index in a separate PR
 LastDistributedEpochIndex = LastDistributedEpochIndex or 0
 LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
 LastKnownMessageTimestamp = LastKnownMessageTimestamp or 0
@@ -1621,7 +1621,7 @@ addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", Ac
 	local failedGateways = utils.splitAndTrimString(msg.Tags["Failed-Gateways"], ",")
 	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
 	assert(
-		epochIndex and epochIndex > 0 and utils.isInteger(epochIndex),
+		epochIndex and epochIndex >= 0 and utils.isInteger(epochIndex),
 		"Epoch index is required. Must be a number greater than 0."
 	)
 	assert(utils.isValidArweaveAddress(reportTxId), "Invalid report tx id. Must be a valid Arweave address.")
@@ -1777,7 +1777,6 @@ end, function(msg)
 	--
 	print("Ticking from " .. lastCreatedEpochIndex .. " to " .. targetCurrentEpochIndex)
 	for epochIndexToTick = lastCreatedEpochIndex, targetCurrentEpochIndex do
-		print("The epoch index to tick is: " .. epochIndexToTick)
 		local tickResult = tick.tickEpoch(msg.Timestamp, blockHeight, hashchain, msgId, epochIndexToTick)
 		if tickResult.pruneGatewaysResult ~= nil then
 			table.insert(newPruneGatewaysResults, tickResult.pruneGatewaysResult)

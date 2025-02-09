@@ -89,7 +89,7 @@ EpochSettings = EpochSettings
 --- @param epochIndex number The epoch index
 --- @return  PrescribedEpoch | nil # The prescribed epoch
 function epochs.getEpoch(epochIndex)
-	if epochIndex < 1 then
+	if epochIndex < 0 then
 		return nil
 	end
 	local epoch = utils.deepCopy(Epochs[epochIndex]) or nil
@@ -106,7 +106,7 @@ end
 --- @param epochIndex number The epoch index
 --- @return table<WalletAddress, WalletAddress> # The prescribed observers for the epoch
 function epochs.getPrescribedObserversForEpoch(epochIndex)
-	if epochIndex < 1 then
+	if epochIndex < 0 then
 		return {}
 	end
 	local epoch = epochs.getEpoch(epochIndex)
@@ -162,7 +162,7 @@ end
 --- @param epochIndex number The epoch index
 --- @return DistributedEpochRewards # The distributed rewards for the epoch
 function epochs.getDistributedRewardsForEpoch(epochIndex)
-	if epochIndex < 1 then
+	if epochIndex < 0 then
 		return {}
 	end
 	local epoch = epochs.getEpoch(epochIndex)
@@ -178,7 +178,7 @@ end
 --- @param epochIndex number The epoch index
 --- @return Observations # The observations for the epoch
 function epochs.getObservationsForEpoch(epochIndex)
-	if epochIndex < 1 then
+	if epochIndex < 0 then
 		return {}
 	end
 	local epoch = epochs.getEpoch(epochIndex)
@@ -189,7 +189,7 @@ end
 --- @param epochIndex number The epoch index
 --- @return DistributedEpochDistribution | PrescribedEpochDistribution # The distributions for the epoch
 function epochs.getDistributionsForEpoch(epochIndex)
-	if epochIndex < 1 then
+	if epochIndex < 0 then
 		return {}
 	end
 	local epoch = epochs.getEpoch(epochIndex)
@@ -200,7 +200,7 @@ end
 --- @param epochIndex number The epoch index
 --- @return string[] # The prescribed names for the epoch
 function epochs.getPrescribedNamesForEpoch(epochIndex)
-	if epochIndex < 1 then
+	if epochIndex < 0 then
 		return {}
 	end
 	local epoch = epochs.getEpoch(epochIndex)
@@ -211,7 +211,7 @@ end
 --- @param epochIndex number The epoch index
 --- @return table<WalletAddress, TransactionId> # The reports for the epoch
 function epochs.getReportsForEpoch(epochIndex)
-	if epochIndex < 1 then
+	if epochIndex < 0 then
 		return {}
 	end
 	local epoch = epochs.getEpoch(epochIndex)
@@ -222,7 +222,7 @@ end
 --- @param epochIndex number The epoch index
 --- @return DistributedEpochDistribution | PrescribedEpochDistribution # The distribution for the epoch
 function epochs.getDistributionForEpoch(epochIndex)
-	if epochIndex < 1 then
+	if epochIndex < 0 then
 		return {}
 	end
 	local epoch = epochs.getEpoch(epochIndex)
@@ -234,7 +234,7 @@ end
 --- @param hashchain string The hashchain
 --- @return string[] # The prescribed names for the epoch
 function epochs.computePrescribedNamesForEpoch(epochIndex, hashchain)
-	if epochIndex < 1 then
+	if epochIndex < 0 then
 		return {}
 	end
 	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
@@ -288,7 +288,7 @@ end
 --- @param hashchain string The hashchain
 --- @return table<WalletAddress, WalletAddress>, WeightedGateway[] # The prescribed observers for the epoch, and all the gateways with weights
 function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
-	assert(epochIndex > 0, "Epoch index must be greater than or equal to 0")
+	assert(epochIndex >= 0, "Epoch index must be greater than or equal to 0")
 	assert(type(hashchain) == "string", "Hashchain must be a string")
 
 	local epochStartTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
@@ -351,31 +351,33 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	return prescribedObserversLookup, weightedGateways
 end
 
---- Gets the epoch timestamps for an epoch index. Epochs are 1-indexed so we subtract 1 to get the correct timestamp
+--- Gets the epoch timestamps for an epoch index. Epochs are 0-indexed.
 --- @param epochIndex number The epoch index
 --- @return number, number # 	The epoch start timestamp, epoch end timestamp
 function epochs.getEpochTimestampsForIndex(epochIndex)
-	if epochIndex < 1 then
+	if epochIndex < 0 then
 		return 0, 0
 	end
 	local epochStartTimestamp = epochs.getSettings().epochZeroStartTimestamp
-		+ epochs.getSettings().durationMs * (epochIndex - 1)
+		+ epochs.getSettings().durationMs * epochIndex
 	local epochEndTimestamp = epochStartTimestamp + epochs.getSettings().durationMs
 	return epochStartTimestamp, epochEndTimestamp
 end
 
---- Gets the epoch index for a given timestamp. Epochs are 1-indexed so we add 1 to the result
+--- Gets the epoch index for a given timestamp. Epochs are 0-indexed.
 --- @param timestamp number The timestamp
 --- @return number # 	The epoch index
 function epochs.getEpochIndexForTimestamp(timestamp)
 	local timestampInMS = utils.checkAndConvertTimestampToMs(timestamp)
 	local epochZeroStartTimestamp = epochs.getSettings().epochZeroStartTimestamp
 	local epochLengthMs = epochs.getSettings().durationMs
-	local epochIndex = math.floor((timestampInMS - epochZeroStartTimestamp) / epochLengthMs) + 1
+	local epochIndex = math.floor((timestampInMS - epochZeroStartTimestamp) / epochLengthMs)
 	return epochIndex
 end
 
 --- Creates a new epoch and updates the gateway weights
+---
+--- TODO: if we are asked to create an epoch to catch up, we should stub out the prescribed observers and names. Non-critical.
 --- @param currentTimestamp number The current timestamp in milliseconds
 --- @param currentBlockHeight number The current block height
 --- @param currentHashchain string The current hashchain
@@ -391,22 +393,20 @@ function epochs.createAndPrescribeNewEpoch(currentTimestamp, currentBlockHeight,
 		return nil
 	end
 
-	local epochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp)
-	if epochs.getEpoch(epochIndex) then
-		print("Epoch already exists for index, skipping creation: " .. epochIndex)
+	local currentEpochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp)
+	if epochs.getEpoch(currentEpochIndex) then
+		print("Epoch already exists for index, skipping creation: " .. currentEpochIndex)
 		return nil -- do not return the existing epoch to prevent sending redundant epoch-created-notices
 	end
 
+	print("Creating new epoch: " .. currentEpochIndex)
+
 	-- get the max rewards for each participant eligible for the epoch
 	local prescribedObservers, updatedGatewaysWithWeights =
-		epochs.computePrescribedObserversForEpoch(epochIndex, currentHashchain)
-	local prescribedNames = epochs.computePrescribedNamesForEpoch(epochIndex, currentHashchain)
-	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObservers)
-	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
-
-	assert(epochStartTimestamp, "Epoch start timestamp is required")
-	assert(epochEndTimestamp, "Epoch end timestamp is required")
-
+		epochs.computePrescribedObserversForEpoch(currentEpochIndex, currentHashchain)
+	local prescribedNames = epochs.computePrescribedNamesForEpoch(currentEpochIndex, currentHashchain)
+	local eligibleEpochRewards = epochs.computeTotalEligibleRewardsForEpoch(currentEpochIndex, prescribedObservers)
+	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(currentEpochIndex)
 	local arnsStatsAtEpochStart = arns.getArNSStatsAtTimestamp(epochStartTimestamp)
 
 	-- update gateway weights for every new epoch, so its clear why the prescribed observers are selected
@@ -417,7 +417,7 @@ function epochs.createAndPrescribeNewEpoch(currentTimestamp, currentBlockHeight,
 	--- @type PrescribedEpoch
 	local epoch = {
 		hashchain = currentHashchain,
-		epochIndex = epochIndex,
+		epochIndex = currentEpochIndex,
 		startTimestamp = epochStartTimestamp,
 		endTimestamp = epochEndTimestamp,
 		startHeight = currentBlockHeight,
@@ -438,7 +438,7 @@ function epochs.createAndPrescribeNewEpoch(currentTimestamp, currentBlockHeight,
 			},
 		},
 	}
-	Epochs[epochIndex] = epoch
+	Epochs[currentEpochIndex] = epoch
 
 	return epoch
 end
@@ -458,7 +458,7 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	for _, address in ipairs(failedGatewayAddresses) do
 		assert(utils.isValidAddress(address, true), "Failed gateway address is not a valid address") -- allow unsafe addresses for failed gateway addresses
 	end
-	assert(epochIndex > 0, "Epoch index must be greater than 0")
+	assert(epochIndex >= 0, "Epoch index must be greater than 0")
 	assert(type(currentTimestamp) == "number", "Timestamp is required")
 
 	local epochStartTimestamp, epochEndTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
@@ -545,7 +545,7 @@ end
 --- @param prescribedObserversLookup table<WalletAddress, WalletAddress> The prescribed observers for the epoch
 --- @return ComputedRewards # The total eligible rewards
 function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObserversLookup)
-	if epochIndex < 1 then
+	if epochIndex < 0 then
 		return {
 			totalEligibleGateways = 0,
 			totalEligibleRewards = 0,
@@ -615,43 +615,52 @@ end
 --- 2. Allocate 95% of the rewards for passed gateways, 5% for observers - based on total gateways during the epoch and # of prescribed observers
 --- 3. Distribute the rewards to the gateways and observers
 --- 4. Increment the epoch stats for the gateways
---- @param previousEpochIndex number The previous epoch index
+--- @param epochIndexToDistribute number The epoch to distribute
 --- @return DistributedEpoch | nil # The updated epoch with the distributed rewards, or nil if no rewards were distributed
-function epochs.distributeEpoch(previousEpochIndex, currentTimestamp)
-	if previousEpochIndex < 1 then
+function epochs.distributeEpoch(epochIndexToDistribute, currentTimestamp)
+	if epochIndexToDistribute < 0 then
 		-- silently ignore - Distribution can only occur after the epoch has ended
 		return nil
 	end
 
-	local previousEpoch = epochs.getEpoch(previousEpochIndex)
+	local epochToDistribute = epochs.getEpoch(epochIndexToDistribute)
 
-	if not previousEpoch then
+	if not epochToDistribute then
 		-- TODO: consider throwing an error here instead of silently returning, as this is a critical error and should be fixed
-		print("Epoch " .. previousEpochIndex .. " not found in state. Skipping distribution.")
+		print("Epoch " .. epochIndexToDistribute .. " not found in state. Skipping distribution.")
 		return nil
 	end
 
 	--- The epoch was already distributed and should be cleaned up
-	--- @cast previousEpoch DistributedEpoch
-	if previousEpoch.distributions.distributedTimestamp then
+	--- @cast epochToDistribute DistributedEpoch
+	if epochToDistribute.distributions.distributedTimestamp then
 		print(
 			"Rewards already distributed for epoch. Epoch will be removed from the epoch registry: "
-				.. previousEpochIndex
+				.. epochIndexToDistribute
 		)
-		Epochs[previousEpochIndex] = nil
+		Epochs[epochIndexToDistribute] = nil
 		return nil -- do not return the epoch as it has already been distributed, and we do not want to send redundant epoch-distributed-notices
 	end
 
-	print("Distributing epoch: " .. previousEpochIndex)
+	-- ensure we are not distributing the current epoch, that can only happen
+	local currentEpochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp)
+	if currentEpochIndex == epochIndexToDistribute then
+		print("Epoch is not ready to be distributed, skipping distribution: " .. epochIndexToDistribute)
+		return nil
+	end
 
-	local eligibleGatewaysForEpoch = previousEpoch.distributions.rewards.eligible or {}
-	local prescribedObserversLookup = previousEpoch.prescribedObservers or {}
-	local totalEligibleObserverReward = previousEpoch.distributions.totalEligibleObserverReward or 0
-	local totalEligibleGatewayReward = previousEpoch.distributions.totalEligibleGatewayReward or 0
-	local totalObservationsSubmitted = utils.lengthOfTable(previousEpoch.observations.reports) or 0
-	local prescribedObserversWithWeights = epochs.getPrescribedObserversWithWeightsForEpoch(previousEpoch.epochIndex)
-	local previousEpochReports = previousEpoch.observations and previousEpoch.observations.reports or {}
-	local previousEpochFailureSummaries = previousEpoch.observations and previousEpoch.observations.failureSummaries
+	print("Distributing epoch: " .. epochIndexToDistribute)
+
+	local eligibleGatewaysForEpoch = epochToDistribute.distributions.rewards.eligible or {}
+	local prescribedObserversLookup = epochToDistribute.prescribedObservers or {}
+	local totalEligibleObserverReward = epochToDistribute.distributions.totalEligibleObserverReward or 0
+	local totalEligibleGatewayReward = epochToDistribute.distributions.totalEligibleGatewayReward or 0
+	local totalObservationsSubmitted = utils.lengthOfTable(epochToDistribute.observations.reports) or 0
+	local prescribedObserversWithWeights =
+		epochs.getPrescribedObserversWithWeightsForEpoch(epochToDistribute.epochIndex)
+	local epochToDistributeReports = epochToDistribute.observations and epochToDistribute.observations.reports or {}
+	local epochToDistributeFailureSummaries = epochToDistribute.observations
+			and epochToDistribute.observations.failureSummaries
 		or {}
 	local distributed = {}
 	for gatewayAddress, totalEligibleRewardsForGateway in pairs(eligibleGatewaysForEpoch) do
@@ -659,13 +668,13 @@ function epochs.distributeEpoch(previousEpochIndex, currentTimestamp)
 		-- only distribute rewards if the gateway is found and not leaving
 		if gateway and totalEligibleRewardsForGateway and gateway.status ~= "leaving" then
 			-- check the observations to see if gateway passed, if 50% or more of the observers marked the gateway as failed, it is considered failed
-			local observersMarkedFailed = previousEpochFailureSummaries[gatewayAddress] or {}
+			local observersMarkedFailed = epochToDistributeFailureSummaries[gatewayAddress] or {}
 			local failed = #observersMarkedFailed > (totalObservationsSubmitted / 2) -- more than 50% of observations submitted marked gateway as failed
 
 			-- if prescribed, we'll update the prescribed stats as well - find if the observer address is in prescribed observers
 			local isPrescribed = prescribedObserversLookup[gateway.observerAddress]
 
-			local observationSubmitted = isPrescribed and previousEpochReports[gateway.observerAddress] ~= nil
+			local observationSubmitted = isPrescribed and epochToDistributeReports[gateway.observerAddress] ~= nil
 
 			local updatedStats = {
 				totalEpochCount = gateway.stats.totalEpochCount + 1,
@@ -765,13 +774,13 @@ function epochs.distributeEpoch(previousEpochIndex, currentTimestamp)
 
 	-- create a distributed epoch from the prescribed epoch
 	local distributedEpoch = convertPrescribedEpochToDistributedEpoch(
-		previousEpoch,
+		epochToDistribute,
 		currentTimestamp,
 		distributed,
 		prescribedObserversWithWeights
 	)
 	-- remove the epoch from the epoch table
-	Epochs[previousEpochIndex] = nil
+	Epochs[epochIndexToDistribute] = nil
 	return distributedEpoch
 end
 
