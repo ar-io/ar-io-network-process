@@ -77,14 +77,7 @@ describe("gar", function()
 		_G.Balances = {
 			[stubGatewayAddress] = minOperatorStake,
 		}
-		_G.Epochs = {
-			[1] = {
-				startTimestamp = 0,
-				endTimestamp = 100,
-				prescribedObservers = {},
-				observations = {},
-			},
-		}
+		_G.Epochs = {}
 		_G.GatewayRegistry = {}
 		_G.Redelegations = {}
 	end)
