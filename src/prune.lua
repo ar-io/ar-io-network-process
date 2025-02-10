@@ -2,7 +2,6 @@ local prune = {}
 local arns = require("arns")
 local gar = require("gar")
 local vaults = require("vaults")
-local epochs = require("epochs")
 local primaryNames = require("primary_names")
 
 ---@class PruneStateResult
@@ -12,7 +11,6 @@ local primaryNames = require("primary_names")
 ---@field prunedReserved table<string, ReservedName>
 ---@field prunedVaults table<string, Vault>
 ---@field pruneGatewaysResult table<string, table>
----@field prunedEpochs table<string, Epoch>
 ---@field prunedPrimaryNamesAndOwners table<string, RemovedPrimaryName[]>
 ---@field prunedPrimaryNameRequests table<WalletAddress, PrimaryNameRequest>
 ---@field delegatorsWithFeeReset WalletAddress[]
@@ -41,7 +39,7 @@ function prune.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 	local prunedVaults = vaults.pruneVaults(timestamp)
 	local pruneGatewaysResult = gar.pruneGateways(timestamp, msgId)
 	local delegatorsWithFeeReset = gar.pruneRedelegationFeeData(timestamp)
-	local prunedEpochs = epochs.pruneEpochs(timestamp)
+
 	return {
 		prunedRecords = prunedRecords,
 		newGracePeriodRecords = newGracePeriodRecords,
@@ -49,7 +47,6 @@ function prune.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 		prunedReserved = prunedReserved,
 		prunedVaults = prunedVaults,
 		pruneGatewaysResult = pruneGatewaysResult,
-		prunedEpochs = prunedEpochs,
 		prunedPrimaryNamesAndOwners = prunedPrimaryNamesAndOwners,
 		prunedPrimaryNameRequests = prunedPrimaryNameRequests,
 		delegatorsWithFeeReset = delegatorsWithFeeReset,

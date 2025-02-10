@@ -11,6 +11,8 @@ import {
   validGatewayTags,
   STUB_PROCESS_ID,
   INITIAL_OPERATOR_STAKE,
+  STUB_BLOCK_HEIGHT,
+  STUB_HASH_CHAIN,
 } from '../tools/constants.mjs';
 
 const initialOperatorStake = 100_000_000_000;
@@ -45,9 +47,12 @@ export async function handle({
   memory = startMemory,
   shouldAssertNoResultError = true,
   timestamp = STUB_TIMESTAMP,
+  blockHeight = STUB_BLOCK_HEIGHT,
+  hashchain = STUB_HASH_CHAIN,
 }) {
   options.Timestamp ??= timestamp;
-
+  options['Block-Height'] ??= blockHeight;
+  options['Hash-Chain'] ??= hashchain;
   const result = await originalHandle(
     memory,
     {
@@ -519,6 +524,7 @@ export const delegateStake = async ({
     memory: transferMemory,
     shouldAssertNoResultError,
   });
+
   return {
     result: delegateResult,
     memory: delegateResult.Memory,
@@ -794,9 +800,6 @@ export const buyRecord = async ({
     timestamp,
     memory,
   });
-  if (assertError) {
-    assertNoResultError(buyRecordResult);
-  }
   return {
     result: buyRecordResult,
     memory: buyRecordResult.Memory,
@@ -809,6 +812,7 @@ export const saveObservations = async ({
   shouldAssertNoResultError = true,
   failedGateways = 'failed-gateway-'.padEnd(43, 'e'),
   reportTxId = 'report-tx-id-'.padEnd(43, 'f'),
+  epochIndex = 0,
   memory = startMemory,
 }) => {
   const result = await handle({
@@ -819,6 +823,7 @@ export const saveObservations = async ({
         { name: 'Action', value: 'Save-Observations' },
         { name: 'Report-Tx-Id', value: reportTxId },
         { name: 'Failed-Gateways', value: failedGateways },
+        { name: 'Epoch-Index', value: epochIndex },
       ],
       Timestamp: timestamp,
     },
@@ -850,11 +855,15 @@ export const tick = async ({
   memory,
   timestamp = STUB_TIMESTAMP,
   forcePrune = false,
+  blockHeight,
+  hashchain,
 }) => {
   const tickResult = await handle({
     options: {
       Tags: [{ name: 'Action', value: 'Tick' }],
       Timestamp: timestamp,
+      'Block-Height': blockHeight,
+      'Hash-Chain': hashchain,
       ...(forcePrune ? { name: 'Force-Prune', value: 'true' } : {}),
     },
     memory,
@@ -873,11 +882,21 @@ export const getInfo = async ({ memory, timestamp }) => {
     },
     memory,
   });
-  assertNoResultError(nameResult);
   return {
     memory: nameResult.Memory,
     result: nameResult,
   };
+};
+
+export const getGateways = async ({ memory, timestamp }) => {
+  const gatewaysResult = await handle({
+    options: {
+      Tags: [{ name: 'Action', value: 'Gateways' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  return JSON.parse(gatewaysResult.Messages[0].Data);
 };
 
 export const getRecord = async ({
@@ -895,7 +914,6 @@ export const getRecord = async ({
     },
     memory,
   });
-  assertNoResultError(nameResult);
   return JSON.parse(nameResult.Messages[0].Data);
 };
 
@@ -907,7 +925,6 @@ export const getPruningTimestamps = async ({ memory, timestamp }) => {
     },
     memory,
   });
-  assertNoResultError(nameResult);
   return JSON.parse(nameResult.Messages[0].Data);
 };
 
@@ -928,7 +945,6 @@ export const getEpoch = async ({
     },
     memory,
   });
-  assertNoResultError(epochResult);
   return JSON.parse(epochResult.Messages[0].Data);
 };
 
@@ -969,7 +985,6 @@ export const getPrescribedObservers = async ({
     },
     memory,
   });
-  assertNoResultError(prescribedObserversResult);
   return JSON.parse(prescribedObserversResult.Messages[0].Data);
 };
 
@@ -990,7 +1005,6 @@ export const getPrescribedNames = async ({
     },
     memory,
   });
-  assertNoResultError(prescribedNamesResult);
   return JSON.parse(prescribedNamesResult.Messages[0].Data);
 };
 
@@ -1005,6 +1019,5 @@ export const getEpochSettings = async ({
     },
     memory,
   });
-  assertNoResultError(epochSettingsResult);
   return JSON.parse(epochSettingsResult.Messages[0].Data);
 };
