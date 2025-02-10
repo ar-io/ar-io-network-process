@@ -362,10 +362,11 @@ describe("arns", function()
 			end)
 		end)
 
-		describe("increaseundernameLimit [" .. addressType .. "]", function()
+		describe("increaseUndernameLimit [" .. addressType .. "]", function()
 			it("should throw an error if name is not active", function()
-				local status, error = pcall(arns.increaseundernameLimit, testAddress, "test-name", 50, timestamp)
+				local status, error = pcall(arns.increaseUndernameLimit, testAddress, "test-name", 50, timestamp)
 				assert.is_false(status)
+				assert(error)
 				assert.match("Name is not registered", error)
 			end)
 
@@ -380,7 +381,7 @@ describe("arns", function()
 					undernameLimit = 10,
 				}
 				_G.Balances[testAddress] = 0
-				local status, error = pcall(arns.increaseundernameLimit, testAddress, "test-name", 50, timestamp)
+				local status, error = pcall(arns.increaseUndernameLimit, testAddress, "test-name", 50, timestamp)
 				assert.is_false(status)
 				assert.match("Insufficient balance", error)
 			end)
@@ -395,7 +396,7 @@ describe("arns", function()
 					undernameLimit = 10,
 				}
 				local status, error = pcall(
-					arns.increaseundernameLimit,
+					arns.increaseUndernameLimit,
 					testAddress,
 					"test-name",
 					1,
@@ -418,7 +419,7 @@ describe("arns", function()
 				}
 				local demandBefore = demand.getCurrentPeriodRevenue()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
-				local result = arns.increaseundernameLimit(testAddress, "test-name", 50, timestamp, "msg-id")
+				local result = arns.increaseUndernameLimit(testAddress, "test-name", 50, timestamp, "msg-id")
 				local expectation = {
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
@@ -464,7 +465,7 @@ describe("arns", function()
 				}
 				local demandBefore = demand.getCurrentPeriodRevenue()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
-				local result = arns.increaseundernameLimit(testAddress, "test-name", 50, timestamp)
+				local result = arns.increaseUndernameLimit(testAddress, "test-name", 50, timestamp, "msg-id", "balance")
 				local expectation = {
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,

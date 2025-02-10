@@ -1011,7 +1011,7 @@ addEventingHandler(
 		)
 		assertValidFundFrom(fundFrom)
 
-		local result = arns.increaseundernameLimit(msg.From, name, quantity, msg.Timestamp, msg.Id, fundFrom)
+		local result = arns.increaseUndernameLimit(msg.From, name, quantity, msg.Timestamp, msg.Id, fundFrom)
 		local recordResult = {}
 		if result ~= nil then
 			recordResult = result.record
