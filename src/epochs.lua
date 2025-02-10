@@ -96,6 +96,13 @@ function epochs.getEpoch(epochIndex)
 	return epoch
 end
 
+--- Gets an epoch by index without copying
+--- @param epochIndex number The epoch index
+--- @return PrescribedEpoch | nil # The prescribed epoch
+function epochs.getEpochUnsafe(epochIndex)
+	return Epochs[epochIndex]
+end
+
 --- Gets the epoch settings
 --- @return EpochSettings|nil # The epoch settings
 function epochs.getSettings()
@@ -482,8 +489,8 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	local observingGateway = gar.getGateway(gatewayAddressForObserver)
 	assert(observingGateway, "The associated gateway not found in the registry.")
 
-	-- TODO: this could be unsafe to avoid copying the epoch on every observation
-	local epoch = epochs.getEpoch(epochIndex)
+	-- we'll be updating the epoch, so get a direct reference to it
+	local epoch = epochs.getEpochUnsafe(epochIndex)
 	assert(epoch, "Unable to save observation. Epoch not found for index: " .. epochIndex)
 
 	-- check if this is the first report filed in this epoch
@@ -496,7 +503,8 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 
 	-- use ipairs as failedGatewayAddresses is an array
 	for _, failedGatewayAddress in ipairs(failedGatewayAddresses) do
-		local gateway = gar.getGateway(failedGatewayAddress)
+		-- we're not updating the gateway, so we can use getGatewayUnsafe without fear of overwriting the gateway
+		local gateway = gar.getGatewayUnsafe(failedGatewayAddress)
 
 		if gateway then
 			local gatewayPresentDuringEpoch = gar.isGatewayActiveBeforeTimestamp(epochStartTimestamp, gateway)
@@ -527,9 +535,8 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 		epoch.observations.reports = {}
 	end
 
-	epoch.observations.reports[observingGateway.observerAddress] = reportTxId
 	-- update the epoch
-	Epochs[epochIndex] = epoch
+	epoch.observations.reports[observingGateway.observerAddress] = reportTxId
 	return epoch.observations
 end
 
