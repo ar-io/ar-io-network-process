@@ -1021,3 +1021,64 @@ export const getEpochSettings = async ({
   });
   return JSON.parse(epochSettingsResult.Messages[0].Data);
 };
+
+export const getTokenCost = async ({
+  from = STUB_ADDRESS,
+  memory,
+  intent,
+  timestamp = STUB_TIMESTAMP,
+  name,
+  type = 'lease',
+  years = 1,
+  fundFrom = 'balance',
+  processId = STUB_PROCESS_ID,
+  quantity = 1,
+}) => {
+  const result = await handle({
+    options: {
+      From: from,
+      Owner: from,
+      Tags: [
+        { name: 'Action', value: 'Cost-Details' },
+        { name: 'Intent', value: intent },
+        { name: 'Name', value: name },
+        { name: 'Purchase-Type', value: type },
+        { name: 'Years', value: years },
+        { name: 'Process-Id', value: processId },
+        { name: 'Fund-From', value: fundFrom },
+        { name: 'Quantity', value: quantity },
+      ],
+    },
+    timestamp,
+    memory,
+  });
+  return JSON.parse(result.Messages[0].Data);
+};
+
+export const increaseUndernameLimit = async ({
+  from = STUB_ADDRESS,
+  memory,
+  name,
+  quantity = 1,
+  timestamp = STUB_TIMESTAMP,
+  fundFrom = 'balance',
+}) => {
+  const result = await handle({
+    options: {
+      From: from,
+      Owner: from,
+      Tags: [
+        { name: 'Action', value: 'Increase-Undername-Limit' },
+        { name: 'Name', value: name },
+        { name: 'Quantity', value: quantity },
+        { name: 'Fund-From', value: fundFrom },
+      ],
+    },
+    timestamp,
+    memory,
+  });
+  return {
+    memory: result.Memory,
+    result,
+  };
+};
