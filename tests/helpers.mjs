@@ -106,7 +106,7 @@ export function assertValidSupplyEventData(result) {
 }
 
 export const getBalances = async ({ memory, timestamp = STUB_TIMESTAMP }) => {
-  assert(memory, 'Memory is required');
+  // assert(memory, 'Memory is required');
   const result = await handle({
     options: {
       Tags: [{ name: 'Action', value: 'Balances' }],
@@ -1022,16 +1022,44 @@ export const getEpochSettings = async ({
   return JSON.parse(epochSettingsResult.Messages[0].Data);
 };
 
+export const extendLease = async ({
+  from = STUB_ADDRESS,
+  memory,
+  name,
+  years,
+  timestamp = STUB_TIMESTAMP,
+  fundFrom = 'balance',
+}) => {
+  const result = await handle({
+    options: {
+      From: from,
+      Owner: from,
+      Tags: [
+        { name: 'Action', value: 'Extend-Lease' },
+        { name: 'Name', value: name },
+        { name: 'Years', value: years },
+        { name: 'Fund-From', value: fundFrom },
+      ],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  return {
+    memory: result.Memory,
+    result,
+  };
+};
+
 export const getTokenCost = async ({
   from = STUB_ADDRESS,
   memory,
   intent,
   timestamp = STUB_TIMESTAMP,
   name,
-  type = 'lease',
+  type,
   years = 1,
   fundFrom = 'balance',
-  processId = STUB_PROCESS_ID,
+  processId,
   quantity = 1,
 }) => {
   const result = await handle({

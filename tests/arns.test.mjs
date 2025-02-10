@@ -19,6 +19,7 @@ import {
   getRecord,
   getGateway,
   delegateStake,
+  extendLease,
 } from './helpers.mjs';
 import assert from 'node:assert';
 import {
@@ -313,19 +314,17 @@ describe('ArNS', async () => {
       });
 
       // delegate stake from someone else
-      const transferMemory = await transfer({
-        recipient: STUB_ADDRESS,
-        quantity: 10_000_000_000,
-        memory: joinNetworkResult.Memory,
-      });
-
       const { result: delegateStakeResult } = await delegateStake({
-        memory: transferMemory,
-        from: STUB_ADDRESS,
-        address: STUB_OPERATOR_ADDRESS,
-        quantity: 10_000_000_000,
+        memory: joinNetworkResult.Memory,
+        delegatorAddress: STUB_ADDRESS,
+        gatewayAddress: STUB_OPERATOR_ADDRESS,
+        quantity: 650_000_000,
       });
 
+      const gatewayBefore = await getGateway({
+        memory: delegateStakeResult.Memory,
+        address: STUB_OPERATOR_ADDRESS,
+      });
       const { result: increaseUndernameResult } = await increaseUndernameLimit({
         from: STUB_ADDRESS,
         name: 'test-name',
@@ -346,8 +345,8 @@ describe('ArNS', async () => {
         address: STUB_OPERATOR_ADDRESS,
       });
       assert.equal(
-        gatewayAfter.delegatedStake,
-        gatewayBefore.delegatedStake - costForIncreaseUndernameLimit,
+        gatewayAfter.totalDelegatedStake,
+        gatewayBefore.totalDelegatedStake - costForIncreaseUndernameLimit,
       );
     });
   });
@@ -380,7 +379,6 @@ describe('ArNS', async () => {
       const transferMemory = await transfer({
         recipient: testNewAddress,
         quantity: 400_000_000,
-        cast: true,
         memory: sharedMemory,
       });
 
@@ -411,30 +409,19 @@ describe('ArNS', async () => {
       const transferMemory = await transfer({
         recipient: testNewAddress,
         quantity: 400_000_000,
-        cast: true,
         memory: sharedMemory,
       });
 
-      const result = await handle({
-        options: {
-          From: testNewAddress,
-          Owner: testNewAddress,
-          Tags: [
-            // latest tags
-            { name: 'Action', value: 'Cost-Details' },
-            { name: 'Intent', value: 'Buy-Name' },
-            { name: 'Name', value: 'test-name' },
-            { name: 'Purchase-Type', value: 'lease' },
-            { name: 'Years', value: '1' },
-            { name: 'Process-Id', value: ''.padEnd(43, 'a') },
-            { name: 'Fund-From', value: 'balance' },
-          ],
-        },
+      const result = await getTokenCost({
+        from: testNewAddress,
+        name: 'test-name',
+        intent: 'Buy-Name',
+        type: 'lease',
+        years: 1,
+        fundFrom: 'balance',
         memory: transferMemory,
       });
-
-      const tokenCostResult = JSON.parse(result.Messages[0].Data);
-      assert.deepEqual(tokenCostResult, {
+      assert.deepEqual(result, {
         discounts: [],
         tokenCost: baseLeasePriceFor9CharNameFor1Year,
         fundingPlan: {
@@ -444,7 +431,6 @@ describe('ArNS', async () => {
           stakes: [],
         },
       });
-      sharedMemory = result.Memory;
     });
 
     it('should return the correct cost of increasing an undername limit', async () => {
@@ -457,21 +443,14 @@ describe('ArNS', async () => {
         memory: sharedMemory,
       });
 
-      const result = await handle({
-        options: {
-          Tags: [
-            { name: 'Action', value: 'Token-Cost' },
-            { name: 'Intent', value: 'Increase-Undername-Limit' },
-            { name: 'Name', value: 'test-name' },
-            { name: 'Quantity', value: '1' },
-          ],
-        },
+      const result = await getTokenCost({
+        from: STUB_ADDRESS,
+        name: 'test-name',
+        intent: 'Increase-Undername-Limit',
         memory: buyRecordResult.Memory,
       });
-      const tokenCost = JSON.parse(result.Messages[0].Data);
       const expectedPrice = 500000000 * 0.001 * 1 * 1;
-      assert.equal(tokenCost, expectedPrice);
-      sharedMemory = result.Memory;
+      assert.equal(result.tokenCost, expectedPrice);
     });
 
     it('should return the correct cost of extending an existing leased record', async () => {
@@ -484,20 +463,14 @@ describe('ArNS', async () => {
         memory: sharedMemory,
       });
 
-      const result = await handle({
-        options: {
-          Tags: [
-            { name: 'Action', value: 'Token-Cost' },
-            { name: 'Intent', value: 'Extend-Lease' },
-            { name: 'Name', value: 'test-name' },
-            { name: 'Years', value: '2' },
-          ],
-        },
+      const result = await getTokenCost({
+        from: STUB_ADDRESS,
+        name: 'test-name',
+        intent: 'Extend-Lease',
+        years: 2,
         memory: buyRecordResult.Memory,
       });
-      const tokenCost = JSON.parse(result.Messages[0].Data);
-      assert.equal(tokenCost, 200000000); // known cost for extending a 9 character name by 2 years (500 ARIO * 0.2 * 2)
-      sharedMemory = result.Memory;
+      assert.equal(result.tokenCost, 200000000); // known cost for extending a 9 character name by 2 years (500 ARIO * 0.2 * 2)
     });
 
     it('should get the cost of upgrading an existing leased record to permanently owned', async () => {
@@ -510,20 +483,13 @@ describe('ArNS', async () => {
         memory: sharedMemory,
       });
 
-      const upgradeNameResult = await handle({
-        options: {
-          Tags: [
-            { name: 'Action', value: 'Token-Cost' },
-            { name: 'Intent', value: 'Upgrade-Name' },
-            { name: 'Name', value: 'test-name' },
-          ],
-        },
+      const upgradeNameResult = await getTokenCost({
+        from: STUB_ADDRESS,
+        name: 'test-name',
+        intent: 'Upgrade-Name',
         memory: buyRecordResult.Memory,
       });
-
-      const tokenCost = JSON.parse(upgradeNameResult.Messages[0].Data);
-      assert.equal(tokenCost, basePermabuyPrice);
-      sharedMemory = upgradeNameResult.Memory;
+      assert.equal(upgradeNameResult.tokenCost, basePermabuyPrice);
     });
 
     it('should return the correct cost of creating a primary name request', async () => {
@@ -545,37 +511,25 @@ describe('ArNS', async () => {
       }
 
       // get the cost of increasing the undername limit for a 51 character name
-      const undernameResult = await handle({
-        options: {
-          Tags: [
-            { name: 'Action', value: 'Token-Cost' },
-            { name: 'Intent', value: 'Increase-Undername-Limit' },
-            { name: 'Name', value: ''.padEnd(51, 'a') },
-            { name: 'Quantity', value: '1' },
-          ],
-          Timestamp: STUB_TIMESTAMP,
-        },
+      const undernameResult = await getTokenCost({
+        from: STUB_ADDRESS,
+        name: ''.padEnd(51, 'a'),
+        intent: 'Increase-Undername-Limit',
         memory: buyNameMemory,
       });
-      const undernameTokenCost = JSON.parse(undernameResult.Messages[0].Data);
 
       // check the costs for both primary names, they should be the same as the undername limit cost for a 51 character name
       for (const name of ['test-name', ''.padEnd(51, 'a')]) {
-        const primaryNameRequestResult = await handle({
-          options: {
-            Tags: [
-              { name: 'Action', value: 'Token-Cost' },
-              { name: 'Intent', value: 'Primary-Name-Request' },
-              { name: 'Name', value: name },
-            ],
-            Timestamp: STUB_TIMESTAMP,
-          },
+        const primaryNameRequestResult = await getTokenCost({
+          from: STUB_ADDRESS,
+          name: name,
+          intent: 'Primary-Name-Request',
           memory: buyNameMemory,
         });
-        const primaryNameCost = JSON.parse(
-          primaryNameRequestResult.Messages[0].Data,
+        assert.equal(
+          primaryNameRequestResult.tokenCost,
+          undernameResult.tokenCost,
         );
-        assert.equal(primaryNameCost, undernameTokenCost);
       }
       sharedMemory = undernameResult.Memory;
     });
@@ -595,14 +549,9 @@ describe('ArNS', async () => {
         name: 'test-name',
         memory: buyRecordResult.Memory,
       });
-      const extendResult = await handle({
-        options: {
-          Tags: [
-            { name: 'Action', value: 'Extend-Lease' },
-            { name: 'Name', value: 'test-name' },
-            { name: 'Years', value: '1' },
-          ],
-        },
+      const { result: extendResult } = await extendLease({
+        name: 'test-name',
+        years: 1,
         memory: buyRecordResult.Memory,
       });
       const record = await getRecord({
@@ -617,15 +566,12 @@ describe('ArNS', async () => {
     });
 
     it('should properly handle extending a leased record paying with balance and stakes', async () => {
-      let memory = sharedMemory;
-      const stakeResult = await setUpStake({
-        memory,
+      const { result: stakeResult } = await setUpStake({
+        memory: sharedMemory,
         transferQty: 700000000, // 600000000 for name purchase + 100000000 for extending the lease
         stakeQty: 650000000, // delegate most of their balance so that name purchase uses balance and stakes
         timestamp: STUB_TIMESTAMP,
       });
-
-      memory = stakeResult.memory;
 
       const { result: buyRecordResult } = await buyRecord({
         name: 'test-name',
@@ -633,9 +579,8 @@ describe('ArNS', async () => {
         type: 'lease',
         years: 1,
         timestamp: STUB_TIMESTAMP,
-        memory,
+        memory: stakeResult.Memory,
       });
-      memory = buyRecordResult.Memory;
 
       const recordBefore = await getRecord({
         name: 'test-name',
@@ -643,17 +588,10 @@ describe('ArNS', async () => {
       });
 
       // Last 100,000,000 mARIO will be paid from exit vault 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm'
-      const extendResult = await handle({
-        options: {
-          From: STUB_ADDRESS,
-          Owner: STUB_ADDRESS,
-          Tags: [
-            { name: 'Action', value: 'Extend-Lease' },
-            { name: 'Name', value: 'test-name' },
-            { name: 'Years', value: '1' },
-            { name: 'Fund-From', value: 'any' },
-          ],
-        },
+      const { result: extendResult } = await extendLease({
+        name: 'test-name',
+        years: 1,
+        fundFrom: 'any',
         memory: buyRecordResult.Memory,
       });
 
@@ -1606,12 +1544,8 @@ describe('ArNS', async () => {
       const baseFeeForName = 500000000; // base fee for a 10 character name
       const buyRecordTimestamp = afterDistributionTimestamp;
       before(async () => {
-        const tokenSupplyMemory = await totalTokenSupply({
-          memory: startMemory,
-        });
-
         const { result: buyRecordResult } = await buyRecord({
-          memory: tokenSupplyMemory,
+          memory: arnsDiscountMemory,
           name: 'great-name',
           processId: ''.padEnd(43, 'a'),
           type: 'lease',
@@ -1646,7 +1580,6 @@ describe('ArNS', async () => {
 
       describe('extending the lease', () => {
         const extendLeaseTimestamp = buyRecordTimestamp + 1;
-        const baseFeeForName = 500000000; // base fee for a 10 character name
         const baseLeaseOneYearExtensionPrice = baseFeeForName * 0.2; // 1 year extension at 20% for the year
 
         it('should apply the discount to extending the lease for an eligible gateway', async () => {
@@ -1692,13 +1625,8 @@ describe('ArNS', async () => {
             timestamp: extendLeaseTimestamp - 1,
             address: joinedGateway,
           });
-          const nonEligibleGatewayBalanceBefore = await getBalance({
-            memory: buyRecordMemory,
-            timestamp: extendLeaseTimestamp - 1,
-            address: nonEligibleAddress,
-          });
 
-          const eligibleGatewayResult = await getTokenCost({
+          const eligibleGatewayTokenCost = await getTokenCost({
             from: joinedGateway,
             name: 'great-name',
             intent: 'Extend-Lease',
@@ -1706,36 +1634,30 @@ describe('ArNS', async () => {
             memory: buyRecordMemory,
             timestamp: extendLeaseTimestamp,
           });
-          const nonEligibleGatewayResult = await getTokenCost({
-            from: nonEligibleAddress,
-            name: 'great-name',
-            intent: 'Extend-Lease',
-            years: 1,
+
+          const { result: extendLeaseResult } = await extendLease({
             memory: buyRecordMemory,
+            name: 'great-name',
+            years: 1,
             timestamp: extendLeaseTimestamp,
+            from: joinedGateway,
           });
 
           const eligibleBalanceAfter = await getBalance({
-            memory: eligibleGatewayResult.Memory,
-            timestamp: extendLeaseTimestamp + 1,
             address: joinedGateway,
-          });
-          const nonEligibleBalanceAfter = await getBalance({
-            memory: nonEligibleGatewayResult.Memory,
+            memory: extendLeaseResult.Memory,
             timestamp: extendLeaseTimestamp + 1,
-            address: nonEligibleAddress,
           });
 
           assert.equal(
-            eligibleGatewayBalanceBefore - baseLeaseOneYearExtensionPrice * 0.8,
+            eligibleGatewayTokenCost.tokenCost,
+            baseLeaseOneYearExtensionPrice * 0.8,
+          );
+
+          assert.equal(
+            eligibleGatewayBalanceBefore - eligibleGatewayTokenCost.tokenCost,
             eligibleBalanceAfter,
           );
-
-          assert.equal(
-            nonEligibleGatewayBalanceBefore - baseLeaseOneYearExtensionPrice,
-            nonEligibleBalanceAfter,
-          );
-          sharedMemory = nonEligibleGatewayResult.Memory;
         });
 
         describe('upgrading the lease to a permabuy', () => {

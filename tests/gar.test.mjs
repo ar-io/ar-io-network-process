@@ -19,8 +19,6 @@ import {
   delegateStake,
   decreaseOperatorStake,
   saveObservations,
-  genesisEpochTimestamp,
-  epochLength,
   totalTokenSupply,
   tick,
   getEpochSettings,
