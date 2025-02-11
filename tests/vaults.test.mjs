@@ -137,10 +137,9 @@ describe('Vaults', async () => {
       const errorTag = createVaultResult.Messages?.[0]?.Tags?.find(
         (tag) => tag.name === 'Error',
       );
-      console.log(errorTag);
       assert(
         errorTag.value.includes(
-          `Invalid quantity. Must be integer greater than or equal to 100000000 mARIO`,
+          'Invalid quantity. Must be integer greater than or equal to 100000000 mARIO',
         ),
       );
 
