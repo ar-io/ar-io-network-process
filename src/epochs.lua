@@ -91,7 +91,7 @@ function epochs.getEpoch(epochIndex)
 	return epoch
 end
 
---- Gets an epoch by index without copying
+-- Gets an epoch by index, unsafe
 --- @param epochIndex number The epoch index
 --- @return PrescribedEpoch | nil # The prescribed epoch
 function epochs.getEpochUnsafe(epochIndex)

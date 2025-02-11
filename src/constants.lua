@@ -43,7 +43,7 @@ function constants.hoursToMs(hours)
 end
 
 -- TOKEN SUPPLY
-constants.TOTAL_TOKEN_SUPPLY = constants.ARIOToMARIO(1000000000) -- 1 billion tokens
+constants.TOTAL_TOKEN_SUPPLY = constants.ARIOToMARIO(10 ^ 6) -- 1 billion tokens
 constants.DEFAULT_PROTOCOL_BALANCE = constants.ARIOToMARIO(50000000) -- 50M ARIO (TODO: may change to 65M on mainnet)
 constants.MIN_UNSAFE_ADDRESS_LENGTH = 1
 constants.MAX_UNSAFE_ADDRESS_LENGTH = 128
