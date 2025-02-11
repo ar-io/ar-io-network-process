@@ -508,8 +508,15 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	return epoch.observations
 end
 
+--- @class DistributionSettings
+--- @field gatewayOperatorRewardRatio number The gateway operator reward ratio
+--- @field observerRewardRatio number The observer reward ratio
+--- @field rewardDecayStartEpoch number The reward decay start epoch
+--- @field rewardDecayLastEpoch number The reward decay last epoch
+--- @field maximumRewardRate number The maximum reward rate
+--- @field minimumRewardRate number The minimum reward rate
 function epochs.getDistributionSettings()
-	return DistributionSettings
+	return utils.deepCopy(DistributionSettings)
 end
 
 --- @class ComputedRewards
@@ -807,19 +814,36 @@ end
 ---@returns number
 function epochs.getRewardRateForEpoch(epochIndex)
 	local distributionSettings = epochs.getDistributionSettings()
-	if epochIndex <= distributionSettings.rewardDecayStartEpoch then
-		return distributionSettings.minimumRewardRate
-	elseif epochIndex <= distributionSettings.rewardDecayLastEpoch then
-		local totalDecayPeriod = (
-			distributionSettings.rewardDecayLastEpoch - distributionSettings.rewardDecayStartEpoch
-		) + 1
-		local epochsAlreadyDecayed = (epochIndex - distributionSettings.rewardDecayStartEpoch)
-		local decayRatePerEpoch = (distributionSettings.maximumRewardRate - distributionSettings.minimumRewardRate)
-			/ totalDecayPeriod
-		return distributionSettings.maximumRewardRate - (decayRatePerEpoch * epochsAlreadyDecayed)
-	else
+
+	-- if we are before the decay start, return the maximum reward rate (0.1%)
+	if epochIndex < distributionSettings.rewardDecayStartEpoch then
+		return distributionSettings.maximumRewardRate
+	end
+
+	-- if we are after the decay start, return the minimum reward rate (0.05%)
+	if epochIndex > distributionSettings.rewardDecayLastEpoch then
 		return distributionSettings.minimumRewardRate
 	end
+	print("epochIndex: " .. epochIndex)
+	-- if we are in the decay period (1 year to 1.5 years), return the linearly decaying reward rate
+	local totalDecayPeriod = (distributionSettings.rewardDecayLastEpoch - distributionSettings.rewardDecayStartEpoch)
+	local epochsAlreadyDecayed = (epochIndex - distributionSettings.rewardDecayStartEpoch)
+	print("epochsAlreadyDecayed: " .. epochsAlreadyDecayed)
+	local decayRatePerEpoch = utils.roundToPrecision(
+		(distributionSettings.maximumRewardRate - distributionSettings.minimumRewardRate) / totalDecayPeriod,
+		12
+	)
+	print("decayRatePerEpoch: " .. decayRatePerEpoch)
+	local totalRateDecayed = utils.roundToPrecision(decayRatePerEpoch * epochsAlreadyDecayed, 5)
+	print("totalRateDecayed: " .. totalRateDecayed)
+	local totalRewardRateDecayed = utils.roundToPrecision(distributionSettings.maximumRewardRate - totalRateDecayed, 5)
+	print("totalRewardRateDecayed: " .. totalRewardRateDecayed)
+
+	print("totalRewardRateDecayed: " .. totalRewardRateDecayed)
+	local roundedRateWithPrecision = utils.roundToPrecision(totalRewardRateDecayed, 5)
+	print("roundedRateWithPrecision: " .. roundedRateWithPrecision)
+	-- avoid floating point precision issues, round to 5 decimal places
+	return roundedRateWithPrecision
 end
 
 return epochs

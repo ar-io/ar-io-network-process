@@ -69,7 +69,7 @@ constants.DEFAULT_DISTRIBUTION_SETTINGS = {
 	maximumRewardRate = 0.001, -- 0.1% of the protocol balance for the first year
 	minimumRewardRate = 0.0005, -- 0.05% of the protocol balance after the first year
 	rewardDecayStartEpoch = 365, -- one year of epochs before it kicks in
-	rewardDecayLastEpoch = 547, -- 1.5 years of epochs before it stops
+	rewardDecayLastEpoch = 547, -- 1.5 years of epochs before it stops (365 + 182)
 	gatewayOperatorRewardRatio = 0.9, -- 90% of the rewards go to the gateway operators
 	observerRewardRatio = 0.1, -- 10% of the rewards go to the observers
 }
