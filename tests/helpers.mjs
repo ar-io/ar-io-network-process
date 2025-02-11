@@ -272,7 +272,7 @@ export const getBaseRegistrationFeeForName = async ({
 }) => {
   const result = await handle({
     options: {
-      Tags: [{ name: 'Action', value: 'Get-Registration-Fees' }],
+      Tags: [{ name: 'Action', value: 'Registration-Fees' }],
       Timestamp: timestamp,
     },
     memory,

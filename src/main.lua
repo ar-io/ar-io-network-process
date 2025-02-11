@@ -94,7 +94,6 @@ local ActionMap = {
 	--- ArNS
 	Record = "Record",
 	Records = "Records",
-	BuyRecord = "Buy-Record", -- deprecated - use Buy-Name instead
 	BuyName = "Buy-Name",
 	UpgradeName = "Upgrade-Name",
 	ExtendLease = "Extend-Lease",
@@ -104,9 +103,7 @@ local ActionMap = {
 	ReservedNames = "Reserved-Names",
 	ReservedName = "Reserved-Name",
 	TokenCost = "Token-Cost",
-	GetCostDetails = "Get-Cost-Details-For-Action", -- deprecated - use Cost-Details instead
 	CostDetails = "Cost-Details",
-	GetRegistrationFees = "Get-Registration-Fees", -- deprecated - use Registration-Fees instead
 	RegistrationFees = "Registration-Fees",
 	ReturnedNames = "Returned-Names",
 	ReturnedName = "Returned-Name",
@@ -1088,9 +1085,7 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 	})
 end)
 
-addEventingHandler(ActionMap.GetCostDetails, function(msg)
-	return msg.Action == ActionMap.CostDetails or msg.Action == ActionMap.GetCostDetails
-end, function(msg)
+addEventingHandler(ActionMap.CostDetails, utils.hasMatchingTag("Action", ActionMap.CostDetails), function(msg)
 	local fundFrom = msg.Tags["Fund-From"]
 	local name = string.lower(msg.Tags.Name)
 	local years = msg.Tags.Years or 1
@@ -1120,14 +1115,12 @@ end, function(msg)
 	})
 end)
 
-addEventingHandler(ActionMap.GetRegistrationFees, function(msg)
-	return msg.Action == ActionMap.RegistrationFees or msg.Action == ActionMap.GetRegistrationFees
-end, function(msg)
+addEventingHandler(ActionMap.RegistrationFees, utils.hasMatchingTag("Action", ActionMap.RegistrationFees), function(msg)
 	local priceList = arns.getRegistrationFees()
 
 	Send(msg, {
 		Target = msg.From,
-		Tags = { Action = ActionMap.GetRegistrationFees .. "-Notice" },
+		Tags = { Action = ActionMap.RegistrationFees .. "-Notice" },
 		Data = json.encode(priceList),
 	})
 end)

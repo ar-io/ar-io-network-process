@@ -713,7 +713,7 @@ function arns.getTokenCost(intendedAction)
 
 	assert(type(intent) == "string", "Intent is required and must be a string.")
 	assert(type(name) == "string", "Name is required and must be a string.")
-	if intent == "Buy-Name" or intent == "Buy-Record" then
+	if intent == "Buy-Name" then
 		-- stub the process id as it is not required for this intent
 		local processId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 		arns.assertValidBuyRecord(name, years, purchaseType, processId, false)

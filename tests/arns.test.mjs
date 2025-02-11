@@ -121,34 +121,6 @@ describe('ArNS', async () => {
       sharedMemory = buyRecordResult.Memory;
     });
 
-    it('should support `Buy-Record` as a backwards compatible alias', async () => {
-      // not using stub to test the backwards compatibility of the tag
-      const { result: buyRecordResult } = await buyRecord({
-        name: 'test-buy-record-tag',
-        type: 'lease',
-        years: 1,
-        processId: ''.padEnd(43, 'a'),
-        memory: sharedMemory,
-      });
-      const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
-      assert.equal(
-        buyRecordResult.Messages[0].Tags.find((t) => t.name === 'Action').value,
-        'Buy-Name-Notice',
-      );
-      const buyRecordResponse = JSON.parse(buyRecordResult.Messages[0].Data);
-      assert.deepEqual(buyRecordResponse, {
-        name: 'test-buy-record-tag',
-        processId: ''.padEnd(43, 'a'),
-        purchasePrice: buyRecordData.purchasePrice,
-        startTimestamp: buyRecordData.startTimestamp,
-        type: 'lease',
-        undernameLimit: 10,
-        endTimestamp: buyRecordData.endTimestamp,
-        baseRegistrationFee: buyRecordData.baseRegistrationFee,
-        remainingBalance: 948999520000000,
-      });
-    });
-
     it('should fail to buy a permanently registered record', async () => {
       const { result: buyRecordResult } = await buyRecord({
         name: 'test-owned-name',
@@ -351,11 +323,11 @@ describe('ArNS', async () => {
     });
   });
 
-  describe('Get-Registration-Fees', () => {
+  describe('Registration-Fees', () => {
     it('should return the base registration fees for each name length', async () => {
       const priceListResult = await handle({
         options: {
-          Tags: [{ name: 'Action', value: 'Get-Registration-Fees' }],
+          Tags: [{ name: 'Action', value: 'Registration-Fees' }],
         },
         memory: sharedMemory,
       });
