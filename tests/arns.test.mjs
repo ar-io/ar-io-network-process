@@ -1517,7 +1517,7 @@ describe('ArNS', async () => {
         {
           discountTotal: baseLeasePriceFor9CharNameFor1Year * 0.2,
           multiplier: 0.2,
-          name: 'ArNS Discount',
+          name: 'Gateway Operator ArNS Discount',
         },
       ]);
     });
@@ -1599,7 +1599,7 @@ describe('ArNS', async () => {
             {
               discountTotal: baseLeaseOneYearExtensionPrice * 0.2,
               multiplier: 0.2,
-              name: 'ArNS Discount',
+              name: 'Gateway Operator ArNS Discount',
             },
           ]);
         });
@@ -1676,7 +1676,7 @@ describe('ArNS', async () => {
               {
                 discountTotal: basePermabuyPrice * 0.2,
                 multiplier: 0.2,
-                name: 'ArNS Discount',
+                name: 'Gateway Operator ArNS Discount',
               },
             ]);
           });
@@ -1713,7 +1713,7 @@ describe('ArNS', async () => {
             {
               discountTotal: undernameCostForName * 0.2,
               multiplier: 0.2,
-              name: 'ArNS Discount',
+              name: 'Gateway Operator ArNS Discount',
             },
           ]);
           assert.equal(tokenCostResult.tokenCost, undernameCostForName * 0.8);

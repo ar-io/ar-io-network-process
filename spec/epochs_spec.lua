@@ -562,7 +562,7 @@ describe("epochs", function()
 
 		it("should create and prescribe the new epoch, and update gateway weights with computed weights", function()
 			local expectedEligibleGateways = 1
-			local expectedEligibleRewards = math.floor(protocolBalance * constants.minimumRewardRate)
+			local expectedEligibleRewards = math.floor(protocolBalance * 0.001) -- it's 0.1% for the first year
 			local expectedTotalGatewayReward = math.floor(expectedEligibleRewards * 0.90)
 			local expectedTotalObserverReward = math.floor(expectedEligibleRewards * 0.10)
 			local expectedPerGatewayReward = math.floor(expectedTotalGatewayReward / 1) -- only one gateway in the registry
@@ -990,22 +990,16 @@ describe("epochs", function()
 	end)
 
 	describe("getRewardRateForEpoch", function()
-		it("returns 0.05% for the first 365 epochs (approximately one year)", function()
-			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(1))
-			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(2))
-			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(364))
-			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(365))
+		it("returns 0.1% for the first 365 epochs (approximately one year)", function()
+			for i = 1, 365 do
+				assert.are.equal(0.001, epochs.getRewardRateForEpoch(i))
+			end
 		end)
 
-		it("returns a linearly decreasing rate starting from 0.1% after 365 epochs", function()
-			assert.are.equal(0.00099726775956284147498, epochs.getRewardRateForEpoch(366))
-			assert.are.equal(0.00099453551912568314598, epochs.getRewardRateForEpoch(367))
-			assert.are.equal(0.00099180327868852460015, epochs.getRewardRateForEpoch(368))
-
-			assert.are.equal(0.0005109289617486338685, epochs.getRewardRateForEpoch(544))
-			assert.are.equal(0.00050819672131147543108, epochs.getRewardRateForEpoch(545))
-			assert.are.equal(0.00050546448087431699366, epochs.getRewardRateForEpoch(546))
-			assert.are.equal(0.00050273224043715844783, epochs.getRewardRateForEpoch(547))
+		it("returns a linearly decreasing rate starting from 0.1% after 365 epochs, up to 5 decimal places", function()
+			assert.are.equal(0.001, epochs.getRewardRateForEpoch(366))
+			assert.are.equal(0.00075, epochs.getRewardRateForEpoch(366 + 91))
+			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(366 + 182))
 		end)
 
 		it("returns 0.05% after 547 epochs (approximately 1.5 years)", function()

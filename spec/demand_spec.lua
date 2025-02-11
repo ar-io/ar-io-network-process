@@ -12,7 +12,7 @@ describe("demand", function()
 			revenueThisPeriod = 0,
 			currentDemandFactor = 1,
 			consecutivePeriodsWithMinDemandFactor = 0,
-			fees = constants.genesisFees,
+			fees = constants.DEFAULT_GENESIS_FEES,
 		}
 		_G.DemandFactorSettings = {
 			periodZeroStartTimestamp = 0,
@@ -117,7 +117,7 @@ describe("demand", function()
 				local expectedFees = {}
 				local startNextPeriodTimestamp = _G.DemandFactorSettings.periodLengthMs * currentPeriod + 1
 				-- use pairs as fees is a map
-				for nameLength, fee in pairs(constants.genesisFees) do
+				for nameLength, fee in pairs(_G.DemandFactor.fees) do
 					expectedFees[nameLength] = fee * _G.DemandFactorSettings.demandFactorMin
 				end
 				demand.updateDemandFactor(startNextPeriodTimestamp)

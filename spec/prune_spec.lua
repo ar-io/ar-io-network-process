@@ -1,6 +1,6 @@
 local tick = require("prune")
-local constants = require("constants")
 
+local returnedNameMs = 1209600000 -- 14 days
 describe("prune", function()
 	before_each(function()
 		_G.NameRegistry = {
@@ -77,7 +77,7 @@ describe("prune", function()
 
 	it("should prune returned names at the time they expire", function()
 		_G.NextReturnedNamesPruneTimestamp = 0
-		local pruneTimestamp = 1000000 + constants.returnedNamePeriod + 1
+		local pruneTimestamp = 1000000 + returnedNameMs + 1
 		local result = tick.pruneState(pruneTimestamp, "msgId", 0)
 		assert.are.same({
 			["test-returned-name"] = {
