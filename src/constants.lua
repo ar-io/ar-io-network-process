@@ -43,8 +43,8 @@ function constants.hoursToMs(hours)
 end
 
 -- TOKEN SUPPLY
-constants.TOTAL_TOKEN_SUPPLY = constants.ARIOToMARIO(10 ^ 6) -- 1 billion tokens
-constants.DEFAULT_PROTOCOL_BALANCE = constants.ARIOToMARIO(50000000) -- 50M ARIO (TODO: may change to 65M on mainnet)
+constants.TOTAL_TOKEN_SUPPLY = constants.ARIOToMARIO(10 ^ 9) -- 1 billion tokens
+constants.DEFAULT_PROTOCOL_BALANCE = constants.ARIOToMARIO(50 * (10 ^ 6)) -- 50M ARIO (TODO: change to 65M on mainnet)
 constants.MIN_UNSAFE_ADDRESS_LENGTH = 1
 constants.MAX_UNSAFE_ADDRESS_LENGTH = 128
 
@@ -61,8 +61,6 @@ constants.DEFAULT_EPOCH_SETTINGS = {
 	Distribution rewards will be 0.1% of the protocol balance for the first year,
 	then decay linearly to 0.05% of the protocol balance after the first year until 1.5 years.
 	After 1.5 years, the reward rate will be 0.05% of the protocol balance.
-
-	TODO: ensure this is enabled on mainnet
 ]]
 --
 constants.DEFAULT_DISTRIBUTION_SETTINGS = {
