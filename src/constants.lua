@@ -148,8 +148,7 @@ constants.RETURNED_NAME_DURATION_MS = constants.daysToMs(14)
 constants.RETURNED_NAME_MAX_MULTIPLIER = 50 -- Freshly returned names will have a multiplier of 50x
 constants.PRIMARY_NAME_REQUEST_DEFAULT_NAME_LENGTH = 51 -- primary name requests cost the same as a single undername on a 51 character name
 constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERCENTAGE = 0.2 -- operator discount applied to arns requests
--- the tenure weight threshold for eligibility for the arns discount (you need to be an operator for 3 months to qualify)
--- TODO: consider bumping this to 1 implying you must run a gateway for 6 months before qualifying
+-- the tenure weight threshold for eligibility for the arns discount (you need to be an operator for 6 months to qualify)
 constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD = 1
 -- the gateway performance ratio threshold for eligibility for the arns discount (you need to have a 85% performance ratio to qualify)
 constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD = 0.85
