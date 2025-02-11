@@ -270,6 +270,8 @@ export const getBaseRegistrationFees = async ({ memory, timestamp }) => {
     options: {
       Tags: [{ name: 'Action', value: 'Registration-Fees' }],
     },
+    memory,
+    timestamp,
   });
   return JSON.parse(result.Messages[0].Data);
 };

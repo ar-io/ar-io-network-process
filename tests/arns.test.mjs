@@ -326,11 +326,10 @@ describe('ArNS', async () => {
 
   describe('Registration-Fees', () => {
     it('should return the base registration fees for each name length', async () => {
-      const priceListResult = await getBaseRegistrationFees({
+      const priceList = await getBaseRegistrationFees({
         memory: sharedMemory,
       });
 
-      const priceList = JSON.parse(priceListResult.Messages[0].Data);
       // check that each key has lease with years and permabuy prices
       assert(Object.keys(priceList).length == 51);
       Object.keys(priceList).forEach((key) => {
