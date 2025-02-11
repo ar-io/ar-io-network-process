@@ -13,7 +13,7 @@ local mARIO_PER_ARIO = 10 ^ constants.DENOMINATION -- 1 million mARIO per ARIO
 --- @param ARIO number
 --- @return mARIO mARIO the amount of mario for the given ARIO
 function constants.ARIOToMARIO(ARIO)
-	return ARIO * mARIO_PER_ARIO
+	return math.floor(ARIO * mARIO_PER_ARIO)
 end
 
 --- @param days number
@@ -75,6 +75,7 @@ constants.DEFAULT_DISTRIBUTION_SETTINGS = {
 }
 
 -- GAR
+constants.MIN_WITHDRAWAL_AMOUNT = constants.ARIOToMARIO(1)
 constants.DEFAULT_GAR_SETTINGS = {
 	observers = {
 		maxPerEpoch = 50, -- remove this reference, it is above and defined by the epoch settings
@@ -98,13 +99,13 @@ constants.DEFAULT_GAR_SETTINGS = {
 		-- TODO: verify the logic uses these variables
 		minRedelegationPenaltyRate = 0.10, -- the minimum penalty rate for a redelegation (10% of the amount being redelegated)
 		maxRedelegationPenaltyRate = 0.60, -- the maximum penalty rate for a redelegation (50% of the amount being redelegated)
-		minRedelegationAmount = constants.ARIOToMARIO(1), -- the minimum amount that can be redelegated
+		minRedelegationAmount = constants.MIN_WITHDRAWAL_AMOUNT, -- the minimum amount that can be redelegated
 		redelegationFeeResetIntervalMs = constants.daysToMs(7), -- 7 days
 	},
 	expeditedWithdrawals = {
 		minExpeditedWithdrawalPenaltyRate = 0.10, -- the minimum penalty rate for an expedited withdrawal (10% of the amount being withdrawn)
 		maxExpeditedWithdrawalPenaltyRate = 0.50, -- the maximum penalty rate for an expedited withdrawal (50% of the amount being withdrawn)
-		minExpeditedWithdrawalAmount = constants.ARIOToMARIO(1), -- the minimum amount that can be expedited
+		minExpeditedWithdrawalAmount = constants.MIN_WITHDRAWAL_AMOUNT, -- the minimum amount that can be expedited
 	},
 }
 

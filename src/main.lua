@@ -1276,8 +1276,8 @@ addEventingHandler(
 		local quantity = msg.Tags.Quantity
 		local instantWithdraw = msg.Tags.Instant and msg.Tags.Instant == "true" or false
 		assert(
-			quantity and utils.isInteger(quantity) and quantity > constants.minimumWithdrawalAmount,
-			"Invalid quantity. Must be integer greater than " .. constants.minimumWithdrawalAmount
+			quantity and utils.isInteger(quantity) and quantity > constants.MIN_WITHDRAWAL_AMOUNT,
+			"Invalid quantity. Must be integer greater than " .. constants.MIN_WITHDRAWAL_AMOUNT
 		)
 		assert(
 			msg.Tags.Instant == nil or (msg.Tags.Instant == "true" or msg.Tags.Instant == "false"),
@@ -1462,8 +1462,8 @@ addEventingHandler(
 		msg.ioEvent:addField("Target-Formatted", target)
 		msg.ioEvent:addField("Quantity", quantity)
 		assert(
-			quantity and utils.isInteger(quantity) and quantity > constants.minimumWithdrawalAmount,
-			"Invalid quantity. Must be integer greater than " .. constants.minimumWithdrawalAmount
+			quantity and utils.isInteger(quantity) and quantity > constants.MIN_WITHDRAWAL_AMOUNT,
+			"Invalid quantity. Must be integer greater than " .. constants.MIN_WITHDRAWAL_AMOUNT
 		)
 
 		local result = gar.decreaseDelegateStake(target, msg.From, quantity, msg.Timestamp, msg.Id, instantWithdraw)
@@ -2198,7 +2198,7 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	local releaseNameData = {
 		name = name,
 		startTimestamp = returnedName.startTimestamp,
-		endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod,
+		endTimestamp = returnedName.startTimestamp + constants.RETURNED_NAME_DURATION_MS,
 		initiator = returnedName.initiator,
 	}
 
@@ -2228,7 +2228,7 @@ addEventingHandler(ActionMap.ReturnedNames, utils.hasMatchingTag("Action", Actio
 		table.insert(returnedNameDataArray, {
 			name = v.name,
 			startTimestamp = v.startTimestamp,
-			endTimestamp = v.startTimestamp + constants.returnedNamePeriod,
+			endTimestamp = v.startTimestamp + constants.RETURNED_NAME_DURATION_MS,
 			initiator = v.initiator,
 			premiumMultiplier = arns.getReturnedNamePremiumMultiplier(v.startTimestamp, msg.Timestamp),
 		})
@@ -2262,7 +2262,7 @@ addEventingHandler(ActionMap.ReturnedName, utils.hasMatchingTag("Action", Action
 		Data = json.encode({
 			name = returnedName.name,
 			startTimestamp = returnedName.startTimestamp,
-			endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod,
+			endTimestamp = returnedName.startTimestamp + constants.RETURNED_NAME_DURATION_MS,
 			initiator = returnedName.initiator,
 			premiumMultiplier = arns.getReturnedNamePremiumMultiplier(returnedName.startTimestamp, msg.Timestamp),
 		}),
