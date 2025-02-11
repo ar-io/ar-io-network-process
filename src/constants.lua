@@ -144,12 +144,16 @@ constants.UNDERNAME_LEASE_FEE_PERCENTAGE = 0.001 -- for leased names the underna
 constants.UNDERNAME_PERMABUY_FEE_PERCENTAGE = 0.005 -- for permabuy names the undername fee is 0.5% for one undername
 constants.GRACE_PERIOD_MS = constants.daysToMs(14) -- the grace period for expired names (TODO: verify in addition to extending, it can be upgraded)
 constants.MAX_LEASE_LENGTH_YEARS = 5 -- the maximum number of years a name can be leased for
-constants.RETURNED_NAME_DURATION_MS = constants.daysToMs(14) -- the returned period for names that have expired beyond their grace period or manually returned, where a multiplier is applied for purchasing
+-- the returned period for names that have expired beyond their grace period or manually returned, where a multiplier is applied for purchasing
+constants.RETURNED_NAME_DURATION_MS = constants.daysToMs(14)
 constants.RETURNED_NAME_MAX_MULTIPLIER = 50 -- Freshly returned names will have a multiplier of 50x
 constants.PRIMARY_NAME_REQUEST_DEFAULT_NAME_LENGTH = 51 -- primary name requests cost the same as a single undername on a 51 character name
 constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERCENTAGE = 0.2 -- operator discount applied to arns requests
-constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD = 1 -- the tenure weight threshold for eligibility for the arns discount (you need to be an operator for 3 months to qualify) TODO: consider bumping this to 1 implying you must run a gateway for 6 months before qualifying
-constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD = 0.85 -- the gateway performance ratio threshold for eligibility for the arns discount (you need to have a 85% performance ratio to qualify)
+-- the tenure weight threshold for eligibility for the arns discount (you need to be an operator for 3 months to qualify)
+-- TODO: consider bumping this to 1 implying you must run a gateway for 6 months before qualifying
+constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD = 1
+-- the gateway performance ratio threshold for eligibility for the arns discount (you need to have a 85% performance ratio to qualify)
+constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD = 0.85
 constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_NAME = "Gateway Operator ArNS Discount" -- the name of the discount applied to arns requests
 -- TODO: these will likely be adjusted for mainnet
 constants.DEFAULT_GENESIS_FEES = {

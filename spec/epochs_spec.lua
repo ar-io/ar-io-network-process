@@ -562,7 +562,8 @@ describe("epochs", function()
 
 		it("should create and prescribe the new epoch, and update gateway weights with computed weights", function()
 			local expectedEligibleGateways = 1
-			local expectedEligibleRewards = math.floor(protocolBalance * constants.minimumRewardRate)
+			local expectedEligibleRewards =
+				math.floor(protocolBalance * constants.DEFAULT_DISTRIBUTION_SETTINGS.minimumRewardRate)
 			local expectedTotalGatewayReward = math.floor(expectedEligibleRewards * 0.90)
 			local expectedTotalObserverReward = math.floor(expectedEligibleRewards * 0.10)
 			local expectedPerGatewayReward = math.floor(expectedTotalGatewayReward / 1) -- only one gateway in the registry

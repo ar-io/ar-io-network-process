@@ -20,7 +20,7 @@ DemandFactor = DemandFactor
 		revenueThisPeriod = 0,
 		currentDemandFactor = 1,
 		consecutivePeriodsWithMinDemandFactor = 0,
-		fees = constants.genesisFees,
+		fees = constants.DEFAULT_GENESIS_FEES,
 	}
 
 --- @class DemandFactorSettings

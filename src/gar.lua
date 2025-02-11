@@ -87,6 +87,11 @@ GatewayRegistry = GatewayRegistry or {}
 --- @field leaveLengthMs number
 --- @field failedEpochCountMax number
 --- @field failedEpochSlashRate number
+--- @field maxDelegateRewardShareRatio number
+--- @class ExpeditedWithdrawalsSettings
+--- @field minExpeditedWithdrawalPenaltyRate number
+--- @field maxExpeditedWithdrawalPenaltyRate number
+--- @field minExpeditedWithdrawalAmount number
 
 --- @class DelegateSettings
 --- @field minStake number
@@ -96,6 +101,7 @@ GatewayRegistry = GatewayRegistry or {}
 --- @field observers ObserverSettings
 --- @field operators OperatorSettings
 --- @field delegates DelegateSettings
+--- @field expeditedWithdrawals ExpeditedWithdrawalsSettings
 GatewayRegistrySettings = GatewayRegistrySettings or constants.DEFAULT_GAR_SETTINGS
 
 --- @type Timestamp|nil
@@ -217,7 +223,7 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 
 	-- update global state
 	GatewayRegistry[from] = gateway
-	return utils.deepCopy(gateway)
+	return gateway
 end
 
 --- Increases the operator stake for a gateway
@@ -250,27 +256,26 @@ end
 ---@return number # The final amount withdrawn, after the penalty fee is subtracted and moved to the from balance
 local function processInstantWithdrawal(stake, elapsedTimeMs, totalWithdrawalTimeMs, from)
 	-- Calculate the withdrawal fee and the amount to withdraw
-	local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
-		- (
-			(constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE - constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE)
-			* (elapsedTimeMs / totalWithdrawalTimeMs)
-		)
-	penaltyRate = math.max(
-		constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE,
-		math.min(constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE, penaltyRate)
-	)
+	local maxPenaltyRate = gar.getSettings().expeditedWithdrawals.maxExpeditedWithdrawalPenaltyRate
+	local minPenaltyRate = gar.getSettings().expeditedWithdrawals.minExpeditedWithdrawalPenaltyRate
+	local penaltyRateDecay = (maxPenaltyRate - minPenaltyRate) * elapsedTimeMs / totalWithdrawalTimeMs
+	local penaltyRateAfterDecay = maxPenaltyRate - penaltyRateDecay
+	-- the maximum rate they'll pay based on the decay
+	local maximumPenaltyRate = math.min(maxPenaltyRate, penaltyRateAfterDecay)
+	-- take the maximum rate between the minimum rate and the maximum rate after decay
+	local floatingPenaltyRate = math.max(minPenaltyRate, maximumPenaltyRate)
 
 	-- round to three decimal places to avoid floating point precision loss with small numbers
-	penaltyRate = utils.roundToPrecision(penaltyRate, 3)
-
-	local expeditedWithdrawalFee = math.floor(stake * penaltyRate)
+	local finalPenaltyRate = utils.roundToPrecision(floatingPenaltyRate, 3)
+	-- round down to avoid any floating point precision loss with small numbers
+	local expeditedWithdrawalFee = math.floor(stake * finalPenaltyRate)
 	local amountToWithdraw = stake - expeditedWithdrawalFee
 
 	-- Withdraw the tokens to the delegate and the protocol balance
 	balances.increaseBalance(ao.id, expeditedWithdrawalFee)
 	balances.increaseBalance(from, amountToWithdraw)
 
-	return expeditedWithdrawalFee, amountToWithdraw, penaltyRate
+	return expeditedWithdrawalFee, amountToWithdraw, finalPenaltyRate
 end
 
 function gar.decreaseOperatorStake(from, qty, currentTimestamp, msgId, instantWithdraw)
@@ -331,6 +336,7 @@ end
 --- @param observerAddress WalletAddress
 --- @param currentTimestamp Timestamp
 --- @param msgId MessageId
+--- @return Gateway # the updated gateway
 function gar.updateGatewaySettings(from, updatedSettings, updatedServices, observerAddress, currentTimestamp, msgId)
 	local gateway = gar.getGateway(from)
 	assert(gateway, "Gateway not found")
@@ -598,10 +604,12 @@ function gar.increaseExistingDelegateStake(gatewayAddress, gateway, delegateAddr
 	return gateway
 end
 
+---@return GatewayRegistrySettings # a deep copy of the gateway registry settings
 function gar.getSettings()
 	return utils.deepCopy(GatewayRegistrySettings)
 end
 
+---@return GatewayRegistrySettings # the gateway registry settings
 function gar.getSettingsUnsafe()
 	return GatewayRegistrySettings
 end
@@ -818,8 +826,9 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 			type(settings.delegateRewardShareRatio) == "number"
 				and utils.isInteger(settings.delegateRewardShareRatio)
 				and settings.delegateRewardShareRatio >= 0
-				and settings.delegateRewardShareRatio <= constants.maxDelegateRewardShareRatio,
-			"delegateRewardShareRatio must be an integer between 0 and " .. constants.maxDelegateRewardShareRatio
+				and settings.delegateRewardShareRatio <= gar.getSettings().operators.maxDelegateRewardShareRatio,
+			"delegateRewardShareRatio must be an integer between 0 and "
+				.. gar.getSettings().operators.maxDelegateRewardShareRatio
 		)
 	end
 	if settings.autoStake ~= nil then
@@ -1324,8 +1333,9 @@ function gar.isEligibleForArNSDiscount(from)
 	local tenureWeight = gateway.weights.tenureWeight or 0
 	local gatewayPerformanceRatio = gateway.weights.gatewayPerformanceRatio or 0
 
-	return tenureWeight >= constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD
-		and gatewayPerformanceRatio >= constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD
+	return tenureWeight >= constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD
+		and gatewayPerformanceRatio
+			>= constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD
 end
 
 --- Remove delegate addresses from the allowedDelegatesLookup table in the gateway's settings
@@ -1779,7 +1789,8 @@ function gar.pruneRedelegationFeeData(currentTimestamp)
 		return delegatorsWithFeesReset
 	end
 
-	local pruningThreshold = currentTimestamp - constants.redelegationFeeResetIntervalMs
+	local pruningThreshold = currentTimestamp
+		- constants.DEFAULT_GAR_SETTINGS.redelegations.redelegationFeeResetIntervalMs
 
 	-- reset the next prune timestamp, below will populate it with the next prune timestamp minimum
 	NextRedelegationsPruneTimestamp = nil
@@ -1787,7 +1798,9 @@ function gar.pruneRedelegationFeeData(currentTimestamp)
 	Redelegations = utils.reduce(gar.getRedelgationsUnsafe(), function(acc, delegateAddress, redelegationData)
 		if redelegationData.timestamp > pruningThreshold then
 			acc[delegateAddress] = redelegationData
-			gar.scheduleNextRedelegationsPruning(redelegationData.timestamp + constants.redelegationFeeResetIntervalMs)
+			gar.scheduleNextRedelegationsPruning(
+				redelegationData.timestamp + constants.DEFAULT_GAR_SETTINGS.redelegations.redelegationFeeResetIntervalMs
+			)
 		else
 			table.insert(delegatorsWithFeesReset, delegateAddress)
 		end
@@ -1974,13 +1987,16 @@ function gar.redelegateStake(params)
 		timestamp = currentTimestamp,
 		redelegations = redelegationsSinceFeeReset,
 	}
-	gar.scheduleNextRedelegationsPruning(currentTimestamp + constants.redelegationFeeResetIntervalMs)
+	gar.scheduleNextRedelegationsPruning(
+		currentTimestamp + constants.DEFAULT_GAR_SETTINGS.redelegations.redelegationFeeResetIntervalMs
+	)
 
 	return {
 		sourceAddress = sourceAddress,
 		targetAddress = targetAddress,
 		redelegationFee = redelegationFee,
-		feeResetTimestamp = currentTimestamp + constants.redelegationFeeResetIntervalMs,
+		feeResetTimestamp = currentTimestamp
+			+ constants.DEFAULT_GAR_SETTINGS.redelegations.redelegationFeeResetIntervalMs,
 		redelegationsSinceFeeReset = redelegationsSinceFeeReset,
 	}
 end
@@ -1994,7 +2010,7 @@ function gar.getRedelegationFee(delegateAddress)
 
 	local lastRedelegationTimestamp = previousRedelegations and previousRedelegations.timestamp or nil
 	local feeResetTimestamp = lastRedelegationTimestamp
-			and lastRedelegationTimestamp + constants.redelegationFeeResetIntervalMs
+			and lastRedelegationTimestamp + constants.DEFAULT_GAR_SETTINGS.redelegations.redelegationFeeResetIntervalMs
 		or nil
 
 	return {

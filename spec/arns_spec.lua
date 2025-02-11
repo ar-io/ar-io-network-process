@@ -168,18 +168,23 @@ describe("arns", function()
 				function()
 					_G.GatewayRegistry[testAddress] = testGateway
 					_G.GatewayRegistry[testAddress].weights = {
-						tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
-						gatewayPerformanceRatio = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+						tenureWeight = constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+						gatewayPerformanceRatio = constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+						normalizedCompositeWeight = 1,
+						stakeWeight = 1,
+						observerPerformanceRatio = 1,
+						compositeWeight = 1,
 					}
 					local result = gar.isEligibleForArNSDiscount(testAddress)
 					assert.is_true(result)
 
 					local demandBefore = demand.getCurrentPeriodRevenue()
 					local purchasesBefore = demand.getCurrentPeriodPurchases()
-					local discountTotal = 600000000 - (math.floor(600000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+					local discountTotal = 600000000
+						- (math.floor(600000000 * constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERCENTAGE))
 
 					local buyRecordResult =
-						arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId)
+						arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId, "msg-id")
 					assert.are.same({
 						purchasePrice = discountTotal,
 						type = "lease",
@@ -210,7 +215,8 @@ describe("arns", function()
 				function()
 					local demandBefore = demand.getCurrentPeriodRevenue()
 					local purchasesBefore = demand.getCurrentPeriodPurchases()
-					local result = arns.buyRecord("test-name", nil, nil, testAddress, timestamp, testProcessId)
+					local result =
+						arns.buyRecord("test-name", nil, nil, testAddress, timestamp, testProcessId, "msg-id")
 					assert.are.same({
 						purchasePrice = 600000000,
 						type = "lease",
@@ -248,7 +254,7 @@ describe("arns", function()
 					arns.buyRecord,
 					"test-name",
 					"lease",
-					constants.maxLeaseLengthYears + 1,
+					constants.MAX_LEASE_LENGTH_YEARS + 1,
 					testAddress,
 					timestamp,
 					testProcessId
@@ -267,10 +273,11 @@ describe("arns", function()
 					undernameLimit = 10,
 				}
 				_G.NameRegistry.records["test-name"] = existingRecord
-				local status, result =
-					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
+				local status, error =
+					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId, "msg-id")
 				assert.is_false(status)
-				assert.match("Name is already registered", result)
+				assert(error, "Expected error")
+				assert.match("Name is already registered", error)
 				assert.are.same(existingRecord, _G.NameRegistry.records["test-name"])
 			end)
 
@@ -281,7 +288,7 @@ describe("arns", function()
 				}
 				_G.NameRegistry.reserved["test-name"] = reservedName
 				local status, result =
-					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
+					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId, "msg-id")
 				assert.is_false(status)
 				assert.match("Name is reserved", result)
 				assert.are.same({}, _G.NameRegistry.records)
@@ -295,7 +302,7 @@ describe("arns", function()
 					target = testAddress,
 					endTimestamp = 1000,
 				}
-				local result = arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId)
+				local result = arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId, "msg-id")
 				local expectation = {
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
@@ -333,7 +340,7 @@ describe("arns", function()
 					}
 					local result =
 						arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId, "msd-id")
-					local expectedPrice = math.floor(600000000 * constants.returnedNameMaxMultiplier)
+					local expectedPrice = math.floor(600000000 * constants.RETURNED_NAME_MAX_MULTIPLIER)
 					local expectation = {
 						endTimestamp = timestamp + constants.yearsToMs(1),
 						processId = testProcessId,
@@ -355,7 +362,7 @@ describe("arns", function()
 			it("should throw an error if the user does not have enough balance [" .. addressType .. "]", function()
 				_G.Balances[testAddress] = 0
 				local status, result =
-					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId)
+					pcall(arns.buyRecord, "test-name", "lease", 1, testAddress, timestamp, testProcessId, "msg-id")
 				assert.is_false(status)
 				assert.match("Insufficient balance", result)
 				assert.are.same({}, _G.NameRegistry.records)
@@ -364,7 +371,8 @@ describe("arns", function()
 
 		describe("increaseUndernameLimit [" .. addressType .. "]", function()
 			it("should throw an error if name is not active", function()
-				local status, error = pcall(arns.increaseUndernameLimit, testAddress, "test-name", 50, timestamp)
+				local status, error =
+					pcall(arns.increaseUndernameLimit, testAddress, "test-name", 50, timestamp, "msg-id", "balance")
 				assert.is_false(status)
 				assert(error)
 				assert.match("Name is not registered", error)
@@ -381,7 +389,8 @@ describe("arns", function()
 					undernameLimit = 10,
 				}
 				_G.Balances[testAddress] = 0
-				local status, error = pcall(arns.increaseUndernameLimit, testAddress, "test-name", 50, timestamp)
+				local status, error =
+					pcall(arns.increaseUndernameLimit, testAddress, "test-name", 50, timestamp, "msg-id", "balance")
 				assert.is_false(status)
 				assert.match("Insufficient balance", error)
 			end)
@@ -450,8 +459,12 @@ describe("arns", function()
 			it("should apply ArNS discount for increasing undername limit for eligible gateways", function()
 				_G.GatewayRegistry[testAddress] = testGateway
 				_G.GatewayRegistry[testAddress].weights = {
-					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
-					gatewayPerformanceRatio = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+					tenureWeight = constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+					gatewayPerformanceRatio = constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+					normalizedCompositeWeight = 1,
+					stakeWeight = 1,
+					observerPerformanceRatio = 1,
+					compositeWeight = 1,
 				}
 				assert.is_true(gar.isEligibleForArNSDiscount(testAddress))
 
@@ -477,7 +490,8 @@ describe("arns", function()
 				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
 
-				local discountTotal = 25000000 - (math.floor(25000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+				local discountTotal = 25000000
+					- (math.floor(25000000 * constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERCENTAGE))
 
 				assert.is.equal(
 					_G.Balances[testAddress],
@@ -519,7 +533,7 @@ describe("arns", function()
 						testAddress,
 						"test-name",
 						1,
-						timestamp + constants.yearsToMs(1) + constants.gracePeriodMs + 1
+						timestamp + constants.yearsToMs(1) + constants.GRACE_PERIOD_MS + 1
 					)
 					assert.is_false(status)
 					assert.match("Name is expired", error)
@@ -568,7 +582,7 @@ describe("arns", function()
 				}
 				local demandBefore = demand.getCurrentPeriodRevenue()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
-				local result = arns.extendLease(testAddress, "test-name", 4, timestamp)
+				local result = arns.extendLease(testAddress, "test-name", 4, timestamp, "msg-id", "balance")
 				assert.are.same({
 					endTimestamp = timestamp + constants.yearsToMs(5),
 					processId = testProcessId,
@@ -632,8 +646,12 @@ describe("arns", function()
 			it("should apply ArNS discount to eligible gateways for extending leases", function()
 				_G.GatewayRegistry[testAddress] = testGateway
 				_G.GatewayRegistry[testAddress].weights = {
-					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
-					gatewayPerformanceRatio = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+					tenureWeight = constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+					gatewayPerformanceRatio = constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+					normalizedCompositeWeight = 1,
+					stakeWeight = 1,
+					observerPerformanceRatio = 1,
+					compositeWeight = 1,
 				}
 				local result = gar.isEligibleForArNSDiscount(testAddress)
 				assert.is_true(result)
@@ -649,7 +667,7 @@ describe("arns", function()
 				}
 				local demandBefore = demand.getCurrentPeriodRevenue()
 				local purchasesBefore = demand.getCurrentPeriodPurchases()
-				local extendLeaseResult = arns.extendLease(testAddress, "test-name", 4, timestamp)
+				local extendLeaseResult = arns.extendLease(testAddress, "test-name", 4, timestamp, "msg-id", "balance")
 				assert.are.same({
 					endTimestamp = timestamp + constants.yearsToMs(5),
 					processId = testProcessId,
@@ -669,7 +687,8 @@ describe("arns", function()
 					},
 				}, _G.NameRegistry.records)
 
-				local discountTotal = 400000000 - (math.floor(400000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+				local discountTotal = 400000000
+					- (math.floor(400000000 * constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERCENTAGE))
 
 				assert.is.equal(
 					_G.Balances[testAddress],
@@ -788,7 +807,7 @@ describe("arns", function()
 					testProcessId,
 					-- Just before the grace period ends
 					123456789
-						+ constants.gracePeriodMs
+						+ constants.GRACE_PERIOD_MS
 						- 1,
 					newProcessId
 				)
@@ -884,8 +903,9 @@ describe("arns", function()
 			local baseFee = 500000000
 			local years = 2
 			local demandFactor = 0.974
-			local expectedCost =
-				math.floor((((years * baseFee * 0.20) + baseFee) * demandFactor) * constants.returnedNameMaxMultiplier)
+			local expectedCost = math.floor(
+				(((years * baseFee * 0.20) + baseFee) * demandFactor) * constants.RETURNED_NAME_MAX_MULTIPLIER
+			)
 			local intendedAction = {
 				intent = "Buy-Name",
 				purchaseType = "lease",
@@ -900,8 +920,12 @@ describe("arns", function()
 		it("should return the correct token cost for an ArNS discount eligible address", function()
 			_G.GatewayRegistry[stubRandomAddress] = testGateway
 			_G.GatewayRegistry[stubRandomAddress].weights = {
-				tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
-				gatewayPerformanceRatio = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+				tenureWeight = constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+				gatewayPerformanceRatio = constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+				normalizedCompositeWeight = 1,
+				stakeWeight = 1,
+				observerPerformanceRatio = 1,
+				compositeWeight = 1,
 			}
 			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
 			assert.is_true(result)
@@ -918,7 +942,8 @@ describe("arns", function()
 			}
 			_G.DemandFactor.currentDemandFactor = demandFactor
 
-			local discountTotal = expectedCost - (math.floor(expectedCost * constants.ARNS_DISCOUNT_PERCENTAGE))
+			local discountTotal = expectedCost
+				- (math.floor(expectedCost * constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERCENTAGE))
 			assert.are.equal(discountTotal, arns.getTokenCost(intendedAction).tokenCost)
 		end)
 
@@ -927,6 +952,10 @@ describe("arns", function()
 			_G.GatewayRegistry[stubRandomAddress].weights = {
 				tenureWeight = 0.1,
 				gatewayPerformanceRatio = 0.1,
+				normalizedCompositeWeight = 1,
+				stakeWeight = 1,
+				observerPerformanceRatio = 1,
+				compositeWeight = 1,
 			}
 			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
 			assert.is_false(result)
@@ -982,7 +1011,7 @@ describe("arns", function()
 					intent = "Increase-Undername-Limit",
 					quantity = 5,
 					name = "test-name",
-					currentTimestamp = timestamp + constants.gracePeriodMs + 1, -- expired beyond grace period
+					currentTimestamp = timestamp + constants.GRACE_PERIOD_MS + 1, -- expired beyond grace period
 				})
 				assert.is_false(status)
 				assert.match("Name must be active to increase undername limit", error)
@@ -1061,7 +1090,7 @@ describe("arns", function()
 							undernameLimit = 5,
 						},
 						["grace-period-record"] = {
-							endTimestamp = currentTimestamp - constants.gracePeriodMs + 10, -- expired, but within grace period
+							endTimestamp = currentTimestamp - constants.GRACE_PERIOD_MS + 10, -- expired, but within grace period
 							processId = "grace-process-id",
 							purchasePrice = 500000000,
 							startTimestamp = 0,
@@ -1098,7 +1127,7 @@ describe("arns", function()
 						undernameLimit = 10,
 					},
 					["grace-period-record"] = {
-						endTimestamp = currentTimestamp - constants.gracePeriodMs + 10, -- expired, but within grace period
+						endTimestamp = currentTimestamp - constants.GRACE_PERIOD_MS + 10, -- expired, but within grace period
 						processId = "grace-process-id",
 						purchasePrice = 500000000,
 						startTimestamp = 0,
@@ -1116,7 +1145,7 @@ describe("arns", function()
 				}, _G.NameRegistry.records)
 				assert.are.same({
 					["expired-record"] = {
-						endTimestamp = currentTimestamp - constants.gracePeriodMs - 1, -- expired and past the grace period
+						endTimestamp = currentTimestamp - constants.GRACE_PERIOD_MS - 1, -- expired and past the grace period
 						processId = "expired-process-id",
 						purchasePrice = 400000000,
 						startTimestamp = 0,
@@ -1126,7 +1155,7 @@ describe("arns", function()
 				}, prunedRecords)
 				assert.are.same({
 					["grace-period-record"] = {
-						endTimestamp = currentTimestamp - constants.gracePeriodMs + 10, -- expired, but within grace period
+						endTimestamp = currentTimestamp - constants.GRACE_PERIOD_MS + 10, -- expired, but within grace period
 						processId = "grace-process-id",
 						purchasePrice = 500000000,
 						startTimestamp = 0,
@@ -1136,8 +1165,8 @@ describe("arns", function()
 				}, newGracePeriodRecords)
 
 				-- advance time, run again, and ensure the grace period record is not in the grace period list again
-				local gracePeriodRecordEndTimestamp = currentTimestamp - constants.gracePeriodMs + 10
-				currentTimestamp = currentTimestamp + constants.gracePeriodMs + 1
+				local gracePeriodRecordEndTimestamp = currentTimestamp - constants.GRACE_PERIOD_MS + 10
+				currentTimestamp = currentTimestamp + constants.GRACE_PERIOD_MS + 1
 				prunedRecords, newGracePeriodRecords =
 					arns.pruneRecords(currentTimestamp, gracePeriodRecordEndTimestamp)
 				assert.are.same({
@@ -1234,7 +1263,7 @@ describe("arns", function()
 
 	describe("getArNSStatsAtTimestamp", function()
 		it("should return the correct ArNS stats", function()
-			local currentTimestamp = constants.gracePeriodMs
+			local currentTimestamp = constants.GRACE_PERIOD_MS
 			_G.NameRegistry = {
 				returned = {
 					["returned-record"] = {
@@ -1244,7 +1273,7 @@ describe("arns", function()
 					-- this should not be counted as a returned name since it's expired
 					["expired-returned"] = {
 						name = "expired-returned",
-						startTimestamp = currentTimestamp - constants.returnedNamePeriod - 1,
+						startTimestamp = currentTimestamp - constants.RETURNED_NAME_DURATION_MS - 1,
 					},
 				},
 				reserved = {
@@ -1286,7 +1315,7 @@ describe("arns", function()
 					["grace-period-record"] = {
 						startTimestamp = 0,
 						type = "lease",
-						endTimestamp = currentTimestamp - constants.gracePeriodMs + 1,
+						endTimestamp = currentTimestamp - constants.GRACE_PERIOD_MS + 1,
 					},
 				},
 			}
@@ -1324,13 +1353,13 @@ describe("arns", function()
 	describe("pruneReturnedNames", function()
 		local currentTimestamp = 1000000
 		local expiredReturnedName = {
-			name = "expired--returned-name",
-			startTimestamp = currentTimestamp - constants.returnedNamePeriod - 1,
+			name = "expired-returned-name",
+			startTimestamp = currentTimestamp - constants.RETURNED_NAME_DURATION_MS - 1,
 			initiator = "test-initiator",
 		}
 		local activeReturnedName = {
 			name = "active-returned-name",
-			startTimestamp = currentTimestamp - constants.returnedNamePeriod + 1,
+			startTimestamp = currentTimestamp - constants.RETURNED_NAME_DURATION_MS + 1,
 			initiator = "test-initiator",
 		}
 
@@ -1443,14 +1472,14 @@ describe("arns", function()
 		describe("getReturnedNamePremiumMultiplier", function()
 			it("should return the correct multiplier for a returned name", function()
 				local startTimestamp = 1000000
-				local currentTimestamp = 1000000 + constants.returnedNamePeriod / 2
+				local currentTimestamp = 1000000 + constants.RETURNED_NAME_DURATION_MS / 2
 				local multiplier = arns.getReturnedNamePremiumMultiplier(startTimestamp, currentTimestamp)
-				assert.are.equal(constants.returnedNameMaxMultiplier / 2, multiplier)
+				assert.are.equal(constants.RETURNED_NAME_MAX_MULTIPLIER / 2, multiplier)
 			end)
 
 			it("should throw an error if provided timestamps fall outside the returned name period", function()
 				local startTimestamp = 1000000
-				local currentTimestamp = 1000000 + constants.returnedNamePeriod + 1
+				local currentTimestamp = 1000000 + constants.RETURNED_NAME_DURATION_MS + 1
 				local status, error = pcall(arns.getReturnedNamePremiumMultiplier, startTimestamp, currentTimestamp)
 				assert.is_false(status)
 				assert.match("Current timestamp is after the returned name period", error)
@@ -1508,8 +1537,12 @@ describe("arns", function()
 			it("should apply the ArNS discount to the upgrade cost", function()
 				_G.GatewayRegistry[stubRandomAddress] = testGateway
 				_G.GatewayRegistry[stubRandomAddress].weights = {
-					tenureWeight = constants.ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
-					gatewayPerformanceRatio = constants.ARNS_DISCOUNT_GATEWAY_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+					tenureWeight = constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD,
+					gatewayPerformanceRatio = constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD,
+					normalizedCompositeWeight = 1,
+					stakeWeight = 1,
+					observerPerformanceRatio = 1,
+					compositeWeight = 1,
 				}
 				_G.NameRegistry.records["upgrade-name"] = {
 					endTimestamp = 1000000,
@@ -1523,7 +1556,8 @@ describe("arns", function()
 				assert(gar.isEligibleForArNSDiscount(stubRandomAddress))
 				local updatedRecord = arns.upgradeRecord(stubRandomAddress, "upgrade-name", 1000000, "msgId")
 
-				local expectedCost = 2500000000 - (math.floor(2500000000 * constants.ARNS_DISCOUNT_PERCENTAGE))
+				local expectedCost = 2500000000
+					- (math.floor(2500000000 * constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERCENTAGE))
 
 				assert.are.same({
 					name = "upgrade-name",
@@ -1574,7 +1608,7 @@ describe("arns", function()
 			end)
 
 			it("should throw an error if the record is expired", function()
-				local currentTimestamp = 1000000 + constants.gracePeriodMs + 1
+				local currentTimestamp = 1000000 + constants.RETURNED_NAME_DURATION_MS + 1
 				_G.NameRegistry.records["upgrade-name"] = {
 					endTimestamp = 1000000,
 					processId = "test-process-id",
@@ -1585,6 +1619,7 @@ describe("arns", function()
 				}
 				local status, error = pcall(arns.upgradeRecord, testAddressArweave, "upgrade-name", currentTimestamp)
 				assert.is_false(status)
+				assert(error, "Expected error")
 				assert.match("Name is expired", error)
 			end)
 

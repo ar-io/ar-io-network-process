@@ -117,7 +117,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 
 	local record = arns.getRecord(name)
 	local isPermabuy = record ~= nil and record.type == "permabuy"
-	local isActiveLease = record ~= nil and (record.endTimestamp or 0) + constants.gracePeriodMs > timestamp
+	local isActiveLease = record ~= nil and (record.endTimestamp or 0) + constants.GRACE_PERIOD_MS > timestamp
 
 	assert(not isPermabuy and not isActiveLease, "Name is already registered")
 
@@ -130,7 +130,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 		type = purchaseType,
 		undernameLimit = constants.DEFAULT_UNDERNAME_COUNT,
 		purchasePrice = totalFee,
-		endTimestamp = purchaseType == "lease" and timestamp + constants.yearsToMs(years) or nil,
+		endTimestamp = purchaseType == "lease" and timestamp + constants.yearsToMs(numYears) or nil,
 	}
 
 	-- Register the leased or permanently owned name
@@ -407,7 +407,7 @@ local function getReturnedNamesAtTimestamp(timestamp)
 	local totalReturnedNames = 0
 
 	for _, returnedName in pairs(returnedNames) do
-		if returnedName.startTimestamp + constants.returnedNamePeriod >= timestamp then
+		if returnedName.startTimestamp + constants.RETURNED_NAME_DURATION_MS >= timestamp then
 			totalReturnedNames = totalReturnedNames + 1
 		end
 	end
@@ -492,7 +492,7 @@ end
 function arns.modifyRecordEndTimestamp(name, newEndTimestamp)
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
-	local maxLeaseLength = constants.maxLeaseLengthYears * constants.yearsToMs(1)
+	local maxLeaseLength = constants.MAX_LEASE_LENGTH_YEARS * constants.yearsToMs(1)
 	local maxEndTimestamp = record.startTimestamp + maxLeaseLength
 	assert(newEndTimestamp <= maxEndTimestamp, "Cannot extend lease beyond 5 years")
 	NameRegistry.records[name].endTimestamp = newEndTimestamp
@@ -631,15 +631,18 @@ function arns.getMaxAllowedYearsExtensionForRecord(record, currentTimestamp)
 		return 0
 	end
 
-	if currentTimestamp > record.endTimestamp and currentTimestamp < record.endTimestamp + constants.gracePeriodMs then
-		return constants.maxLeaseLengthYears
+	if
+		currentTimestamp > record.endTimestamp
+		and currentTimestamp < record.endTimestamp + constants.GRACE_PERIOD_MS
+	then
+		return constants.MAX_LEASE_LENGTH_YEARS
 	end
 
 	-- TODO: should we put this as the ceiling? or should we allow people to extend as soon as it is purchased
 	local yearsRemainingOnLease = math.ceil((record.endTimestamp - currentTimestamp) / constants.yearsToMs(1))
 
-	-- a number between 0 and 5 (MAX_YEARS)
-	return constants.maxLeaseLengthYears - yearsRemainingOnLease
+	-- a number between 0 and 5 (MAX_LEASE_LENGTH_YEARS)
+	return constants.MAX_LEASE_LENGTH_YEARS - yearsRemainingOnLease
 end
 
 --- @class RegistrationFee
@@ -665,7 +668,7 @@ function arns.getRegistrationFees()
 			lease = {},
 			permabuy = 0,
 		}
-		for years = 1, constants.maxLeaseLengthYears do
+		for years = 1, constants.MAX_LEASE_LENGTH_YEARS do
 			feesForNameLength.lease[tostring(years)] = arns.calculateLeaseFee(baseFee, years, demandFactor)
 		end
 		feesForNameLength.permabuy = arns.calculatePermabuyFee(baseFee, demandFactor)
@@ -723,7 +726,7 @@ function arns.getTokenCost(intendedAction)
 				name = name,
 				initiator = returnedName.initiator,
 				startTimestamp = returnedName.startTimestamp,
-				endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod,
+				endTimestamp = returnedName.startTimestamp + constants.RETURNED_NAME_DURATION_MS,
 				premiumMultiplier = premiumMultiplier,
 				basePrice = tokenCost,
 			}
@@ -760,11 +763,11 @@ function arns.getTokenCost(intendedAction)
 
 	-- if the address is eligible for the ArNS discount, apply the discount
 	if gar.isEligibleForArNSDiscount(intendedAction.from) then
-		local discountTotal = math.floor(tokenCost * constants.ARNS_DISCOUNT_PERCENTAGE)
+		local discountTotal = math.floor(tokenCost * constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERCENTAGE)
 		local discount = {
-			name = constants.ARNS_DISCOUNT_NAME,
+			name = constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_NAME,
 			discountTotal = discountTotal,
-			multiplier = constants.ARNS_DISCOUNT_PERCENTAGE,
+			multiplier = constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERCENTAGE,
 		}
 		table.insert(discounts, discount)
 		tokenCost = tokenCost - discountTotal
@@ -891,7 +894,7 @@ end
 function arns.recordInGracePeriod(record, timestamp)
 	return record.endTimestamp
 			and record.endTimestamp < timestamp
-			and record.endTimestamp + constants.gracePeriodMs > timestamp
+			and record.endTimestamp + constants.GRACE_PERIOD_MS > timestamp
 		or false
 end
 
@@ -953,7 +956,7 @@ function arns.createReturnedName(name, timestamp, initiator)
 		initiator = initiator,
 	}
 	NameRegistry.returned[name] = returnedName
-	arns.scheduleNextReturnedNamesPrune(timestamp + constants.returnedNamePeriod)
+	arns.scheduleNextReturnedNamesPrune(timestamp + constants.RETURNED_NAME_DURATION_MS)
 	return returnedName
 end
 
@@ -980,16 +983,16 @@ end
 function arns.getReturnedNamePremiumMultiplier(startTimestamp, currentTimestamp)
 	assert(currentTimestamp >= startTimestamp, "Current timestamp must be after the start timestamp")
 	assert(
-		currentTimestamp < startTimestamp + constants.returnedNamePeriod,
+		currentTimestamp < startTimestamp + constants.RETURNED_NAME_DURATION_MS,
 		"Current timestamp is after the returned name period"
 	)
 	local timestampDiff = currentTimestamp - startTimestamp
 	-- The percentage of the period that has passed e.g: 0.5 if half the period has passed
-	local percentageOfReturnedNamePeriodPassed = timestampDiff / constants.returnedNamePeriod
+	local percentageOfReturnedNamePeriodPassed = timestampDiff / constants.RETURNED_NAME_DURATION_MS
 	-- Take the inverse so that a fresh returned name has the full multiplier, and a name almost expired has a multiplier close to base price
 	local pctOfReturnPeriodRemaining = 1 - percentageOfReturnedNamePeriodPassed
 
-	return constants.returnedNameMaxMultiplier * pctOfReturnPeriodRemaining
+	return constants.RETURNED_NAME_MAX_MULTIPLIER * pctOfReturnPeriodRemaining
 end
 
 --- Removes an returnedName by name
@@ -1048,7 +1051,7 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 				newGracePeriodRecords[name] = record
 			end
 			-- Make sure we prune when the grace period is over
-			arns.scheduleNextRecordsPrune(record.endTimestamp + constants.gracePeriodMs)
+			arns.scheduleNextRecordsPrune(record.endTimestamp + constants.GRACE_PERIOD_MS)
 		elseif record.endTimestamp then
 			arns.scheduleNextRecordsPrune(record.endTimestamp)
 		end
@@ -1071,7 +1074,7 @@ function arns.pruneReturnedNames(currentTimestamp)
 
 	-- note: use unsafe to avoid copying all the returned names, but be careful not to modify the returned names directly here
 	for name, returnedName in pairs(arns.getReturnedNamesUnsafe()) do
-		local endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod
+		local endTimestamp = returnedName.startTimestamp + constants.RETURNED_NAME_DURATION_MS
 		if currentTimestamp >= endTimestamp then
 			prunedReturnedNames[name] = arns.removeReturnedName(name)
 		else

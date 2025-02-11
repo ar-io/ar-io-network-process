@@ -690,7 +690,8 @@ describe("gar", function()
 		it("should instantly withdraw operator stake with expedited withdrawal fee", function()
 			_G.Balances[ao.id] = 0 -- Initialize protocol balance to 0
 			_G.Balances[stubGatewayAddress] = 0
-			local expeditedWithdrawalFee = 1000 * constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
+			local expeditedWithdrawalFee = 1000
+				* gar.getSettings().expeditedWithdrawals.maxExpeditedWithdrawalPenaltyRate
 			local withdrawalAmount = 1000 - expeditedWithdrawalFee
 
 			_G.GatewayRegistry[stubGatewayAddress] = {
@@ -1189,7 +1190,7 @@ describe("gar", function()
 					delegatePruned = false,
 					expeditedWithdrawalFee = expeditedWithdrawalFee,
 					gatewayTotalDelegatedStake = minDelegatedStake,
-					penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE,
+					penaltyRate = constants.DEFAULT_GAR_SETTINGS.expeditedWithdrawals.maxExpeditedWithdrawalPenaltyRate,
 					updatedDelegate = {
 						delegatedStake = minDelegatedStake,
 						startTimestamp = 0,
@@ -1314,7 +1315,7 @@ describe("gar", function()
 				delegatePruned = true,
 				expeditedWithdrawalFee = expeditedWithdrawalFee,
 				gatewayTotalDelegatedStake = 0,
-				penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE,
+				penaltyRate = constants.DEFAULT_GAR_SETTINGS.expeditedWithdrawals.maxExpeditedWithdrawalPenaltyRate,
 				updatedDelegate = {
 					delegatedStake = 0,
 					startTimestamp = 0,
@@ -1728,11 +1729,11 @@ describe("gar", function()
 					local vaultTimestamp = delegateStartTimestamp
 					local elapsedTime = delegateLeaveLengthMs - 1 -- 1ms less than 90 days in milliseconds
 					local currentTimestamp = delegateStartTimestamp + elapsedTime
-					local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
+					local penaltyRate = constants.DEFAULT_GAR_SETTINGS.expeditedWithdrawals.maxExpeditedWithdrawalPenaltyRate
 						- (
 							(
-								constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
-								- constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE
+								constants.DEFAULT_GAR_SETTINGS.expeditedWithdrawals.maxExpeditedWithdrawalPenaltyRate
+								- constants.DEFAULT_GAR_SETTINGS.expeditedWithdrawals.minExpeditedWithdrawalPenaltyRate
 							) * (elapsedTime / delegateLeaveLengthMs)
 						)
 					local expectedWithdrawalFee = math.floor(vaultBalance * penaltyRate)

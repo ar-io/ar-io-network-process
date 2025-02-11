@@ -77,7 +77,7 @@ describe("prune", function()
 
 	it("should prune returned names at the time they expire", function()
 		_G.NextReturnedNamesPruneTimestamp = 0
-		local pruneTimestamp = 1000000 + constants.returnedNamePeriod + 1
+		local pruneTimestamp = 1000000 + constants.RETURNED_NAME_DURATION_MS + 1
 		local result = tick.pruneState(pruneTimestamp, "msgId", 0)
 		assert.are.same({
 			["test-returned-name"] = {
