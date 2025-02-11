@@ -824,26 +824,15 @@ function epochs.getRewardRateForEpoch(epochIndex)
 	if epochIndex > distributionSettings.rewardDecayLastEpoch then
 		return distributionSettings.minimumRewardRate
 	end
-	print("epochIndex: " .. epochIndex)
 	-- if we are in the decay period (1 year to 1.5 years), return the linearly decaying reward rate
 	local totalDecayPeriod = (distributionSettings.rewardDecayLastEpoch - distributionSettings.rewardDecayStartEpoch)
 	local epochsAlreadyDecayed = (epochIndex - distributionSettings.rewardDecayStartEpoch)
-	print("epochsAlreadyDecayed: " .. epochsAlreadyDecayed)
-	local decayRatePerEpoch = utils.roundToPrecision(
-		(distributionSettings.maximumRewardRate - distributionSettings.minimumRewardRate) / totalDecayPeriod,
-		12
-	)
-	print("decayRatePerEpoch: " .. decayRatePerEpoch)
-	local totalRateDecayed = utils.roundToPrecision(decayRatePerEpoch * epochsAlreadyDecayed, 5)
-	print("totalRateDecayed: " .. totalRateDecayed)
-	local totalRewardRateDecayed = utils.roundToPrecision(distributionSettings.maximumRewardRate - totalRateDecayed, 5)
-	print("totalRewardRateDecayed: " .. totalRewardRateDecayed)
-
-	print("totalRewardRateDecayed: " .. totalRewardRateDecayed)
-	local roundedRateWithPrecision = utils.roundToPrecision(totalRewardRateDecayed, 5)
-	print("roundedRateWithPrecision: " .. roundedRateWithPrecision)
+	local decayRatePerEpoch = (distributionSettings.maximumRewardRate - distributionSettings.minimumRewardRate)
+		/ totalDecayPeriod
+	local totalRateDecayed = decayRatePerEpoch * epochsAlreadyDecayed
+	local totalRewardRateDecayed = distributionSettings.maximumRewardRate - totalRateDecayed
 	-- avoid floating point precision issues, round to 5 decimal places
-	return roundedRateWithPrecision
+	return utils.roundToPrecision(totalRewardRateDecayed, 5)
 end
 
 return epochs

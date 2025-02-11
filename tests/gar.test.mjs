@@ -24,6 +24,8 @@ import {
   getEpochSettings,
   getEpochDistributions,
   getPrescribedObservers,
+  getBalance,
+  getGateways,
 } from './helpers.mjs';
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
@@ -1672,6 +1674,15 @@ describe('GatewayRegistry', async () => {
         observerAddress,
       });
 
+      const protocolBalance = await getBalance({
+        memory: addGatewayMemory,
+        address: PROCESS_ID,
+      });
+
+      const gateways = await getGateways({
+        memory: addGatewayMemory,
+        timestamp: epochSettings.epochZeroStartTimestamp,
+      });
       // create the first epoch, this will setup the epoch and prescribe the observer to the gateway
       const { result: createFirstEpoch } = await tick({
         timestamp: epochSettings.epochZeroStartTimestamp,
@@ -1695,18 +1706,23 @@ describe('GatewayRegistry', async () => {
       });
 
       // assert the eligible distributions are correct
-      assert.equal(totalEligibleObserverReward, 1_250_000_000);
-      assert.equal(totalEligibleGatewayReward, 11_250_000_000);
-      assert.equal(totalEligibleRewards, 25_000_000_000);
-      assert.equal(totalEligibleGateways, 2);
-      assert.deepEqual(rewards, {
+      const expectedEligibleRewards = protocolBalance * 0.001; // 0.1% of the protocol balance
+      const expectedObserverRewards =
+        (expectedEligibleRewards * 0.1) / gateways.totalItems;
+      const expectedGatewayRewards =
+        (expectedEligibleRewards * 0.9) / gateways.totalItems;
+      assert.equal(totalEligibleObserverReward, expectedObserverRewards);
+      assert.equal(totalEligibleGatewayReward, expectedGatewayRewards);
+      assert.equal(totalEligibleRewards, expectedEligibleRewards);
+      assert.equal(totalEligibleGateways, gateways.totalItems);
+      assert.deepStrictEqual(rewards, {
         eligible: {
-          '2222222222222222222222222222222222222222222': {
-            operatorReward: 12_500_000_000,
+          [STUB_ADDRESS]: {
+            operatorReward: expectedGatewayRewards + expectedObserverRewards,
             delegateRewards: [],
           },
-          'gateway-address-aaaaaaaaaaaaaaaaaaaaaaaaaaa': {
-            operatorReward: 12_500_000_000,
+          [gatewayAddress]: {
+            operatorReward: expectedGatewayRewards + expectedObserverRewards,
             delegateRewards: [],
           },
         },

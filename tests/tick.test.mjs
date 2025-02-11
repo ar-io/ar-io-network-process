@@ -380,8 +380,6 @@ describe('Tick', async () => {
       'Tick-Notice',
     );
 
-    const createdEpochData = JSON.parse(newEpochTick.Messages[0].Data);
-
     // assert the new epoch is created
     const epochData = await getEpoch({
       memory: newEpochTickMemory,
@@ -390,7 +388,7 @@ describe('Tick', async () => {
 
     // get the epoch timestamp and assert it is in 24 hours
     const protocolBalanceAtStartOfEpoch = 50_000_000_000_000; // 50M ARIO
-    const totalEligibleRewards = protocolBalanceAtStartOfEpoch * 0.0005; // 0.05% of the protocol balance
+    const totalEligibleRewards = protocolBalanceAtStartOfEpoch * 0.001; // 0.1% of the protocol balance for the first 365 epochs
     const totalGatewayRewards = Math.ceil(totalEligibleRewards * 0.9); // 90% go to gateways
     const totalObserverRewards = Math.floor(totalEligibleRewards * 0.1); // 10% go to observers
     const totalEligibleGatewayRewards =
@@ -542,12 +540,29 @@ describe('Tick', async () => {
       timestamp: distributionTimestamp,
     });
 
+    const expectedOperatorStake =
+      INITIAL_OPERATOR_STAKE + expectedGatewayOperatorReward;
+    const expectedTotalDelegatedStake =
+      delegateQuantity + expectedGatewayDelegateReward;
+    const expectedStakeWeight =
+      (expectedOperatorStake + expectedTotalDelegatedStake) /
+      INITIAL_OPERATOR_STAKE;
+    const expectedTenureWeight = 1.0055555555555555; // it's been around for 1 epoch, so it's 1 + 0.0055555555555555
+    const expectedGatewayPerformanceRatio = 1;
+    const expectedObserverPerformanceRatio = 1;
+    const expectedCompositeWeight =
+      expectedStakeWeight *
+      expectedTenureWeight *
+      expectedGatewayPerformanceRatio *
+      expectedObserverPerformanceRatio;
+    const expectedNormalizedCompositeWeight = 1; // it's the only operator
+
     assert.deepStrictEqual(gateway, {
       status: 'joined',
       startTimestamp: joinNetworkTimestamp,
       observerAddress: STUB_ADDRESS,
-      operatorStake: INITIAL_OPERATOR_STAKE + expectedGatewayOperatorReward,
-      totalDelegatedStake: delegateQuantity + expectedGatewayDelegateReward,
+      operatorStake: expectedOperatorStake,
+      totalDelegatedStake: expectedTotalDelegatedStake,
       settings: {
         allowDelegatedStaking: true,
         autoStake: true,
@@ -570,12 +585,12 @@ describe('Tick', async () => {
         totalEpochCount: 1,
       },
       weights: {
-        compositeWeight: 5.530555555555555,
-        gatewayPerformanceRatio: 1,
-        normalizedCompositeWeight: 1,
-        observerPerformanceRatio: 1,
-        stakeWeight: 5.5,
-        tenureWeight: 1.0055555555555555,
+        compositeWeight: expectedCompositeWeight,
+        gatewayPerformanceRatio: expectedGatewayPerformanceRatio,
+        normalizedCompositeWeight: expectedNormalizedCompositeWeight,
+        observerPerformanceRatio: expectedObserverPerformanceRatio,
+        stakeWeight: expectedStakeWeight,
+        tenureWeight: expectedTenureWeight,
       },
     });
 
