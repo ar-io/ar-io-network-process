@@ -290,48 +290,38 @@ end
 --- @param msgId string The current message id
 --- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
 --- @return RecordInteractionResult # The result
-function arns.increaseundernameLimit(from, name, qty, currentTimestamp, msgId, fundFrom)
+function arns.increaseUndernameLimit(from, name, qty, currentTimestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
 	-- validate record can increase undernames
 	local record = arns.getRecord(name)
 
 	assert(record, "Name is not registered")
 
-	-- throws errors on invalid requests
-	arns.assertValidIncreaseUndername(record, qty, currentTimestamp)
+	local increaseUndernameCost = arns.getTokenCost({
+		currentTimestamp = currentTimestamp,
+		intent = "Increase-Undername-Limit",
+		name = name,
+		quantity = qty,
+		type = record.type,
+		from = from,
+	})
 
-	local yearsRemaining = constants.PERMABUY_LEASE_FEE_LENGTH
-	if record.type == "lease" then
-		yearsRemaining = arns.calculateYearsBetweenTimestamps(currentTimestamp, record.endTimestamp)
-	end
-
-	local baseRegistrationFee = demand.baseFeeForNameLength(#name)
-	local totalFee =
-		arns.calculateUndernameCost(baseRegistrationFee, qty, record.type, yearsRemaining, demand.getDemandFactor())
-
-	-- if the address is eligible for the ArNS discount, apply the discount
-	if gar.isEligibleForArNSDiscount(from) then
-		local discount = math.floor(totalFee * constants.ARNS_DISCOUNT_PERCENTAGE)
-		totalFee = totalFee - discount
-	end
-
-	assert(totalFee >= 0, "Invalid undername cost")
-
-	local fundingPlan = gar.getFundingPlan(from, totalFee, fundFrom)
+	assert(increaseUndernameCost.tokenCost >= 0, "Invalid undername cost")
+	local fundingPlan = gar.getFundingPlan(from, increaseUndernameCost.tokenCost, fundFrom)
 	assert(fundingPlan and fundingPlan.shortfall == 0 or false, "Insufficient balances")
 	local fundingResult = gar.applyFundingPlan(fundingPlan, msgId, currentTimestamp)
-	assert(fundingResult.totalFunded == totalFee, "Funding plan application failed")
+	assert(fundingResult.totalFunded == increaseUndernameCost.tokenCost, "Funding plan application failed")
 
 	-- update the record with the new undername count
-	arns.modifyRecordundernameLimit(name, qty)
+	arns.modifyRecordUndernameLimit(name, qty)
 
 	-- Transfer tokens to the protocol balance
-	balances.increaseBalance(ao.id, totalFee)
-	demand.tallyNamePurchase(totalFee)
+	balances.increaseBalance(ao.id, increaseUndernameCost.tokenCost)
+	demand.tallyNamePurchase(increaseUndernameCost.tokenCost)
 	return {
 		record = arns.getRecord(name),
-		totalFee = totalFee,
-		baseRegistrationFee = baseRegistrationFee,
+		totalFee = increaseUndernameCost.tokenCost,
+		baseRegistrationFee = demand.baseFeeForNameLength(#name),
 		remainingBalance = balances.getBalance(from),
 		protocolBalance = balances.getBalance(ao.id),
 		recordsCount = utils.lengthOfTable(NameRegistry.records),
@@ -477,7 +467,7 @@ end
 --- @param name string The name of the record
 --- @param qty number The quantity to increase the undername limit by
 --- @return StoredRecord|nil # The updated record
-function arns.modifyRecordundernameLimit(name, qty)
+function arns.modifyRecordUndernameLimit(name, qty)
 	local record = arns.getRecord(name)
 	assert(record, "Name is not registered")
 	NameRegistry.records[name].undernameLimit = record.undernameLimit + qty
