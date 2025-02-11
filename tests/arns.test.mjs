@@ -20,6 +20,7 @@ import {
   getGateway,
   delegateStake,
   extendLease,
+  getBaseRegistrationFees,
 } from './helpers.mjs';
 import assert from 'node:assert';
 import {
@@ -325,10 +326,7 @@ describe('ArNS', async () => {
 
   describe('Registration-Fees', () => {
     it('should return the base registration fees for each name length', async () => {
-      const priceListResult = await handle({
-        options: {
-          Tags: [{ name: 'Action', value: 'Registration-Fees' }],
-        },
+      const priceListResult = await getBaseRegistrationFees({
         memory: sharedMemory,
       });
 

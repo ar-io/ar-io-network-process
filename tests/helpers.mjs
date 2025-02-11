@@ -265,21 +265,25 @@ export const setUpStake = async ({
   };
 };
 
+export const getBaseRegistrationFees = async ({ memory, timestamp }) => {
+  const result = await handle({
+    options: {
+      Tags: [{ name: 'Action', value: 'Registration-Fees' }],
+    },
+  });
+  return JSON.parse(result.Messages[0].Data);
+};
+
 export const getBaseRegistrationFeeForName = async ({
   memory,
   timestamp,
   name = 'great-nam',
 }) => {
-  const result = await handle({
-    options: {
-      Tags: [{ name: 'Action', value: 'Registration-Fees' }],
-      Timestamp: timestamp,
-    },
+  const baseRegistrationFees = await getBaseRegistrationFees({
     memory,
+    timestamp,
   });
-  return JSON.parse(result.Messages[0].Data)[name.length.toString()]['lease'][
-    '1'
-  ];
+  return baseRegistrationFees[name.length.toString()]['lease']['1'];
 };
 
 export const getDemandFactor = async ({ memory, timestamp }) => {
