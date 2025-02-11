@@ -223,7 +223,7 @@ function gar.leaveNetwork(from, currentTimestamp, msgId)
 
 	-- update global state
 	GatewayRegistry[from] = gateway
-	return gateway
+	return utils.deepCopy(gateway)
 end
 
 --- Increases the operator stake for a gateway
