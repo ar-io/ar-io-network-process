@@ -2005,6 +2005,8 @@ addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epo
 		-- populate the prescribed observers with weights for the epoch, this helps improve DX of downstream apps
 		epoch.prescribedObservers = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 	end
+	-- remove the distributions data from the epoch to avoid unbounded response payloads
+	epoch.distributions = nil
 	Send(msg, { Target = msg.From, Action = "Epoch-Notice", Data = json.encode(epoch) })
 end)
 
