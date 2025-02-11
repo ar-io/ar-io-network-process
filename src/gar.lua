@@ -609,11 +609,6 @@ function gar.getSettings()
 	return utils.deepCopy(GatewayRegistrySettings)
 end
 
----@return GatewayRegistrySettings # the gateway registry settings
-function gar.getSettingsUnsafe()
-	return GatewayRegistrySettings
-end
-
 --- @class DecreaseDelegateStakeReturn
 --- @field gatewayTotalDelegatedStake mARIO The updated amount of total delegated stake at the gateway
 --- @field updatedDelegate Delegate The updated delegate object
@@ -900,7 +895,7 @@ function gar.updateGatewayStats(address, gateway, stats)
 	GatewayRegistry[address] = gateway
 
 	-- Schedule pruning if necessary
-	if stats.failedConsecutiveEpochs >= gar.getSettingsUnsafe().operators.failedEpochCountMax then
+	if stats.failedConsecutiveEpochs >= gar.getSettings().operators.failedEpochCountMax then
 		gar.scheduleNextGatewaysPruning(0)
 	end
 
