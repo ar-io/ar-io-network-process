@@ -746,7 +746,7 @@ describe('Tick', async () => {
           memory: tickMemory,
           timestamp: nextDemandFactorPeriodTimestamp,
         });
-        assert.equal(demandFactor, 0.50655939255251769548);
+        assert.equal(demandFactor, 0.50656); // rounded to 5 decimal places
       }
 
       if ([46, 47, 48].includes(i)) {

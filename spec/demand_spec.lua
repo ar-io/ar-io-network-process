@@ -1,6 +1,6 @@
 local constants = require("constants")
 local demand = require("demand")
-
+local utils = require("utils")
 describe("demand", function()
 	before_each(function()
 		_G.DemandFactor = {
@@ -20,9 +20,10 @@ describe("demand", function()
 			periodLengthMs = 60 * 1000 * 24, -- one day
 			demandFactorBaseValue = 1,
 			demandFactorMin = 0.5,
+
 			demandFactorUpAdjustment = 0.05,
-			demandFactorDownAdjustment = 0.025,
-			stepDownThreshold = 3,
+			demandFactorDownAdjustment = 0.015,
+			maxPeriodsAtMinDemandFactor = 3,
 			criteria = "revenue",
 		}
 	end)
@@ -79,8 +80,8 @@ describe("demand", function()
 				_G.DemandFactor.revenueThisPeriod = 0
 				_G.DemandFactor.trailingPeriodRevenues = { 0, 10, 0, 0, 5, 10, 0 }
 				local startNextPeriodTimestamp = _G.DemandFactorSettings.periodLengthMs * currentPeriod + 1
-				demand.updateDemandFactor(startNextPeriodTimestamp)
-				assert.are.equal(0.9749999999999999778, _G.DemandFactor.currentDemandFactor)
+				local resultingDemandFactor = demand.updateDemandFactor(startNextPeriodTimestamp)
+				assert.are.equal(0.985, resultingDemandFactor)
 				-- update the 6th spot in the pervious period revenues for the 5th period
 				assert.are.same({ 0, 10, 0, 0, 5, 0, 0 }, _G.DemandFactor.trailingPeriodRevenues)
 				assert.are.equal(currentPeriod + 1, _G.DemandFactor.currentPeriod)
@@ -106,12 +107,13 @@ describe("demand", function()
 		)
 
 		it(
-			"updateDemandFactor() adjust fees and reset demend factor parameters when consecutive periods at minimum threshold is hit",
+			"updateDemandFactor() adjust fees and reset demand factor parameters when consecutive periods at minimum threshold is hit",
 			function()
 				local currentPeriod = 15
 				_G.DemandFactor.currentPeriod = currentPeriod -- 15 % 7 = 1 = 2 index of the trailing period array
 				_G.DemandFactor.currentDemandFactor = _G.DemandFactorSettings.demandFactorMin - 0.1
-				_G.DemandFactor.consecutivePeriodsWithMinDemandFactor = _G.DemandFactorSettings.stepDownThreshold
+				_G.DemandFactor.consecutivePeriodsWithMinDemandFactor =
+					_G.DemandFactorSettings.maxPeriodsAtMinDemandFactor
 				_G.DemandFactor.revenueThisPeriod = 0
 				_G.DemandFactor.trailingPeriodRevenues = { 0, 10, 10, 10, 10, 10, 0 }
 				local expectedFees = {}
@@ -127,6 +129,52 @@ describe("demand", function()
 				assert.are.same({ 0, 0, 10, 10, 10, 10, 0 }, _G.DemandFactor.trailingPeriodRevenues)
 			end
 		)
+
+		it("cuts fees in half after hitting the minimum demand factor period threshold", function()
+			--[[
+				We want to validate that the demand factor steps down to the minimum and resets fees 5 times.
+				With a step down of 0.015 per period, the demand factor will reduce to 0.5 after 46 periods (log(0.5) / log(1 - 0.015)).
+				We run this process multiple times to verify that fees continue to be reduced after the demand factor
+				reaches the minimum, with final fees being initial * 0.5 ^ 3. We also validate that the demand factor
+				reaches the minimum and is reset to the base value (1) when fees reset.
+			]]
+			--
+			local currentTimestamp = 0
+			local numPeriodsToHitMinimum = math.ceil(
+				math.log(_G.DemandFactorSettings.demandFactorMin)
+					/ math.log(1 - _G.DemandFactorSettings.demandFactorDownAdjustment)
+			)
+			local periodAtWhichFeesReset = numPeriodsToHitMinimum + _G.DemandFactorSettings.maxPeriodsAtMinDemandFactor
+			local totalStepDownCycles = 5
+			for _ = 1, totalStepDownCycles do
+				local initialFees = utils.deepCopy(_G.DemandFactor.fees)
+				for i = 1, periodAtWhichFeesReset do
+					-- Advance time past one period so that updateDemandFactor triggers.
+					currentTimestamp = currentTimestamp + _G.DemandFactorSettings.periodLengthMs + 1
+					local demandBeforeUpdate = _G.DemandFactor.currentDemandFactor
+					local maybeNewDemandFactor = demand.updateDemandFactor(currentTimestamp)
+					-- make sure the demand factor is dropping for every period in between
+					if i < periodAtWhichFeesReset then
+						local expectedDemandFactor = math.max(
+							utils.roundToPrecision(
+								demandBeforeUpdate * (1 - _G.DemandFactorSettings.demandFactorDownAdjustment),
+								5
+							),
+							_G.DemandFactorSettings.demandFactorMin
+						)
+						assert.are.equal(expectedDemandFactor, maybeNewDemandFactor)
+						assert.is_true(maybeNewDemandFactor >= 0.5)
+					end
+				end
+				-- after 46 periods, the fees should be cut in half
+				for nameLength, fee in pairs(_G.DemandFactor.fees) do
+					local expectedFee = initialFees[nameLength] * _G.DemandFactorSettings.demandFactorMin -- fees are reduced by the demand factor minimum every time they are reset
+					assert.are.equal(expectedFee, fee)
+				end
+				-- assert the demand factor is returned the the base value
+				assert.are.equal(_G.DemandFactorSettings.demandFactorBaseValue, _G.DemandFactor.currentDemandFactor)
+			end
+		end)
 	end)
 
 	describe("purchase count criteria", function()
@@ -135,11 +183,12 @@ describe("demand", function()
 				periodZeroStartTimestamp = 0,
 				movingAvgPeriodCount = 7,
 				periodLengthMs = 60 * 1000 * 24, -- one day
+				demandFactorStartingValue = 1,
 				demandFactorBaseValue = 1,
 				demandFactorMin = 0.5,
 				demandFactorUpAdjustment = 0.05,
 				demandFactorDownAdjustment = 0.025,
-				stepDownThreshold = 3,
+				maxPeriodsAtMinDemandFactor = 3,
 				criteria = "purchases",
 			}
 		end)

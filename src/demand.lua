@@ -27,11 +27,11 @@ DemandFactor = DemandFactor
 --- @field periodZeroStartTimestamp number The timestamp of the start of period zero
 --- @field movingAvgPeriodCount number The number of periods to use for the moving average
 --- @field periodLengthMs number The length of a period in milliseconds
---- @field demandFactorBaseValue number The base demand factor value
+--- @field demandFactorBaseValue number The base demand factor value that is what the demand factor is reset to when fees are reset
 --- @field demandFactorMin number The minimum demand factor value
 --- @field demandFactorUpAdjustment number The adjustment to the demand factor when it is increasing
 --- @field demandFactorDownAdjustment number The adjustment to the demand factor when it is decreasing
---- @field stepDownThreshold number The threshold for the number of consecutive periods with the minimum demand factor before adjusting the demand factor
+--- @field maxPeriodsAtMinDemandFactor number The threshold for the number of consecutive periods with the minimum demand factor before adjusting the demand factor
 --- @field criteria 'revenue' | 'purchases' The criteria to use for determining if the demand is increasing
 DemandFactorSettings = DemandFactorSettings or constants.DEFAULT_DEMAND_FACTOR_SETTINGS
 
@@ -136,19 +136,20 @@ function demand.updateDemandFactor(timestamp)
 
 	if demand.isDemandIncreasing() then
 		local upAdjustment = settings.demandFactorUpAdjustment
-		demand.setDemandFactor(demand.getDemandFactor() * (1 + upAdjustment))
+		local unroundedUpdatedDemandFactor = demand.getDemandFactor() * (1 + upAdjustment)
+		local updatedDemandFactor = utils.roundToPrecision(unroundedUpdatedDemandFactor, 5)
+		demand.setDemandFactor(updatedDemandFactor)
 	else
 		if demand.getDemandFactor() > settings.demandFactorMin then
 			local downAdjustment = settings.demandFactorDownAdjustment
-			local updatedDemandFactor =
-				math.max(demand.getDemandFactor() * (1 - downAdjustment), settings.demandFactorMin)
-			-- increment consecutive periods with min demand factor
+			local unroundedUpdatedDemandFactor = demand.getDemandFactor() * (1 - downAdjustment)
+			local updatedDemandFactor = utils.roundToPrecision(unroundedUpdatedDemandFactor, 5)
 			demand.setDemandFactor(updatedDemandFactor)
 		end
 	end
 
 	if demand.getDemandFactor() <= settings.demandFactorMin then
-		if demand.getConsecutivePeriodsWithMinDemandFactor() >= settings.stepDownThreshold then
+		if demand.getConsecutivePeriodsWithMinDemandFactor() >= settings.maxPeriodsAtMinDemandFactor then
 			demand.updateFees(settings.demandFactorMin)
 			demand.setDemandFactor(settings.demandFactorBaseValue)
 			demand.resetConsecutivePeriodsWithMinimumDemandFactor()
@@ -242,10 +243,10 @@ function demand.getCurrentPeriod()
 	return demandFactor and demandFactor.currentPeriod or 1
 end
 
---- Sets the demand factor
+--- Sets the demand factor, ensuring it is not less than the minimum demand factor
 --- @param demandFactor number # The demand factor
 function demand.setDemandFactor(demandFactor)
-	DemandFactor.currentDemandFactor = demandFactor
+	DemandFactor.currentDemandFactor = math.max(demandFactor, DemandFactorSettings.demandFactorMin)
 end
 
 --- Gets the period index
