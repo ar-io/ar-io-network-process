@@ -22,7 +22,7 @@ const argv = yargs(hideBin(process.argv))
     alias: 'o',
     type: 'string',
     description: 'Output CSV file path',
-    default: './files/arns_records.csv',
+    default: './outputs/primary_names.csv',
   })
   .help()
   .parseSync();
@@ -32,7 +32,7 @@ const dryRun = argv.dryRun;
 const output = argv.output;
 
 console.log(
-  'Pulling records from process',
+  'Pulling primary names from process',
   processId,
   'and writing to',
   output,
@@ -47,35 +47,20 @@ const ario = ARIO.init({
   }),
 });
 
-const { items: records } = await ario.getArNSRecords({
+const { items: primaryNames } = await ario.getPrimaryNames({
   limit: 5000,
 });
-
-const activeRecords = records.filter(
-  (record) => record.type === 'permabuy' || record.endTimestamp > Date.now(),
-);
 
 // overwrite the file if it exists
 fs.writeFileSync(path.join(process.cwd(), output), '');
 
 // write the header
-fs.appendFileSync(
-  output,
-  'name,processId,type,startTimestamp,endTimestamp,purchasePrice\n',
-);
+fs.appendFileSync(output, 'name,address,processId\n');
 
-for (const record of activeRecords) {
-  const { name, processId, type, startTimestamp, endTimestamp, purchasePrice } =
-    record;
+for (const primaryName of primaryNames) {
+  const { name, owner: address, processId } = primaryName;
 
-  const csvRow = [
-    name,
-    processId,
-    type,
-    startTimestamp,
-    endTimestamp,
-    purchasePrice,
-  ].join(',');
+  const csvRow = [name, address, processId].join(',');
   if (dryRun) {
     console.log(csvRow);
   } else {

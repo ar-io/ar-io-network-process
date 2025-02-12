@@ -18,23 +18,23 @@ const argv = yargs(hideBin(process.argv))
     description: 'Run without making any changes',
     default: false,
   })
-  .option('output', {
+  .option('output-balances', {
     alias: 'o',
     type: 'string',
     description: 'Output CSV file path',
-    default: './files/liquid_balances.csv',
+    default: './outputs/liquid_balances.csv',
   })
   .option('output-delegates', {
     alias: 'l',
     type: 'string',
     description: 'Output CSV file path for assigned delegates',
-    default: './files/assigned_delegates.csv',
+    default: './outputs/assigned_delegates.csv',
   })
-  .option('gatewaysFile', {
+  .option('gateways-file', {
     alias: 'g',
     type: 'string',
     description: 'Gateways CSV file path',
-    default: './files/gateways.csv',
+    default: '../gateways/outputs/gateways.csv',
   })
   .option('staked-multiplier', {
     alias: 'm',
@@ -47,15 +47,17 @@ const argv = yargs(hideBin(process.argv))
 
 const processId = argv.processId;
 const dryRun = argv.dryRun;
-const output = argv.output;
-const gatewaysFile = argv.gatewaysFile;
-const stakedMultiplier = argv.stakedMultiplier;
-const outputDelegates = argv.outputDelegates;
+const outputBalances = argv['output-balances'];
+const outputDelegates = argv['output-delegates'];
+const gatewaysFile = argv['gateways-file'];
+const stakedMultiplier = argv['staked-multiplier'];
 console.log(
   'Pulling liquid balances from AIRDROP process',
   processId,
   'and writing to',
-  output,
+  outputBalances,
+  'and delegates to',
+  outputDelegates,
 );
 
 const airdrop = new AOProcess({
@@ -79,10 +81,10 @@ const { items: registrants } = await airdrop.read({
 });
 
 // overwrite the file if it exists
-fs.writeFileSync(path.join(process.cwd(), output), '');
+fs.writeFileSync(path.join(process.cwd(), outputBalances), '');
 
 // write the header
-fs.appendFileSync(output, 'address,mARIOQty\n');
+fs.appendFileSync(outputBalances, 'address,mARIOQty\n');
 
 const liquidRegistrants = registrants.filter((r) => r.type === 'wallet');
 
@@ -94,7 +96,7 @@ for (const registrant of liquidRegistrants) {
   if (dryRun) {
     console.log(csvRow);
   } else {
-    fs.appendFileSync(output, `${csvRow}\n`);
+    fs.appendFileSync(outputBalances, `${csvRow}\n`);
   }
 }
 

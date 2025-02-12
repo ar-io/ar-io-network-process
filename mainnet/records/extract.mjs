@@ -22,7 +22,7 @@ const argv = yargs(hideBin(process.argv))
     alias: 'o',
     type: 'string',
     description: 'Output CSV file path',
-    default: './files/gateways.csv',
+    default: './outputs/arns_records.csv',
   })
   .help()
   .parseSync();
@@ -31,9 +31,12 @@ const processId = argv.processId;
 const dryRun = argv.dryRun;
 const output = argv.output;
 
-console.log('Pulling gateways from process', processId);
-
-// extracts gateways from the ARIO testnet process and produces a CSV with defaulted values
+console.log(
+  'Pulling records from process',
+  processId,
+  'and writing to',
+  output,
+);
 
 const ario = ARIO.init({
   process: new AOProcess({
@@ -44,12 +47,12 @@ const ario = ARIO.init({
   }),
 });
 
-const { items: gateways } = await ario.getGateways({
-  limit: 1000,
+const { items: records } = await ario.getArNSRecords({
+  limit: 5000,
 });
 
-const nonLeavingGateways = gateways.filter(
-  (gateway) => gateway.status !== 'leaving',
+const activeRecords = records.filter(
+  (record) => record.type === 'permabuy' || record.endTimestamp > Date.now(),
 );
 
 // overwrite the file if it exists
@@ -58,36 +61,20 @@ fs.writeFileSync(path.join(process.cwd(), output), '');
 // write the header
 fs.appendFileSync(
   output,
-  'gatewayAddress,observerAddress,operatorStake,fqdn,port,protocol,allowDelegatedStaking,delegateRewardShareRatio,allowedDelegates,minDelegatedStake,autoStake,label,note,properties,status,failedConsecutiveEpochsCount\n',
+  'name,processId,type,startTimestamp,endTimestamp,purchasePrice\n',
 );
 
-for (const gateway of nonLeavingGateways) {
-  const {
-    gatewayAddress,
-    observerAddress,
-    settings,
-    status,
-    stats,
-    operatorStake,
-  } = gateway;
+for (const record of activeRecords) {
+  const { name, processId, type, startTimestamp, endTimestamp, purchasePrice } =
+    record;
 
   const csvRow = [
-    gatewayAddress,
-    observerAddress,
-    operatorStake,
-    settings.fqdn,
-    settings.port,
-    settings.protocol,
-    settings.allowDelegatedStaking,
-    settings.delegateRewardShareRatio,
-    settings.allowedDelegates,
-    settings.minDelegatedStake,
-    settings.autoStake,
-    settings.label,
-    settings.note,
-    settings.properties,
-    status,
-    stats.failedConsecutiveEpochsCount,
+    name,
+    processId,
+    type,
+    startTimestamp,
+    endTimestamp,
+    purchasePrice,
   ].join(',');
   if (dryRun) {
     console.log(csvRow);
