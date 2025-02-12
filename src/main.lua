@@ -163,7 +163,7 @@ local function adjustSuppliesForFundingPlan(fundingPlan, rewardForInitiator)
 end
 
 --- @param ioEvent ARIOEvent
---- @param result BuyRecordResult|RecordInteractionResult|CreatePrimaryNameResult|PrimaryNameRequestApproval
+--- @param result BuyNameResult|RecordInteractionResult|CreatePrimaryNameResult|PrimaryNameRequestApproval
 local function addResultFundingPlanFields(ioEvent, result)
 	ioEvent:addFieldsWithPrefixIfExist(result.fundingPlan, "FP-", { "balance" })
 	local fundingPlanVaultsCount = 0
@@ -205,7 +205,7 @@ local function addResultFundingPlanFields(ioEvent, result)
 end
 
 --- @param ioEvent ARIOEvent
----@param result RecordInteractionResult|BuyRecordResult
+---@param result RecordInteractionResult|BuyNameResult
 local function addRecordResultFields(ioEvent, result)
 	ioEvent:addFieldsIfExist(result, {
 		"baseRegistrationFee",
@@ -1029,7 +1029,6 @@ addEventingHandler(
 function assertTokenCostTags(msg)
 	local intentType = msg.Tags.Intent
 	local validIntents = utils.createLookupTable({
-		ActionMap.BuyRecord, -- Deprecated
 		ActionMap.BuyName,
 		ActionMap.ExtendLease,
 		ActionMap.IncreaseUndernameLimit,
