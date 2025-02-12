@@ -70,7 +70,7 @@ end
 --- @field fundingResult table The funding result
 --- @field totalFee mARIO The total fee for the name-related operation
 
---- @class BuyRecordResult : RecordInteractionResult
+--- @class BuyNameResult : RecordInteractionResult
 --- @field recordsCount number The total number of records
 --- @field reservedRecordsCount number The total number of reserved records
 --- @field returnedName nil|ReturnedNameBuyRecordResult -- The initiator and reward details if returned name was purchased
@@ -85,7 +85,7 @@ end
 --- @param msgId string The current message id
 --- @param fundFrom string|nil The intended payment sources; one of "any", "balance", or "stake". Default "balance"
 --- @param allowUnsafeProcessId boolean|nil Whether to allow unsafe processIds. Default false.
---- @return BuyRecordResult # The result including relevant metadata about the purchase
+--- @return BuyNameResult # The result including relevant metadata about the purchase
 function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, msgId, fundFrom, allowUnsafeProcessId)
 	fundFrom = fundFrom or "balance"
 	allowUnsafeProcessId = allowUnsafeProcessId or false
@@ -713,7 +713,7 @@ function arns.getTokenCost(intendedAction)
 
 	assert(type(intent) == "string", "Intent is required and must be a string.")
 	assert(type(name) == "string", "Name is required and must be a string.")
-	if intent == "Buy-Name" or intent == "Buy-Record" then
+	if intent == "Buy-Name" then
 		-- stub the process id as it is not required for this intent
 		local processId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 		arns.assertValidBuyRecord(name, years, purchaseType, processId, false)

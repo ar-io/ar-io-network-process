@@ -94,7 +94,6 @@ local ActionMap = {
 	--- ArNS
 	Record = "Record",
 	Records = "Records",
-	BuyRecord = "Buy-Record", -- deprecated - use Buy-Name instead
 	BuyName = "Buy-Name",
 	UpgradeName = "Upgrade-Name",
 	ExtendLease = "Extend-Lease",
@@ -104,9 +103,7 @@ local ActionMap = {
 	ReservedNames = "Reserved-Names",
 	ReservedName = "Reserved-Name",
 	TokenCost = "Token-Cost",
-	GetCostDetails = "Get-Cost-Details-For-Action", -- deprecated - use Cost-Details instead
 	CostDetails = "Cost-Details",
-	GetRegistrationFees = "Get-Registration-Fees", -- deprecated - use Registration-Fees instead
 	RegistrationFees = "Registration-Fees",
 	ReturnedNames = "Returned-Names",
 	ReturnedName = "Returned-Name",
@@ -166,7 +163,7 @@ local function adjustSuppliesForFundingPlan(fundingPlan, rewardForInitiator)
 end
 
 --- @param ioEvent ARIOEvent
---- @param result BuyRecordResult|RecordInteractionResult|CreatePrimaryNameResult|PrimaryNameRequestApproval
+--- @param result BuyNameResult|RecordInteractionResult|CreatePrimaryNameResult|PrimaryNameRequestApproval
 local function addResultFundingPlanFields(ioEvent, result)
 	ioEvent:addFieldsWithPrefixIfExist(result.fundingPlan, "FP-", { "balance" })
 	local fundingPlanVaultsCount = 0
@@ -208,7 +205,7 @@ local function addResultFundingPlanFields(ioEvent, result)
 end
 
 --- @param ioEvent ARIOEvent
----@param result RecordInteractionResult|BuyRecordResult
+---@param result RecordInteractionResult|BuyNameResult
 local function addRecordResultFields(ioEvent, result)
 	ioEvent:addFieldsIfExist(result, {
 		"baseRegistrationFee",
@@ -867,9 +864,7 @@ addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", Actio
 	})
 end)
 
-addEventingHandler(ActionMap.BuyRecord, function(msg)
-	return msg.Action == ActionMap.BuyRecord or msg.Action == ActionMap.BuyName
-end, function(msg)
+addEventingHandler(ActionMap.BuyName, utils.hasMatchingTag("Action", ActionMap.BuyName), function(msg)
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
 	local purchaseType = msg.Tags["Purchase-Type"] and string.lower(msg.Tags["Purchase-Type"]) or "lease"
 	local years = msg.Tags.Years or nil
@@ -1034,7 +1029,6 @@ addEventingHandler(
 function assertTokenCostTags(msg)
 	local intentType = msg.Tags.Intent
 	local validIntents = utils.createLookupTable({
-		ActionMap.BuyRecord, -- Deprecated
 		ActionMap.BuyName,
 		ActionMap.ExtendLease,
 		ActionMap.IncreaseUndernameLimit,
@@ -1088,9 +1082,7 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 	})
 end)
 
-addEventingHandler(ActionMap.GetCostDetails, function(msg)
-	return msg.Action == ActionMap.CostDetails or msg.Action == ActionMap.GetCostDetails
-end, function(msg)
+addEventingHandler(ActionMap.CostDetails, utils.hasMatchingTag("Action", ActionMap.CostDetails), function(msg)
 	local fundFrom = msg.Tags["Fund-From"]
 	local name = string.lower(msg.Tags.Name)
 	local years = msg.Tags.Years or 1
@@ -1120,14 +1112,12 @@ end, function(msg)
 	})
 end)
 
-addEventingHandler(ActionMap.GetRegistrationFees, function(msg)
-	return msg.Action == ActionMap.RegistrationFees or msg.Action == ActionMap.GetRegistrationFees
-end, function(msg)
+addEventingHandler(ActionMap.RegistrationFees, utils.hasMatchingTag("Action", ActionMap.RegistrationFees), function(msg)
 	local priceList = arns.getRegistrationFees()
 
 	Send(msg, {
 		Target = msg.From,
-		Tags = { Action = ActionMap.GetRegistrationFees .. "-Notice" },
+		Tags = { Action = ActionMap.RegistrationFees .. "-Notice" },
 		Data = json.encode(priceList),
 	})
 end)
@@ -1999,7 +1989,12 @@ addEventingHandler(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Re
 	Send(msg, recordNotice)
 end)
 
--- TODO: this handler will not scale well as gateways and delegates increase, we should slice out the larger pieces (e.g. distributions should be fetched via a paginated handler)
+---[[
+--- TODO: this handler will not scale well as gateways and delegates increase,
+--- slice out the larger pieces (e.g. distributions should be fetched via a paginated handler)
+---
+--- This has downstream effects on the network portal, which loads the entire epoch data for each epoch
+---]]
 addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])

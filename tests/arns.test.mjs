@@ -20,6 +20,7 @@ import {
   getGateway,
   delegateStake,
   extendLease,
+  getBaseRegistrationFees,
 } from './helpers.mjs';
 import assert from 'node:assert';
 import {
@@ -119,34 +120,6 @@ describe('ArNS', async () => {
         endTimestamp: buyRecordData.endTimestamp,
       });
       sharedMemory = buyRecordResult.Memory;
-    });
-
-    it('should support `Buy-Record` as a backwards compatible alias', async () => {
-      // not using stub to test the backwards compatibility of the tag
-      const { result: buyRecordResult } = await buyRecord({
-        name: 'test-buy-record-tag',
-        type: 'lease',
-        years: 1,
-        processId: ''.padEnd(43, 'a'),
-        memory: sharedMemory,
-      });
-      const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
-      assert.equal(
-        buyRecordResult.Messages[0].Tags.find((t) => t.name === 'Action').value,
-        'Buy-Name-Notice',
-      );
-      const buyRecordResponse = JSON.parse(buyRecordResult.Messages[0].Data);
-      assert.deepEqual(buyRecordResponse, {
-        name: 'test-buy-record-tag',
-        processId: ''.padEnd(43, 'a'),
-        purchasePrice: buyRecordData.purchasePrice,
-        startTimestamp: buyRecordData.startTimestamp,
-        type: 'lease',
-        undernameLimit: 10,
-        endTimestamp: buyRecordData.endTimestamp,
-        baseRegistrationFee: buyRecordData.baseRegistrationFee,
-        remainingBalance: 948999520000000,
-      });
     });
 
     it('should fail to buy a permanently registered record', async () => {
@@ -351,16 +324,12 @@ describe('ArNS', async () => {
     });
   });
 
-  describe('Get-Registration-Fees', () => {
+  describe('Registration-Fees', () => {
     it('should return the base registration fees for each name length', async () => {
-      const priceListResult = await handle({
-        options: {
-          Tags: [{ name: 'Action', value: 'Get-Registration-Fees' }],
-        },
+      const priceList = await getBaseRegistrationFees({
         memory: sharedMemory,
       });
 
-      const priceList = JSON.parse(priceListResult.Messages[0].Data);
       // check that each key has lease with years and permabuy prices
       assert(Object.keys(priceList).length == 51);
       Object.keys(priceList).forEach((key) => {

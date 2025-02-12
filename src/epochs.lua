@@ -820,7 +820,7 @@ function epochs.getRewardRateForEpoch(epochIndex)
 		return distributionSettings.maximumRewardRate
 	end
 
-	-- if we are after the decay start, return the minimum reward rate (0.05%)
+	-- if at the end of the decay period, return the minimum reward rate (0.05%)
 	if epochIndex > distributionSettings.rewardDecayLastEpoch then
 		return distributionSettings.minimumRewardRate
 	end
