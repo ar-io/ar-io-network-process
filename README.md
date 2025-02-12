@@ -215,4 +215,4 @@ dependencies = {
 
 Merging to develop or main will evolve the devnet or testnet contract to the next version. The script managing the logic is located at `tools/evolve.mjs`, which uses aoconnect to perform an `Eval` action. The deployment process is automated using Github Actions.
 
-[contract whitepaper]: https://ar.io/whitepaper
+[contract whitepaper]: https://whitepaper.arweave.net
