@@ -64,6 +64,7 @@ local ActionMap = {
 	PrescribedNames = "Epoch-Prescribed-Names",
 	Observations = "Epoch-Observations",
 	Distributions = "Epoch-Distributions",
+	EligibleDistributions = "Eligible-Distributions",
 	--- Vaults
 	Vault = "Vault",
 	Vaults = "Vaults",
@@ -2057,6 +2058,23 @@ addEventingHandler(ActionMap.Distributions, utils.hasMatchingTag("Action", Actio
 		Data = json.encode(distributions),
 	})
 end)
+
+addEventingHandler(
+	"eligibleDistributions",
+	utils.hasMatchingTag("Action", ActionMap.EligibleDistributions),
+	function(msg)
+		local page = utils.parsePaginationTags(msg)
+
+		local eligibleDistributions =
+			epochs.getEligibleDistributions(msg.Timestamp, page.cursor, page.limit, page.sortBy, page.sortOrder)
+
+		Send(msg, {
+			Target = msg.From,
+			Action = "Eligible-Distributions-Notice",
+			Data = json.encode(eligibleDistributions),
+		})
+	end
+)
 
 addEventingHandler("paginatedReservedNames", utils.hasMatchingTag("Action", ActionMap.ReservedNames), function(msg)
 	local page = utils.parsePaginationTags(msg)

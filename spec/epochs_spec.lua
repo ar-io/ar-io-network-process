@@ -1008,4 +1008,122 @@ describe("epochs", function()
 			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(12053))
 		end)
 	end)
+
+	describe("getEligibleDistributionsForEpoch", function()
+		it("should return paginated eligible distributions", function()
+			_G.Epochs[0] = {
+				distributions = {
+					rewards = {
+						eligible = {
+							["test-this-is-valid-arweave-wallet-address-1"] = {
+								operatorReward = 300,
+								delegateRewards = {
+									["this-is-a-delegate-2"] = 2550,
+									["this-is-a-delegate"] = 25,
+								},
+							},
+							["test-this-is-valid-arweave-wallet-address-2"] = {
+								operatorReward = 255,
+								delegateRewards = { ["this-is-a-delegate"] = 50 },
+							},
+							["test-this-is-valid-arweave-wallet-address-3"] = {
+								operatorReward = 125,
+								delegateRewards = { ["this-is-a-delegate"] = 20 },
+							},
+							["test-this-is-valid-arweave-wallet-address-4"] = {
+								operatorReward = 40,
+								delegateRewards = { ["this-is-a-delegate"] = 30 },
+							},
+							["test-this-is-valid-arweave-wallet-address-5"] = {
+								operatorReward = 5,
+								delegateRewards = { ["this-is-a-delegate"] = 10 },
+							},
+						},
+					},
+				},
+			}
+
+			local result = epochs.getEligibleDistributions(
+				_G.EpochSettings.epochZeroStartTimestamp,
+				nil,
+				3,
+				"eligibleReward",
+				"desc"
+			)
+
+			assert.are.same({
+				limit = 3,
+				sortBy = "eligibleReward",
+				sortOrder = "desc",
+				hasMore = true,
+				totalItems = 11,
+				nextCursor = "test-this-is-valid-arweave-wallet-address-2_test-this-is-valid-arweave-wallet-address-2",
+				items = {
+					{
+						cursorId = "test-this-is-valid-arweave-wallet-address-1_this-is-a-delegate-2",
+						eligibleReward = 2550,
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
+						recipient = "this-is-a-delegate-2",
+						type = "delegateReward",
+					},
+					{
+						cursorId = "test-this-is-valid-arweave-wallet-address-1_test-this-is-valid-arweave-wallet-address-1",
+						eligibleReward = 300,
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
+						recipient = "test-this-is-valid-arweave-wallet-address-1",
+						type = "operatorReward",
+					},
+					{
+						cursorId = "test-this-is-valid-arweave-wallet-address-2_test-this-is-valid-arweave-wallet-address-2",
+						eligibleReward = 255,
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-2",
+						recipient = "test-this-is-valid-arweave-wallet-address-2",
+						type = "operatorReward",
+					},
+				},
+			}, result)
+
+			-- Test with a different cursor
+			result = epochs.getEligibleDistributions(
+				_G.EpochSettings.epochZeroStartTimestamp,
+				"test-this-is-valid-arweave-wallet-address-2_test-this-is-valid-arweave-wallet-address-2",
+				3,
+				"eligibleReward",
+				"desc"
+			)
+
+			assert.are.same({
+				limit = 3,
+				sortBy = "eligibleReward",
+				sortOrder = "desc",
+				hasMore = true,
+				nextCursor = "test-this-is-valid-arweave-wallet-address-4_test-this-is-valid-arweave-wallet-address-4",
+				totalItems = 11,
+				items = {
+					{
+						cursorId = "test-this-is-valid-arweave-wallet-address-3_test-this-is-valid-arweave-wallet-address-3",
+						eligibleReward = 125,
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-3",
+						recipient = "test-this-is-valid-arweave-wallet-address-3",
+						type = "operatorReward",
+					},
+					{
+						cursorId = "test-this-is-valid-arweave-wallet-address-2_this-is-a-delegate",
+						eligibleReward = 50,
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-2",
+						recipient = "this-is-a-delegate",
+						type = "delegateReward",
+					},
+
+					{
+						cursorId = "test-this-is-valid-arweave-wallet-address-4_test-this-is-valid-arweave-wallet-address-4",
+						eligibleReward = 40,
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-4",
+						recipient = "test-this-is-valid-arweave-wallet-address-4",
+						type = "operatorReward",
+					},
+				},
+			}, result)
+		end)
+	end)
 end)

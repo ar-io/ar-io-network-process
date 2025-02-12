@@ -182,6 +182,29 @@ function epochs.getDistributionsForEpoch(epochIndex)
 	return epoch and epoch.distributions or {}
 end
 
+--- @class EligibleRewardTotals
+--- @field totalEligibleGateways number The total eligible gateways
+--- @field totalEligibleRewards number The total eligible rewards
+--- @field totalEligibleGatewayReward number The total eligible gateway reward
+--- @field totalEligibleObserverReward number The total eligible observer reward
+
+-- TODO: Replace getDistributionsForEpoch function with this once network portal uses paginated handler
+--- @param epochIndex number The epoch index
+--- @return EligibleRewardTotals | nil # The totals for the eligible rewards for the epoch
+function epochs.getTotalEligibleRewardsForEpoch(epochIndex)
+	local epoch = epochs.getEpochUnsafe(epochIndex)
+	if not epoch or not epoch.distributions then
+		return nil
+	end
+
+	return {
+		totalEligibleGateways = epoch.distributions.totalEligibleGateways,
+		totalEligibleRewards = epoch.distributions.totalEligibleRewards,
+		totalEligibleGatewayReward = epoch.distributions.totalEligibleGatewayReward,
+		totalEligibleObserverReward = epoch.distributions.totalEligibleObserverReward,
+	}
+end
+
 --- Gets the prescribed names for an epoch
 --- @param epochIndex number The epoch index
 --- @return string[] # The prescribed names for the epoch
@@ -833,6 +856,59 @@ function epochs.getRewardRateForEpoch(epochIndex)
 	local totalRewardRateDecayed = distributionSettings.maximumRewardRate - totalRateDecayed
 	-- avoid floating point precision issues, round to 5 decimal places
 	return utils.roundToPrecision(totalRewardRateDecayed, 5)
+end
+
+--- @class EligibleRewards
+--- @field recipient WalletAddress
+--- @field eligibleReward mARIO
+--- @field gatewayAddress WalletAddress
+--- @field type "delegateReward"|"operatorReward"
+--- @field cursorId string gatewayAddress concatenated with recipient for pagination
+
+--- Gets the distributions for the current epoch
+--- @param currentTimestamp number
+--- @param cursor string|nil The cursor to paginate from
+--- @param limit number The limit of records to return
+--- @param sortBy string|nil The field to sort by
+--- @param sortOrder string The order to sort by
+--- @return PaginatedTable<PrescribedEpochDistribution> The paginated eligible distributions for the epoch
+function epochs.getEligibleDistributions(currentTimestamp, cursor, limit, sortBy, sortOrder)
+	local epochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp)
+	if epochIndex < 0 then
+		return {}
+	end
+	local epoch = epochs.getEpochUnsafe(epochIndex)
+	if
+		not epoch
+		or not epoch.distributions
+		or not epoch.distributions.rewards
+		or not epoch.distributions.rewards.eligible
+	then
+		return {}
+	end
+
+	local rewardsArray = {}
+	for gatewayAddress, reward in pairs(epoch.distributions.rewards.eligible) do
+		table.insert(rewardsArray, {
+			type = "operatorReward",
+			recipient = gatewayAddress,
+			eligibleReward = reward.operatorReward,
+			gatewayAddress = gatewayAddress,
+			cursorId = gatewayAddress .. "_" .. gatewayAddress,
+		})
+
+		for delegateAddress, delegateRewardQty in pairs(reward.delegateRewards) do
+			table.insert(rewardsArray, {
+				type = "delegateReward",
+				recipient = delegateAddress,
+				eligibleReward = delegateRewardQty,
+				gatewayAddress = gatewayAddress,
+				cursorId = gatewayAddress .. "_" .. delegateAddress,
+			})
+		end
+	end
+
+	return utils.paginateTableWithCursor(rewardsArray, cursor, "cursorId", limit, sortBy, sortOrder)
 end
 
 return epochs
