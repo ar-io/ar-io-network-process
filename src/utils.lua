@@ -69,6 +69,9 @@ end
 function utils.parsePaginationTags(msg)
 	local cursor = msg.Tags.Cursor
 	local limit = tonumber(msg.Tags["Limit"]) or 100
+
+	assert(limit <= 1000, "Limit must be less than or equal to 1000")
+
 	local sortOrder = msg.Tags["Sort-Order"] and string.lower(msg.Tags["Sort-Order"]) or "desc"
 	local sortBy = msg.Tags["Sort-By"]
 	return {
