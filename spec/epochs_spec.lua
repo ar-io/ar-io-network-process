@@ -1008,4 +1008,117 @@ describe("epochs", function()
 			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(12053))
 		end)
 	end)
+
+	describe("getEligibleDistributionsForEpoch", function()
+		it("should return paginated eligible distributions", function()
+			_G.Epochs[0] = {
+				distributions = {
+					rewards = {
+						eligible = {
+							["test-this-is-valid-arweave-wallet-address-1"] = {
+								operatorReward = 300,
+								delegateRewards = { ["this-is-a-delegate"] = 25 },
+							},
+							["test-this-is-valid-arweave-wallet-address-2"] = {
+								operatorReward = 255,
+								delegateRewards = { ["this-is-a-delegate"] = 25 },
+							},
+							["test-this-is-valid-arweave-wallet-address-3"] = {
+								operatorReward = 125,
+								delegateRewards = { ["this-is-a-delegate"] = 25 },
+							},
+							["test-this-is-valid-arweave-wallet-address-4"] = {
+								operatorReward = 25,
+								delegateRewards = { ["this-is-a-delegate"] = 25 },
+							},
+							["test-this-is-valid-arweave-wallet-address-5"] = {
+								operatorReward = 5,
+								delegateRewards = { ["this-is-a-delegate"] = 25 },
+							},
+						},
+					},
+				},
+			}
+
+			local result = epochs.getEligibleDistributions(
+				_G.EpochSettings.epochZeroStartTimestamp,
+				nil,
+				3,
+				"operatorReward",
+				"desc"
+			)
+
+			assert.are.same({
+				limit = 3,
+				sortBy = "operatorReward",
+				sortOrder = "desc",
+				hasMore = true,
+				totalItems = 5,
+				nextCursor = "test-this-is-valid-arweave-wallet-address-3",
+				items = {
+					{
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
+						operatorReward = 300,
+						delegateRewards = {
+							["this-is-a-delegate"] = 25,
+						},
+					},
+					{
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-2",
+						operatorReward = 255,
+						delegateRewards = {
+							["this-is-a-delegate"] = 25,
+						},
+					},
+					{
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-3",
+						operatorReward = 125,
+						delegateRewards = {
+							["this-is-a-delegate"] = 25,
+						},
+					},
+				},
+			}, result)
+
+			-- Test with a different cursor
+			result = epochs.getEligibleDistributions(
+				_G.EpochSettings.epochZeroStartTimestamp,
+				"test-this-is-valid-arweave-wallet-address-2",
+				3,
+				"operatorReward",
+				"desc"
+			)
+
+			assert.are.same({
+				limit = 3,
+				sortBy = "operatorReward",
+				sortOrder = "desc",
+				hasMore = false,
+				totalItems = 5,
+				items = {
+					{
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-3",
+						operatorReward = 125,
+						delegateRewards = {
+							["this-is-a-delegate"] = 25,
+						},
+					},
+					{
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-4",
+						operatorReward = 25,
+						delegateRewards = {
+							["this-is-a-delegate"] = 25,
+						},
+					},
+					{
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-5",
+						operatorReward = 5,
+						delegateRewards = {
+							["this-is-a-delegate"] = 25,
+						},
+					},
+				},
+			}, result)
+		end)
+	end)
 end)
