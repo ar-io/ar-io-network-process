@@ -871,7 +871,7 @@ function epochs.getEligibleDistributions(currentTimestamp, cursor, limit, sortBy
 		return {}
 	end
 	local epoch = epochs.getEpoch(epochIndex)
-	if not epoch or not epoch.distributions then
+	if not epoch or not epoch.distributions or not epoch.distributions.rewards or not epoch.distributions.rewards.eligible then
 		return {}
 	end
 
