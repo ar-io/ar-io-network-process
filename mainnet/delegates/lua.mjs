@@ -14,13 +14,19 @@ const argv = yargs(hideBin(process.argv))
     alias: 'o',
     type: 'string',
     description: 'Output CSV file path',
-    default: './outputs/balances.lua',
+    default: './outputs/delegates.lua',
   })
   .option('input', {
     alias: 'i',
     type: 'string',
     description: 'Input CSV file path',
-    default: './outputs/balances.csv',
+    default: './outputs/delegates.csv',
+  })
+  .option('start-timestamp', {
+    alias: 's',
+    type: 'number',
+    description: 'Start timestamp for the gateway and all delegates',
+    default: Date.now(),
   })
   .help()
   .parseSync();
@@ -28,8 +34,10 @@ const argv = yargs(hideBin(process.argv))
 const dryRun = argv.dryRun;
 const output = argv.output;
 const input = argv.input;
+const startTimestamp = argv.startTimestamp;
+
 console.log(
-  'Creating raw balances from',
+  'Creating delegate balances from',
   input,
   'and writing to',
   output,
@@ -38,8 +46,8 @@ console.log(
 // overwrite the file if it exists
 fs.writeFileSync(path.join(process.cwd(), output), '');
 
-// read all the records from the input file
-const balances = fs
+// now do the same with assigned delegates
+const assignedDelegates = fs
   .readFileSync(path.join(process.cwd(), input), 'utf8')
   .split('\n')
   .slice(1)
@@ -48,14 +56,15 @@ const balances = fs
   .filter(Boolean) // Remove empty lines
   .map((row) => row.split(','));
 
-for (const balance of balances) {
-  const [address, mARIOQty] = balance;
-  const luaRecord = `Balances["${address}"] = ${mARIOQty};\n`;
-  if (dryRun) {
-    console.log(luaRecord);
-  } else {
-    fs.appendFileSync(output, luaRecord);
+  for (const delegate of assignedDelegates) {
+    const [address, delegateAddress, delegateStake] = delegate;
+    const luaRecord = `GatewayRegistry["${address}"].delegates["${delegateAddress}"] = { delegatedStake = ${delegateStake}, startTimestamp = ${startTimestamp}, vaults = {} },\n`;
+    if (dryRun) {
+      console.log(luaRecord);
+    } else {
+      fs.appendFileSync(output, luaRecord);
+    }
+    // TODO: update the total delegated stake balances on the gateway
   }
-}
 
 console.log('Done');

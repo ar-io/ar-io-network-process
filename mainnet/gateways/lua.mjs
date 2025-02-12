@@ -103,6 +103,8 @@ for (const gateway of gateways) {
   }
   assignedDelegatesForGatewayLua += '\t\t}';
 
+  // consider separting delgates to separate file
+
   const luaRecord = `
 GatewayRegistry["${gatewayAddress}"] = {
     observerAddress = "${observerAddress}",

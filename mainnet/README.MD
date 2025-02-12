@@ -4,7 +4,7 @@ Each section supports extraction of state from existing AO processes, and creati
 
 ---
 
-### Balances and Delegates
+### Balances
 
 This tool creates a CSV file with the liquid balances from the $ARIO airdrop process. Wallets that selected 'wallet' when registering receive no additional mARIO.
 
@@ -72,10 +72,11 @@ Resulting lua file: [./gateways/outputs/gateways.lua](./gateways/outputs/gateway
 <summary>Lua file</summary>
 
 ```lua
+-- for every gateway in the input file
 GatewayRegistry["<gatewayAddress>"] = {
     observerAddress = "<observerAddress>",
     operatorStake = <operatorStake>,
-    totalDelegatedStake = <totalDelegatedStake>,
+    totalDelegatedStake = 0,
     settings = {
         fqdn = "<fqdn>",
         port = <port>,
@@ -89,13 +90,7 @@ GatewayRegistry["<gatewayAddress>"] = {
         autoStake = <autoStake>,
         allowedDelegates = {},
     },
-    delegates = {
-        ["<delegateAddress>"] = {
-            delegatedStake = <delegatedStake>,
-            startTimestamp = <startTimestamp>,
-            vaults = {},
-        },
-    },
+    delegates = {},
     services = {},
     status = "<status>",
     weights = {
@@ -118,6 +113,41 @@ GatewayRegistry["<gatewayAddress>"] = {
 ```
 
 </details>
+
+---
+
+### Delegates
+
+This tool creates a CSV file with the delegates for the airdrop. It also creates a lua file with the delegates and their assigned gateways.
+
+To run:
+
+```bash
+node delegates/extract.mjs --input <inputFile> --output <outputFile>
+```
+
+Resulting CSV file: [./delegates/outputs/delegates.csv](./delegates/outputs/delegates.csv)
+
+```csv
+gatewayAddress,delegateAddress,delegateStake
+```
+
+To create the lua file from the csv file:
+
+```bash
+node delegates/lua.mjs --input <inputFile> --output <outputFile> --gateways-file <gatewaysFile>
+```
+
+Resulting lua file: [./delegates/outputs/delegates.lua](./delegates/outputs/delegates.lua)
+
+Lua file content:
+
+```lua
+GatewayRegistry["<gatewayAddress>"].delegates["<delegateAddress>"] = { delegatedStake = <delegatedStake>, startTimestamp = <startTimestamp>, vaults = {} },
+-- ...
+-- Update the total delegated stake on the gateway after all delegates have been added
+GatewayRegistry["<gatewayAddress>"].totalDelegatedStake = <totalDelegatedStake>,
+```
 
 ---
 
@@ -190,3 +220,4 @@ NameRegistry.records["<name>"] = {
 ```
 
 // TODO: vaults
+// Create a boot.lua that takes all the generated lua and requires it

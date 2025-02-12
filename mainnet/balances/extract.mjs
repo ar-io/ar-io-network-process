@@ -18,46 +18,23 @@ const argv = yargs(hideBin(process.argv))
     description: 'Run without making any changes',
     default: false,
   })
-  .option('output-balances', {
+  .option('output', {
     alias: 'o',
     type: 'string',
     description: 'Output CSV file path',
-    default: './outputs/liquid_balances.csv',
-  })
-  .option('output-delegates', {
-    alias: 'l',
-    type: 'string',
-    description: 'Output CSV file path for assigned delegates',
-    default: './outputs/assigned_delegates.csv',
-  })
-  .option('gateways-file', {
-    alias: 'g',
-    type: 'string',
-    description: 'Gateways CSV file path',
-    default: '../gateways/outputs/gateways.csv',
-  })
-  .option('staked-multiplier', {
-    alias: 'm',
-    type: 'number',
-    description: 'The multiplier for staked wallets',
-    default: 1.25, // 25% for staked wallets
+    default: './outputs/balances.csv',
   })
   .help()
   .parseSync();
 
 const processId = argv.processId;
 const dryRun = argv.dryRun;
-const outputBalances = argv['output-balances'];
-const outputDelegates = argv['output-delegates'];
-const gatewaysFile = argv['gateways-file'];
-const stakedMultiplier = argv['staked-multiplier'];
+const output = argv.output;
 console.log(
   'Pulling liquid balances from AIRDROP process',
   processId,
   'and writing to',
-  outputBalances,
-  'and delegates to',
-  outputDelegates,
+  output,
 );
 
 const airdrop = new AOProcess({
@@ -81,10 +58,10 @@ const { items: registrants } = await airdrop.read({
 });
 
 // overwrite the file if it exists
-fs.writeFileSync(path.join(process.cwd(), outputBalances), '');
+fs.writeFileSync(path.join(process.cwd(), output), '');
 
 // write the header
-fs.appendFileSync(outputBalances, 'address,mARIOQty\n');
+fs.appendFileSync(output, 'address,mARIOQty\n');
 
 const liquidRegistrants = registrants.filter((r) => r.type === 'wallet');
 
@@ -96,50 +73,7 @@ for (const registrant of liquidRegistrants) {
   if (dryRun) {
     console.log(csvRow);
   } else {
-    fs.appendFileSync(outputBalances, `${csvRow}\n`);
-  }
-}
-
-// assign the delegates
-fs.writeFileSync(path.join(process.cwd(), outputDelegates), '');
-
-// write the header
-fs.appendFileSync(
-  outputDelegates,
-  'gatewayAddress,delegateAddress,delegateStake\n',
-);
-
-const gatewayAddresses = fs
-  .readFileSync(gatewaysFile, 'utf8')
-  .split('\n')
-  .slice(1) // Skip header row
-  .filter(Boolean) // Remove empty lines
-  .map((line) => line.split(',')[1]); // Get just the address column
-const stakedRegistrants = registrants.filter((r) => r.type === 'stake');
-
-console.log(
-  `Assigning ${stakedRegistrants.length} staked registrations to ${gatewayAddresses.length} gateways`,
-);
-
-for (const registrant of stakedRegistrants) {
-  const { address: delegateAddress, mARIOBaseQty } = registrant;
-
-  // compute the assigned gateway based on the hash of the address
-  const delegateHash = crypto
-    .createHash('sha256')
-    .update(delegateAddress)
-    .digest('hex');
-  const truncatedHash = delegateHash.substring(0, 8);
-  const gatewayAddress =
-    gatewayAddresses[parseInt(truncatedHash, 16) % gatewayAddresses.length];
-
-  // assign the delegate
-  const delegateStake = mARIOBaseQty * stakedMultiplier;
-  const csvRow = [gatewayAddress, delegateAddress, delegateStake].join(',');
-  if (dryRun) {
-    console.log(csvRow);
-  } else {
-    fs.appendFileSync(outputDelegates, `${csvRow}\n`);
+    fs.appendFileSync(output, `${csvRow}\n`);
   }
 }
 
