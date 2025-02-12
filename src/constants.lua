@@ -113,11 +113,11 @@ constants.DEFAULT_DEMAND_FACTOR_SETTINGS = {
 	periodZeroStartTimestamp = 1722837600000, -- 08/05/2024 @ 12:00am (UTC) (TODO: set this on mainnet process, it could start whenever the process is created)
 	movingAvgPeriodCount = 7, -- the number of periods to use for the moving average
 	periodLengthMs = constants.daysToMs(1), -- one day in milliseconds
-	demandFactorBaseValue = 1, -- the base demand factor
-	demandFactorMin = 0.5, -- the minimum demand factor
-	demandFactorUpAdjustment = 0.05, -- 5%
-	demandFactorDownAdjustment = 0.015, -- 1.5%
-	stepDownThreshold = 3, -- three consecutive periods with the minimum demand factor (TODO: mainnet this should be 14)
+	demandFactorBaseValue = 1, -- the base demand factor value that is what the demand factor is reset to when fees are reset
+	demandFactorMin = 0.5, -- the minimum demand factor allowed, after which maxPeriodsAtMinDemandFactor is applied and fees are reset
+	demandFactorUpAdjustment = 0.05, -- the % of the demand factor to increase by each period
+	demandFactorDownAdjustment = 0.015, -- the % of the demand factor to decrease by each period
+	maxPeriodsAtMinDemandFactor = 3, -- three consecutive periods with the minimum demand factor (TODO: mainnet this should be 14)
 	criteria = "revenue", -- "revenue" or "purchases"
 	-- NOTE: we may manually set the demand factor to 2 on mainnet, would be a separate variable here
 }
