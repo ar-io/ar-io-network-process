@@ -858,11 +858,18 @@ function epochs.getRewardRateForEpoch(epochIndex)
 	return utils.roundToPrecision(totalRewardRateDecayed, 5)
 end
 
+--- @class EligibleRewards
+--- @field recipient WalletAddress
+--- @field eligibleReward mARIO
+--- @field gatewayAddress WalletAddress
+--- @field type "delegateReward"|"operatorReward"
+--- @field cursorId string gatewayAddress concatenated with recipient for pagination
+
 --- Gets the distributions for the current epoch
 --- @param currentTimestamp number
 --- @param cursor string|nil The cursor to paginate from
 --- @param limit number The limit of records to return
---- @param sortBy string The field to sort by
+--- @param sortBy string|nil The field to sort by
 --- @param sortOrder string The order to sort by
 --- @return PaginatedTable<PrescribedEpochDistribution> The paginated eligible distributions for the epoch
 function epochs.getEligibleDistributions(currentTimestamp, cursor, limit, sortBy, sortOrder)
@@ -881,14 +888,27 @@ function epochs.getEligibleDistributions(currentTimestamp, cursor, limit, sortBy
 	end
 
 	local rewardsArray = {}
-	for address, reward in pairs(epoch.distributions.rewards.eligible) do
-		local rewardCopy = utils.deepCopy(reward)
-		---@diagnostic disable-next-line: inject-field
-		rewardCopy.gatewayAddress = address
-		table.insert(rewardsArray, rewardCopy)
+	for gatewayAddress, reward in pairs(epoch.distributions.rewards.eligible) do
+		table.insert(rewardsArray, {
+			type = "operatorReward",
+			recipient = gatewayAddress,
+			eligibleReward = reward.operatorReward,
+			gatewayAddress = gatewayAddress,
+			cursorId = gatewayAddress .. "_" .. gatewayAddress,
+		})
+
+		for delegateAddress, delegateRewardQty in pairs(reward.delegateRewards) do
+			table.insert(rewardsArray, {
+				type = "delegateReward",
+				recipient = delegateAddress,
+				eligibleReward = delegateRewardQty,
+				gatewayAddress = gatewayAddress,
+				cursorId = gatewayAddress .. "_" .. delegateAddress,
+			})
+		end
 	end
 
-	return utils.paginateTableWithCursor(rewardsArray, cursor, "gatewayAddress", limit, sortBy, sortOrder)
+	return utils.paginateTableWithCursor(rewardsArray, cursor, "cursorId", limit, sortBy, sortOrder)
 end
 
 return epochs
