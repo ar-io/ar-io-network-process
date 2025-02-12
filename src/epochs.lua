@@ -188,7 +188,8 @@ end
 --- @field totalEligibleGatewayReward number The total eligible gateway reward
 --- @field totalEligibleObserverReward number The total eligible observer reward
 
--- TODO: Replace above function with this once network portal uses paginated handler
+-- TODO: Replace getDistributionsForEpoch function with this once network portal uses paginated handler
+--- @param epochIndex number The epoch index
 --- @return EligibleRewardTotals | nil # The totals for the eligible rewards for the epoch
 function epochs.getTotalEligibleRewardsForEpoch(epochIndex)
 	local epoch = epochs.getEpoch(epochIndex)
@@ -857,7 +858,7 @@ function epochs.getRewardRateForEpoch(epochIndex)
 	return utils.roundToPrecision(totalRewardRateDecayed, 5)
 end
 
---- Gets the distributions for an epoch
+--- Gets the distributions for the current epoch
 --- @param currentTimestamp number
 --- @param cursor string|nil The cursor to paginate from
 --- @param limit number The limit of records to return
@@ -882,10 +883,7 @@ function epochs.getEligibleDistributions(currentTimestamp, cursor, limit, sortBy
 		table.insert(rewardsArray, rewardCopy)
 	end
 
-	local paginatedRewards =
-		utils.paginateTableWithCursor(rewardsArray, cursor, "gatewayAddress", limit, sortBy, sortOrder)
-
-	return paginatedRewards
+	return utils.paginateTableWithCursor(rewardsArray, cursor, "gatewayAddress", limit, sortBy, sortOrder)
 end
 
 return epochs
