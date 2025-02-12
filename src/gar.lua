@@ -86,7 +86,7 @@ GatewayRegistry = GatewayRegistry or {}
 --- @field withdrawLengthMs number
 --- @field leaveLengthMs number
 --- @field failedEpochCountMax number
---- @field failedEpochSlashRate number
+--- @field failedGatewaySlashRate number
 --- @field maxDelegateRewardShareRatio number
 --- @class ExpeditedWithdrawalsSettings
 --- @field minExpeditedWithdrawalPenaltyRate number
@@ -1048,7 +1048,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 			then
 				-- slash the minimum operator stake and return it to the protocol balance; mark the gateway as leaving which will vault remaining stake
 				local slashableOperatorStake = math.min(gateway.operatorStake, garSettings.operators.minStake)
-				local slashAmount = math.floor(slashableOperatorStake * garSettings.operators.failedEpochSlashRate)
+				local slashAmount = math.floor(slashableOperatorStake * garSettings.operators.failedGatewaySlashRate)
 				result.delegateStakeWithdrawing = result.delegateStakeWithdrawing + gateway.totalDelegatedStake
 				result.gatewayStakeWithdrawing = result.gatewayStakeWithdrawing + (gateway.operatorStake - slashAmount)
 				gar.slashOperatorStake(gatewayAddress, slashAmount, currentTimestamp)

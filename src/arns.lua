@@ -117,7 +117,7 @@ function arns.buyRecord(name, purchaseType, years, from, timestamp, processId, m
 
 	local record = arns.getRecord(name)
 	local isPermabuy = record ~= nil and record.type == "permabuy"
-	local isActiveLease = record ~= nil and (record.endTimestamp or 0) + constants.GRACE_PERIOD_MS > timestamp
+	local isActiveLease = record ~= nil and (record.endTimestamp or 0) + constants.GRACE_PERIOD_DURATION_MS > timestamp
 
 	assert(not isPermabuy and not isActiveLease, "Name is already registered")
 
@@ -527,7 +527,7 @@ end
 --- @param demandFactor number The demand factor
 --- @return number permabuyFee - the permabuy fee
 function arns.calculatePermabuyFee(baseFee, demandFactor)
-	local permabuyPrice = baseFee + arns.calculateAnnualRenewalFee(baseFee, constants.PERMABUY_LEASE_FEE_LENGTH)
+	local permabuyPrice = baseFee + arns.calculateAnnualRenewalFee(baseFee, constants.PERMABUY_LEASE_FEE_LENGTH_YEARS)
 	return math.floor(demandFactor * permabuyPrice)
 end
 
@@ -633,7 +633,7 @@ function arns.getMaxAllowedYearsExtensionForRecord(record, currentTimestamp)
 
 	if
 		currentTimestamp > record.endTimestamp
-		and currentTimestamp < record.endTimestamp + constants.GRACE_PERIOD_MS
+		and currentTimestamp < record.endTimestamp + constants.GRACE_PERIOD_DURATION_MS
 	then
 		return constants.MAX_LEASE_LENGTH_YEARS
 	end
@@ -894,7 +894,7 @@ end
 function arns.recordInGracePeriod(record, timestamp)
 	return record.endTimestamp
 			and record.endTimestamp < timestamp
-			and record.endTimestamp + constants.GRACE_PERIOD_MS > timestamp
+			and record.endTimestamp + constants.GRACE_PERIOD_DURATION_MS > timestamp
 		or false
 end
 
@@ -1051,7 +1051,7 @@ function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)
 				newGracePeriodRecords[name] = record
 			end
 			-- Make sure we prune when the grace period is over
-			arns.scheduleNextRecordsPrune(record.endTimestamp + constants.GRACE_PERIOD_MS)
+			arns.scheduleNextRecordsPrune(record.endTimestamp + constants.GRACE_PERIOD_DURATION_MS)
 		elseif record.endTimestamp then
 			arns.scheduleNextRecordsPrune(record.endTimestamp)
 		end

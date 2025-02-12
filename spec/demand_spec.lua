@@ -21,8 +21,8 @@ describe("demand", function()
 			demandFactorBaseValue = 1,
 			demandFactorMin = 0.5,
 
-			demandFactorUpAdjustment = 0.05,
-			demandFactorDownAdjustment = 0.015,
+			demandFactorUpAdjustmentRate = 0.05,
+			demandFactorDownAdjustmentRate = 0.015,
 			maxPeriodsAtMinDemandFactor = 3,
 			criteria = "revenue",
 		}
@@ -142,7 +142,7 @@ describe("demand", function()
 			local currentTimestamp = 0
 			local numPeriodsToHitMinimum = math.ceil(
 				math.log(_G.DemandFactorSettings.demandFactorMin)
-					/ math.log(1 - _G.DemandFactorSettings.demandFactorDownAdjustment)
+					/ math.log(1 - _G.DemandFactorSettings.demandFactorDownAdjustmentRate)
 			)
 			local periodAtWhichFeesReset = numPeriodsToHitMinimum + _G.DemandFactorSettings.maxPeriodsAtMinDemandFactor
 			local totalStepDownCycles = 5
@@ -157,7 +157,7 @@ describe("demand", function()
 					if i < periodAtWhichFeesReset then
 						local expectedDemandFactor = math.max(
 							utils.roundToPrecision(
-								demandBeforeUpdate * (1 - _G.DemandFactorSettings.demandFactorDownAdjustment),
+								demandBeforeUpdate * (1 - _G.DemandFactorSettings.demandFactorDownAdjustmentRate),
 								5
 							),
 							_G.DemandFactorSettings.demandFactorMin
@@ -186,8 +186,8 @@ describe("demand", function()
 				demandFactorStartingValue = 1,
 				demandFactorBaseValue = 1,
 				demandFactorMin = 0.5,
-				demandFactorUpAdjustment = 0.05,
-				demandFactorDownAdjustment = 0.025,
+				demandFactorUpAdjustmentRate = 0.05,
+				demandFactorDownAdjustmentRate = 0.025,
 				maxPeriodsAtMinDemandFactor = 3,
 				criteria = "purchases",
 			}

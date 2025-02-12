@@ -11,17 +11,7 @@ local demand = {}
 --- @field currentDemandFactor number The current demand factor
 --- @field consecutivePeriodsWithMinDemandFactor number The number of consecutive periods with the minimum demand factor
 --- @field fees table<number, number> The fees for each name length
-DemandFactor = DemandFactor
-	or {
-		currentPeriod = 1, -- one based index of the current period
-		trailingPeriodPurchases = { 0, 0, 0, 0, 0, 0, 0 }, -- Acts as a ring buffer of trailing period purchase counts
-		trailingPeriodRevenues = { 0, 0, 0, 0, 0, 0 }, -- Acts as a ring buffer of trailing period revenues
-		purchasesThisPeriod = 0,
-		revenueThisPeriod = 0,
-		currentDemandFactor = 1,
-		consecutivePeriodsWithMinDemandFactor = 0,
-		fees = constants.DEFAULT_GENESIS_FEES,
-	}
+DemandFactor = DemandFactor or utils.deepCopy(constants.DEFAULT_DEMAND_FACTOR)
 
 --- @class DemandFactorSettings
 --- @field periodZeroStartTimestamp number The timestamp of the start of period zero
@@ -29,11 +19,11 @@ DemandFactor = DemandFactor
 --- @field periodLengthMs number The length of a period in milliseconds
 --- @field demandFactorBaseValue number The base demand factor value that is what the demand factor is reset to when fees are reset
 --- @field demandFactorMin number The minimum demand factor value
---- @field demandFactorUpAdjustment number The adjustment to the demand factor when it is increasing
---- @field demandFactorDownAdjustment number The adjustment to the demand factor when it is decreasing
+--- @field demandFactorUpAdjustmentRate number The adjustment to the demand factor when it is increasing
+--- @field demandFactorDownAdjustmentRate number The adjustment to the demand factor when it is decreasing
 --- @field maxPeriodsAtMinDemandFactor number The threshold for the number of consecutive periods with the minimum demand factor before adjusting the demand factor
 --- @field criteria 'revenue' | 'purchases' The criteria to use for determining if the demand is increasing
-DemandFactorSettings = DemandFactorSettings or constants.DEFAULT_DEMAND_FACTOR_SETTINGS
+DemandFactorSettings = DemandFactorSettings or utils.deepCopy(constants.DEFAULT_DEMAND_FACTOR_SETTINGS)
 
 --- Tally a name purchase
 --- @param qty number The quantity of the purchase
@@ -135,13 +125,13 @@ function demand.updateDemandFactor(timestamp)
 	end
 
 	if demand.isDemandIncreasing() then
-		local upAdjustment = settings.demandFactorUpAdjustment
+		local upAdjustment = settings.demandFactorUpAdjustmentRate
 		local unroundedUpdatedDemandFactor = demand.getDemandFactor() * (1 + upAdjustment)
 		local updatedDemandFactor = utils.roundToPrecision(unroundedUpdatedDemandFactor, 5)
 		demand.setDemandFactor(updatedDemandFactor)
 	else
 		if demand.getDemandFactor() > settings.demandFactorMin then
-			local downAdjustment = settings.demandFactorDownAdjustment
+			local downAdjustment = settings.demandFactorDownAdjustmentRate
 			local unroundedUpdatedDemandFactor = demand.getDemandFactor() * (1 - downAdjustment)
 			local updatedDemandFactor = utils.roundToPrecision(unroundedUpdatedDemandFactor, 5)
 			demand.setDemandFactor(updatedDemandFactor)
