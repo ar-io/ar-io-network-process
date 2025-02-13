@@ -528,6 +528,8 @@ end
 --- @return number permabuyFee - the permabuy fee
 function arns.calculatePermabuyFee(baseFee, demandFactor)
 	local permabuyPrice = baseFee + arns.calculateAnnualRenewalFee(baseFee, constants.PERMABUY_LEASE_FEE_LENGTH_YEARS)
+	print("permabuyPrice: " .. permabuyPrice)
+	print("demandFactor: " .. demandFactor)
 	return math.floor(demandFactor * permabuyPrice)
 end
 

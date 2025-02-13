@@ -88,18 +88,21 @@ function demand.isDemandIncreasing()
 end
 
 --- Checks if the demand should update the demand factor
---- @param currentTimestamp number The current timestamp
+--- @param timestamp number The timestamp to check if the demand should update the demand factor
 --- @return boolean # True if the demand should update the demand factor, false otherwise
-function demand.shouldUpdateDemandFactor(currentTimestamp)
+function demand.shouldUpdateDemandFactor(timestamp)
+	assert(timestamp, "Timestamp must be provided")
 	local settings = demand.getSettings()
 
 	if not settings or not settings.periodZeroStartTimestamp then
 		return false
 	end
 
-	local calculatedPeriod = math.floor(
-		(currentTimestamp - settings.periodZeroStartTimestamp) / settings.periodLengthMs
-	) + 1
+	if timestamp < settings.periodZeroStartTimestamp then
+		return false
+	end
+
+	local calculatedPeriod = demand.getPeriodForTimestamp(timestamp)
 	return calculatedPeriod > demand.getCurrentPeriod()
 end
 
@@ -109,53 +112,72 @@ function demand.getDemandFactorInfo()
 	return utils.deepCopy(DemandFactor)
 end
 
---- Updates the demand factor and returns the updated demand factor
+--- Gets the period for the timestamp
 --- @param timestamp number The current timestamp
---- @return number | nil # The demand factor, updated if necessary, nil if no update is necessary
-function demand.updateDemandFactor(timestamp)
-	if not demand.shouldUpdateDemandFactor(timestamp) then
-		return nil
-	end
+--- @return number # The period for the timestamp
+function demand.getPeriodForTimestamp(timestamp)
+	return math.floor((timestamp - demand.getSettings().periodZeroStartTimestamp) / demand.getSettings().periodLengthMs)
+		+ 1
+end
 
+function demand.getTimestampForPeriod(period)
+	return demand.getSettings().periodZeroStartTimestamp + (period - 1) * demand.getSettings().periodLengthMs
+end
+
+--- Updates the demand factor and returns the updated demand factor to the current period. If multiple periods need to be updated, this function will call itself multiple times.
+--- @param currentTimestamp number The current timestamp
+--- @return number | nil, table<number, number> # The demand factor, updated if necessary, nil if no update is necessary, and the updated demand factors
+function demand.updateDemandFactor(currentTimestamp)
+	assert(currentTimestamp, "Timestamp must be provided")
 	local settings = demand.getSettings()
+	local periodForCurrentTimestamp = demand.getPeriodForTimestamp(currentTimestamp)
+	local lastKnownPeriod = demand.getCurrentPeriod()
+	local updatedDemandFactors = {} --- table tracking the period and the generated demand factor for each period
 
-	-- check that we have settings
-	if not settings then
-		return nil
-	end
+	-- update the demand factor for each period between the last known period and the current period
+	for periodToUpdate = lastKnownPeriod + 1, periodForCurrentTimestamp do
+		local timestamp = demand.getTimestampForPeriod(periodToUpdate)
+		if demand.shouldUpdateDemandFactor(timestamp) then
+			if demand.isDemandIncreasing() then
+				local upAdjustment = settings.demandFactorUpAdjustmentRate
+				local unroundedUpdatedDemandFactor = demand.getDemandFactor() * (1 + upAdjustment)
+				local updatedDemandFactor = utils.roundToPrecision(unroundedUpdatedDemandFactor, 5)
+				demand.setDemandFactor(updatedDemandFactor)
+			else
+				if demand.getDemandFactor() > settings.demandFactorMin then
+					local downAdjustment = settings.demandFactorDownAdjustmentRate
+					local unroundedUpdatedDemandFactor = demand.getDemandFactor() * (1 - downAdjustment)
+					local updatedDemandFactor = utils.roundToPrecision(unroundedUpdatedDemandFactor, 5)
+					demand.setDemandFactor(updatedDemandFactor)
+				end
+			end
 
-	if demand.isDemandIncreasing() then
-		local upAdjustment = settings.demandFactorUpAdjustmentRate
-		local unroundedUpdatedDemandFactor = demand.getDemandFactor() * (1 + upAdjustment)
-		local updatedDemandFactor = utils.roundToPrecision(unroundedUpdatedDemandFactor, 5)
-		demand.setDemandFactor(updatedDemandFactor)
-	else
-		if demand.getDemandFactor() > settings.demandFactorMin then
-			local downAdjustment = settings.demandFactorDownAdjustmentRate
-			local unroundedUpdatedDemandFactor = demand.getDemandFactor() * (1 - downAdjustment)
-			local updatedDemandFactor = utils.roundToPrecision(unroundedUpdatedDemandFactor, 5)
-			demand.setDemandFactor(updatedDemandFactor)
+			if demand.getDemandFactor() <= settings.demandFactorMin then
+				if demand.getConsecutivePeriodsWithMinDemandFactor() >= settings.maxPeriodsAtMinDemandFactor then
+					print(
+						settings.maxPeriodsAtMinDemandFactor
+							.. " consecutive periods at min demand factor. Resetting demand factor and fees."
+					)
+					demand.updateFees(settings.demandFactorMin)
+					demand.setDemandFactor(settings.demandFactorBaseValue)
+					demand.resetConsecutivePeriodsWithMinimumDemandFactor()
+				else
+					demand.incrementConsecutivePeriodsWithMinDemandFactor(1)
+				end
+			end
+
+			-- update the current period values in the ring buffer for previous periods
+			demand.updateTrailingPeriodPurchases()
+			demand.updateTrailingPeriodRevenues()
+			demand.resetPurchasesThisPeriod()
+			demand.resetRevenueThisPeriod()
+			demand.incrementCurrentPeriod(1)
+			table.insert(updatedDemandFactors, { period = lastKnownPeriod, demandFactor = demand.getDemandFactor() })
 		end
 	end
 
-	if demand.getDemandFactor() <= settings.demandFactorMin then
-		if demand.getConsecutivePeriodsWithMinDemandFactor() >= settings.maxPeriodsAtMinDemandFactor then
-			demand.updateFees(settings.demandFactorMin)
-			demand.setDemandFactor(settings.demandFactorBaseValue)
-			demand.resetConsecutivePeriodsWithMinimumDemandFactor()
-		else
-			demand.incrementConsecutivePeriodsWithMinDemandFactor(1)
-		end
-	end
-
-	-- update the current period values in the ring buffer for previous periods
-	demand.updateTrailingPeriodPurchases()
-	demand.updateTrailingPeriodRevenues()
-	demand.resetPurchasesThisPeriod()
-	demand.resetRevenueThisPeriod()
-	demand.incrementCurrentPeriod(1)
-
-	return demand.getDemandFactor()
+	-- return the demand factor for the current period
+	return demand.getDemandFactor(), updatedDemandFactors
 end
 
 --- Updates the fees

@@ -506,7 +506,7 @@ describe('ArNS', async () => {
           undernameResult.tokenCost,
         );
       }
-      sharedMemory = undernameResult.Memory;
+      sharedMemory = buyNameMemory;
     });
   });
 
@@ -1473,6 +1473,11 @@ describe('ArNS', async () => {
           years: 1,
           timestamp: buyRecordTimestamp,
         });
+        const demandFactor = await getDemandFactor({
+          memory: buyRecordResult.Memory,
+          timestamp: buyRecordTimestamp,
+        });
+        console.log('demandFactor', demandFactor);
         buyRecordMemory = buyRecordResult.Memory;
       });
 
@@ -1486,19 +1491,15 @@ describe('ArNS', async () => {
           memory: buyRecordMemory,
         });
 
-        const demandFactor = await getDemandFactor({
-          memory: tickResult.Memory,
-          timestamp: returnedNameTimestamp,
-        });
-
-        const baseRegistrationFeeForName = await getBaseRegistrationFeeForName({
+        const baseFeeForName = await getBaseRegistrationFeeForName({
           memory: tickResult.Memory,
           timestamp: returnedNameTimestamp,
           name: 'great-name',
+          type: 'lease',
+          years: 1,
         });
 
         const tokenCostResult = await getTokenCost({
-          from: joinedGateway,
           name: 'great-name',
           intent: 'Buy-Name',
           years: 1,
@@ -1507,10 +1508,7 @@ describe('ArNS', async () => {
           timestamp: returnedNameTimestamp,
         });
 
-        assert.equal(
-          tokenCostResult.tokenCost,
-          baseRegistrationFeeForName * 50,
-        ); // 50 times the base fee for a 10 character name
+        assert.equal(tokenCostResult.tokenCost, baseFeeForName * 50); // 50 times the base fee for a 10 character name, account for the demand factor impact after ticking
       });
 
       describe('extending the lease', () => {
@@ -1615,21 +1613,13 @@ describe('ArNS', async () => {
 
         describe('upgrading the lease to a permabuy', () => {
           it('should apply the discount to upgrading the lease to a permabuy for an eligible gateway', async () => {
-            const demandFactor = await getDemandFactor({
+            const basePermabuyPrice = await getBaseRegistrationFeeForName({
               memory: buyRecordMemory,
               timestamp: afterDistributionTimestamp,
+              name: 'great-name',
+              type: 'permabuy',
+              years: 1,
             });
-            const baseRegistrationFeeForName =
-              await getBaseRegistrationFeeForName({
-                memory: buyRecordMemory,
-                timestamp: afterDistributionTimestamp,
-                name: 'great-name',
-              });
-            console.log(
-              'baseRegistrationFeeForName',
-              baseRegistrationFeeForName,
-            );
-            const permabuyPrice = baseRegistrationFeeForName * (1 + 0.2 * 20); // 20 years of annual renewal fees
             const tokenCostResult = await getTokenCost({
               from: joinedGateway,
               name: 'great-name',
@@ -1637,13 +1627,10 @@ describe('ArNS', async () => {
               memory: buyRecordMemory,
               timestamp: afterDistributionTimestamp,
             });
-            assert.equal(
-              tokenCostResult.tokenCost,
-              permabuyPrice * demandFactor,
-            );
+            assert.equal(tokenCostResult.tokenCost, basePermabuyPrice * 0.8);
             assert.deepEqual(tokenCostResult.discounts, [
               {
-                discountTotal: permabuyPrice * 0.2 * demandFactor,
+                discountTotal: basePermabuyPrice * 0.2,
                 multiplier: 0.2,
                 name: 'Gateway Operator ArNS Discount',
               },

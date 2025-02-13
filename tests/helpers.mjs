@@ -275,21 +275,30 @@ export const getBaseRegistrationFeeForName = async ({
   memory,
   timestamp,
   name = 'great-nam',
+  type = 'lease',
+  years = 1,
 }) => {
   const baseRegistrationFees = await getBaseRegistrationFees({
     memory,
     timestamp,
   });
-  return baseRegistrationFees[name.length.toString()]['lease']['1'];
+  const baseFeesForType = baseRegistrationFees[name.length.toString()][type];
+  if (type === 'lease') {
+    return baseFeesForType[years.toString()];
+  } else if (type === 'permabuy') {
+    return baseFeesForType;
+  } else {
+    assert(false, 'Invalid type');
+  }
 };
 
 export const getDemandFactor = async ({ memory, timestamp }) => {
   const result = await handle({
     options: {
       Tags: [{ name: 'Action', value: 'Demand-Factor' }],
-      Timestamp: timestamp,
     },
     memory,
+    timestamp,
   });
   return result.Messages[0].Data;
 };
@@ -298,8 +307,8 @@ export const getDemandFactorSettings = async ({ memory, timestamp }) => {
   const result = await handle({
     options: {
       Tags: [{ name: 'Action', value: 'Demand-Factor-Settings' }],
-      Timestamp: timestamp,
     },
+    timestamp,
     memory,
   });
   return JSON.parse(result.Messages[0].Data);
@@ -319,9 +328,9 @@ export const getDelegates = async ({
         { name: 'Action', value: 'Paginated-Delegates' },
         { name: 'Address', value: gatewayAddress },
       ],
-      Timestamp: timestamp,
     },
     memory,
+    timestamp,
   });
   return {
     result: delegatesResult,

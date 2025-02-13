@@ -506,7 +506,7 @@ addEventingHandler("prune", function()
 	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
 end, function(msg)
 	local epochIndex = epochs.getEpochIndexForTimestamp(msg.Timestamp)
-	msg.ioEvent:addField("epochIndex", epochIndex)
+	msg.ioEvent:addField("Epoch-Index", epochIndex)
 
 	local previousStateSupplies = {
 		protocolBalance = Balances[Protocol],
@@ -1746,19 +1746,17 @@ end, function(msg)
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
 	local distributedEpochIndexes = {}
 	local newEpochIndexes = {}
-	local newDemandFactors = {}
 	local newPruneGatewaysResults = {}
 	local tickedRewardDistributions = {}
 	local totalTickedRewardsDistributed = 0
 
-	-- tick the demand factor
-	local demandFactor = demand.updateDemandFactor(msg.Timestamp)
-	if demandFactor ~= nil then
-		table.insert(newDemandFactors, demandFactor)
+	-- tick the demand factor all the way to the current period
+	local latestDemandFactor, newDemandFactors = demand.updateDemandFactor(msg.Timestamp)
+	if latestDemandFactor ~= nil then
 		Send(msg, {
 			Target = msg.From,
-			Action = "Demand-Factor-Updated-Notice",
-			Data = tostring(demandFactor),
+			Action = "Updated-Demand-Factor-Notice",
+			Data = tostring(latestDemandFactor),
 		})
 	end
 
@@ -1814,8 +1812,9 @@ end, function(msg)
 			end)
 		msg.ioEvent:addField("Prescribed-Observers", prescribedObserverAddresses)
 	end
-	if #newDemandFactors > 0 then
-		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors)
+	local updatedDemandFactorCount = utils.lengthOfTable(newDemandFactors)
+	if updatedDemandFactorCount > 0 then
+		msg.ioEvent:addField("Updated-Demand-Factors", newDemandFactors)
 	end
 	if #newPruneGatewaysResults > 0 then
 		-- Reduce the prune gateways results and then track changes
