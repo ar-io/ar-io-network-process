@@ -175,6 +175,20 @@ describe("demand", function()
 				assert.are.equal(_G.DemandFactorSettings.demandFactorBaseValue, _G.DemandFactor.currentDemandFactor)
 			end
 		end)
+
+		it(
+			"should update the demand factor for multiple periods, when the demand factor is not updated for a while",
+			function()
+				local currentPeriod = 1
+				_G.DemandFactor.currentPeriod = currentPeriod
+				--- 100 periods from the current period
+				local futureTimestamp = _G.DemandFactorSettings.periodZeroStartTimestamp
+					+ (_G.DemandFactorSettings.periodLengthMs * 100)
+				local resultingDemandFactor = demand.updateDemandFactor(futureTimestamp)
+				assert.are.equal(0.97023, resultingDemandFactor)
+				assert.are.equal(101, _G.DemandFactor.currentPeriod)
+			end
+		)
 	end)
 
 	describe("purchase count criteria", function()

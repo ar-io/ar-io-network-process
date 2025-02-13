@@ -17,7 +17,6 @@ import {
 
 const initialOperatorStake = 100_000_000_000;
 
-export const basePermabuyPrice = 2_500_000_000;
 export const returnedNamesPeriod = 1000 * 60 * 60 * 24 * 14; // 14 days
 
 export const mARIOPerARIO = 1_000_000;

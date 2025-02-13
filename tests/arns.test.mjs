@@ -437,7 +437,7 @@ describe('ArNS', async () => {
         intent: 'Increase-Undername-Limit',
         memory: buyRecordResult.Memory,
       });
-      const expectedPrice = 500000000 * 0.001 * 1 * 1;
+      const expectedPrice = 500000000 * 0.001; // one year lease at 0.1% for an undername
       assert.equal(result.tokenCost, expectedPrice);
     });
 
@@ -1168,11 +1168,6 @@ describe('ArNS', async () => {
         initiator,
       });
 
-      const demandFactor = await getDemandFactor({
-        memory: releaseNameResult.Memory,
-        timestamp: releasedTimestamp,
-      });
-
       const returnedNameTokenCost = await getTokenCost({
         name: 'test-name',
         memory: releaseNameResult.Memory,
@@ -1529,11 +1524,6 @@ describe('ArNS', async () => {
           years: 1,
           timestamp: buyRecordTimestamp,
         });
-        const demandFactor = await getDemandFactor({
-          memory: buyRecordResult.Memory,
-          timestamp: buyRecordTimestamp,
-        });
-        console.log('demandFactor', demandFactor);
         buyRecordMemory = buyRecordResult.Memory;
       });
 
@@ -1569,17 +1559,21 @@ describe('ArNS', async () => {
 
       describe('extending the lease', () => {
         let extendLeaseTimestamp;
-        const baseLeaseOneYearExtensionPrice = baseFeeForName * 0.2; // 1 year extension at 20% for the year
+        let baseFeeForOneYearExtension;
 
         before(async () => {
           extendLeaseTimestamp = buyRecordTimestamp + 1;
+          const baseFeeForName = await getBaseRegistrationFeeForName({
+            memory: buyRecordMemory,
+            timestamp: extendLeaseTimestamp,
+            name: 'great-name',
+            type: 'lease',
+            years: 1,
+          });
+          baseFeeForOneYearExtension = baseFeeForName * 0.2;
         });
 
         it('should apply the discount to extending the lease for an eligible gateway', async () => {
-          const demandFactor = await getDemandFactor({
-            memory: buyRecordMemory,
-            timestamp: extendLeaseTimestamp,
-          });
           const tokenCostResult = await getTokenCost({
             from: joinedGateway,
             name: 'great-name',
@@ -1591,12 +1585,11 @@ describe('ArNS', async () => {
 
           assert.equal(
             tokenCostResult.tokenCost,
-            baseLeaseOneYearExtensionPrice * 0.8 * demandFactor,
+            baseFeeForOneYearExtension * 0.8,
           );
           assert.deepEqual(tokenCostResult.discounts, [
             {
-              discountTotal:
-                baseLeaseOneYearExtensionPrice * 0.2 * demandFactor,
+              discountTotal: baseFeeForOneYearExtension * 0.2,
               multiplier: 0.2,
               name: 'Gateway Operator ArNS Discount',
             },
@@ -1604,10 +1597,6 @@ describe('ArNS', async () => {
         });
 
         it('should not apply the discount to extending the lease for a non-eligible gateway', async () => {
-          const demandFactor = await getDemandFactor({
-            memory: buyRecordMemory,
-            timestamp: afterDistributionTimestamp,
-          });
           const tokenCostResult = await getTokenCost({
             from: nonEligibleAddress,
             name: 'great-name',
@@ -1615,10 +1604,7 @@ describe('ArNS', async () => {
             memory: buyRecordMemory,
             timestamp: extendLeaseTimestamp,
           });
-          assert.equal(
-            tokenCostResult.tokenCost,
-            baseLeaseOneYearExtensionPrice * demandFactor,
-          );
+          assert.equal(tokenCostResult.tokenCost, baseFeeForOneYearExtension);
           assert.deepEqual(tokenCostResult.discounts, []);
         });
 
@@ -1652,13 +1638,9 @@ describe('ArNS', async () => {
             timestamp: extendLeaseTimestamp + 1,
           });
 
-          const demandFactor = await getDemandFactor({
-            memory: extendLeaseResult.Memory,
-            timestamp: extendLeaseTimestamp + 1,
-          });
           assert.equal(
             eligibleGatewayTokenCost.tokenCost,
-            baseLeaseOneYearExtensionPrice * 0.8 * demandFactor,
+            baseFeeForOneYearExtension * 0.8,
           );
 
           assert.equal(
