@@ -37,7 +37,10 @@ console.log('Creating raw lua records from', input, 'and writing to', output);
 fs.writeFileSync(path.join(process.cwd(), output), '');
 
 // read all the records from the input file
-const records = fs.readFileSync(path.join(process.cwd(), input), 'utf8').split('\n').slice(1);
+const records = fs
+  .readFileSync(path.join(process.cwd(), input), 'utf8')
+  .split('\n')
+  .slice(1);
 
 for (const record of records) {
   const [name, processId, type, startTimestamp, endTimestamp, purchasePrice] =

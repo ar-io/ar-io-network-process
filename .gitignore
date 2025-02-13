@@ -13,3 +13,7 @@ luacov-html
 dist
 luacov.stats.out
 coverage
+
+
+mainnet/**/outputs/*
+mainnet/outputs/*

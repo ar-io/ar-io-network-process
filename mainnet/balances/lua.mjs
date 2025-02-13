@@ -28,12 +28,7 @@ const argv = yargs(hideBin(process.argv))
 const dryRun = argv.dryRun;
 const output = argv.output;
 const input = argv.input;
-console.log(
-  'Creating raw balances from',
-  input,
-  'and writing to',
-  output,
-);
+console.log('Creating raw balances from', input, 'and writing to', output);
 
 // overwrite the file if it exists
 fs.writeFileSync(path.join(process.cwd(), output), '');

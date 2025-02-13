@@ -58,19 +58,19 @@ const gateways = fs
   .readFileSync(path.join(process.cwd(), input), 'utf8')
   .split('\n')
   .slice(1)
-  .map(row => row.trim())
-  .filter(row => row.length > 0)
+  .map((row) => row.trim())
+  .filter((row) => row.length > 0)
   .filter(Boolean) // Remove empty lines
-  .map(row => row.split(','));
+  .map((row) => row.split(','));
 
 const assignedDelegates = fs
   .readFileSync(path.join(process.cwd(), assignedDelegatesInput), 'utf8')
   .split('\n')
   .slice(1)
-  .map(row => row.trim())
-  .filter(row => row.length > 0)
+  .map((row) => row.trim())
+  .filter((row) => row.length > 0)
   .filter(Boolean) // Remove empty lines
-  .map(row => row.split(','));
+  .map((row) => row.split(','));
 
 for (const gateway of gateways) {
   const [
