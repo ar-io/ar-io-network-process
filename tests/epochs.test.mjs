@@ -8,10 +8,9 @@ import {
   startMemory,
   totalTokenSupply,
   getEpochSettings,
-  getGateways,
   getBalance,
   getGateway,
-  handle,
+  getEligibleDistributions,
 } from './helpers.mjs';
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
@@ -138,35 +137,32 @@ describe('epochs', () => {
         });
         firstEpoch = epoch;
 
-        const result = await handle({
-          options: {
-            Tags: [
+        const { result: eligibleDistributionsResult } =
+          await getEligibleDistributions({
+            memory: tickMemory,
+            timestamp: epochSettings.epochZeroStartTimestamp,
+          });
+
+        assert.deepStrictEqual(
+          JSON.parse(eligibleDistributionsResult.Messages[0].Data),
+          {
+            hasMore: false,
+            items: [
               {
-                name: 'Action',
-                value: 'Eligible-Distributions',
+                cursorId:
+                  'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE_EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
+                eligibleReward: 50002000000,
+                gatewayAddress: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
+                recipient: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
+                type: 'operatorReward',
               },
             ],
+            limit: 100,
+            sortBy: 'cursorId',
+            sortOrder: 'desc',
+            totalItems: 1,
           },
-          memory: tickMemory,
-          timestamp: epochSettings.epochZeroStartTimestamp,
-        });
-        assert.deepStrictEqual(JSON.parse(result.Messages[0].Data), {
-          hasMore: false,
-          items: [
-            {
-              cursorId:
-                'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE_EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
-              eligibleReward: 50002000000,
-              gatewayAddress: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
-              recipient: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
-              type: 'operatorReward',
-            },
-          ],
-          limit: 100,
-          sortBy: 'cursorId',
-          sortOrder: 'desc',
-          totalItems: 1,
-        });
+        );
 
         sharedMemory = tickMemory;
       });
