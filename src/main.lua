@@ -2065,8 +2065,13 @@ addEventingHandler(
 	function(msg)
 		local page = utils.parsePaginationTags(msg)
 
-		local eligibleDistributions =
-			epochs.getEligibleDistributions(msg.Timestamp, page.cursor, page.limit, page.sortBy, page.sortOrder)
+		local eligibleDistributions = epochs.getEligibleDistributions(
+			msg.Timestamp,
+			page.cursor,
+			page.limit,
+			page.sortBy or "cursorId",
+			page.sortOrder
+		)
 
 		Send(msg, {
 			Target = msg.From,

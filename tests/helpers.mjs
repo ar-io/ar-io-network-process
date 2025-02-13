@@ -1116,3 +1116,23 @@ export const increaseUndernameLimit = async ({
     result,
   };
 };
+
+export const getEligibleDistributions = async ({ memory, timestamp }) => {
+  const result = await handle({
+    options: {
+      Tags: [
+        {
+          name: 'Action',
+          value: 'Eligible-Distributions',
+        },
+      ],
+    },
+    memory,
+    timestamp,
+  });
+
+  return {
+    memory: result.Memory,
+    result,
+  };
+};
