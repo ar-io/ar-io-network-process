@@ -36,16 +36,12 @@ const output = argv.output;
 const input = argv.input;
 const startTimestamp = argv.startTimestamp;
 
-console.log(
-  'Creating delegate balances from',
-  input,
-  'and writing to',
-  output,
-);
+console.log('Creating delegate balances from', input, 'and writing to', output);
 
 // overwrite the file if it exists
 fs.writeFileSync(path.join(process.cwd(), output), '');
 
+const gatewayDelegatedStakeTotals = {};
 // now do the same with assigned delegates
 const assignedDelegates = fs
   .readFileSync(path.join(process.cwd(), input), 'utf8')
@@ -56,15 +52,29 @@ const assignedDelegates = fs
   .filter(Boolean) // Remove empty lines
   .map((row) => row.split(','));
 
-  for (const delegate of assignedDelegates) {
-    const [address, delegateAddress, delegateStake] = delegate;
-    const luaRecord = `GatewayRegistry["${address}"].delegates["${delegateAddress}"] = { delegatedStake = ${delegateStake}, startTimestamp = ${startTimestamp}, vaults = {} },\n`;
-    if (dryRun) {
-      console.log(luaRecord);
-    } else {
-      fs.appendFileSync(output, luaRecord);
-    }
-    // TODO: update the total delegated stake balances on the gateway
+for (const delegate of assignedDelegates) {
+  const [address, delegateAddress, delegateStake] = delegate;
+  if (!gatewayDelegatedStakeTotals[address]) {
+    gatewayDelegatedStakeTotals[address] = 0;
   }
+  gatewayDelegatedStakeTotals[address] += parseInt(delegateStake);
+  const luaRecord = `GatewayRegistry["${address}"].delegates["${delegateAddress}"] = { delegatedStake = ${delegateStake}, startTimestamp = ${startTimestamp}, vaults = {} },\n`;
+  if (dryRun) {
+    console.log(luaRecord);
+  } else {
+    fs.appendFileSync(output, luaRecord);
+  }
+}
+
+for (const [address, totalDelegatedStake] of Object.entries(
+  gatewayDelegatedStakeTotals,
+)) {
+  const luaRecord = `GatewayRegistry["${address}"].totalDelegatedStake = ${totalDelegatedStake};\n`;
+  if (dryRun) {
+    console.log(luaRecord);
+  } else {
+    fs.appendFileSync(output, luaRecord);
+  }
+}
 
 console.log('Done');
