@@ -13,13 +13,7 @@ Wallets that selected 'stake' receive 25% more mARIO and are assigned to a gatew
 To run:
 
 ```bash
-node balances/extract.mjs --processId <processId> --output-balances <outputBalancesFile> --output-delegates <outputDelegatesFile> --gateways-file <gatewaysFile> --staked-multiplier <stakedMultiplier>
-```
-
-Example:
-
-```bash
-node balances/extract.mjs --gateways-file ./gateways/outputs/gateways.csv --staked-multiplier 1.25
+node balances/extract.mjs --processId <processId> --output <outputFile>
 ```
 
 #### Output files
@@ -30,19 +24,17 @@ Liquid wallets: [./balances/outputs/liquid_balances.csv](./balances/outputs/liqu
 address,mARIOQty
 ```
 
-Staked wallets: [./balances/outputs/assigned_delegates.csv](./balances/outputs/assigned_delegates.csv)
-
-```csv
-gatewayAddress,delegateAddress,delegateStake
-```
-
 To create the lua file from the csv file:
 
 ```bash
 node balances/lua.mjs --input <inputFile> --output <outputFile>
 ```
 
----
+Resulting lua file: [./balances/outputs/balances.lua](./balances/outputs/balances.lua)
+
+```lua
+Balances["<address>"] = <mARIOQty>
+```
 
 ### Gateways
 
@@ -63,13 +55,10 @@ gatewayAddress,observerAddress,operatorStake,fqdn,port,protocol,allowDelegatedSt
 To create the lua file from the csv file:
 
 ```bash
-node gateways/lua.mjs --input <inputFile> --assigned-delegates-input <assignedDelegatesFile> --output <outputFile>
+node gateways/lua.mjs --input <inputFile> --output <outputFile>
 ```
 
 Resulting lua file: [./gateways/outputs/gateways.lua](./gateways/outputs/gateways.lua)
-
-<details>
-<summary>Lua file</summary>
 
 ```lua
 -- for every gateway in the input file
@@ -112,8 +101,6 @@ GatewayRegistry["<gatewayAddress>"] = {
 }
 ```
 
-</details>
-
 ---
 
 ### Delegates
@@ -123,7 +110,7 @@ This tool creates a CSV file with the delegates for the airdrop. It also creates
 To run:
 
 ```bash
-node delegates/extract.mjs --input <inputFile> --output <outputFile>
+node delegates/extract.mjs --output <outputFile> --gateways-file <gatewaysFile>
 ```
 
 Resulting CSV file: [./delegates/outputs/delegates.csv](./delegates/outputs/delegates.csv)
@@ -135,7 +122,7 @@ gatewayAddress,delegateAddress,delegateStake
 To create the lua file from the csv file:
 
 ```bash
-node delegates/lua.mjs --input <inputFile> --output <outputFile> --gateways-file <gatewaysFile>
+node delegates/lua.mjs --input <inputFile> --output <outputFile>
 ```
 
 Resulting lua file: [./delegates/outputs/delegates.lua](./delegates/outputs/delegates.lua)
