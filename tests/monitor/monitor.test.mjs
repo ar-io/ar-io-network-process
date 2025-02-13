@@ -38,6 +38,132 @@ describe('setup', () => {
     await compose.down();
   });
 
+  const getBalances = async () => {
+    let cursor;
+    let balances = [];
+    while (true) {
+      const {
+        items: balancePage,
+        nextCursor,
+        hasMore,
+      } = await io.getBalances({
+        limit: 1_000,
+        cursor,
+      });
+      balances = [...balances, ...balancePage];
+      cursor = nextCursor;
+      if (!hasMore) {
+        break;
+      }
+    }
+    return balances;
+  };
+
+  const getGateways = async () => {
+    let cursor;
+    let gateways = [];
+    while (true) {
+      const {
+        items: gatewaysPage,
+        nextCursor,
+        hasMore,
+      } = await io.getGateways({
+        limit: 1000,
+        cursor,
+      });
+      gateways = [...gateways, ...gatewaysPage];
+      cursor = nextCursor;
+      if (!hasMore) {
+        break;
+      }
+    }
+    return gateways;
+  };
+
+  const getDelegates = async () => {
+    let cursor;
+    let delegates = [];
+    while (true) {
+      const {
+        items: delegatesPage,
+        nextCursor,
+        hasMore,
+      } = await io.getAllDelegates({
+        limit: 1000,
+        cursor,
+      });
+      delegates = [...delegates, ...delegatesPage];
+      cursor = nextCursor;
+      if (!hasMore) {
+        break;
+      }
+    }
+    return delegates;
+  };
+
+  const getGatewayVaults = async () => {
+    let cursor;
+    let gatewayVaults = [];
+    while (true) {
+      const {
+        items: gatewayVaultsPage,
+        nextCursor,
+        hasMore,
+      } = await io.getAllGatewayVaults({
+        limit: 1000,
+        cursor,
+      });
+      gatewayVaults = [...gatewayVaults, ...gatewayVaultsPage];
+      cursor = nextCursor;
+      if (!hasMore) {
+        break;
+      }
+    }
+    return gatewayVaults;
+  };
+
+  const getArNSRecords = async () => {
+    let cursor;
+    let arNSRecords = [];
+    while (true) {
+      const {
+        items: recordsPage,
+        nextCursor,
+        hasMore,
+      } = await io.getArNSRecords({
+        limit: 1000,
+        cursor,
+      });
+      arNSRecords = [...arNSRecords, ...recordsPage];
+      cursor = nextCursor;
+      if (!hasMore) {
+        break;
+      }
+    }
+    return arNSRecords;
+  };
+
+  const getVaults = async () => {
+    let cursor;
+    let vaults = [];
+    while (true) {
+      const {
+        items: vaultsPage,
+        nextCursor,
+        hasMore,
+      } = await io.getVaults({
+        limit: 1000,
+        cursor,
+      });
+      vaults = [...vaults, ...vaultsPage];
+      cursor = nextCursor;
+      if (!hasMore) {
+        break;
+      }
+    }
+    return vaults;
+  };
+
   describe('handlers', () => {
     it('should always have correct handler order', async () => {
       const { Handlers: handlersList } = await io.getInfo();
@@ -83,16 +209,10 @@ describe('setup', () => {
   });
 
   describe('balances', () => {
-    let balances;
-
+    let balances = [];
     before(async () => {
-      balances = (
-        await io.getBalances({
-          limit: 10_000,
-        })
-      ).items;
+      balances = await getBalances();
     });
-
     it('should always be up to date', async () => {
       // assert they are all integers
       for (const balance of balances) {
@@ -187,9 +307,7 @@ describe('setup', () => {
         `Delegated supply is undefined: ${supplyData.delegated}`,
       );
 
-      const { items: balances } = await io.getBalances({
-        limit: 10_000,
-      });
+      const balances = await getBalances();
 
       const protocolBalance = await io.getBalance({
         address: processId,
@@ -211,9 +329,7 @@ describe('setup', () => {
       );
 
       // get the supply staked
-      const { items: gateways } = await io.getGateways({
-        limit: 1000,
-      });
+      const gateways = await getGateways();
 
       const staked = gateways.reduce(
         (acc, curr) => acc + curr.operatorStake,
@@ -271,11 +387,7 @@ describe('setup', () => {
     before(async () => {
       epochSettings = await io.getEpochSettings();
       currentEpoch = await io.getCurrentEpoch();
-      gateways = (
-        await io.getGateways({
-          limit: 1000,
-        })
-      ).items;
+      gateways = await getGateways();
     });
 
     it('should always be up to date', async () => {
@@ -396,128 +508,109 @@ describe('setup', () => {
         (Date.now() - epochZeroStartTimestamp) / durationMs,
       );
 
-      const { items: gateways, totalItems: totalGateways } =
-        await io.getGateways({
-          limit: 10_000,
-        });
+      const gateways = await getGateways();
 
       const uniqueGateways = new Set();
-      await Promise.all(
-        gateways.map((gateway) =>
-          throttle(async () => {
-            uniqueGateways.add(gateway.gatewayAddress);
-            if (gateway.status === 'joined') {
-              assert(
-                Number.isInteger(gateway.operatorStake),
-                `Gateway ${gateway.gatewayAddress} has an invalid operator stake: ${gateway.operatorStake}`,
-              );
-              assert(
-                Number.isInteger(gateway.totalDelegatedStake),
-                `Gateway ${gateway.gatewayAddress} has an invalid total delegated stake: ${gateway.totalDelegatedStake}`,
-              );
-              assert(
-                gateway.operatorStake >= 10_000_000_000,
-                `Gateway ${gateway.gatewayAddress} has less than 10_000_000_000 ARIO staked`,
-              );
-              assert(
-                gateway.stats.failedConsecutiveEpochs >= 0,
-                `Gateway ${gateway.gatewayAddress} has less than 0 failed consecutive epochs`,
-              );
-              assert(
-                gateway.stats.failedConsecutiveEpochs < 30,
-                `Gateway ${gateway.gatewayAddress} has more than 30 failed consecutive epochs`,
-              );
-              assert(
-                gateway.stats.passedConsecutiveEpochs <= currentEpochIndex,
-                `Gateway ${gateway.gatewayAddress} has more passed consecutive epochs than current epoch index`,
-              );
-              assert(
-                gateway.stats.passedConsecutiveEpochs >= 0,
-                `Gateway ${gateway.gatewayAddress} has less than 0 passed consecutive epochs`,
-              );
-              assert(
-                gateway.stats.totalEpochCount <= currentEpochIndex,
-                `Gateway ${gateway.gatewayAddress} has more total epochs than current epoch index`,
-              );
-              assert(
-                gateway.stats.totalEpochCount >= 0,
-                `Gateway ${gateway.gatewayAddress} has less than 0 total epochs`,
-              );
-              assert(
-                gateway.stats.prescribedEpochCount <= currentEpochIndex,
-                `Gateway ${gateway.gatewayAddress} has more prescribed epochs than current epoch index`,
-              );
-              assert(
-                gateway.stats.prescribedEpochCount >= 0,
-                `Gateway ${gateway.gatewayAddress} has less than 0 prescribed epochs`,
-              );
-            }
-            if (gateway.status === 'leaving') {
-              assert(gateway.totalDelegatedStake === 0);
-              assert(gateway.operatorStake === 0);
-            }
-          }),
-        ),
-      );
+      for (const gateway of gateways) {
+        uniqueGateways.add(gateway.gatewayAddress);
+        if (gateway.status === 'joined') {
+          assert(
+            Number.isInteger(gateway.operatorStake),
+            `Gateway ${gateway.gatewayAddress} has an invalid operator stake: ${gateway.operatorStake}`,
+          );
+          assert(
+            Number.isInteger(gateway.totalDelegatedStake),
+            `Gateway ${gateway.gatewayAddress} has an invalid total delegated stake: ${gateway.totalDelegatedStake}`,
+          );
+          assert(
+            gateway.operatorStake >= 10_000_000_000,
+            `Gateway ${gateway.gatewayAddress} has less than 10_000_000_000 ARIO staked`,
+          );
+          assert(
+            gateway.stats.failedConsecutiveEpochs >= 0,
+            `Gateway ${gateway.gatewayAddress} has less than 0 failed consecutive epochs`,
+          );
+          assert(
+            gateway.stats.failedConsecutiveEpochs < 30,
+            `Gateway ${gateway.gatewayAddress} has more than 30 failed consecutive epochs`,
+          );
+          assert(
+            gateway.stats.passedConsecutiveEpochs <= currentEpochIndex,
+            `Gateway ${gateway.gatewayAddress} has more passed consecutive epochs than current epoch index`,
+          );
+          assert(
+            gateway.stats.passedConsecutiveEpochs >= 0,
+            `Gateway ${gateway.gatewayAddress} has less than 0 passed consecutive epochs`,
+          );
+          assert(
+            gateway.stats.totalEpochCount <= currentEpochIndex,
+            `Gateway ${gateway.gatewayAddress} has more total epochs than current epoch index`,
+          );
+          assert(
+            gateway.stats.totalEpochCount >= 0,
+            `Gateway ${gateway.gatewayAddress} has less than 0 total epochs`,
+          );
+          assert(
+            gateway.stats.prescribedEpochCount <= currentEpochIndex,
+            `Gateway ${gateway.gatewayAddress} has more prescribed epochs than current epoch index`,
+          );
+          assert(
+            gateway.stats.prescribedEpochCount >= 0,
+            `Gateway ${gateway.gatewayAddress} has less than 0 prescribed epochs`,
+          );
+        }
+        if (gateway.status === 'leaving') {
+          assert(gateway.totalDelegatedStake === 0);
+          assert(gateway.operatorStake === 0);
+        }
+      }
       assert(
-        uniqueGateways.size === totalGateways,
-        `Counted total gateways (${uniqueGateways.size}) does not match total gateways (${totalGateways})`,
+        uniqueGateways.size === gateways.length,
+        `Counted total gateways (${uniqueGateways.size}) does not match total gateways (${gateways.length})`,
       );
     });
 
     it('should have valid delegates for all gateways', async () => {
-      const { items: delegates } = await io.getAllDelegates({
-        limit: 10_000,
-      });
-      await Promise.all(
-        delegates.map((delegate) =>
-          throttle(async () => {
-            assert(
-              delegate.delegatedStake >= 0 && delegate.startTimestamp > 0,
-              `Gateway ${delegate.gatewayAddress} has invalid delegate`,
-            );
-            // TODO: assert it's a valid gateway that is active
-            assert(delegate.gatewayAddress, 'Gateway address is invalid');
-            assert(delegate.vaultedStake >= 0, 'Vaulted stake is invalid');
-          }),
-        ),
-      );
+      const delegates = await getDelegates();
+      for (const delegate of delegates) {
+        assert(
+          delegate.delegatedStake >= 0 && delegate.startTimestamp > 0,
+          `Gateway ${delegate.gatewayAddress} has invalid delegate`,
+        );
+        // TODO: assert it's a valid gateway that is active
+        assert(delegate.gatewayAddress, 'Gateway address is invalid');
+        assert(delegate.vaultedStake >= 0, 'Vaulted stake is invalid');
+      }
     });
 
     it('should have valid vaults for all gateways', async () => {
-      const { items: vaults } = await io.getAllGatewayVaults({
-        limit: 10_000,
-      });
+      const vaults = await getGatewayVaults();
       if (vaults.length > 0) {
         // Fixed inverted logic
-        await Promise.all(
-          vaults.map((vault) =>
-            throttle(async () => {
-              // assert vault balance is greater than 0 and startTimestamp and endTimestamp are valid timestamps (they are all set to 90 by default, but old ones have to expire out)
-              assert(
-                Number.isInteger(vault.balance),
-                `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid balance (${vault.balance})`, // Fixed vaultId reference
-              );
-              assert(
-                vault.balance >= 0 &&
-                  vault.balance <= ARIOToMARIO(1_000_000_000_000),
-                `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid balance (${vault.balance})`, // Fixed vaultId reference
-              );
-              assert(
-                vault.startTimestamp > 0,
-                `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid start timestamp (${vault.startTimestamp})`, // Fixed vaultId reference
-              );
-              assert(
-                vault.endTimestamp > 0,
-                `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`,
-              );
-              assert(
-                vault.endTimestamp > vault.startTimestamp,
-                `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`,
-              );
-            }),
-          ),
-        );
+        for (const vault of vaults) {
+          // assert vault balance is greater than 0 and startTimestamp and endTimestamp are valid timestamps (they are all set to 90 by default, but old ones have to expire out)
+          assert(
+            Number.isInteger(vault.balance),
+            `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid balance (${vault.balance})`, // Fixed vaultId reference
+          );
+          assert(
+            vault.balance >= 0 &&
+              vault.balance <= ARIOToMARIO(1_000_000_000_000),
+            `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid balance (${vault.balance})`, // Fixed vaultId reference
+          );
+          assert(
+            vault.startTimestamp > 0,
+            `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid start timestamp (${vault.startTimestamp})`, // Fixed vaultId reference
+          );
+          assert(
+            vault.endTimestamp > 0,
+            `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`,
+          );
+          assert(
+            vault.endTimestamp > vault.startTimestamp,
+            `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid end timestamp (${vault.endTimestamp})`,
+          );
+        }
       }
     });
   });
@@ -526,48 +619,41 @@ describe('setup', () => {
     const minLockTimeMs = 14 * 24 * 60 * 60 * 1000;
     const maxLockTimeMs = 12 * 365 * 24 * 60 * 60 * 1000;
     it('should have valid vaults with non-zero balance and startTimestamp and endTimestamp', async () => {
-      const { items: vaults } = await io.getVaults({
-        limit: 10_000,
-      });
-      await Promise.all(
-        vaults.map((vault) =>
-          throttle(async () => {
-            assert(
-              vault.address,
-              `Vault ${vault.vaultId} for ${vaults.address} has no address`,
-            );
-            assert(
-              typeof vault.vaultId === 'string',
-              `Vault ${vault.vaultId} for ${vault.address} has an invalid vaultId (${vault.vaultId})`,
-            );
-            assert(
-              vault.balance > 0,
-              `Vault ${vault.vaultId} for ${vault.address} has an invalid balance (${vault.balance})`,
-            );
-            assert(
-              vault.startTimestamp <= Date.now(),
-              `Vault ${vault.vaultId} for ${vault.address} has an invalid start timestamp ${vault.startTimestamp} (${new Date(vault.startTimestamp).toLocaleString()})`,
-            );
-            assert(
-              vault.endTimestamp > vault.startTimestamp &&
-                vault.endTimestamp > Date.now() &&
-                vault.endTimestamp >= vault.startTimestamp + minLockTimeMs &&
-                vault.endTimestamp <= vault.startTimestamp + maxLockTimeMs &&
-                `Vault ${vault.vaultId} for ${vault.address} has an invalid end timestamp ${vault.endTimestamp} (${new Date(vault.endTimestamp).toLocaleString()} - and length of ${
-                  (vault.endTimestamp - vault.startTimestamp) /
-                  (24 * 60 * 60 * 1000)
-                } days)`,
-            );
-            if (vault.controller) {
-              assert(
-                typeof vault.controller === 'string' &&
-                  vault.controller.length > 0,
-                `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid controller (${vault.controller})`,
-              );
-            }
-          }),
-        ),
-      );
+      const vaults = await getVaults();
+      for (const vault of vaults) {
+        assert(
+          vault.address,
+          `Vault ${vault.vaultId} for ${vaults.address} has no address`,
+        );
+        assert(
+          typeof vault.vaultId === 'string',
+          `Vault ${vault.vaultId} for ${vault.address} has an invalid vaultId (${vault.vaultId})`,
+        );
+        assert(
+          vault.balance > 0,
+          `Vault ${vault.vaultId} for ${vault.address} has an invalid balance (${vault.balance})`,
+        );
+        assert(
+          vault.startTimestamp <= Date.now(),
+          `Vault ${vault.vaultId} for ${vault.address} has an invalid start timestamp ${vault.startTimestamp} (${new Date(vault.startTimestamp).toLocaleString()})`,
+        );
+        assert(
+          vault.endTimestamp > vault.startTimestamp &&
+            vault.endTimestamp > Date.now() &&
+            vault.endTimestamp >= vault.startTimestamp + minLockTimeMs &&
+            vault.endTimestamp <= vault.startTimestamp + maxLockTimeMs &&
+            `Vault ${vault.vaultId} for ${vault.address} has an invalid end timestamp ${vault.endTimestamp} (${new Date(vault.endTimestamp).toLocaleString()} - and length of ${
+              (vault.endTimestamp - vault.startTimestamp) /
+              (24 * 60 * 60 * 1000)
+            } days)`,
+        );
+        if (vault.controller) {
+          assert(
+            typeof vault.controller === 'string' && vault.controller.length > 0,
+            `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid controller (${vault.controller})`,
+          );
+        }
+      }
     });
   });
 
@@ -579,50 +665,43 @@ describe('setup', () => {
       'should not have any arns records older than two weeks',
       { timeout: 60000 },
       async () => {
-        const { items: arnsRecords, totalItems: totalArNSRecords } =
-          await io.getArNSRecords({
-            limit: 10000,
-          });
+        const arnsRecords = await getArNSRecords();
+        const totalArNSRecords = arnsRecords.length;
         const uniqueNames = new Set();
-        await Promise.all(
-          arnsRecords.map((arn) =>
-            throttle(async () => {
-              uniqueNames.add(arn.name);
-              assert(arn.processId, `ArNS name '${arn.name}' has no processId`);
-              assert(arn.type, `ArNS name '${arn.name}' has no type`);
-              assert(
-                arn.startTimestamp,
-                `ArNS name '${arn.name}' has no start timestamp`,
-              );
-              assert(
-                Number.isInteger(arn.purchasePrice) && arn.purchasePrice >= 0,
-                `ArNS name '${arn.name}' has invalid purchase price: ${arn.purchasePrice}`,
-              );
-              assert(
-                Number.isInteger(arn.undernameLimit) &&
-                  arn.undernameLimit >= 10,
-                `ArNS name '${arn.name}' has invalid undername limit: ${arn.undernameLimit}`,
-              );
-              if (arn.type === 'lease') {
-                assert(
-                  arn.endTimestamp,
-                  `ArNS name '${arn.name}' has no end timestamp`,
-                );
-                assert(
-                  arn.endTimestamp > Date.now() - twoWeeks,
-                  `ArNS name '${arn.name}' is older than two weeks`,
-                );
-              }
-              // if permabuy, assert no endTimestamp
-              if (arn.type === 'permabuy') {
-                assert(
-                  !arn.endTimestamp,
-                  `ArNS name '${arn.name}' has an end timestamp`,
-                );
-              }
-            }),
-          ),
-        );
+        for (const arn of arnsRecords) {
+          uniqueNames.add(arn.name);
+          assert(arn.processId, `ArNS name '${arn.name}' has no processId`);
+          assert(arn.type, `ArNS name '${arn.name}' has no type`);
+          assert(
+            arn.startTimestamp,
+            `ArNS name '${arn.name}' has no start timestamp`,
+          );
+          assert(
+            Number.isInteger(arn.purchasePrice) && arn.purchasePrice >= 0,
+            `ArNS name '${arn.name}' has invalid purchase price: ${arn.purchasePrice}`,
+          );
+          assert(
+            Number.isInteger(arn.undernameLimit) && arn.undernameLimit >= 10,
+            `ArNS name '${arn.name}' has invalid undername limit: ${arn.undernameLimit}`,
+          );
+          if (arn.type === 'lease') {
+            assert(
+              arn.endTimestamp,
+              `ArNS name '${arn.name}' has no end timestamp`,
+            );
+            assert(
+              arn.endTimestamp > Date.now() - twoWeeks,
+              `ArNS name '${arn.name}' is older than two weeks`,
+            );
+          }
+          // if permabuy, assert no endTimestamp
+          if (arn.type === 'permabuy') {
+            assert(
+              !arn.endTimestamp,
+              `ArNS name '${arn.name}' has an end timestamp`,
+            );
+          }
+        }
         assert(
           uniqueNames.size === totalArNSRecords,
           `Counted total ArNS (${uniqueNames.size}) does not match total ArNS (${totalArNSRecords})`,
@@ -634,58 +713,49 @@ describe('setup', () => {
   it('should not have any returned names older than two weeks', async () => {
     const twoWeekMs = 2 * 7 * 24 * 60 * 60 * 1000;
     const { items: returnedNames } = await io.getArNSReturnedNames({
-      limit: 10000,
+      limit: 1000,
     });
-    await Promise.all(
-      returnedNames.map((returnedName) =>
-        throttle(async () => {
-          assert(returnedName.name, 'Returned name has no name');
-          assert(
-            returnedName.startTimestamp &&
-              returnedName.startTimestamp <= Date.now(),
-            `Returned name ${returnedName.name} has unexpected start timestamp ${returnedName.startTimestamp} (${new Date(returnedName.startTimestamp).toLocaleString()})`,
-          );
-          assert(
-            returnedName.endTimestamp &&
-              returnedName.endTimestamp > Date.now() &&
-              returnedName.endTimestamp ==
-                returnedName.startTimestamp + twoWeekMs,
-            `Returned name ${returnedName.name} has unexpected end timestamp ${returnedName.endTimestamp} (${new Date(returnedName.endTimestamp).toLocaleString()})`,
-          );
-          assert(
-            returnedName.initiator &&
-              typeof returnedName.initiator === 'string' &&
-              returnedName.initiator.length > 0,
-            `Returned name ${returnedName.name} has no initiator`,
-          );
-        }),
-      ),
-    );
+    for (const returnedName of returnedNames) {
+      assert(returnedName.name, 'Returned name has no name');
+      assert(
+        returnedName.startTimestamp &&
+          returnedName.startTimestamp <= Date.now(),
+        `Returned name ${returnedName.name} has unexpected start timestamp ${returnedName.startTimestamp} (${new Date(returnedName.startTimestamp).toLocaleString()})`,
+      );
+      assert(
+        returnedName.endTimestamp &&
+          returnedName.endTimestamp > Date.now() &&
+          returnedName.endTimestamp == returnedName.startTimestamp + twoWeekMs,
+        `Returned name ${returnedName.name} has unexpected end timestamp ${returnedName.endTimestamp} (${new Date(returnedName.endTimestamp).toLocaleString()})`,
+      );
+      assert(
+        returnedName.initiator &&
+          typeof returnedName.initiator === 'string' &&
+          returnedName.initiator.length > 0,
+        `Returned name ${returnedName.name} has no initiator`,
+      );
+    }
   });
 
   it('should not have any expired reserved names', async () => {
     const { items: reservedNames } = await io.getArNSReservedNames({
-      limit: 10_000,
+      limit: 1000,
     });
-    await Promise.all(
-      reservedNames.map((reservedName) =>
-        throttle(async () => {
-          assert(reservedName.name, 'Reserved name has no name');
-          if (reservedName.endTimestamp) {
-            assert(
-              reservedName.endTimestamp > Date.now(),
-              `Reserved name ${reservedName.name} has unexpected end timestamp ${reservedName.endTimestamp} (${new Date(reservedName.endTimestamp).toLocaleString()})`,
-            );
-          }
-          if (reservedName.target) {
-            assert(
-              typeof reservedName.target === 'string' &&
-                reservedName.target.length > 0,
-              `Reserved name ${reservedName.name} has invalid target: ${reservedName.target}`,
-            );
-          }
-        }),
-      ),
-    );
+    for (const reservedName of reservedNames) {
+      assert(reservedName.name, 'Reserved name has no name');
+      if (reservedName.endTimestamp) {
+        assert(
+          reservedName.endTimestamp > Date.now(),
+          `Reserved name ${reservedName.name} has unexpected end timestamp ${reservedName.endTimestamp} (${new Date(reservedName.endTimestamp).toLocaleString()})`,
+        );
+      }
+      if (reservedName.target) {
+        assert(
+          typeof reservedName.target === 'string' &&
+            reservedName.target.length > 0,
+          `Reserved name ${reservedName.name} has invalid target: ${reservedName.target}`,
+        );
+      }
+    }
   });
 });
