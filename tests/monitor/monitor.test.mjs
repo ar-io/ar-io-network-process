@@ -88,7 +88,7 @@ describe('setup', () => {
     before(async () => {
       balances = (
         await io.getBalances({
-          limit: 10_000,
+          limit: 1_000,
         })
       ).items;
     });
@@ -188,7 +188,7 @@ describe('setup', () => {
       );
 
       const { items: balances } = await io.getBalances({
-        limit: 10_000,
+        limit: 1_000,
       });
 
       const protocolBalance = await io.getBalance({
@@ -398,7 +398,7 @@ describe('setup', () => {
 
       const { items: gateways, totalItems: totalGateways } =
         await io.getGateways({
-          limit: 10_000,
+          limit: 1_000,
         });
 
       const uniqueGateways = new Set();
@@ -467,7 +467,7 @@ describe('setup', () => {
 
     it('should have valid delegates for all gateways', async () => {
       const { items: delegates } = await io.getAllDelegates({
-        limit: 10_000,
+        limit: 1_000,
       });
       await Promise.all(
         delegates.map((delegate) =>
@@ -486,7 +486,7 @@ describe('setup', () => {
 
     it('should have valid vaults for all gateways', async () => {
       const { items: vaults } = await io.getAllGatewayVaults({
-        limit: 10_000,
+        limit: 1_000,
       });
       if (vaults.length > 0) {
         // Fixed inverted logic
@@ -527,7 +527,7 @@ describe('setup', () => {
     const maxLockTimeMs = 12 * 365 * 24 * 60 * 60 * 1000;
     it('should have valid vaults with non-zero balance and startTimestamp and endTimestamp', async () => {
       const { items: vaults } = await io.getVaults({
-        limit: 10_000,
+        limit: 1_000,
       });
       await Promise.all(
         vaults.map((vault) =>
@@ -665,7 +665,7 @@ describe('setup', () => {
 
   it('should not have any expired reserved names', async () => {
     const { items: reservedNames } = await io.getArNSReservedNames({
-      limit: 10_000,
+      limit: 1_000,
     });
     await Promise.all(
       reservedNames.map((reservedName) =>
