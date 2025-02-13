@@ -128,12 +128,6 @@ function demand.updateDemandFactor(timestamp)
 	end
 
 	local settings = demand.getSettings()
-
-	-- check that we have settings
-	if not settings then
-		return nil
-	end
-
 	if demand.isDemandIncreasing() then
 		local upAdjustment = settings.demandFactorUpAdjustment
 		local unroundedUpdatedDemandFactor = demand.getDemandFactor() * (1 + upAdjustment)
