@@ -1081,7 +1081,6 @@ export const getTokenCost = async ({
     timestamp,
     memory,
   });
-  // console.log(result);
   return JSON.parse(result.Messages[0].Data);
 };
 
