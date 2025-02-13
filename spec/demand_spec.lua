@@ -20,7 +20,6 @@ describe("demand", function()
 			periodLengthMs = 60 * 1000 * 24, -- one day
 			demandFactorBaseValue = 1,
 			demandFactorMin = 0.5,
-
 			demandFactorUpAdjustmentRate = 0.05,
 			demandFactorDownAdjustmentRate = 0.015,
 			maxPeriodsAtMinDemandFactor = 3,

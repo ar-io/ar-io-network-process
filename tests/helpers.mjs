@@ -20,12 +20,7 @@ const initialOperatorStake = 100_000_000_000;
 export const basePermabuyPrice = 2_500_000_000;
 export const baseLeasePriceFor9CharNameFor1Year = 600_000_000;
 export const baseLeasePriceFor9CharNameFor3Years = 800_000_000;
-
 export const returnedNamesPeriod = 1000 * 60 * 60 * 24 * 14; // 14 days
-
-export const genesisEpochTimestamp = 1719900000000; // Tuesday, July 2, 2024, 06:00:00 AM UTC
-export const epochLength = 1000 * 60 * 60 * 24; // 24 hours
-export const distributionDelay = 1000 * 60 * 40; // 40 minutes
 
 export const mARIOPerARIO = 1_000_000;
 export const ARIOToMARIO = (amount) => amount * mARIOPerARIO;
@@ -1065,7 +1060,7 @@ export const getTokenCost = async ({
   type,
   years = 1,
   fundFrom = 'balance',
-  processId,
+  processId = undefined,
   quantity = 1,
 }) => {
   const result = await handle({
@@ -1086,6 +1081,7 @@ export const getTokenCost = async ({
     timestamp,
     memory,
   });
+  // console.log(result);
   return JSON.parse(result.Messages[0].Data);
 };
 
@@ -1115,4 +1111,64 @@ export const increaseUndernameLimit = async ({
     memory: result.Memory,
     result,
   };
+};
+
+export const getReturnedName = async ({ memory, name, timestamp }) => {
+  const result = await handle({
+    options: {
+      Tags: [
+        { name: 'Action', value: 'Returned-Name' },
+        { name: 'Name', value: name },
+      ],
+    },
+    timestamp,
+    memory,
+  });
+  return JSON.parse(result.Messages[0].Data);
+};
+
+export const getReturnedNames = async ({ memory, timestamp }) => {
+  const result = await handle({
+    options: {
+      Tags: [{ name: 'Action', value: 'Returned-Names' }],
+    },
+    memory,
+    timestamp,
+  });
+  return JSON.parse(result.Messages[0].Data);
+};
+
+export const releaseName = async ({
+  from,
+  memory,
+  name,
+  timestamp,
+  initiator,
+}) => {
+  const result = await handle({
+    options: {
+      Tags: [
+        { name: 'Action', value: 'Release-Name' },
+        { name: 'Name', value: name },
+        { name: 'Initiator', value: initiator }, // simulate who the owner is of the ANT process when sending the message
+      ],
+      From: from,
+      Owner: from,
+    },
+    timestamp,
+    memory,
+  });
+  return {
+    memory: result.Memory,
+    result,
+  };
+};
+
+export const getReservedNames = async ({ memory, timestamp }) => {
+  const result = await handle({
+    options: { Tags: [{ name: 'Action', value: 'Reserved-Names' }] },
+    memory,
+    timestamp,
+  });
+  return JSON.parse(result.Messages[0].Data);
 };

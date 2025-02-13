@@ -1904,7 +1904,7 @@ describe("gar", function()
 				weights = testGateway.weights,
 			}
 			local timestamp = 100
-			local expectedTenureWeight = timestamp / gar.getSettings().observers.tenureWeightPeriod
+			local expectedTenureWeight = timestamp / gar.getSettings().observers.tenureWeightDurationMs
 			local expectedStakeWeight = 1
 			-- NOTE: we increment by one to avoid division by zero
 			local expectedObserverRatioWeight = 2 / 4 -- (the stats are 1/3)

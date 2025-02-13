@@ -77,10 +77,8 @@ constants.DEFAULT_DISTRIBUTION_SETTINGS = {
 constants.MIN_WITHDRAWAL_AMOUNT = constants.ARIOToMARIO(1)
 constants.DEFAULT_GAR_SETTINGS = {
 	observers = {
-		maxPerEpoch = 50, -- remove this reference, it is above and defined by the epoch settings
-		tenureWeightDaysDenominator = 180, -- tenure weight is computed by tenure / 6-months
-		tenureWeightPeriod = constants.daysToMs(180), -- 180 days in ms
-		maxTenureWeight = 4, -- i.e. an operator has been running for 2 years or more
+		tenureWeightDurationMs = constants.daysToMs(180), -- 180 days in ms
+		maxTenureWeight = 4, -- the maximum tenure weight, reached when a gateway has been running for 2 years or more
 	},
 	operators = {
 		minStake = constants.ARIOToMARIO(10000), -- 10,000 ARIO
@@ -88,7 +86,7 @@ constants.DEFAULT_GAR_SETTINGS = {
 		leaveLengthMs = constants.daysToMs(90), -- 90 days that balance will be vaulted
 		failedEpochCountMax = 30, -- number of epochs failed before marked as leaving
 		failedGatewaySlashRate = 1, -- (100%) applied to the minimum operator stake, the rest is vaulted
-		maxDelegateRewardShareRatio = 95, -- (95%) rate for delegates to share in rewards, intended to promote competition between gateways
+		maxDelegateRewardSharePct = 95, -- (95%) the maximum percentage of rewards that can be shared with delegates, intentionally represented as a percentage (vs. rate)
 	},
 	delegates = {
 		minStake = constants.ARIOToMARIO(10), -- 10 ARIO
@@ -132,6 +130,7 @@ constants.MAX_LEASE_LENGTH_YEARS = 5 -- the maximum number of years a name can b
 constants.RETURNED_NAME_DURATION_MS = constants.daysToMs(14)
 constants.RETURNED_NAME_MAX_MULTIPLIER = 50 -- Freshly returned names will have a multiplier of 50x
 constants.PRIMARY_NAME_REQUEST_DEFAULT_NAME_LENGTH = 51 -- primary name requests cost the same as a single undername on a 51 character name
+constants.PRIMARY_NAME_REQUEST_DURATION_MS = constants.daysToMs(7) -- the duration of a primary name request
 constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERCENTAGE = 0.2 -- operator discount applied to arns requests
 -- the tenure weight threshold for eligibility for the arns discount (you need to be an operator for 6 months to qualify)
 constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD = 1
@@ -193,18 +192,22 @@ constants.DEFAULT_GENESIS_FEES = {
 	[51] = constants.ARIOToMARIO(400),
 }
 
--- DEMAND FACTOR
+--[[
+	DEMAND FACTOR:
+	The demand factor is used to adjust the fees for ARNS purchases. It is a moving average of the trailing period purchases and revenues.
+	The formula to compute how many periods it would take to reset fees is math.ceil(log(demandFactorMin) / log(1 - demandFactorDownAdjustmentRate)) + maxPeriodsAtMinDemandFactor.
+	With these values, it would take 46 periods to get to the minimum demand factor of 0.5. Then an additional 7 periods to reset fees to half of the initial fees.
+]]
 constants.DEFAULT_DEMAND_FACTOR = {
 	currentPeriod = 1, -- one based index of the current period
 	trailingPeriodPurchases = { 0, 0, 0, 0, 0, 0, 0 }, -- Acts as a ring buffer of trailing period purchase counts
-	trailingPeriodRevenues = { 0, 0, 0, 0, 0, 0 }, -- Acts as a ring buffer of trailing period revenues
+	trailingPeriodRevenues = { 0, 0, 0, 0, 0, 0, 0 }, -- Acts as a ring buffer of trailing period revenues
 	purchasesThisPeriod = 0,
 	revenueThisPeriod = 0,
-	currentDemandFactor = 1,
+	currentDemandFactor = 1, -- TODO: start at a 2x demand factor to prevent sniping
 	consecutivePeriodsWithMinDemandFactor = 0,
 	fees = constants.DEFAULT_GENESIS_FEES,
 }
-
 constants.DEFAULT_DEMAND_FACTOR_SETTINGS = {
 	periodZeroStartTimestamp = 1740009600000, -- 2025-02-20T00:00:00Z
 	movingAvgPeriodCount = 7, -- the number of periods to use for the moving average

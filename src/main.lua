@@ -2,6 +2,9 @@
 local process = { _version = "0.0.1" }
 local constants = require("constants")
 local token = require("token")
+local utils = require("utils")
+local json = require("json")
+local ao = ao or require("ao")
 local ARIOEvent = require("ario_event")
 
 Name = Name or "Testnet ARIO"
@@ -11,18 +14,18 @@ Denomination = constants.DENOMINATION
 DemandFactor = DemandFactor or {}
 Owner = Owner or ao.env.Process.Owner
 Protocol = Protocol or ao.env.Process.Id
+Vaults = Vaults or {}
+GatewayRegistry = GatewayRegistry or {}
+NameRegistry = NameRegistry or {}
+Epochs = Epochs or {}
 Balances = Balances or {}
-if not Balances[Protocol] then -- initialize the balance for the process id
+-- NOTE: this is primary for test setup and balances will be set in the module for the process
+if not Balances[Protocol] then
 	Balances = {
 		[Protocol] = constants.DEFAULT_PROTOCOL_BALANCE, -- 50M ARIO
 		[Owner] = math.floor(constants.TOTAL_TOKEN_SUPPLY - constants.DEFAULT_PROTOCOL_BALANCE), -- 950M ARIO
 	}
 end
-Vaults = Vaults or {}
-GatewayRegistry = GatewayRegistry or {}
-NameRegistry = NameRegistry or {}
-Epochs = Epochs or {}
-
 -- last known variables in the state, these help control tick, prune, and distribute behavior
 LastCreatedEpochIndex = LastCreatedEpochIndex or -1 -- TODO: we will move to a 1-based index in a separate PR
 LastDistributedEpochIndex = LastDistributedEpochIndex or 0
@@ -30,9 +33,7 @@ LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
 LastKnownMessageTimestamp = LastKnownMessageTimestamp or 0
 LastKnownMessageId = LastKnownMessageId or ""
 
-local utils = require("utils")
-local json = require("json")
-local ao = ao or require("ao")
+-- NOTE: These are imported after global variables are initialized
 local balances = require("balances")
 local arns = require("arns")
 local gar = require("gar")
