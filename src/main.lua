@@ -420,6 +420,11 @@ end
 
 -- Sanitize inputs before every interaction
 local function assertAndSanitizeInputs(msg)
+	if msg.Tags.Action ~= "Eval" and msg.Data then
+		-- assert data size is less than 100 bytes, we dont use msg.Data
+		assert(#msg.Data < 100, "Data size is too large")
+	end
+
 	assert(
 		-- TODO: replace this with LastKnownMessageTimestamp after node release 23.0.0
 		msg.Timestamp and tonumber(msg.Timestamp) >= 0,

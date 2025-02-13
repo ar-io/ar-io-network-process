@@ -22,6 +22,7 @@ import {
   parseEventsFromResult,
   transfer,
   totalTokenSupply,
+  handle,
 } from './helpers.mjs';
 import { STUB_ADDRESS } from '../tools/constants.mjs';
 
@@ -44,6 +45,27 @@ describe('ARNS Record Pruning', () => {
       memory: totalTokenSupplyMemory,
     });
     sharedMemory = transferMemory;
+  });
+
+  it('messages with more than 100 bytes of data will throw an error', async () => {
+    const longMessage = 'a'.repeat(101);
+    const result = await handle({
+      options: {
+        Data: longMessage,
+        Tags: [
+          {
+            name: 'Action',
+            value: 'Info',
+          },
+        ],
+      },
+      memory: sharedMemory,
+    });
+
+    assert(
+      result.Error.includes('Data size is too large'),
+      'Expected error to be thrown',
+    );
   });
 
   it('should prune expired records after grace period', async () => {
