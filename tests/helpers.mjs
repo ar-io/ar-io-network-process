@@ -271,7 +271,7 @@ export const getBaseRegistrationFees = async ({ memory, timestamp }) => {
 export const getBaseRegistrationFeeForName = async ({
   memory,
   timestamp,
-  name = 'great-nam',
+  name = 'great-name',
   type = 'lease',
   years = 1,
 }) => {

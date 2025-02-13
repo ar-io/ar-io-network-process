@@ -1512,8 +1512,8 @@ describe('ArNS', async () => {
 
     describe('for an existing record', () => {
       let buyRecordMemory;
-      const baseFeeForName = 500000000; // base fee for a 10 character name
       let buyRecordTimestamp;
+      const baseFeeForName = 500000000;
       before(async () => {
         buyRecordTimestamp = afterDistributionTimestamp;
         const { result: buyRecordResult } = await buyRecord({
@@ -1527,50 +1527,49 @@ describe('ArNS', async () => {
         buyRecordMemory = buyRecordResult.Memory;
       });
 
-      it('returns the correct cost details for a returned name', async () => {
-        const oneYearMs = 1000 * 60 * 60 * 24 * 365;
-        const twoWeeksMs = 1000 * 60 * 60 * 24 * 14;
-        const returnedNameTimestamp =
-          buyRecordTimestamp + oneYearMs + twoWeeksMs + 1; // 1 year and 2 weeks after the buy record
-        const { result: tickResult } = await tick({
-          timestamp: returnedNameTimestamp,
-          memory: buyRecordMemory,
-        });
+      describe('returned name', () => {
+        it('returns the correct cost details for a returned name', async () => {
+          const oneYearMs = 1000 * 60 * 60 * 24 * 365;
+          const twoWeeksMs = 1000 * 60 * 60 * 24 * 14;
+          const returnedNameTimestamp =
+            buyRecordTimestamp + oneYearMs + twoWeeksMs + 1; // 1 year and 2 weeks after the buy record
+          const { result: tickResult } = await tick({
+            timestamp: returnedNameTimestamp,
+            memory: buyRecordMemory,
+          });
 
-        const baseFeeForName = await getBaseRegistrationFeeForName({
-          memory: tickResult.Memory,
-          timestamp: returnedNameTimestamp,
-          name: 'great-name',
-          type: 'lease',
-          years: 1,
-        });
+          const baseFeeForNameAfterReturned =
+            await getBaseRegistrationFeeForName({
+              memory: tickResult.Memory,
+              timestamp: returnedNameTimestamp,
+              name: 'great-name',
+              type: 'lease',
+              years: 1,
+            });
 
-        const tokenCostResult = await getTokenCost({
-          name: 'great-name',
-          intent: 'Buy-Name',
-          years: 1,
-          processId: ''.padEnd(43, 'a'),
-          memory: tickResult.Memory,
-          timestamp: returnedNameTimestamp,
-        });
+          const tokenCostResult = await getTokenCost({
+            name: 'great-name',
+            intent: 'Buy-Name',
+            type: 'lease',
+            years: 1,
+            processId: ''.padEnd(43, 'a'),
+            memory: tickResult.Memory,
+            timestamp: returnedNameTimestamp,
+          });
 
-        assert.equal(tokenCostResult.tokenCost, baseFeeForName * 50); // 50 times the base fee for a 10 character name, account for the demand factor impact after ticking
+          assert.equal(
+            tokenCostResult.tokenCost,
+            baseFeeForNameAfterReturned * 50,
+          ); // 50 times the base fee for a 10 character name, account for the demand factor impact after ticking
+        });
       });
 
       describe('extending the lease', () => {
         let extendLeaseTimestamp;
-        let baseFeeForOneYearExtension;
+        const baseFeeForOneYearExtension = baseFeeForName * 0.2;
 
         before(async () => {
           extendLeaseTimestamp = buyRecordTimestamp + 1;
-          const baseFeeForName = await getBaseRegistrationFeeForName({
-            memory: buyRecordMemory,
-            timestamp: extendLeaseTimestamp,
-            name: 'great-name',
-            type: 'lease',
-            years: 1,
-          });
-          baseFeeForOneYearExtension = baseFeeForName * 0.2;
         });
 
         it('should apply the discount to extending the lease for an eligible gateway', async () => {
@@ -1611,7 +1610,7 @@ describe('ArNS', async () => {
         it('balances should be updated when the extend lease action is performed', async () => {
           const eligibleGatewayBalanceBefore = await getBalance({
             memory: buyRecordMemory,
-            timestamp: extendLeaseTimestamp - 1,
+            timestamp: extendLeaseTimestamp,
             address: joinedGateway,
           });
 
@@ -1702,10 +1701,6 @@ describe('ArNS', async () => {
           baseFeeForName * 0.001 * increaseUndernameQty;
 
         it('should apply the discount to increasing the undername limit for an eligible gateway', async () => {
-          const demandFactor = await getDemandFactor({
-            memory: buyRecordMemory,
-            timestamp: afterDistributionTimestamp,
-          });
           const tokenCostResult = await getTokenCost({
             from: joinedGateway,
             name: 'great-name',
@@ -1716,22 +1711,15 @@ describe('ArNS', async () => {
           });
           assert.deepEqual(tokenCostResult.discounts, [
             {
-              discountTotal: undernameCostForName * 0.2 * demandFactor,
+              discountTotal: undernameCostForName * 0.2,
               multiplier: 0.2,
               name: 'Gateway Operator ArNS Discount',
             },
           ]);
-          assert.equal(
-            tokenCostResult.tokenCost,
-            undernameCostForName * 0.8 * demandFactor,
-          );
+          assert.equal(tokenCostResult.tokenCost, undernameCostForName * 0.8);
         });
 
         it('should not apply the discount to increasing the undername limit for a non-eligible gateway', async () => {
-          const demandFactor = await getDemandFactor({
-            memory: buyRecordMemory,
-            timestamp: afterDistributionTimestamp,
-          });
           const tokenCostResult = await getTokenCost({
             from: nonEligibleAddress,
             name: 'great-name',
@@ -1741,10 +1729,7 @@ describe('ArNS', async () => {
             timestamp: afterDistributionTimestamp,
           });
           assertNoResultError(tokenCostResult);
-          assert.equal(
-            tokenCostResult.tokenCost,
-            undernameCostForName * demandFactor,
-          );
+          assert.equal(tokenCostResult.tokenCost, undernameCostForName);
           assert.deepEqual(tokenCostResult.discounts, []);
         });
       });
