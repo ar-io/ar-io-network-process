@@ -26,9 +26,21 @@ export async function createAosLoader() {
     AO_LOADER_HANDLER_ENV,
   );
 
+  // // send a total token supply message
+  const totalSupplyRes = await handle(
+    bootRes.Memory,
+    {
+      ...DEFAULT_HANDLE_OPTIONS,
+      Id: PROCESS_ID,
+      From: PROCESS_ID,
+      Tags: [{ name: 'Action', value: 'Total-Supply' }],
+    },
+    AO_LOADER_HANDLER_ENV,
+  );
+
   return {
     handle,
-    memory: bootRes.Memory,
+    memory: totalSupplyRes.Memory,
   };
 }
 

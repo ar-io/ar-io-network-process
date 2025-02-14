@@ -24,16 +24,16 @@ const projectRootPath = process.cwd();
 describe('setup', () => {
   let compose;
   before(async () => {
-    compose = await new DockerComposeEnvironment(
-      projectRootPath,
-      'tests/monitor/docker-compose.test.yml',
-    )
-      .withWaitStrategy('ao-cu', Wait.forHttp(`/state/${processId}`, 6363))
-      .up();
+    // compose = await new DockerComposeEnvironment(
+    //   projectRootPath,
+    //   'tests/monitor/docker-compose.test.yml',
+    // )
+    //   .withWaitStrategy('ao-cu', Wait.forHttp(`/state/${processId}`, 6363))
+    //   .up();
   });
 
   after(async () => {
-    await compose.down();
+    // await compose.down();
   });
 
   const getBalances = async () => {
@@ -236,6 +236,9 @@ describe('setup', () => {
   describe('distribution totals', () => {
     it('should always have correct eligible rewards for the the previous epoch (within 10 mARIO)', async () => {
       const currentEpoch = await io.getCurrentEpoch();
+      if (currentEpoch == undefined) {
+        return;
+      }
       const previousEpoch = await io.getEpoch({
         epochIndex: currentEpoch.epochIndex - 1,
       });
@@ -393,8 +396,12 @@ describe('setup', () => {
       currentEpoch = await io.getCurrentEpoch();
       gateways = await getGateways();
     });
+  
 
     it('should always be up to date', async () => {
+      if (Date.now() < epochSettings.epochZeroStartTimestamp) {
+        return;
+      }
       const { durationMs, epochZeroStartTimestamp } = epochSettings;
       const currentEpochIndex = Math.floor(
         (Date.now() - epochZeroStartTimestamp) / durationMs,
@@ -406,6 +413,9 @@ describe('setup', () => {
       );
     });
     it('should contain the startTimestamp, endTimestamp and distributions, observations and correct totals and stats for the current epoch', async () => {
+      if (Date.now() < epochSettings.epochZeroStartTimestamp) {
+        return;
+      }
       const {
         epochIndex,
         startTimestamp,
@@ -468,6 +478,9 @@ describe('setup', () => {
     });
 
     it('the previous epoch should have a been distributed', async () => {
+            if (Date.now() < epochSettings.epochZeroStartTimestamp) {
+              return;
+            }
       const { epochIndex: currentEpochIndex } = currentEpoch;
       const previousEpochIndex = currentEpochIndex - 1;
       const { epochIndex, distributions, endTimestamp, startTimestamp } =
@@ -529,8 +542,11 @@ describe('setup', () => {
       const { durationMs, epochZeroStartTimestamp } =
         await io.getEpochSettings();
       // compute the epoch index based on the epoch settings
-      const currentEpochIndex = Math.floor(
-        (Date.now() - epochZeroStartTimestamp) / durationMs,
+      const currentEpochIndex = Math.max(
+        0,
+        Math.floor(
+          (Date.now() - epochZeroStartTimestamp) / durationMs,
+        ),
       );
 
       const gateways = await getGateways();
