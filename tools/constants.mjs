@@ -23,12 +23,12 @@ export const AO_LOADER_HANDLER_ENV = {
   Process: {
     Id: PROCESS_ID,
     Owner: PROCESS_OWNER,
-    Tags: [{ name: 'Authority', value: 'XXXXXX' }],
+    Tags: [{ name: 'Authority', value: PROCESS_OWNER }],
   },
-  Module: {
-    Id: PROCESS_ID,
-    Tags: [{ name: 'Authority', value: 'YYYYYY' }],
-  },
+  // Module: {
+  //   Id: PROCESS_ID,
+  //   Tags: [{ name: 'Authority', value: 'YYYYYY' }],
+  // },
 };
 
 export const AO_LOADER_OPTIONS = {
@@ -41,10 +41,7 @@ export const AO_LOADER_OPTIONS = {
 };
 
 export const AOS_WASM = fs.readFileSync(
-  path.join(
-    __dirname,
-    'fixtures/aos-cbn0KKrBZH7hdNkNokuXLtGryrWM--PjSTBqIzw9Kkk.wasm',
-  ),
+  path.join(__dirname, 'fixtures/bootstrap-process.wasm'),
 );
 
 export const BUNDLED_SOURCE_CODE = fs.readFileSync(

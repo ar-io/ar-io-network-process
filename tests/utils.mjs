@@ -5,6 +5,7 @@ import {
   AO_LOADER_OPTIONS,
   DEFAULT_HANDLE_OPTIONS,
   BUNDLED_SOURCE_CODE,
+  PROCESS_ID,
 } from '../tools/constants.mjs';
 import assert from 'node:assert';
 
@@ -14,21 +15,20 @@ import assert from 'node:assert';
  */
 export async function createAosLoader() {
   const handle = await AoLoader(AOS_WASM, AO_LOADER_OPTIONS);
-  const evalRes = await handle(
+  const bootRes = await handle(
     null,
     {
       ...DEFAULT_HANDLE_OPTIONS,
-      Tags: [
-        { name: 'Action', value: 'Eval' },
-        { name: 'Module', value: ''.padEnd(43, '1') },
-      ],
-      Data: BUNDLED_SOURCE_CODE,
+      Id: PROCESS_ID,
+      From: PROCESS_ID,
+      Tags: [{ name: 'Type', value: 'Process' }],
     },
     AO_LOADER_HANDLER_ENV,
   );
+
   return {
     handle,
-    memory: evalRes.Memory,
+    memory: bootRes.Memory,
   };
 }
 

@@ -374,10 +374,12 @@
   resolved "https://registry.yarnpkg.com/@noble/ed25519/-/ed25519-1.7.3.tgz#57e1677bf6885354b466c38e2b620c62f45a7123"
   integrity sha512-iR8GBkDt0Q3GyaVcIu7mSsVIqnFbkbRzGLWlvhwunacoLwt4J3swfKhfaM6rN6WY+TBGoYT1GtT1mIh2/jGbRQ==
 
-"@permaweb/ao-loader@^0.0.36":
-  version "0.0.36"
-  resolved "https://registry.yarnpkg.com/@permaweb/ao-loader/-/ao-loader-0.0.36.tgz#901632148d7c8ee6b5013068b0249d047e9d9d43"
-  integrity sha512-So4WzXjh+Ovx5aAivw3JIL2bBgqDsetu6+Dyn4S23HeOyZTS9Sm2MJvTrnt3LvjdpsYSxfp2p445L1uEOspMTA==
+"@permaweb/ao-loader@0.0.44":
+  version "0.0.44"
+  resolved "https://registry.yarnpkg.com/@permaweb/ao-loader/-/ao-loader-0.0.44.tgz#47d568c55068e213d47eeda058f027a26f02aeda"
+  integrity sha512-O/5XuwqxCD9dTIN/jZ6x4rmqIA/Css0bqaXScOrXc0xTz7VjYseM+PNXFf8vAXiOgnNFmrZzDJ0or94cjmqhZA==
+  dependencies:
+    "@permaweb/wasm-metering" "^0.2.2"
 
 "@permaweb/ao-scheduler-utils@~0.0.20", "@permaweb/ao-scheduler-utils@~0.0.23":
   version "0.0.25"
@@ -415,6 +417,23 @@
     ramda "^0.30.1"
     warp-arbundles "^1.0.4"
     zod "^3.23.8"
+
+"@permaweb/wasm-json-toolkit@^0.2.9":
+  version "0.2.9"
+  resolved "https://registry.yarnpkg.com/@permaweb/wasm-json-toolkit/-/wasm-json-toolkit-0.2.9.tgz#241cdf37c1690a751a73dd05987336142e5576d1"
+  integrity sha512-CGCeUwS+UeqUdvORiyG0LykkQXLTwS5TWc590CUkDfOYyBUSPv8pse0sJStvTC9LKAzuNx3ELBvmqHCI4muUAA==
+  dependencies:
+    buffer-pipe "0.0.3"
+    leb128 "0.0.4"
+    safe-buffer "^5.1.2"
+
+"@permaweb/wasm-metering@^0.2.2":
+  version "0.2.2"
+  resolved "https://registry.yarnpkg.com/@permaweb/wasm-metering/-/wasm-metering-0.2.2.tgz#a854c485d9ddbbefb4a17a3692822b696d54a2c7"
+  integrity sha512-xM2MbPkHc4rzhTR6VH5eXtfC+liaYSuNCa0kPRaqSZO2gr1SirJWnzUBDa5VOfTBTgIlIVv5RW+Mkbt/VuK+oA==
+  dependencies:
+    "@permaweb/wasm-json-toolkit" "^0.2.9"
+    leb128 "^0.0.4"
 
 "@pkgjs/parseargs@^0.11.0":
   version "0.11.0"
@@ -737,7 +756,7 @@ bl@^4.0.3:
     inherits "^2.0.4"
     readable-stream "^3.4.0"
 
-bn.js@^4.0.0, bn.js@^4.11.9:
+bn.js@^4.0.0, bn.js@^4.11.6, bn.js@^4.11.9:
   version "4.12.1"
   resolved "https://registry.yarnpkg.com/bn.js/-/bn.js-4.12.1.tgz#215741fe3c9dba2d7e12c001d0cfdbae43975ba7"
   integrity sha512-k8TVBiPkPJT9uHLdOKfFpqcfprwBFOAAXXozRubr7R7PfIuKvQlzcI4M0pALeqXN09vdaMbUdUj+pass+uULAg==
@@ -777,6 +796,20 @@ buffer-crc32@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/buffer-crc32/-/buffer-crc32-1.0.0.tgz#a10993b9055081d55304bd9feb4a072de179f405"
   integrity sha512-Db1SbgBS/fg/392AblrMJk97KggmvYhr4pB5ZIMTWtaivCPMWLkmb7m21cJvpvgK+J3nsU2CmmixNBZx4vFj/w==
+
+buffer-pipe@0.0.0:
+  version "0.0.0"
+  resolved "https://registry.yarnpkg.com/buffer-pipe/-/buffer-pipe-0.0.0.tgz#186ec257d696e8e74c3051160a0e9e9a9811a387"
+  integrity sha512-PvKbsvQOH4dcUyUEvQQSs3CIkkuPcOHt3gKnXwf4HsPKFDxSN7bkmICVIWgOmW/jx/fAEGGn4mIayIJPLs7G8g==
+  dependencies:
+    safe-buffer "^5.1.1"
+
+buffer-pipe@0.0.3:
+  version "0.0.3"
+  resolved "https://registry.yarnpkg.com/buffer-pipe/-/buffer-pipe-0.0.3.tgz#242197681d4591e7feda213336af6c07a5ce2409"
+  integrity sha512-GlxfuD/NrKvCNs0Ut+7b1IHjylfdegMBxQIlZHj7bObKVQBxB5S84gtm2yu1mQ8/sSggceWBDPY0cPXgvX2MuA==
+  dependencies:
+    safe-buffer "^5.1.2"
 
 buffer@^5.5.0:
   version "5.7.1"
@@ -1320,6 +1353,14 @@ lazystream@^1.0.0:
   dependencies:
     readable-stream "^2.0.5"
 
+leb128@0.0.4, leb128@^0.0.4:
+  version "0.0.4"
+  resolved "https://registry.yarnpkg.com/leb128/-/leb128-0.0.4.tgz#f96d698cf3ba5b677423abfe50b7e9b2df1463ff"
+  integrity sha512-2zejk0fCIgY8RVcc/KzvyfpDio5Oo8HgPZmkrOmdwmbk0KpKpgD+JKwikxKk8cZYkANIhwHK50SNukkCm3XkCQ==
+  dependencies:
+    bn.js "^4.11.6"
+    buffer-pipe "0.0.0"
+
 lilconfig@~3.1.2:
   version "3.1.2"
   resolved "https://registry.yarnpkg.com/lilconfig/-/lilconfig-3.1.2.tgz#e4a7c3cb549e3a606c8dcc32e5ae1005e62c05cb"
@@ -1724,7 +1765,7 @@ rfdc@^1.4.1:
   resolved "https://registry.yarnpkg.com/rfdc/-/rfdc-1.4.1.tgz#778f76c4fb731d93414e8f925fbecf64cce7f6ca"
   integrity sha512-q1b3N5QkRUWUl7iyylaaj3kOpIT0N2i9MqIEQXP73GVsN9cw3fdx8X63cEmWhJGi2PPCF23Ijp7ktmd39rawIA==
 
-safe-buffer@^5.0.1, safe-buffer@~5.2.0:
+safe-buffer@^5.0.1, safe-buffer@^5.1.1, safe-buffer@^5.1.2, safe-buffer@~5.2.0:
   version "5.2.1"
   resolved "https://registry.yarnpkg.com/safe-buffer/-/safe-buffer-5.2.1.tgz#1eaf9fa9bdb1fdd4ec75f58f9cdb4e6b7827eec6"
   integrity sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==
