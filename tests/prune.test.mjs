@@ -22,7 +22,7 @@ import {
   parseEventsFromResult,
   transfer,
   totalTokenSupply,
-  handle,
+  sendEval,
 } from './helpers.mjs';
 import { STUB_ADDRESS } from '../tools/constants.mjs';
 
@@ -48,19 +48,9 @@ describe('ARNS Record Pruning', () => {
   });
 
   it('Eval action messages with more than 100 bytes of data will not throw an error', async () => {
-    const longMessage = '-- a'.repeat(101);
-    const result = await handle({
-      options: {
-        Data: longMessage + "\nprint('hello')",
-        Tags: [
-          {
-            name: 'Action',
-            value: 'Eval',
-          },
-        ],
-      },
+    const { result } = await sendEval({
       memory: sharedMemory,
-      shouldAssertNoResultError: false,
+      data: '-- a'.repeat(101) + "\nprint('hello')",
     });
 
     assert(result.Error === undefined, 'Expected error to not be thrown');
@@ -72,18 +62,11 @@ describe('ARNS Record Pruning', () => {
 
   it('messages with more than 100 bytes of data will throw an error', async () => {
     const longMessage = 'a'.repeat(101);
-    const result = await handle({
-      options: {
-        Data: longMessage,
-        Tags: [
-          {
-            name: 'Action',
-            value: 'Info',
-          },
-        ],
-      },
+
+    const { result } = await getInfo({
       memory: sharedMemory,
-      shouldAssertNoResultError: false,
+      timestamp: STUB_TIMESTAMP,
+      data: longMessage,
     });
 
     assert(
