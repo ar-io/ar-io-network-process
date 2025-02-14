@@ -2,6 +2,9 @@
 local process = { _version = "0.0.1" }
 local constants = require("constants")
 local token = require("token")
+local utils = require("utils")
+local json = require("json")
+local ao = ao or require("ao")
 local ARIOEvent = require("ario_event")
 
 Name = Name or "Testnet ARIO"
@@ -11,18 +14,18 @@ Denomination = constants.DENOMINATION
 DemandFactor = DemandFactor or {}
 Owner = Owner or ao.env.Process.Owner
 Protocol = Protocol or ao.env.Process.Id
+Vaults = Vaults or {}
+GatewayRegistry = GatewayRegistry or {}
+NameRegistry = NameRegistry or {}
+Epochs = Epochs or {}
 Balances = Balances or {}
-if not Balances[Protocol] then -- initialize the balance for the process id
+-- NOTE: this is primary for test setup and balances will be set in the module for the process
+if not Balances[Protocol] then
 	Balances = {
 		[Protocol] = constants.DEFAULT_PROTOCOL_BALANCE, -- 50M ARIO
 		[Owner] = math.floor(constants.TOTAL_TOKEN_SUPPLY - constants.DEFAULT_PROTOCOL_BALANCE), -- 950M ARIO
 	}
 end
-Vaults = Vaults or {}
-GatewayRegistry = GatewayRegistry or {}
-NameRegistry = NameRegistry or {}
-Epochs = Epochs or {}
-
 -- last known variables in the state, these help control tick, prune, and distribute behavior
 LastCreatedEpochIndex = LastCreatedEpochIndex or -1 -- TODO: we will move to a 1-based index in a separate PR
 LastDistributedEpochIndex = LastDistributedEpochIndex or 0
@@ -30,9 +33,7 @@ LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
 LastKnownMessageTimestamp = LastKnownMessageTimestamp or 0
 LastKnownMessageId = LastKnownMessageId or ""
 
-local utils = require("utils")
-local json = require("json")
-local ao = ao or require("ao")
+-- NOTE: These are imported after global variables are initialized
 local balances = require("balances")
 local arns = require("arns")
 local gar = require("gar")
@@ -506,7 +507,7 @@ addEventingHandler("prune", function()
 	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
 end, function(msg)
 	local epochIndex = epochs.getEpochIndexForTimestamp(msg.Timestamp)
-	msg.ioEvent:addField("epochIndex", epochIndex)
+	msg.ioEvent:addField("Epoch-Index", epochIndex)
 
 	local previousStateSupplies = {
 		protocolBalance = Balances[Protocol],
@@ -1746,19 +1747,17 @@ end, function(msg)
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
 	local distributedEpochIndexes = {}
 	local newEpochIndexes = {}
-	local newDemandFactors = {}
 	local newPruneGatewaysResults = {}
 	local tickedRewardDistributions = {}
 	local totalTickedRewardsDistributed = 0
 
-	-- tick the demand factor
-	local demandFactor = demand.updateDemandFactor(msg.Timestamp)
-	if demandFactor ~= nil then
-		table.insert(newDemandFactors, demandFactor)
+	-- tick the demand factor all the way to the current period
+	local latestDemandFactor, newDemandFactors = demand.updateDemandFactor(msg.Timestamp)
+	if latestDemandFactor ~= nil then
 		Send(msg, {
 			Target = msg.From,
 			Action = "Demand-Factor-Updated-Notice",
-			Data = tostring(demandFactor),
+			Data = tostring(latestDemandFactor),
 		})
 	end
 
@@ -1814,8 +1813,9 @@ end, function(msg)
 			end)
 		msg.ioEvent:addField("Prescribed-Observers", prescribedObserverAddresses)
 	end
-	if #newDemandFactors > 0 then
-		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors)
+	local updatedDemandFactorCount = utils.lengthOfTable(newDemandFactors)
+	if updatedDemandFactorCount > 0 then
+		msg.ioEvent:addField("Updated-Demand-Factors", newDemandFactors)
 	end
 	if #newPruneGatewaysResults > 0 then
 		-- Reduce the prune gateways results and then track changes

@@ -137,32 +137,28 @@ describe('epochs', () => {
         });
         firstEpoch = epoch;
 
-        const { result: eligibleDistributionsResult } =
-          await getEligibleDistributions({
-            memory: tickMemory,
-            timestamp: epochSettings.epochZeroStartTimestamp,
-          });
+        const eligibleDistributions = await getEligibleDistributions({
+          memory: tickMemory,
+          timestamp: epochSettings.epochZeroStartTimestamp,
+        });
 
-        assert.deepStrictEqual(
-          JSON.parse(eligibleDistributionsResult.Messages[0].Data),
-          {
-            hasMore: false,
-            items: [
-              {
-                cursorId:
-                  'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE_EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
-                eligibleReward: 50002000000,
-                gatewayAddress: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
-                recipient: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
-                type: 'operatorReward',
-              },
-            ],
-            limit: 100,
-            sortBy: 'cursorId',
-            sortOrder: 'desc',
-            totalItems: 1,
-          },
-        );
+        assert.deepStrictEqual(eligibleDistributions, {
+          hasMore: false,
+          items: [
+            {
+              cursorId:
+                'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE_EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
+              eligibleReward: 50002000000,
+              gatewayAddress: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
+              recipient: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
+              type: 'operatorReward',
+            },
+          ],
+          limit: 100,
+          sortBy: 'cursorId',
+          sortOrder: 'desc',
+          totalItems: 1,
+        });
 
         sharedMemory = tickMemory;
       });

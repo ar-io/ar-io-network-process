@@ -323,10 +323,11 @@ describe('Tick', async () => {
    * - validate the epoch is created correctly
    * - submit an observation from the gateway prescribed
    * - tick to the epoch distribution timestamp
+   * - validate the demand factor is updated correctly
    * - validate the rewards were distributed correctly
-   * - send epoch distribution notice containing full epoch data
+   * - validate the sent epoch distribution notice contains full epoch data
    */
-  it('should distribute rewards to gateways and delegates, send an epoch distribution notice and remove the epoch from the epoch registry', async () => {
+  it('should update the demand factor, distribute rewards to gateways and delegates, send an epoch distribution notice and remove the epoch from the epoch registry', async () => {
     // give balance to gateway
     const initialMemory = await transfer({
       recipient: STUB_ADDRESS,
@@ -370,13 +371,19 @@ describe('Tick', async () => {
     });
 
     // should only have one message with a tick notice, the epoch distribution notice is sent separately
-    assert.equal(newEpochTick.Messages.length, 2);
+    assert.equal(newEpochTick.Messages.length, 3);
+    // updated demand factor is sent
     assert.equal(
       newEpochTick.Messages[0].Tags.find((tag) => tag.name === 'Action').value,
+      'Demand-Factor-Updated-Notice',
+    );
+    // epoch created notice is sent
+    assert.equal(
+      newEpochTick.Messages[1].Tags.find((tag) => tag.name === 'Action').value,
       'Epoch-Created-Notice',
     );
     assert.equal(
-      newEpochTick.Messages[1].Tags.find((tag) => tag.name === 'Action').value,
+      newEpochTick.Messages[2].Tags.find((tag) => tag.name === 'Action').value,
       'Tick-Notice',
     );
 
@@ -469,7 +476,7 @@ describe('Tick', async () => {
     );
 
     // assert multiple messages are sent given the tick notice, epoch created notice and epoch distribution notice
-    assert.equal(distributionTick.Messages.length, 3); // 1 epoch distribution notice, 1 epoch created notice, 1 tick notice
+    assert.equal(distributionTick.Messages.length, 4); // 1 epoch distribution notice, 1 epoch created notice, 1 tick notice, 1 demand factor updated notice
 
     // new epoch is created
     const createdMessage = distributionTick.Messages.find(
