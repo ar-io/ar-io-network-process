@@ -440,16 +440,6 @@ describe('Tick', async () => {
         totalEligibleRewards: totalEligibleRewards,
         totalEligibleGatewayReward: totalGatewayRewards,
         totalEligibleObserverReward: totalObserverRewards,
-        rewards: {
-          eligible: {
-            [STUB_ADDRESS]: {
-              operatorReward: expectedGatewayOperatorReward,
-              delegateRewards: {
-                [delegateAddress]: expectedGatewayDelegateReward,
-              },
-            },
-          },
-        },
       },
     });
 
@@ -516,7 +506,14 @@ describe('Tick', async () => {
       distributions: {
         ...epochData.distributions,
         rewards: {
-          ...epochData.distributions.rewards,
+          eligible: {
+            '2222222222222222222222222222222222222222222': {
+              delegateRewards: {
+                'delegate-address-11111111111111111111111111': 12500000000,
+              },
+              operatorReward: 37500000000,
+            },
+          },
           distributed: {
             [STUB_ADDRESS]: expectedGatewayOperatorReward,
             [delegateAddress]: expectedGatewayDelegateReward,
