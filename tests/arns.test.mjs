@@ -379,7 +379,7 @@ describe('ArNS', async () => {
         fundingPlan: {
           address: testNewAddress,
           balance: 400_000_000,
-          shortfall: 200_000_000,
+          shortfall: 800_000_000,
           stakes: [],
         },
       });
@@ -416,7 +416,7 @@ describe('ArNS', async () => {
         fundingPlan: {
           address: testNewAddress,
           balance: 400_000_000,
-          shortfall: 200_000_000,
+          shortfall: 800_000_000,
           stakes: [],
         },
       });
@@ -438,7 +438,7 @@ describe('ArNS', async () => {
         intent: 'Increase-Undername-Limit',
         memory: buyRecordResult.Memory,
       });
-      const expectedPrice = 500000000 * 0.001; // one year lease at 0.1% for an undername
+      const expectedPrice = 500000000 * 0.001 * 2; // one year lease at 0.1% for an undername * demand factor of 2
       assert.equal(result.tokenCost, expectedPrice);
     });
 
@@ -459,7 +459,7 @@ describe('ArNS', async () => {
         years: 2,
         memory: buyRecordResult.Memory,
       });
-      assert.equal(result.tokenCost, 200000000); // known cost for extending a 9 character name by 2 years (500 ARIO * 0.2 * 2)
+      assert.equal(result.tokenCost, 400000000); // known cost for extending a 9 character name by 2 years (500 ARIO * 0.2 * 2) * 2 (DemandFactor)
     });
 
     it('should get the cost of upgrading an existing leased record to permanently owned', async () => {
@@ -667,8 +667,8 @@ describe('ArNS', async () => {
       let memory = sharedMemory;
       const stakeResult = await setUpStake({
         memory,
-        transferQty: 3_100_000_000, // 60,000,0000 for name purchase + 2,500,000,000 for upgrading the name
-        stakeQty: 3_100_000_000 - 50_000_000, // delegate most of their balance so that name purchase uses balance and stakes
+        transferQty: 6_200_000_000, // 1,200,000,000 for name purchase + 5,000,000,000 for upgrading the name
+        stakeQty: 6_200_000_000 - 100_000_000, // delegate most of their balance so that name purchase uses balance and stakes
         stakerAddress: STUB_ADDRESS,
         timestamp: STUB_TIMESTAMP,
       });
@@ -726,7 +726,7 @@ describe('ArNS', async () => {
           startTimestamp: buyRecordTimestamp,
           processId: ''.padEnd(43, 'a'),
           undernameLimit: 10,
-          purchasePrice: 2500000000, // expected price for a permanent 9 character name
+          purchasePrice: 5000000000, // expected price for a permanent 9 character name
         },
       );
       sharedMemory = upgradeNameResult.Memory;
