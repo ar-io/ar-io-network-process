@@ -1,4 +1,4 @@
-package.path = "./contract/src/?.lua;" .. package.path
+package.path = "./src/?.lua;" .. package.path
 
 _G.ao = {
 	send = function(val)

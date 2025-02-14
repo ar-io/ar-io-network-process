@@ -1,22 +1,16 @@
--- Utility functions that modify global Vaults object
-local vaults = {}
+require("globals")
 local balances = require("balances")
 local utils = require("utils")
 local constants = require("constants")
+local vaults = {}
+
+--- @alias Vaults table<WalletAddress, table<VaultId, Vault>> -- A table of vaults indexed by owner address, then by vault id
 
 --- @class Vault
 --- @field balance mARIO The balance of the vault
 --- @field controller WalletAddress | nil The controller of a revokable vault. Nil if not revokable (default: nil)
 --- @field startTimestamp Timestamp The start timestamp of the vault
 --- @field endTimestamp Timestamp The end timestamp of the vault
-
---- @alias Vaults table<WalletAddress, table<VaultId, Vault>> -- A table of vaults indexed by owner address, then by vault id
-
---- @type Vaults
-Vaults = Vaults or {}
-
---- @type Timestamp|nil
-NextBalanceVaultsPruneTimestamp = NextBalanceVaultsPruneTimestamp or 0
 
 --- Creates a vault
 --- @param from string The address of the owner

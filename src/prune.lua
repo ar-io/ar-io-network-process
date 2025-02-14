@@ -1,8 +1,9 @@
-local prune = {}
+require("globals")
 local arns = require("arns")
 local gar = require("gar")
 local vaults = require("vaults")
 local primaryNames = require("primary_names")
+local prune = {}
 
 ---@class PruneStateResult
 ---@field prunedRecords table<string, Record>

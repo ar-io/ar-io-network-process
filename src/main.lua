@@ -1,4 +1,5 @@
 -- Adjust package.path to include the current directory
+require("globals")
 local process = { _version = "0.0.1" }
 local constants = require("constants")
 local token = require("token")
@@ -6,32 +7,6 @@ local utils = require("utils")
 local json = require("json")
 local ao = ao or require("ao")
 local ARIOEvent = require("ario_event")
-
-Name = Name or "Testnet ARIO"
-Ticker = Ticker or "tARIO"
-Logo = Logo or "qUjrTmHdVjXX4D6rU6Fik02bUOzWkOR6oOqUg39g4-s"
-Denomination = constants.DENOMINATION
-DemandFactor = DemandFactor or {}
-Owner = Owner or ao.env.Process.Owner
-Protocol = Protocol or ao.env.Process.Id
-Vaults = Vaults or {}
-GatewayRegistry = GatewayRegistry or {}
-NameRegistry = NameRegistry or {}
-Epochs = Epochs or {}
-Balances = Balances or {}
--- NOTE: this is primary for test setup and balances will be set in the module for the process
-if not Balances[Protocol] then
-	Balances = {
-		[Protocol] = constants.DEFAULT_PROTOCOL_BALANCE, -- 50M ARIO
-		[Owner] = math.floor(constants.TOTAL_TOKEN_SUPPLY - constants.DEFAULT_PROTOCOL_BALANCE), -- 950M ARIO
-	}
-end
--- last known variables in the state, these help control tick, prune, and distribute behavior
-LastCreatedEpochIndex = LastCreatedEpochIndex or -1 -- TODO: we will move to a 1-based index in a separate PR
-LastDistributedEpochIndex = LastDistributedEpochIndex or 0
-LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
-LastKnownMessageTimestamp = LastKnownMessageTimestamp or 0
-LastKnownMessageId = LastKnownMessageId or ""
 
 -- NOTE: These are imported after global variables are initialized
 local balances = require("balances")
@@ -268,7 +243,7 @@ local function addSupplyData(ioEvent, supplyData)
 	ioEvent:addField("Delegated-Supply", supplyData.delegatedSupply or LastKnownDelegatedSupply)
 	ioEvent:addField("Withdraw-Supply", supplyData.withdrawSupply or LastKnownWithdrawSupply)
 	ioEvent:addField("Total-Token-Supply", supplyData.totalTokenSupply or token.lastKnownTotalTokenSupply())
-	ioEvent:addField("Protocol-Balance", Balances[Protocol])
+	ioEvent:addField("Protocol-Balance", Balances[ao.id])
 end
 
 --- @param ioEvent ARIOEvent
@@ -536,7 +511,7 @@ end, function(msg)
 	msg.ioEvent:addField("Epoch-Index", epochIndex)
 
 	local previousStateSupplies = {
-		protocolBalance = Balances[Protocol],
+		protocolBalance = Balances[ao.id],
 		lastKnownCirculatingSupply = LastKnownCirculatingSupply,
 		lastKnownLockedSupply = LastKnownLockedSupply,
 		lastKnownStakedSupply = LastKnownStakedSupply,
@@ -622,7 +597,7 @@ end, function(msg)
 		or LastKnownStakedSupply ~= previousStateSupplies.lastKnownStakedSupply
 		or LastKnownDelegatedSupply ~= previousStateSupplies.lastKnownDelegatedSupply
 		or LastKnownWithdrawSupply ~= previousStateSupplies.lastKnownWithdrawSupply
-		or Balances[Protocol] ~= previousStateSupplies.protocolBalance
+		or Balances[ao.id] ~= previousStateSupplies.protocolBalance
 		or token.lastKnownTotalTokenSupply() ~= previousStateSupplies.lastKnownTotalSupply
 	then
 		addSupplyData(msg.ioEvent)

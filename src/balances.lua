@@ -1,8 +1,4 @@
--- balances.lua
---- @type table<WalletAddress, mARIO>
-Balances = Balances or {}
-
--- Utility functions that modify global Balance object
+require("globals")
 local balances = {}
 local utils = require("utils")
 

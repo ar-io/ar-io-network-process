@@ -1,4 +1,4 @@
-local constants = require("constants")
+require("globals")
 local utils = require("utils")
 local demand = {}
 
@@ -11,7 +11,6 @@ local demand = {}
 --- @field currentDemandFactor number The current demand factor
 --- @field consecutivePeriodsWithMinDemandFactor number The number of consecutive periods with the minimum demand factor
 --- @field fees table<number, number> The fees for each name length
-DemandFactor = DemandFactor or utils.deepCopy(constants.DEFAULT_DEMAND_FACTOR)
 
 --- @class DemandFactorSettings
 --- @field periodZeroStartTimestamp number The timestamp of the start of period zero
@@ -23,7 +22,6 @@ DemandFactor = DemandFactor or utils.deepCopy(constants.DEFAULT_DEMAND_FACTOR)
 --- @field demandFactorDownAdjustmentRate number The adjustment to the demand factor when it is decreasing
 --- @field maxPeriodsAtMinDemandFactor number The threshold for the number of consecutive periods with the minimum demand factor before adjusting the demand factor
 --- @field criteria 'revenue' | 'purchases' The criteria to use for determining if the demand is increasing
-DemandFactorSettings = DemandFactorSettings or utils.deepCopy(constants.DEFAULT_DEMAND_FACTOR_SETTINGS)
 
 --- Tally a name purchase
 --- @param qty number The quantity of the purchase

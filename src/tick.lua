@@ -1,6 +1,7 @@
-local tick = {}
+require("globals")
 local epochs = require("epochs")
 local gar = require("gar")
+local tick = {}
 
 --- @class TickResult
 --- @field maybeNewEpoch PrescribedEpoch | nil The new epoch
