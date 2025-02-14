@@ -125,14 +125,6 @@ describe('epochs', () => {
             totalEligibleGateways: 1,
             totalEligibleObserverReward: expectedObserverRewards,
             totalEligibleRewards: expectedEligibleRewards,
-            rewards: {
-              eligible: {
-                [STUB_OPERATOR_ADDRESS]: {
-                  delegateRewards: [],
-                  operatorReward: expectedEligibleRewards,
-                },
-              },
-            },
           },
         });
         firstEpoch = epoch;
@@ -247,6 +239,12 @@ describe('epochs', () => {
             totalDistributedRewards: 43876350000, // the result of the first tick
             rewards: {
               ...firstEpoch.distributions.rewards,
+              eligible: {
+                [STUB_OPERATOR_ADDRESS]: {
+                  delegateRewards: [],
+                  operatorReward: 50002000000,
+                },
+              },
               distributed: {
                 [STUB_OPERATOR_ADDRESS]: 43876350000, // received the full operator reward, but docked 25% for not observing
               },
@@ -337,14 +335,6 @@ describe('epochs', () => {
             totalEligibleGateways: 1,
             totalEligibleObserverReward: expectedSecondEpochObserverReward,
             totalEligibleRewards: expectedNewEligibleRewards,
-            rewards: {
-              eligible: {
-                [STUB_OPERATOR_ADDRESS]: {
-                  delegateRewards: [],
-                  operatorReward: expectedNewEligibleRewards,
-                },
-              },
-            },
           },
         });
         sharedMemory = tickMemory;

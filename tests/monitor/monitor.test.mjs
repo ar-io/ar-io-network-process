@@ -3,7 +3,6 @@ import { connect } from '@permaweb/aoconnect';
 import { strict as assert } from 'node:assert';
 import { describe, it, before, after } from 'node:test';
 import { DockerComposeEnvironment, Wait } from 'testcontainers';
-import pLimit from 'p-limit';
 
 // set debug level logs for to get detailed messages
 Logger.default.setLogLevel('info');
@@ -21,7 +20,6 @@ const io = ARIO.init({
 });
 
 const projectRootPath = process.cwd();
-const throttle = pLimit(25);
 
 describe('setup', () => {
   let compose;
@@ -236,26 +234,23 @@ describe('setup', () => {
   });
 
   describe('distribution totals', () => {
-    it('should always have correct eligible rewards for the current epoch (within 10 mARIO)', async () => {
-      const { distributions: currentEpochDistributions } =
-        await io.getCurrentEpoch();
-
-      // assert it has eligible rewards
-      assert(
-        currentEpochDistributions.rewards?.eligible !== undefined,
-        'No eligible rewards found for current epoch',
-      );
+    it('should always have correct eligible rewards for the the previous epoch (within 10 mARIO)', async () => {
+      const currentEpoch = await io.getCurrentEpoch();
+      const previousEpoch = await io.getEpoch({
+        epochIndex: currentEpoch.epochIndex - 1,
+      });
+      const { distributions: previousEpochDistributions } = previousEpoch;
 
       // No eligible rewards for the current epoch
       if (
-        Object.keys(currentEpochDistributions.rewards.eligible).length === 0
+        Object.keys(previousEpochDistributions.rewards.eligible).length === 0
       ) {
         return;
       }
 
       // add up all the eligible operators and delegates
       const assignedRewards = Object.values(
-        currentEpochDistributions.rewards.eligible,
+        previousEpochDistributions.rewards.eligible,
       ).reduce((acc, curr) => {
         const delegateRewards = Object.values(curr.delegateRewards).reduce(
           (d, c) => d + c,
@@ -266,11 +261,20 @@ describe('setup', () => {
 
       // handle any rounding errors
       const roundingError =
-        assignedRewards - currentEpochDistributions.totalEligibleRewards;
+        assignedRewards - previousEpochDistributions.totalEligibleRewards;
       // assert total eligible rewards rounding is less than 10
       assert(
         roundingError < 10,
         `Rounding for eligible distributions is too large: ${roundingError}`,
+      );
+
+      const distributedRewards = Object.values(
+        previousEpochDistributions.rewards.distributed,
+      ).reduce((acc, curr) => acc + curr, 0);
+      assert(
+        distributedRewards ===
+          previousEpochDistributions.totalDistributedRewards,
+        'Distributed rewards do not match the total distributed rewards',
       );
     });
   });
@@ -379,7 +383,7 @@ describe('setup', () => {
   });
 
   // epoch information
-  describe('epoch', () => {
+  describe('epochs', () => {
     let epochSettings;
     let currentEpoch;
     let gateways;
@@ -420,8 +424,30 @@ describe('setup', () => {
         endTimestamp > startTimestamp,
         `End timestamp is not greater than start timestamp: ${endTimestamp} > ${startTimestamp}`,
       );
-      assert(distributions.rewards.eligible, 'Eligible rewards are not valid');
-
+      assert(
+        distributions.totalEligibleGateways > 0,
+        'Total eligible gateways are not valid',
+      );
+      assert(
+        distributions.totalEligibleGateways <= gateways.length,
+        'Total eligible gateways are greater than the total number of gateways',
+      );
+      assert(
+        distributions.totalEligibleRewards > 0,
+        'Total eligible rewards are not valid',
+      );
+      assert(
+        distributions.totalEligibleRewards > 0,
+        'Total eligible rewards are not valid',
+      );
+      assert(
+        distributions.totalEligibleGatewayReward > 0,
+        'Total eligible gateway reward is not valid',
+      );
+      assert(
+        distributions.totalEligibleObserverReward >= 0,
+        `Total eligible observer reward is not valid or is negative: ${distributions.totalEligibleObserverReward}`,
+      );
       // compare the current gateway count to the current epoch totalEligibleRewards
       const activeGatewayCountAtBeginningOfEpoch = gateways.filter(
         (gateway) =>
@@ -455,15 +481,14 @@ describe('setup', () => {
         endTimestamp > startTimestamp,
         'End timestamp is not greater than start timestamp',
       );
-      // assert(
-      //   distributions.distributedTimestamp >= endTimestamp,
-      //   'Distributed timestamp is not greater than epoch end timestamp',
-      // );
+      assert(
+        distributions.distributedTimestamp >= endTimestamp,
+        'Distributed timestamp is not greater than epoch end timestamp',
+      );
       assert(
         distributions.rewards.eligible !== undefined,
         'Eligible rewards are not valid',
       );
-      // assert all eligible rewards are integers
       assert(
         Object.values(distributions.rewards.eligible).every(
           (reward) =>
@@ -708,54 +733,91 @@ describe('setup', () => {
         );
       },
     );
-  });
 
-  it('should not have any returned names older than two weeks', async () => {
-    const twoWeekMs = 2 * 7 * 24 * 60 * 60 * 1000;
-    const { items: returnedNames } = await io.getArNSReturnedNames({
-      limit: 1000,
-    });
-    for (const returnedName of returnedNames) {
-      assert(returnedName.name, 'Returned name has no name');
-      assert(
-        returnedName.startTimestamp &&
-          returnedName.startTimestamp <= Date.now(),
-        `Returned name ${returnedName.name} has unexpected start timestamp ${returnedName.startTimestamp} (${new Date(returnedName.startTimestamp).toLocaleString()})`,
-      );
-      assert(
-        returnedName.endTimestamp &&
-          returnedName.endTimestamp > Date.now() &&
-          returnedName.endTimestamp == returnedName.startTimestamp + twoWeekMs,
-        `Returned name ${returnedName.name} has unexpected end timestamp ${returnedName.endTimestamp} (${new Date(returnedName.endTimestamp).toLocaleString()})`,
-      );
-      assert(
-        returnedName.initiator &&
-          typeof returnedName.initiator === 'string' &&
-          returnedName.initiator.length > 0,
-        `Returned name ${returnedName.name} has no initiator`,
-      );
-    }
-  });
-
-  it('should not have any expired reserved names', async () => {
-    const { items: reservedNames } = await io.getArNSReservedNames({
-      limit: 1000,
-    });
-    for (const reservedName of reservedNames) {
-      assert(reservedName.name, 'Reserved name has no name');
-      if (reservedName.endTimestamp) {
+    it('should not have any returned names older than two weeks', async () => {
+      const twoWeekMs = 2 * 7 * 24 * 60 * 60 * 1000;
+      const { items: returnedNames } = await io.getArNSReturnedNames({
+        limit: 1000,
+      });
+      for (const returnedName of returnedNames) {
+        assert(returnedName.name, 'Returned name has no name');
         assert(
-          reservedName.endTimestamp > Date.now(),
-          `Reserved name ${reservedName.name} has unexpected end timestamp ${reservedName.endTimestamp} (${new Date(reservedName.endTimestamp).toLocaleString()})`,
+          returnedName.startTimestamp &&
+            returnedName.startTimestamp <= Date.now(),
+          `Returned name ${returnedName.name} has unexpected start timestamp ${returnedName.startTimestamp} (${new Date(returnedName.startTimestamp).toLocaleString()})`,
+        );
+        assert(
+          returnedName.endTimestamp &&
+            returnedName.endTimestamp > Date.now() &&
+            returnedName.endTimestamp ==
+              returnedName.startTimestamp + twoWeekMs,
+          `Returned name ${returnedName.name} has unexpected end timestamp ${returnedName.endTimestamp} (${new Date(returnedName.endTimestamp).toLocaleString()})`,
+        );
+        assert(
+          returnedName.initiator &&
+            typeof returnedName.initiator === 'string' &&
+            returnedName.initiator.length > 0,
+          `Returned name ${returnedName.name} has no initiator`,
         );
       }
-      if (reservedName.target) {
+    });
+
+    it('should not have any expired reserved names', async () => {
+      const { items: reservedNames } = await io.getArNSReservedNames({
+        limit: 1000,
+      });
+      for (const reservedName of reservedNames) {
+        assert(reservedName.name, 'Reserved name has no name');
+        if (reservedName.endTimestamp) {
+          assert(
+            reservedName.endTimestamp > Date.now(),
+            `Reserved name ${reservedName.name} has unexpected end timestamp ${reservedName.endTimestamp} (${new Date(reservedName.endTimestamp).toLocaleString()})`,
+          );
+        }
+        if (reservedName.target) {
+          assert(
+            typeof reservedName.target === 'string' &&
+              reservedName.target.length > 0,
+            `Reserved name ${reservedName.name} has invalid target: ${reservedName.target}`,
+          );
+        }
+      }
+    });
+  });
+
+  describe('primary name', () => {
+    it('should not have any expired primary name requests', async () => {
+      const twoWeeks = 2 * 7 * 24 * 60 * 60 * 1000;
+      const { items: primaryNameRequests } = await io.getPrimaryNameRequests({
+        limit: 1000,
+      });
+      for (const primaryNameRequest of primaryNameRequests) {
+        assert(primaryNameRequest.name, 'Primary name request has no name');
         assert(
-          typeof reservedName.target === 'string' &&
-            reservedName.target.length > 0,
-          `Reserved name ${reservedName.name} has invalid target: ${reservedName.target}`,
+          primaryNameRequest.startTimestamp &&
+            primaryNameRequest.startTimestamp <= Date.now(),
+          `Primary name request ${primaryNameRequest.name} has unexpected start timestamp ${primaryNameRequest.startTimestamp} (${new Date(primaryNameRequest.startTimestamp).toLocaleString()})`,
+        );
+        assert(
+          primaryNameRequest.startTimestamp + twoWeeks > Date.now(),
+          `Primary name request ${primaryNameRequest.name} has unexpected start timestamp ${primaryNameRequest.startTimestamp} (${new Date(primaryNameRequest.startTimestamp).toLocaleString()})`,
         );
       }
-    }
+    });
+
+    it('should have valid owner and name for every primary name', async () => {
+      const { items: primaryNames } = await io.getPrimaryNames({
+        limit: 1000,
+      });
+      for (const primaryName of primaryNames) {
+        assert(primaryName.owner, 'Primary name has no owner');
+        assert(primaryName.name, 'Primary name has no name');
+        assert(
+          primaryName.startTimestamp,
+          'Primary name has no start timestamp',
+        );
+        assert(primaryName.processId, 'Primary name has no processId');
+      }
+    });
   });
 });
