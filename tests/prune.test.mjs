@@ -47,6 +47,29 @@ describe('ARNS Record Pruning', () => {
     sharedMemory = transferMemory;
   });
 
+  it('Eval action messages with more than 100 bytes of data will not throw an error', async () => {
+    const longMessage = '-- a'.repeat(101);
+    const result = await handle({
+      options: {
+        Data: longMessage + "\nprint('hello')",
+        Tags: [
+          {
+            name: 'Action',
+            value: 'Eval',
+          },
+        ],
+      },
+      memory: sharedMemory,
+      shouldAssertNoResultError: false,
+    });
+
+    assert(result.Error === undefined, 'Expected error to not be thrown');
+    assert(
+      (result.Output.data.output = 'hello'),
+      'Expected hello to be printed',
+    );
+  });
+
   it('messages with more than 100 bytes of data will throw an error', async () => {
     const longMessage = 'a'.repeat(101);
     const result = await handle({
@@ -60,6 +83,7 @@ describe('ARNS Record Pruning', () => {
         ],
       },
       memory: sharedMemory,
+      shouldAssertNoResultError: false,
     });
 
     assert(

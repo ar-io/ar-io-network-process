@@ -421,8 +421,8 @@ end
 -- Sanitize inputs before every interaction
 local function assertAndSanitizeInputs(msg)
 	if msg.Tags.Action ~= "Eval" and msg.Data then
-		-- assert data size is less than 100 bytes, we dont use msg.Data
-		assert(#msg.Data < 100, "Data size is too large")
+		-- assert data size is less than or equal to 100 bytes, we dont use msg.Data
+		assert(#msg.Data <= 100, "Data size is too large")
 	end
 
 	assert(
