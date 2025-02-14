@@ -1,10 +1,14 @@
-import { AOProcess, ARIO, ARIO_TESTNET_PROCESS_ID } from '@ar.io/sdk';
+import { AOProcess } from '@ar.io/sdk';
 import { connect } from '@permaweb/aoconnect';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const argv = yargs(hideBin(process.argv))
   .option('processId', {
     alias: 'p',
@@ -29,7 +33,8 @@ const argv = yargs(hideBin(process.argv))
 
 const processId = argv.processId;
 const dryRun = argv.dryRun;
-const output = argv.output;
+const output = path.join(__dirname, argv.output);
+
 console.log(
   'Pulling liquid balances from AIRDROP process',
   processId,
@@ -57,8 +62,11 @@ const { items: registrants } = await airdrop.read({
   ],
 });
 
+// mkdir if not exists
+fs.mkdirSync(path.dirname(output), { recursive: true });
+
 // overwrite the file if it exists
-fs.writeFileSync(path.join(process.cwd(), output), '');
+fs.writeFileSync(output, '');
 
 // write the header
 fs.appendFileSync(output, 'address,mARIOQty\n');

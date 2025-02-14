@@ -4,6 +4,10 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const argv = yargs(hideBin(process.argv))
   .option('processId', {
@@ -29,7 +33,7 @@ const argv = yargs(hideBin(process.argv))
 
 const processId = argv.processId;
 const dryRun = argv.dryRun;
-const output = argv.output;
+const output = path.join(__dirname, argv.output);
 
 console.log('Pulling gateways from process', processId);
 
@@ -52,8 +56,11 @@ const nonLeavingGateways = gateways.filter(
   (gateway) => gateway.status !== 'leaving',
 );
 
+// mkdir if not exists
+fs.mkdirSync(path.dirname(output), { recursive: true });
+
 // overwrite the file if it exists
-fs.writeFileSync(path.join(process.cwd(), output), '');
+fs.writeFileSync(output, '');
 
 // write the header
 fs.appendFileSync(

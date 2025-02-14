@@ -2,6 +2,13 @@
 
 Each section supports extraction of state from existing AO processes, and creation of raw lua representing that state.
 
+To run all the scripts:
+
+```bash
+npm run extract:all
+npm run lua:all
+```
+
 ---
 
 ### Balances

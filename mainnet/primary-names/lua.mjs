@@ -5,6 +5,11 @@ import { hideBin } from 'yargs/helpers';
 import fs from 'fs';
 import path from 'path';
 
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const argv = yargs(hideBin(process.argv))
   .option('dryRun', {
     alias: 'd',
@@ -34,22 +39,29 @@ const argv = yargs(hideBin(process.argv))
   .parseSync();
 
 const dryRun = argv.dryRun;
-const output = argv.output;
-const input = argv.input;
+const output = path.join(__dirname, argv.output);
+const input = path.join(__dirname, argv.input);
 const startTimestamp = argv['start-timestamp'];
 console.log('Creating raw lua records from', input, 'and writing to', output);
 
+// mkdir if not exists
+fs.mkdirSync(path.dirname(output), { recursive: true });
+
 // overwrite the file if it exists
-fs.writeFileSync(path.join(process.cwd(), output), '');
+fs.writeFileSync(output, '');
 
 // read all the records from the input file
 const primaryNames = fs
-  .readFileSync(path.join(process.cwd(), input), 'utf8')
+  .readFileSync(input, 'utf8')
   .split('\n')
-  .slice(1);
+  .slice(1)
+  .map((row) => row.trim())
+  .filter((row) => row.length > 0)
+  .filter(Boolean) // Remove empty lines
+  .map((row) => row.split(','));
 
 for (const primaryName of primaryNames) {
-  const [name, address] = primaryName.split(',');
+  const [name, address] = primaryName;
   // add both the owner and the name to the lua file
   const luaRecord = `PrimaryNames.owners["${address}"] = { name = "${name}", startTimestamp = ${startTimestamp} }\nPrimaryNames.names["${name}"] = "${address}"\n`;
 

@@ -2,6 +2,10 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const argv = yargs(hideBin(process.argv))
   .option('dryRun', {
@@ -25,26 +29,29 @@ const argv = yargs(hideBin(process.argv))
   .option('start-timestamp', {
     alias: 's',
     type: 'number',
-    description: 'Start timestamp for the gateway and all delegates',
+    description: 'Start timestamp',
     default: Date.now(),
   })
   .help()
   .parseSync();
 
 const dryRun = argv.dryRun;
-const output = argv.output;
-const input = argv.input;
-const startTimestamp = argv.startTimestamp;
+const output = path.join(__dirname, argv.output);
+const input = path.join(__dirname, argv.input);
+const startTimestamp = argv['start-timestamp'];
 
 console.log('Creating delegate balances from', input, 'and writing to', output);
 
+// mkdir if not exists
+fs.mkdirSync(path.dirname(output), { recursive: true });
+
 // overwrite the file if it exists
-fs.writeFileSync(path.join(process.cwd(), output), '');
+fs.writeFileSync(output, '');
 
 const gatewayDelegatedStakeTotals = {};
 // now do the same with assigned delegates
 const assignedDelegates = fs
-  .readFileSync(path.join(process.cwd(), input), 'utf8')
+  .readFileSync(input, 'utf8')
   .split('\n')
   .slice(1)
   .map((row) => row.trim())
@@ -53,12 +60,13 @@ const assignedDelegates = fs
   .map((row) => row.split(','));
 
 for (const delegate of assignedDelegates) {
-  const [address, delegateAddress, delegateStake] = delegate;
+  const [address, delegateAddress, delegateStake, providedStartTimestamp] =
+    delegate;
   if (!gatewayDelegatedStakeTotals[address]) {
     gatewayDelegatedStakeTotals[address] = 0;
   }
   gatewayDelegatedStakeTotals[address] += parseInt(delegateStake);
-  const luaRecord = `GatewayRegistry["${address}"].delegates["${delegateAddress}"] = { delegatedStake = ${delegateStake}, startTimestamp = ${startTimestamp}, vaults = {} },\n`;
+  const luaRecord = `GatewayRegistry["${address}"].delegates["${delegateAddress}"] = { delegatedStake = ${delegateStake}, startTimestamp = ${providedStartTimestamp || startTimestamp}, vaults = {} }\n`;
   if (dryRun) {
     console.log(luaRecord);
   } else {
