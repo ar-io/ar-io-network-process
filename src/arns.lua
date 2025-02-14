@@ -1,4 +1,5 @@
 -- arns.lua
+require("globals")
 local utils = require("utils")
 local constants = require("constants")
 local balances = require("balances")
@@ -6,26 +7,10 @@ local demand = require("demand")
 local arns = {}
 local gar = require("gar")
 
---- @type Timestamp|nil
-NextRecordsPruneTimestamp = NextRecordsPruneTimestamp or 0
-
---- @type Timestamp|nil
-NextReturnedNamesPruneTimestamp = NextReturnedNamesPruneTimestamp or 0
-
 --- @class NameRegistry
 --- @field reserved table<string, ReservedName> The reserved names
 --- @field records table<string, Record> The records
 --- @field returned table<string, ReturnedName> The returned records
-
-NameRegistry = NameRegistry or {
-	reserved = {},
-	records = {},
-	returned = {},
-}
-
-if not NameRegistry.returned then
-	NameRegistry.returned = {}
-end
 
 --- @class StoredRecord
 --- @field processId string The process id of the record
@@ -528,8 +513,6 @@ end
 --- @return number permabuyFee - the permabuy fee
 function arns.calculatePermabuyFee(baseFee, demandFactor)
 	local permabuyPrice = baseFee + arns.calculateAnnualRenewalFee(baseFee, constants.PERMABUY_LEASE_FEE_LENGTH_YEARS)
-	print("permabuyPrice: " .. permabuyPrice)
-	print("demandFactor: " .. demandFactor)
 	return math.floor(demandFactor * permabuyPrice)
 end
 

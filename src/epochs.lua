@@ -1,9 +1,9 @@
+require("globals")
 local gar = require("gar")
 local crypto = require("crypto.init")
 local utils = require("utils")
 local balances = require("balances")
 local arns = require("arns")
-local constants = require("constants")
 local epochs = {}
 
 --- @alias ObserverAddress string
@@ -75,10 +75,6 @@ local epochs = {}
 --- @field distributedTimestamp number The distributed timestamp
 --- @field totalDistributedRewards number The total distributed rewards
 --- @field rewards DistributedEpochRewards The rewards for the epoch, including eligible and distributed rewards
-
-Epochs = Epochs or {}
-EpochSettings = EpochSettings or utils.deepCopy(constants.DEFAULT_EPOCH_SETTINGS)
-DistributionSettings = DistributionSettings or utils.deepCopy(constants.DEFAULT_DISTRIBUTION_SETTINGS)
 
 --- Gets an epoch by index
 --- @param epochIndex number The epoch index

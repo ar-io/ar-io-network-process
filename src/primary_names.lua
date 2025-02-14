@@ -1,3 +1,4 @@
+require("globals")
 local arns = require("arns")
 local balances = require("balances")
 local utils = require("utils")
@@ -12,15 +13,6 @@ local primaryNames = {}
 --- @field owners table<WalletAddress, PrimaryName> - map indexed by owner address containing the primary name and all metadata, used for reverse lookups
 --- @field names table<ArNSName, WalletAddress> - map indexed by primary name containing the owner address, used for reverse lookups
 --- @field requests table<WalletAddress, PrimaryNameRequest> - map indexed by owner address containing the request, used for pruning expired requests
-
-PrimaryNames = PrimaryNames or {
-	requests = {},
-	names = {},
-	owners = {},
-}
-
---- @type Timestamp|nil
-NextPrimaryNamesPruneTimestamp = NextPrimaryNamesPruneTimestamp or 0
 
 --- @class PrimaryName
 --- @field name ArNSName

@@ -4,7 +4,10 @@
 --
 local constants = {}
 
---- CONVERSION HELPERS
+--- Process constants
+constants.LOGO = "qUjrTmHdVjXX4D6rU6Fik02bUOzWkOR6oOqUg39g4-s"
+constants.TICKER = "ARIO"
+constants.NAME = "ARIO"
 constants.DENOMINATION = 6
 
 -- intentionally not exposed so all callers use ARIOToMARIO for consistency
