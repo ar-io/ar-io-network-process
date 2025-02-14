@@ -65,7 +65,7 @@ fs.writeFileSync(output, '');
 // write the header
 fs.appendFileSync(
   output,
-  'gatewayAddress,observerAddress,operatorStake,fqdn,port,protocol,allowDelegatedStaking,delegateRewardShareRatio,allowedDelegates,minDelegatedStake,autoStake,label,note,properties,status,failedConsecutiveEpochsCount\n',
+  'gatewayAddress,observerAddress,operatorStake,fqdn,port,protocol,allowDelegatedStaking,delegateRewardShareRatio,minDelegatedStake,autoStake,label,note,properties,status,failedConsecutiveEpochsCount\n',
 );
 
 for (const gateway of nonLeavingGateways) {
@@ -87,14 +87,13 @@ for (const gateway of nonLeavingGateways) {
     settings.protocol,
     settings.allowDelegatedStaking,
     settings.delegateRewardShareRatio,
-    settings.allowedDelegates,
     settings.minDelegatedStake,
     settings.autoStake,
     settings.label,
     settings.note,
     settings.properties,
     status,
-    stats.failedConsecutiveEpochsCount,
+    stats.failedConsecutiveEpochs,
   ].join(',');
   if (dryRun) {
     console.log(csvRow);
