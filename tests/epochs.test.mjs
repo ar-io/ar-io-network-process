@@ -140,7 +140,7 @@ describe('epochs', () => {
             {
               cursorId:
                 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE_EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
-              eligibleReward: 50002000000,
+              eligibleReward: 65002000000,
               gatewayAddress: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
               recipient: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
               type: 'operatorReward',
@@ -242,7 +242,7 @@ describe('epochs', () => {
               eligible: {
                 [STUB_OPERATOR_ADDRESS]: {
                   delegateRewards: [],
-                  operatorReward: 50002000000,
+                  operatorReward: 65002000000,
                 },
               },
               distributed: {

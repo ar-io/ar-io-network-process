@@ -392,7 +392,7 @@ describe('Tick', async () => {
     });
 
     // get the epoch timestamp and assert it is in 24 hours
-    const protocolBalanceAtStartOfEpoch = 50_000_000_000_000; // 50M ARIO
+    const protocolBalanceAtStartOfEpoch = 65_000_000_000_000; // 65M ARIO
     const totalEligibleRewards = protocolBalanceAtStartOfEpoch * 0.001; // 0.1% of the protocol balance for the first 365 epochs
     const totalGatewayRewards = Math.ceil(totalEligibleRewards * 0.9); // 90% go to gateways
     const totalObserverRewards = Math.floor(totalEligibleRewards * 0.1); // 10% go to observers
@@ -507,9 +507,9 @@ describe('Tick', async () => {
           eligible: {
             '2222222222222222222222222222222222222222222': {
               delegateRewards: {
-                'delegate-address-11111111111111111111111111': 12500000000,
+                'delegate-address-11111111111111111111111111': 16250000000,
               },
-              operatorReward: 37500000000,
+              operatorReward: 48750000000,
             },
           },
           distributed: {

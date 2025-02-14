@@ -86,7 +86,7 @@ GatewayRegistry = GatewayRegistry or {}
 --- @field leaveLengthMs number
 --- @field failedEpochCountMax number
 --- @field failedGatewaySlashRate number
---- @field maxDelegateRewardShareRatio number
+--- @field maxDelegateRewardSharePct number
 --- @class ExpeditedWithdrawalsSettings
 --- @field minExpeditedWithdrawalPenaltyRate number
 --- @field maxExpeditedWithdrawalPenaltyRate number
@@ -821,9 +821,9 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 			type(settings.delegateRewardShareRatio) == "number"
 				and utils.isInteger(settings.delegateRewardShareRatio)
 				and settings.delegateRewardShareRatio >= 0
-				and settings.delegateRewardShareRatio <= gar.getSettings().operators.maxDelegateRewardShareRatio,
+				and settings.delegateRewardShareRatio <= gar.getSettings().operators.maxDelegateRewardSharePct,
 			"delegateRewardShareRatio must be an integer between 0 and "
-				.. gar.getSettings().operators.maxDelegateRewardShareRatio
+				.. gar.getSettings().operators.maxDelegateRewardSharePct
 		)
 	end
 	if settings.autoStake ~= nil then

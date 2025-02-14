@@ -86,7 +86,7 @@ constants.DEFAULT_GAR_SETTINGS = {
 		leaveLengthMs = constants.daysToMs(90), -- 90 days that balance will be vaulted
 		failedEpochCountMax = 30, -- number of epochs failed before marked as leaving
 		failedGatewaySlashRate = 1, -- (100%) applied to the minimum operator stake, the rest is vaulted
-		maxDelegateRewardShareRatio = 95, -- (95%) the maximum percentage of rewards that can be shared with delegates, intentionally represented as a percentage (vs. rate)
+		maxDelegateRewardSharePct = 95, -- (95%) the maximum percentage of rewards that can be shared with delegates, intentionally represented as a percentage (vs. rate)
 	},
 	delegates = {
 		minStake = constants.ARIOToMARIO(10), -- 10 ARIO

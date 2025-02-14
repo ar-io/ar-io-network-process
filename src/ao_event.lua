@@ -65,7 +65,7 @@ local function AOEvent(initialData)
 					.. ". Supported types are string, number, boolean, or nil."
 			)
 			if type(value) == "table" then
-				print("Invalid field value: " .. require("json").encode(value))
+				print("Invalid field value: " .. json.encode(value))
 			end
 			return self
 		end
