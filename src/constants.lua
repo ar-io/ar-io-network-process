@@ -217,7 +217,7 @@ constants.DEFAULT_DEMAND_FACTOR_SETTINGS = {
 	demandFactorUpAdjustmentRate = 0.05, -- (5%) the rate at which the demand factor increases each period, if demand is increasing (1 + this number)
 	demandFactorDownAdjustmentRate = 0.015, -- (1.5%) the rate at which the demand factor decreases each period, if demand is decreasing (1 - this number)
 	maxPeriodsAtMinDemandFactor = 7, -- 7 consecutive periods with the minimum demand factor before fees are reset
-	criteria = "revenue", -- "revenue" or "purchases" -- TODO: confirm this is accrued over ALL arns purchases related events
+	criteria = "revenue", -- "revenue" or "purchases"
 }
 
 return constants

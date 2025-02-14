@@ -1990,12 +1990,6 @@ addEventingHandler(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Re
 	Send(msg, recordNotice)
 end)
 
----[[
---- TODO: this handler will not scale well as gateways and delegates increase,
---- slice out the larger pieces (e.g. distributions should be fetched via a paginated handler)
----
---- This has downstream effects on the network portal, which loads the entire epoch data for each epoch
----]]
 addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
