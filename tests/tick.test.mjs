@@ -4,10 +4,8 @@ import {
   DEFAULT_HANDLE_OPTIONS,
   STUB_ADDRESS,
   PROCESS_ID,
-  STUB_TIMESTAMP,
   INITIAL_OPERATOR_STAKE,
   INITIAL_DELEGATE_STAKE,
-  STUB_HASH_CHAIN,
 } from '../tools/constants.mjs';
 import {
   getBaseRegistrationFeeForName,
@@ -394,7 +392,7 @@ describe('Tick', async () => {
     });
 
     // get the epoch timestamp and assert it is in 24 hours
-    const protocolBalanceAtStartOfEpoch = 50_000_000_000_000; // 50M ARIO
+    const protocolBalanceAtStartOfEpoch = 65_000_000_000_000; // 65M ARIO
     const totalEligibleRewards = protocolBalanceAtStartOfEpoch * 0.001; // 0.1% of the protocol balance for the first 365 epochs
     const totalGatewayRewards = Math.ceil(totalEligibleRewards * 0.9); // 90% go to gateways
     const totalObserverRewards = Math.floor(totalEligibleRewards * 0.1); // 10% go to observers
@@ -509,9 +507,9 @@ describe('Tick', async () => {
           eligible: {
             '2222222222222222222222222222222222222222222': {
               delegateRewards: {
-                'delegate-address-11111111111111111111111111': 12500000000,
+                'delegate-address-11111111111111111111111111': 16250000000,
               },
-              operatorReward: 37500000000,
+              operatorReward: 48750000000,
             },
           },
           distributed: {
@@ -733,8 +731,17 @@ describe('Tick', async () => {
 
     let tickMemory = zeroPeriodDemandFactorTick.memory;
 
+    // compute the periods until we get to 0.5 from the current demand factor
+    const periodsUntilMinDemandFactor = Math.ceil(
+      Math.log(demandFactorSettings.demandFactorMin) /
+        Math.log(1 - demandFactorSettings.demandFactorDownAdjustmentRate),
+    );
+    const periodsUntilDemandFactorReset =
+      periodsUntilMinDemandFactor +
+      demandFactorSettings.maxPeriodsAtMinDemandFactor;
+
     // Tick to the epoch where demandFactor is 0.5
-    for (let i = 0; i <= 49; i++) {
+    for (let i = 0; i <= periodsUntilDemandFactorReset; i++) {
       const nextDemandFactorPeriodTimestamp =
         demandFactorSettings.periodZeroStartTimestamp +
         demandFactorSettings.periodLengthMs * i;
@@ -745,7 +752,7 @@ describe('Tick', async () => {
 
       tickMemory = nextDemandFactorPeriodTick.memory;
 
-      if (i === 45) {
+      if (i === periodsUntilMinDemandFactor - 1) {
         const demandFactor = await getDemandFactor({
           memory: tickMemory,
           timestamp: nextDemandFactorPeriodTimestamp,
@@ -753,7 +760,14 @@ describe('Tick', async () => {
         assert.equal(demandFactor, 0.50656); // rounded to 5 decimal places
       }
 
-      if ([46, 47, 48].includes(i)) {
+      // the three periods before the demand factor resets to 0.5 should have a demand factor of 0.5
+      if (
+        [
+          periodsUntilDemandFactorReset - 1,
+          periodsUntilDemandFactorReset - 2,
+          periodsUntilDemandFactorReset - 3,
+        ].includes(i)
+      ) {
         const demandFactor = await getDemandFactor({
           memory: tickMemory,
           timestamp: nextDemandFactorPeriodTimestamp,

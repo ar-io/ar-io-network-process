@@ -11,7 +11,7 @@ local stubRandomAddress = "test-this-is-valid-arweave-wallet-address-3"
 local gracePeriodMs = 1209600000 -- 14 days
 local returnedNameMs = 1209600000 -- 14 days
 local minimumTenureWeightForDiscount = 1
-local minimumPerformanceRateForDiscount = 0.85
+local minimumPerformanceRateForDiscount = 0.90
 local operatorDiscountRate = 0.20
 local testSettings = {
 	fqdn = "test.com",
@@ -175,7 +175,6 @@ describe("arns", function()
 					_G.GatewayRegistry[testAddress].weights = {
 						tenureWeight = minimumTenureWeightForDiscount,
 						gatewayPerformanceRatio = minimumPerformanceRateForDiscount,
-
 						normalizedCompositeWeight = 1,
 						stakeWeight = 1,
 						observerPerformanceRatio = 1,
@@ -459,7 +458,6 @@ describe("arns", function()
 				_G.GatewayRegistry[testAddress].weights = {
 					tenureWeight = minimumTenureWeightForDiscount,
 					gatewayPerformanceRatio = minimumPerformanceRateForDiscount,
-
 					normalizedCompositeWeight = 1,
 					stakeWeight = 1,
 					observerPerformanceRatio = 1,
@@ -646,7 +644,6 @@ describe("arns", function()
 				_G.GatewayRegistry[testAddress].weights = {
 					tenureWeight = minimumTenureWeightForDiscount,
 					gatewayPerformanceRatio = minimumPerformanceRateForDiscount,
-
 					normalizedCompositeWeight = 1,
 					stakeWeight = 1,
 					observerPerformanceRatio = 1,
@@ -917,7 +914,7 @@ describe("arns", function()
 			_G.GatewayRegistry[stubRandomAddress] = testGateway
 			_G.GatewayRegistry[stubRandomAddress].weights = {
 				tenureWeight = minimumTenureWeightForDiscount,
-				gatewayPerformanceRatio = 0.85,
+				gatewayPerformanceRatio = minimumPerformanceRateForDiscount,
 				normalizedCompositeWeight = 1,
 				stakeWeight = 1,
 				observerPerformanceRatio = 1,

@@ -26,6 +26,7 @@ import {
   getEpochSettings,
   getReservedNames,
   getBaseRegistrationFeeForName,
+  getDemandFactorInfo,
 } from './helpers.mjs';
 import assert from 'node:assert';
 import {
@@ -1566,10 +1567,15 @@ describe('ArNS', async () => {
 
       describe('extending the lease', () => {
         let extendLeaseTimestamp;
-        const baseFeeForOneYearExtension = baseFeeForName * 0.2;
+        let baseFeeForOneYearExtension;
 
         before(async () => {
           extendLeaseTimestamp = buyRecordTimestamp + 1;
+          const demandFactor = await getDemandFactor({
+            memory: buyRecordMemory,
+            timestamp: extendLeaseTimestamp,
+          });
+          baseFeeForOneYearExtension = baseFeeForName * 0.2 * demandFactor;
         });
 
         it('should apply the discount to extending the lease for an eligible gateway', async () => {
@@ -1697,8 +1703,16 @@ describe('ArNS', async () => {
 
       describe('increasing the undername limit', () => {
         const increaseUndernameQty = 20;
-        const undernameCostForName =
-          baseFeeForName * 0.001 * increaseUndernameQty;
+        let undernameCostForName;
+
+        before(async () => {
+          const demandFactor = await getDemandFactor({
+            memory: buyRecordMemory,
+            timestamp: afterDistributionTimestamp,
+          });
+          undernameCostForName =
+            baseFeeForName * 0.001 * increaseUndernameQty * demandFactor;
+        });
 
         it('should apply the discount to increasing the undername limit for an eligible gateway', async () => {
           const tokenCostResult = await getTokenCost({

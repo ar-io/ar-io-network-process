@@ -140,7 +140,7 @@ describe('epochs', () => {
             {
               cursorId:
                 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE_EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
-              eligibleReward: 50002000000,
+              eligibleReward: 65002000000,
               gatewayAddress: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
               recipient: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
               type: 'operatorReward',
@@ -236,17 +236,17 @@ describe('epochs', () => {
             ...firstEpoch.distributions,
             distributedTimestamp:
               epochSettings.epochZeroStartTimestamp + epochSettings.durationMs,
-            totalDistributedRewards: 33751350000, // the result of the first tick
+            totalDistributedRewards: 43876350000, // the result of the first tick
             rewards: {
               ...firstEpoch.distributions.rewards,
               eligible: {
                 [STUB_OPERATOR_ADDRESS]: {
                   delegateRewards: [],
-                  operatorReward: 50002000000,
+                  operatorReward: 65002000000,
                 },
               },
               distributed: {
-                [STUB_OPERATOR_ADDRESS]: 33751350000, // received the full operator reward, but docked 25% for not observing
+                [STUB_OPERATOR_ADDRESS]: 43876350000, // received the full operator reward, but docked 25% for not observing
               },
             },
           },
