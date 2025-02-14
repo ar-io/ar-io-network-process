@@ -17,9 +17,6 @@ import {
 
 const initialOperatorStake = 100_000_000_000;
 
-export const basePermabuyPrice = 2_500_000_000;
-export const baseLeasePriceFor9CharNameFor1Year = 600_000_000;
-export const baseLeasePriceFor9CharNameFor3Years = 800_000_000;
 export const returnedNamesPeriod = 1000 * 60 * 60 * 24 * 14; // 14 days
 
 export const mARIOPerARIO = 1_000_000;
@@ -274,7 +271,7 @@ export const getBaseRegistrationFees = async ({ memory, timestamp }) => {
 export const getBaseRegistrationFeeForName = async ({
   memory,
   timestamp,
-  name = 'great-nam',
+  name = 'great-name',
   type = 'lease',
   years = 1,
 }) => {
@@ -1060,6 +1057,17 @@ export const extendLease = async ({
   };
 };
 
+export const getDemandFactorInfo = async ({ memory, timestamp }) => {
+  const result = await handle({
+    options: {
+      Tags: [{ name: 'Action', value: 'Demand-Factor-Info' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  return JSON.parse(result.Messages[0].Data);
+};
+
 export const getTokenCost = async ({
   from = STUB_ADDRESS,
   memory,
@@ -1119,6 +1127,22 @@ export const increaseUndernameLimit = async ({
     memory: result.Memory,
     result,
   };
+};
+
+export const getEligibleDistributions = async ({ memory, timestamp }) => {
+  const result = await handle({
+    options: {
+      Tags: [
+        {
+          name: 'Action',
+          value: 'Eligible-Distributions',
+        },
+      ],
+    },
+    memory,
+    timestamp,
+  });
+  return JSON.parse(result.Messages[0].Data);
 };
 
 export const getReturnedName = async ({ memory, name, timestamp }) => {

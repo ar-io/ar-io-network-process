@@ -87,9 +87,9 @@ function demand.isDemandIncreasing()
 	end
 end
 
---- Checks if the demand should update the demand factor
---- @param timestamp number The timestamp to check if the demand should update the demand factor
---- @return boolean # True if the demand should update the demand factor, false otherwise
+--- Checks if the demand should update the demand factor for a given timestamp
+--- @param timestamp number The timestamp to check
+--- @return boolean shouldUpdate # True if the period for the timestamp is greater than the current period, false otherwise
 function demand.shouldUpdateDemandFactor(timestamp)
 	assert(timestamp, "Timestamp must be provided")
 	local settings = demand.getSettings()
@@ -112,14 +112,17 @@ function demand.getDemandFactorInfo()
 	return utils.deepCopy(DemandFactor)
 end
 
---- Gets the period for the timestamp
---- @param timestamp number The current timestamp
---- @return number # The period for the timestamp
+--- Gets the period for the timestamp, 1 based index
+--- @param timestamp number The timestamp to get the period for
+--- @return number # The period for the timestamp, 1 based index
 function demand.getPeriodForTimestamp(timestamp)
 	return math.floor((timestamp - demand.getSettings().periodZeroStartTimestamp) / demand.getSettings().periodLengthMs)
 		+ 1
 end
 
+--- Gets the timestamp for the period, 1 based index
+--- @param period number The period to get the timestamp for
+--- @return number # The timestamp for the period, 1 based index
 function demand.getTimestampForPeriod(period)
 	return demand.getSettings().periodZeroStartTimestamp + (period - 1) * demand.getSettings().periodLengthMs
 end
@@ -196,15 +199,13 @@ end
 --- Gets the demand factor
 --- @return number # The demand factor
 function demand.getDemandFactor()
-	local demandFactor = utils.deepCopy(DemandFactor)
-	return demandFactor and demandFactor.currentDemandFactor or 1
+	return DemandFactor.currentDemandFactor
 end
 
 --- Gets the current period revenue
 --- @return number # The current period revenue
 function demand.getCurrentPeriodRevenue()
-	local demandFactor = utils.deepCopy(DemandFactor)
-	return demandFactor and demandFactor.revenueThisPeriod or 0
+	return DemandFactor.revenueThisPeriod
 end
 
 --- Gets the current period purchases
@@ -244,15 +245,13 @@ end
 --- Gets the consecutive periods with minimum demand factor
 --- @return number # The consecutive periods with minimum demand factor
 function demand.getConsecutivePeriodsWithMinDemandFactor()
-	local demandFactor = utils.deepCopy(DemandFactor)
-	return demandFactor and demandFactor.consecutivePeriodsWithMinDemandFactor or 0
+	return DemandFactor.consecutivePeriodsWithMinDemandFactor
 end
 
 --- Gets the current period
 --- @return number # The current period
 function demand.getCurrentPeriod()
-	local demandFactor = utils.deepCopy(DemandFactor)
-	return demandFactor and demandFactor.currentPeriod or 1
+	return DemandFactor.currentPeriod
 end
 
 --- Sets the demand factor, ensuring it is not less than the minimum demand factor
