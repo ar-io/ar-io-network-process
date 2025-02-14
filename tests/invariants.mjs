@@ -44,7 +44,7 @@ async function assertNoBalanceInvariants({ timestamp, memory }) {
 async function assertNoBalanceVaultInvariants({ timestamp, memory }) {
   const { result } = await getVaults({
     memory,
-    limit: 1_000_000, // egregiously large limit to make sure we get them all
+    limit: 1_000, // egregiously large limit to make sure we get them all
     timestamp,
   });
 

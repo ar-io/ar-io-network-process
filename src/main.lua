@@ -2,27 +2,30 @@
 local process = { _version = "0.0.1" }
 local constants = require("constants")
 local token = require("token")
+local utils = require("utils")
+local json = require("json")
+local ao = ao or require("ao")
 local ARIOEvent = require("ario_event")
 
 Name = Name or "Testnet ARIO"
 Ticker = Ticker or "tARIO"
 Logo = Logo or "qUjrTmHdVjXX4D6rU6Fik02bUOzWkOR6oOqUg39g4-s"
-Denomination = 6
+Denomination = constants.DENOMINATION
 DemandFactor = DemandFactor or {}
 Owner = Owner or ao.env.Process.Owner
 Protocol = Protocol or ao.env.Process.Id
-Balances = Balances or {}
-if not Balances[Protocol] then -- initialize the balance for the process id
-	Balances = {
-		[Protocol] = math.floor(constants.ARIOToMARIO(50000000)), -- 50M ARIO
-		[Owner] = math.floor(constants.totalTokenSupply - (constants.ARIOToMARIO(50000000))), -- 950M ARIO
-	}
-end
 Vaults = Vaults or {}
 GatewayRegistry = GatewayRegistry or {}
 NameRegistry = NameRegistry or {}
 Epochs = Epochs or {}
-
+Balances = Balances or {}
+-- NOTE: this is primary for test setup and balances will be set in the module for the process
+if not Balances[Protocol] then
+	Balances = {
+		[Protocol] = constants.DEFAULT_PROTOCOL_BALANCE, -- 50M ARIO
+		[Owner] = math.floor(constants.TOTAL_TOKEN_SUPPLY - constants.DEFAULT_PROTOCOL_BALANCE), -- 950M ARIO
+	}
+end
 -- last known variables in the state, these help control tick, prune, and distribute behavior
 LastCreatedEpochIndex = LastCreatedEpochIndex or -1 -- TODO: we will move to a 1-based index in a separate PR
 LastDistributedEpochIndex = LastDistributedEpochIndex or 0
@@ -30,9 +33,7 @@ LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
 LastKnownMessageTimestamp = LastKnownMessageTimestamp or 0
 LastKnownMessageId = LastKnownMessageId or ""
 
-local utils = require("utils")
-local json = require("json")
-local ao = ao or require("ao")
+-- NOTE: These are imported after global variables are initialized
 local balances = require("balances")
 local arns = require("arns")
 local gar = require("gar")
@@ -64,6 +65,7 @@ local ActionMap = {
 	PrescribedNames = "Epoch-Prescribed-Names",
 	Observations = "Epoch-Observations",
 	Distributions = "Epoch-Distributions",
+	EligibleDistributions = "Eligible-Distributions",
 	--- Vaults
 	Vault = "Vault",
 	Vaults = "Vaults",
@@ -94,7 +96,6 @@ local ActionMap = {
 	--- ArNS
 	Record = "Record",
 	Records = "Records",
-	BuyRecord = "Buy-Record", -- deprecated - use Buy-Name instead
 	BuyName = "Buy-Name",
 	UpgradeName = "Upgrade-Name",
 	ExtendLease = "Extend-Lease",
@@ -104,9 +105,7 @@ local ActionMap = {
 	ReservedNames = "Reserved-Names",
 	ReservedName = "Reserved-Name",
 	TokenCost = "Token-Cost",
-	GetCostDetails = "Get-Cost-Details-For-Action", -- deprecated - use Cost-Details instead
 	CostDetails = "Cost-Details",
-	GetRegistrationFees = "Get-Registration-Fees", -- deprecated - use Registration-Fees instead
 	RegistrationFees = "Registration-Fees",
 	ReturnedNames = "Returned-Names",
 	ReturnedName = "Returned-Name",
@@ -166,7 +165,7 @@ local function adjustSuppliesForFundingPlan(fundingPlan, rewardForInitiator)
 end
 
 --- @param ioEvent ARIOEvent
---- @param result BuyRecordResult|RecordInteractionResult|CreatePrimaryNameResult|PrimaryNameRequestApproval
+--- @param result BuyNameResult|RecordInteractionResult|CreatePrimaryNameResult|PrimaryNameRequestApproval
 local function addResultFundingPlanFields(ioEvent, result)
 	ioEvent:addFieldsWithPrefixIfExist(result.fundingPlan, "FP-", { "balance" })
 	local fundingPlanVaultsCount = 0
@@ -208,7 +207,7 @@ local function addResultFundingPlanFields(ioEvent, result)
 end
 
 --- @param ioEvent ARIOEvent
----@param result RecordInteractionResult|BuyRecordResult
+---@param result RecordInteractionResult|BuyNameResult
 local function addRecordResultFields(ioEvent, result)
 	ioEvent:addFieldsIfExist(result, {
 		"baseRegistrationFee",
@@ -508,7 +507,7 @@ addEventingHandler("prune", function()
 	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
 end, function(msg)
 	local epochIndex = epochs.getEpochIndexForTimestamp(msg.Timestamp)
-	msg.ioEvent:addField("epochIndex", epochIndex)
+	msg.ioEvent:addField("Epoch-Index", epochIndex)
 
 	local previousStateSupplies = {
 		protocolBalance = Balances[Protocol],
@@ -867,9 +866,7 @@ addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", Actio
 	})
 end)
 
-addEventingHandler(ActionMap.BuyRecord, function(msg)
-	return msg.Action == ActionMap.BuyRecord or msg.Action == ActionMap.BuyName
-end, function(msg)
+addEventingHandler(ActionMap.BuyName, utils.hasMatchingTag("Action", ActionMap.BuyName), function(msg)
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
 	local purchaseType = msg.Tags["Purchase-Type"] and string.lower(msg.Tags["Purchase-Type"]) or "lease"
 	local years = msg.Tags.Years or nil
@@ -1034,7 +1031,6 @@ addEventingHandler(
 function assertTokenCostTags(msg)
 	local intentType = msg.Tags.Intent
 	local validIntents = utils.createLookupTable({
-		ActionMap.BuyRecord, -- Deprecated
 		ActionMap.BuyName,
 		ActionMap.ExtendLease,
 		ActionMap.IncreaseUndernameLimit,
@@ -1088,9 +1084,7 @@ addEventingHandler(ActionMap.TokenCost, utils.hasMatchingTag("Action", ActionMap
 	})
 end)
 
-addEventingHandler(ActionMap.GetCostDetails, function(msg)
-	return msg.Action == ActionMap.CostDetails or msg.Action == ActionMap.GetCostDetails
-end, function(msg)
+addEventingHandler(ActionMap.CostDetails, utils.hasMatchingTag("Action", ActionMap.CostDetails), function(msg)
 	local fundFrom = msg.Tags["Fund-From"]
 	local name = string.lower(msg.Tags.Name)
 	local years = msg.Tags.Years or 1
@@ -1120,14 +1114,12 @@ end, function(msg)
 	})
 end)
 
-addEventingHandler(ActionMap.GetRegistrationFees, function(msg)
-	return msg.Action == ActionMap.RegistrationFees or msg.Action == ActionMap.GetRegistrationFees
-end, function(msg)
+addEventingHandler(ActionMap.RegistrationFees, utils.hasMatchingTag("Action", ActionMap.RegistrationFees), function(msg)
 	local priceList = arns.getRegistrationFees()
 
 	Send(msg, {
 		Target = msg.From,
-		Tags = { Action = ActionMap.GetRegistrationFees .. "-Notice" },
+		Tags = { Action = ActionMap.RegistrationFees .. "-Notice" },
 		Data = json.encode(priceList),
 	})
 end)
@@ -1276,8 +1268,8 @@ addEventingHandler(
 		local quantity = msg.Tags.Quantity
 		local instantWithdraw = msg.Tags.Instant and msg.Tags.Instant == "true" or false
 		assert(
-			quantity and utils.isInteger(quantity) and quantity > constants.minimumWithdrawalAmount,
-			"Invalid quantity. Must be integer greater than " .. constants.minimumWithdrawalAmount
+			quantity and utils.isInteger(quantity) and quantity > constants.MIN_WITHDRAWAL_AMOUNT,
+			"Invalid quantity. Must be integer greater than " .. constants.MIN_WITHDRAWAL_AMOUNT
 		)
 		assert(
 			msg.Tags.Instant == nil or (msg.Tags.Instant == "true" or msg.Tags.Instant == "false"),
@@ -1462,8 +1454,8 @@ addEventingHandler(
 		msg.ioEvent:addField("Target-Formatted", target)
 		msg.ioEvent:addField("Quantity", quantity)
 		assert(
-			quantity and utils.isInteger(quantity) and quantity > constants.minimumWithdrawalAmount,
-			"Invalid quantity. Must be integer greater than " .. constants.minimumWithdrawalAmount
+			quantity and utils.isInteger(quantity) and quantity > constants.MIN_WITHDRAWAL_AMOUNT,
+			"Invalid quantity. Must be integer greater than " .. constants.MIN_WITHDRAWAL_AMOUNT
 		)
 
 		local result = gar.decreaseDelegateStake(target, msg.From, quantity, msg.Timestamp, msg.Id, instantWithdraw)
@@ -1755,19 +1747,17 @@ end, function(msg)
 	-- tick and distribute rewards for every index between the last ticked epoch and the current epoch
 	local distributedEpochIndexes = {}
 	local newEpochIndexes = {}
-	local newDemandFactors = {}
 	local newPruneGatewaysResults = {}
 	local tickedRewardDistributions = {}
 	local totalTickedRewardsDistributed = 0
 
-	-- tick the demand factor
-	local demandFactor = demand.updateDemandFactor(msg.Timestamp)
-	if demandFactor ~= nil then
-		table.insert(newDemandFactors, demandFactor)
+	-- tick the demand factor all the way to the current period
+	local latestDemandFactor, newDemandFactors = demand.updateDemandFactor(msg.Timestamp)
+	if latestDemandFactor ~= nil then
 		Send(msg, {
 			Target = msg.From,
 			Action = "Demand-Factor-Updated-Notice",
-			Data = tostring(demandFactor),
+			Data = tostring(latestDemandFactor),
 		})
 	end
 
@@ -1823,8 +1813,9 @@ end, function(msg)
 			end)
 		msg.ioEvent:addField("Prescribed-Observers", prescribedObserverAddresses)
 	end
-	if #newDemandFactors > 0 then
-		msg.ioEvent:addField("New-Demand-Factors", newDemandFactors)
+	local updatedDemandFactorCount = utils.lengthOfTable(newDemandFactors)
+	if updatedDemandFactorCount > 0 then
+		msg.ioEvent:addField("Updated-Demand-Factors", newDemandFactors)
 	end
 	if #newPruneGatewaysResults > 0 then
 		-- Reduce the prune gateways results and then track changes
@@ -1999,7 +1990,12 @@ addEventingHandler(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Re
 	Send(msg, recordNotice)
 end)
 
--- TODO: this handler will not scale well as gateways and delegates increase, we should slice out the larger pieces (e.g. distributions should be fetched via a paginated handler)
+---[[
+--- TODO: this handler will not scale well as gateways and delegates increase,
+--- slice out the larger pieces (e.g. distributions should be fetched via a paginated handler)
+---
+--- This has downstream effects on the network portal, which loads the entire epoch data for each epoch
+---]]
 addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
@@ -2008,6 +2004,10 @@ addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epo
 	if epoch then
 		-- populate the prescribed observers with weights for the epoch, this helps improve DX of downstream apps
 		epoch.prescribedObservers = epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
+	end
+	if epoch and epoch.distributions then
+		-- remove the distributions data from the epoch to avoid unbounded response payloads
+		epoch.distributions.rewards = nil
 	end
 	Send(msg, { Target = msg.From, Action = "Epoch-Notice", Data = json.encode(epoch) })
 end)
@@ -2062,6 +2062,28 @@ addEventingHandler(ActionMap.Distributions, utils.hasMatchingTag("Action", Actio
 		Data = json.encode(distributions),
 	})
 end)
+
+addEventingHandler(
+	"eligibleDistributions",
+	utils.hasMatchingTag("Action", ActionMap.EligibleDistributions),
+	function(msg)
+		local page = utils.parsePaginationTags(msg)
+
+		local eligibleDistributions = epochs.getEligibleDistributions(
+			msg.Timestamp,
+			page.cursor,
+			page.limit,
+			page.sortBy or "cursorId",
+			page.sortOrder
+		)
+
+		Send(msg, {
+			Target = msg.From,
+			Action = "Eligible-Distributions-Notice",
+			Data = json.encode(eligibleDistributions),
+		})
+	end
+)
 
 addEventingHandler("paginatedReservedNames", utils.hasMatchingTag("Action", ActionMap.ReservedNames), function(msg)
 	local page = utils.parsePaginationTags(msg)
@@ -2198,7 +2220,7 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 	local releaseNameData = {
 		name = name,
 		startTimestamp = returnedName.startTimestamp,
-		endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod,
+		endTimestamp = returnedName.startTimestamp + constants.RETURNED_NAME_DURATION_MS,
 		initiator = returnedName.initiator,
 	}
 
@@ -2228,7 +2250,7 @@ addEventingHandler(ActionMap.ReturnedNames, utils.hasMatchingTag("Action", Actio
 		table.insert(returnedNameDataArray, {
 			name = v.name,
 			startTimestamp = v.startTimestamp,
-			endTimestamp = v.startTimestamp + constants.returnedNamePeriod,
+			endTimestamp = v.startTimestamp + constants.RETURNED_NAME_DURATION_MS,
 			initiator = v.initiator,
 			premiumMultiplier = arns.getReturnedNamePremiumMultiplier(v.startTimestamp, msg.Timestamp),
 		})
@@ -2262,7 +2284,7 @@ addEventingHandler(ActionMap.ReturnedName, utils.hasMatchingTag("Action", Action
 		Data = json.encode({
 			name = returnedName.name,
 			startTimestamp = returnedName.startTimestamp,
-			endTimestamp = returnedName.startTimestamp + constants.returnedNamePeriod,
+			endTimestamp = returnedName.startTimestamp + constants.RETURNED_NAME_DURATION_MS,
 			initiator = returnedName.initiator,
 			premiumMultiplier = arns.getReturnedNamePremiumMultiplier(returnedName.startTimestamp, msg.Timestamp),
 		}),

@@ -119,13 +119,10 @@ describe('Vaults', async () => {
     it('should throw an error if vault size is too small', async () => {
       const lockLengthMs = 1209600000;
       const quantity = 99999999;
-      const balanceBefore = await handle({
-        options: {
-          Tags: [{ name: 'Action', value: 'Balance' }],
-        },
+      const balanceBefore = await getBalance({
+        address: PROCESS_OWNER,
         memory: sharedMemory,
       });
-      const balanceBeforeData = JSON.parse(balanceBefore.Messages[0].Data);
       const { result: createVaultResult } = await createVault({
         quantity,
         lockLengthMs,
@@ -147,17 +144,12 @@ describe('Vaults', async () => {
       );
 
       // assert the balance is deducted
-      const balanceAfterVault = await handle({
-        options: {
-          Tags: [{ name: 'Action', value: 'Balance' }],
-        },
+      const balanceAfterVault = await getBalance({
+        address: PROCESS_OWNER,
         memory: createVaultResult.Memory,
       });
-      const balanceAfterVaultData = JSON.parse(
-        balanceAfterVault.Messages[0].Data,
-      );
-      assert.deepEqual(balanceAfterVaultData, balanceBeforeData);
-      endingMemory = balanceAfterVault.Memory;
+      assert.deepEqual(balanceAfterVault, balanceBefore);
+      endingMemory = createVaultResult.Memory;
     });
   });
 

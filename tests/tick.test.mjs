@@ -323,10 +323,11 @@ describe('Tick', async () => {
    * - validate the epoch is created correctly
    * - submit an observation from the gateway prescribed
    * - tick to the epoch distribution timestamp
+   * - validate the demand factor is updated correctly
    * - validate the rewards were distributed correctly
-   * - send epoch distribution notice containing full epoch data
+   * - validate the sent epoch distribution notice contains full epoch data
    */
-  it('should distribute rewards to gateways and delegates, send an epoch distribution notice and remove the epoch from the epoch registry', async () => {
+  it('should update the demand factor, distribute rewards to gateways and delegates, send an epoch distribution notice and remove the epoch from the epoch registry', async () => {
     // give balance to gateway
     const initialMemory = await transfer({
       recipient: STUB_ADDRESS,
@@ -370,17 +371,21 @@ describe('Tick', async () => {
     });
 
     // should only have one message with a tick notice, the epoch distribution notice is sent separately
-    assert.equal(newEpochTick.Messages.length, 2);
+    assert.equal(newEpochTick.Messages.length, 3);
+    // updated demand factor is sent
     assert.equal(
       newEpochTick.Messages[0].Tags.find((tag) => tag.name === 'Action').value,
+      'Demand-Factor-Updated-Notice',
+    );
+    // epoch created notice is sent
+    assert.equal(
+      newEpochTick.Messages[1].Tags.find((tag) => tag.name === 'Action').value,
       'Epoch-Created-Notice',
     );
     assert.equal(
-      newEpochTick.Messages[1].Tags.find((tag) => tag.name === 'Action').value,
+      newEpochTick.Messages[2].Tags.find((tag) => tag.name === 'Action').value,
       'Tick-Notice',
     );
-
-    const createdEpochData = JSON.parse(newEpochTick.Messages[0].Data);
 
     // assert the new epoch is created
     const epochData = await getEpoch({
@@ -390,7 +395,7 @@ describe('Tick', async () => {
 
     // get the epoch timestamp and assert it is in 24 hours
     const protocolBalanceAtStartOfEpoch = 50_000_000_000_000; // 50M ARIO
-    const totalEligibleRewards = protocolBalanceAtStartOfEpoch * 0.0005; // 0.05% of the protocol balance
+    const totalEligibleRewards = protocolBalanceAtStartOfEpoch * 0.001; // 0.1% of the protocol balance for the first 365 epochs
     const totalGatewayRewards = Math.ceil(totalEligibleRewards * 0.9); // 90% go to gateways
     const totalObserverRewards = Math.floor(totalEligibleRewards * 0.1); // 10% go to observers
     const totalEligibleGatewayRewards =
@@ -435,16 +440,6 @@ describe('Tick', async () => {
         totalEligibleRewards: totalEligibleRewards,
         totalEligibleGatewayReward: totalGatewayRewards,
         totalEligibleObserverReward: totalObserverRewards,
-        rewards: {
-          eligible: {
-            [STUB_ADDRESS]: {
-              operatorReward: expectedGatewayOperatorReward,
-              delegateRewards: {
-                [delegateAddress]: expectedGatewayDelegateReward,
-              },
-            },
-          },
-        },
       },
     });
 
@@ -471,7 +466,7 @@ describe('Tick', async () => {
     );
 
     // assert multiple messages are sent given the tick notice, epoch created notice and epoch distribution notice
-    assert.equal(distributionTick.Messages.length, 3); // 1 epoch distribution notice, 1 epoch created notice, 1 tick notice
+    assert.equal(distributionTick.Messages.length, 4); // 1 epoch distribution notice, 1 epoch created notice, 1 tick notice, 1 demand factor updated notice
 
     // new epoch is created
     const createdMessage = distributionTick.Messages.find(
@@ -511,7 +506,14 @@ describe('Tick', async () => {
       distributions: {
         ...epochData.distributions,
         rewards: {
-          ...epochData.distributions.rewards,
+          eligible: {
+            '2222222222222222222222222222222222222222222': {
+              delegateRewards: {
+                'delegate-address-11111111111111111111111111': 12500000000,
+              },
+              operatorReward: 37500000000,
+            },
+          },
           distributed: {
             [STUB_ADDRESS]: expectedGatewayOperatorReward,
             [delegateAddress]: expectedGatewayDelegateReward,
@@ -542,12 +544,29 @@ describe('Tick', async () => {
       timestamp: distributionTimestamp,
     });
 
+    const expectedOperatorStake =
+      INITIAL_OPERATOR_STAKE + expectedGatewayOperatorReward;
+    const expectedTotalDelegatedStake =
+      delegateQuantity + expectedGatewayDelegateReward;
+    const expectedStakeWeight =
+      (expectedOperatorStake + expectedTotalDelegatedStake) /
+      INITIAL_OPERATOR_STAKE;
+    const expectedTenureWeight = 1.0055555555555555; // it's been around for 1 epoch, so it's 1 + 0.0055555555555555
+    const expectedGatewayPerformanceRatio = 1;
+    const expectedObserverPerformanceRatio = 1;
+    const expectedCompositeWeight =
+      expectedStakeWeight *
+      expectedTenureWeight *
+      expectedGatewayPerformanceRatio *
+      expectedObserverPerformanceRatio;
+    const expectedNormalizedCompositeWeight = 1; // it's the only operator
+
     assert.deepStrictEqual(gateway, {
       status: 'joined',
       startTimestamp: joinNetworkTimestamp,
       observerAddress: STUB_ADDRESS,
-      operatorStake: INITIAL_OPERATOR_STAKE + expectedGatewayOperatorReward,
-      totalDelegatedStake: delegateQuantity + expectedGatewayDelegateReward,
+      operatorStake: expectedOperatorStake,
+      totalDelegatedStake: expectedTotalDelegatedStake,
       settings: {
         allowDelegatedStaking: true,
         autoStake: true,
@@ -570,12 +589,12 @@ describe('Tick', async () => {
         totalEpochCount: 1,
       },
       weights: {
-        compositeWeight: 5.530555555555555,
-        gatewayPerformanceRatio: 1,
-        normalizedCompositeWeight: 1,
-        observerPerformanceRatio: 1,
-        stakeWeight: 5.5,
-        tenureWeight: 1.0055555555555555,
+        compositeWeight: expectedCompositeWeight,
+        gatewayPerformanceRatio: expectedGatewayPerformanceRatio,
+        normalizedCompositeWeight: expectedNormalizedCompositeWeight,
+        observerPerformanceRatio: expectedObserverPerformanceRatio,
+        stakeWeight: expectedStakeWeight,
+        tenureWeight: expectedTenureWeight,
       },
     });
 
@@ -731,7 +750,7 @@ describe('Tick', async () => {
           memory: tickMemory,
           timestamp: nextDemandFactorPeriodTimestamp,
         });
-        assert.equal(demandFactor, 0.50655939255251769548);
+        assert.equal(demandFactor, 0.50656); // rounded to 5 decimal places
       }
 
       if ([46, 47, 48].includes(i)) {

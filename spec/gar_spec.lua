@@ -1,4 +1,3 @@
-local constants = require("constants")
 local gar = require("gar")
 local utils = require("utils")
 
@@ -11,6 +10,8 @@ local minDelegatedStake = 10000000 -- 10 ARIO
 local minOperatorStake = 10000000000 -- 10,000 ARIO
 local operatorLeaveLengthMs = 90 * 24 * 60 * 60 * 1000 -- 90 days
 local delegateLeaveLengthMs = 90 * 24 * 60 * 60 * 1000 -- 90 days
+local minimumTenureWeightForDiscount = 1
+local minimumPerformanceRateForDiscount = 0.85
 local testSettings = {
 	fqdn = "test.com",
 	protocol = "https",
@@ -690,7 +691,7 @@ describe("gar", function()
 		it("should instantly withdraw operator stake with expedited withdrawal fee", function()
 			_G.Balances[ao.id] = 0 -- Initialize protocol balance to 0
 			_G.Balances[stubGatewayAddress] = 0
-			local expeditedWithdrawalFee = 1000 * constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
+			local expeditedWithdrawalFee = 1000 * 0.5
 			local withdrawalAmount = 1000 - expeditedWithdrawalFee
 
 			_G.GatewayRegistry[stubGatewayAddress] = {
@@ -1189,7 +1190,7 @@ describe("gar", function()
 					delegatePruned = false,
 					expeditedWithdrawalFee = expeditedWithdrawalFee,
 					gatewayTotalDelegatedStake = minDelegatedStake,
-					penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE,
+					penaltyRate = 0.5,
 					updatedDelegate = {
 						delegatedStake = minDelegatedStake,
 						startTimestamp = 0,
@@ -1314,7 +1315,7 @@ describe("gar", function()
 				delegatePruned = true,
 				expeditedWithdrawalFee = expeditedWithdrawalFee,
 				gatewayTotalDelegatedStake = 0,
-				penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE,
+				penaltyRate = 0.5,
 				updatedDelegate = {
 					delegatedStake = 0,
 					startTimestamp = 0,
@@ -1728,13 +1729,7 @@ describe("gar", function()
 					local vaultTimestamp = delegateStartTimestamp
 					local elapsedTime = delegateLeaveLengthMs - 1 -- 1ms less than 90 days in milliseconds
 					local currentTimestamp = delegateStartTimestamp + elapsedTime
-					local penaltyRate = constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
-						- (
-							(
-								constants.MAX_EXPEDITED_WITHDRAWAL_PENALTY_RATE
-								- constants.MIN_EXPEDITED_WITHDRAWAL_PENALTY_RATE
-							) * (elapsedTime / delegateLeaveLengthMs)
-						)
+					local penaltyRate = 0.5 - ((0.5 - 0.1) * (elapsedTime / delegateLeaveLengthMs))
 					local expectedWithdrawalFee = math.floor(vaultBalance * penaltyRate)
 					local expectedWithdrawalAmount = vaultBalance - expectedWithdrawalFee
 					_G.Balances[ao.id] = 0
@@ -2380,7 +2375,7 @@ describe("gar", function()
 		it("should return false if gatewayPerformanceRatio is less than 0.85", function()
 			_G.GatewayRegistry[stubRandomAddress] = testGateway
 			_G.GatewayRegistry[stubRandomAddress].weights = {
-				tenureWeight = 1,
+				tenureWeight = minimumTenureWeightForDiscount,
 				gatewayPerformanceRatio = 0.84,
 				stakeWeight = 0,
 				observerPerformanceRatio = 0,
@@ -2394,8 +2389,8 @@ describe("gar", function()
 		it("should return true if gateway is eligible for ArNS discount", function()
 			_G.GatewayRegistry[stubRandomAddress] = testGateway
 			_G.GatewayRegistry[stubRandomAddress].weights = {
-				tenureWeight = 1,
-				gatewayPerformanceRatio = 0.85,
+				tenureWeight = minimumTenureWeightForDiscount,
+				gatewayPerformanceRatio = minimumPerformanceRateForDiscount,
 				stakeWeight = 0,
 				observerPerformanceRatio = 0,
 				compositeWeight = 0,

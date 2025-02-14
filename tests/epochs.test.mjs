@@ -8,12 +8,15 @@ import {
   startMemory,
   totalTokenSupply,
   getEpochSettings,
-  getGateways,
+  getBalance,
+  getGateway,
+  getEligibleDistributions,
 } from './helpers.mjs';
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
 import {
   INITIAL_OPERATOR_STAKE,
+  PROCESS_ID,
   STUB_ADDRESS,
   STUB_HASH_CHAIN,
   STUB_OPERATOR_ADDRESS,
@@ -24,6 +27,7 @@ describe('epochs', () => {
   let sharedMemory;
   let firstEpoch;
   let epochSettings;
+  let protocolBalanceAfterNamePurchase;
 
   before(async () => {
     epochSettings = await getEpochSettings({
@@ -46,6 +50,10 @@ describe('epochs', () => {
       type: 'permabuy',
       from: STUB_OPERATOR_ADDRESS,
       timestamp: 0,
+    });
+    protocolBalanceAfterNamePurchase = await getBalance({
+      memory: buyRecordMemory,
+      address: PROCESS_ID,
     });
     sharedMemory = buyRecordMemory;
   });
@@ -74,6 +82,10 @@ describe('epochs', () => {
           memory: tickMemory,
           timestamp: epochSettings.epochZeroStartTimestamp,
         });
+        const expectedEligibleRewards =
+          protocolBalanceAfterNamePurchase * 0.001; // 0.1% of the protocol balance after the transfers and name purchase
+        const expectedGatewayRewards = expectedEligibleRewards * 0.9; // 90% go to gateways
+        const expectedObserverRewards = expectedEligibleRewards * 0.1; // 10% go to observers
         assert.deepStrictEqual(epoch, {
           epochIndex: 0,
           hashchain: STUB_HASH_CHAIN,
@@ -109,21 +121,37 @@ describe('epochs', () => {
           ],
           prescribedNames: ['prescribed-name'],
           distributions: {
-            totalEligibleGatewayReward: 22500900000,
+            totalEligibleGatewayReward: expectedGatewayRewards,
             totalEligibleGateways: 1,
-            totalEligibleObserverReward: 2500100000,
-            totalEligibleRewards: 25001000000,
-            rewards: {
-              eligible: {
-                [STUB_OPERATOR_ADDRESS]: {
-                  delegateRewards: [],
-                  operatorReward: 25001000000, // 0.001 of the protocol balance after the transfers and name purchase
-                },
-              },
-            },
+            totalEligibleObserverReward: expectedObserverRewards,
+            totalEligibleRewards: expectedEligibleRewards,
           },
         });
         firstEpoch = epoch;
+
+        const eligibleDistributions = await getEligibleDistributions({
+          memory: tickMemory,
+          timestamp: epochSettings.epochZeroStartTimestamp,
+        });
+
+        assert.deepStrictEqual(eligibleDistributions, {
+          hasMore: false,
+          items: [
+            {
+              cursorId:
+                'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE_EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
+              eligibleReward: 50002000000,
+              gatewayAddress: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
+              recipient: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
+              type: 'operatorReward',
+            },
+          ],
+          limit: 100,
+          sortBy: 'cursorId',
+          sortOrder: 'desc',
+          totalItems: 1,
+        });
+
         sharedMemory = tickMemory;
       });
 
@@ -175,6 +203,18 @@ describe('epochs', () => {
 
     describe('Create Second Epoch', () => {
       it('should distribute the last epoch, and create, prescribe, and assign eligible rewards for the next epoch at the epoch end timestamp', async () => {
+        const protocolBalanceBeforeSecondEpochTick = await getBalance({
+          memory: sharedMemory,
+          address: PROCESS_ID,
+          timestamp:
+            epochSettings.epochZeroStartTimestamp + epochSettings.durationMs,
+        });
+        const gatewayBeforeTick = await getGateway({
+          memory: sharedMemory,
+          address: STUB_OPERATOR_ADDRESS,
+          timestamp:
+            epochSettings.epochZeroStartTimestamp + epochSettings.durationMs,
+        });
         const { memory: tickMemory, result: tickResult } = await tick({
           memory: sharedMemory,
           timestamp:
@@ -190,25 +230,27 @@ describe('epochs', () => {
             'Epoch-Distribution-Notice',
         );
         const epochDistributionData = JSON.parse(epochDistributionMessage.Data);
-        assert.deepStrictEqual(
-          {
-            ...firstEpoch,
-            distributions: {
-              ...firstEpoch.distributions,
-              distributedTimestamp:
-                epochSettings.epochZeroStartTimestamp +
-                epochSettings.durationMs,
-              totalDistributedRewards: 16875675000,
-              rewards: {
-                ...firstEpoch.distributions.rewards,
-                distributed: {
-                  [STUB_OPERATOR_ADDRESS]: 16875675000, // received the full operator reward, but docked 25% for not observing
+        assert.deepStrictEqual(epochDistributionData, {
+          ...firstEpoch,
+          distributions: {
+            ...firstEpoch.distributions,
+            distributedTimestamp:
+              epochSettings.epochZeroStartTimestamp + epochSettings.durationMs,
+            totalDistributedRewards: 33751350000, // the result of the first tick
+            rewards: {
+              ...firstEpoch.distributions.rewards,
+              eligible: {
+                [STUB_OPERATOR_ADDRESS]: {
+                  delegateRewards: [],
+                  operatorReward: 50002000000,
                 },
+              },
+              distributed: {
+                [STUB_OPERATOR_ADDRESS]: 33751350000, // received the full operator reward, but docked 25% for not observing
               },
             },
           },
-          epochDistributionData,
-        );
+        });
 
         // it should be pruned from state after distribution notice sent
         const prunedEpoch = await getEpoch({
@@ -227,6 +269,31 @@ describe('epochs', () => {
           timestamp:
             epochSettings.epochZeroStartTimestamp + epochSettings.durationMs,
         });
+
+        const expectedEligibleRewards =
+          protocolBalanceBeforeSecondEpochTick * 0.001; // 0.1% of the protocol balance after the transfers and name purchase
+        const expectedGatewayRewards = expectedEligibleRewards * 0.9; // 90% go to gateways
+        const expectedDistributedRewards = expectedGatewayRewards * 0.75; // the operator received 75% of the gateway rewards because they did not observe the first epoch
+        const updatedOperatorStake =
+          gatewayBeforeTick.operatorStake + expectedDistributedRewards;
+        const expectedStakeWeight =
+          updatedOperatorStake / INITIAL_OPERATOR_STAKE;
+        const expectedTenureWeight = gatewayBeforeTick.weights.tenureWeight;
+        const expectedGatewayPerformanceRatio = 1;
+        const expectedObserverPerformanceRatio = 0.5; // the observer performance ratio is 0.5 because the operator did not observe the first epoch (we add 1 to the denominator to avoid division by zero - so 1/2 = 0.5)
+        const expectedCompositeWeight =
+          expectedStakeWeight *
+          expectedTenureWeight *
+          expectedGatewayPerformanceRatio *
+          expectedObserverPerformanceRatio;
+        const expectedNormalizedCompositeWeight = 1; // it's the only operator
+        const expectedNewEligibleRewards =
+          (protocolBalanceBeforeSecondEpochTick - expectedDistributedRewards) *
+          0.001;
+        const expectedSecondEpochObserverReward =
+          expectedNewEligibleRewards * 0.1;
+        const expectedSecondEpochGatewayReward =
+          expectedNewEligibleRewards * 0.9;
         assert.deepStrictEqual(secondEpoch, {
           epochIndex: 1,
           hashchain: 'hashchain-'.padEnd(43, 'g'),
@@ -252,30 +319,22 @@ describe('epochs', () => {
             {
               observerAddress: STUB_ADDRESS,
               gatewayAddress: STUB_OPERATOR_ADDRESS,
-              stakeWeight: 2.6875675,
-              gatewayPerformanceRatio: 1,
-              observerPerformanceRatio: 0.5,
-              compositeWeight: 5.375135,
-              normalizedCompositeWeight: 1,
-              tenureWeight: 4,
-              stake: INITIAL_OPERATOR_STAKE + 16875675000, // includes the new reward from the previous epoch
+              stakeWeight: expectedStakeWeight,
+              gatewayPerformanceRatio: expectedGatewayPerformanceRatio,
+              observerPerformanceRatio: expectedObserverPerformanceRatio,
+              compositeWeight: expectedCompositeWeight,
+              normalizedCompositeWeight: expectedNormalizedCompositeWeight,
+              tenureWeight: expectedTenureWeight,
+              stake: updatedOperatorStake,
               startTimestamp: 0,
             },
           ],
           prescribedNames: ['prescribed-name'],
           distributions: {
-            totalEligibleGatewayReward: 22493305945,
+            totalEligibleGatewayReward: expectedSecondEpochGatewayReward,
             totalEligibleGateways: 1,
-            totalEligibleObserverReward: 2499256216,
-            totalEligibleRewards: 24992562162,
-            rewards: {
-              eligible: {
-                [STUB_OPERATOR_ADDRESS]: {
-                  delegateRewards: [],
-                  operatorReward: 24992562161, // 0.001 of the protocol balance after the transfers and name purchase
-                },
-              },
-            },
+            totalEligibleObserverReward: expectedSecondEpochObserverReward,
+            totalEligibleRewards: expectedNewEligibleRewards,
           },
         });
         sharedMemory = tickMemory;

@@ -562,7 +562,7 @@ describe("epochs", function()
 
 		it("should create and prescribe the new epoch, and update gateway weights with computed weights", function()
 			local expectedEligibleGateways = 1
-			local expectedEligibleRewards = math.floor(protocolBalance * constants.minimumRewardRate)
+			local expectedEligibleRewards = math.floor(protocolBalance * 0.001) -- it's 0.1% for the first year
 			local expectedTotalGatewayReward = math.floor(expectedEligibleRewards * 0.90)
 			local expectedTotalObserverReward = math.floor(expectedEligibleRewards * 0.10)
 			local expectedPerGatewayReward = math.floor(expectedTotalGatewayReward / 1) -- only one gateway in the registry
@@ -990,28 +990,140 @@ describe("epochs", function()
 	end)
 
 	describe("getRewardRateForEpoch", function()
-		it("returns 0.05% for the first 365 epochs (approximately one year)", function()
-			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(1))
-			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(2))
-			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(364))
-			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(365))
+		it("returns 0.1% for the first 365 epochs (approximately one year)", function()
+			for i = 1, 365 do
+				assert.are.equal(0.001, epochs.getRewardRateForEpoch(i))
+			end
 		end)
 
-		it("returns a linearly decreasing rate starting from 0.1% after 365 epochs", function()
-			assert.are.equal(0.00099726775956284147498, epochs.getRewardRateForEpoch(366))
-			assert.are.equal(0.00099453551912568314598, epochs.getRewardRateForEpoch(367))
-			assert.are.equal(0.00099180327868852460015, epochs.getRewardRateForEpoch(368))
-
-			assert.are.equal(0.0005109289617486338685, epochs.getRewardRateForEpoch(544))
-			assert.are.equal(0.00050819672131147543108, epochs.getRewardRateForEpoch(545))
-			assert.are.equal(0.00050546448087431699366, epochs.getRewardRateForEpoch(546))
-			assert.are.equal(0.00050273224043715844783, epochs.getRewardRateForEpoch(547))
+		it("returns a linearly decreasing rate starting from 0.1% after 365 epochs, up to 5 decimal places", function()
+			assert.are.equal(0.001, epochs.getRewardRateForEpoch(366))
+			assert.are.equal(0.00075, epochs.getRewardRateForEpoch(366 + 91))
+			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(366 + 182))
 		end)
 
 		it("returns 0.05% after 547 epochs (approximately 1.5 years)", function()
 			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(548))
 			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(730))
 			assert.are.equal(0.0005, epochs.getRewardRateForEpoch(12053))
+		end)
+	end)
+
+	describe("getEligibleDistributionsForEpoch", function()
+		it("should return paginated eligible distributions", function()
+			_G.Epochs[0] = {
+				distributions = {
+					rewards = {
+						eligible = {
+							["test-this-is-valid-arweave-wallet-address-1"] = {
+								operatorReward = 300,
+								delegateRewards = {
+									["this-is-a-delegate-2"] = 2550,
+									["this-is-a-delegate"] = 25,
+								},
+							},
+							["test-this-is-valid-arweave-wallet-address-2"] = {
+								operatorReward = 255,
+								delegateRewards = { ["this-is-a-delegate"] = 50 },
+							},
+							["test-this-is-valid-arweave-wallet-address-3"] = {
+								operatorReward = 125,
+								delegateRewards = { ["this-is-a-delegate"] = 20 },
+							},
+							["test-this-is-valid-arweave-wallet-address-4"] = {
+								operatorReward = 40,
+								delegateRewards = { ["this-is-a-delegate"] = 30 },
+							},
+							["test-this-is-valid-arweave-wallet-address-5"] = {
+								operatorReward = 5,
+								delegateRewards = { ["this-is-a-delegate"] = 10 },
+							},
+						},
+					},
+				},
+			}
+
+			local result = epochs.getEligibleDistributions(
+				_G.EpochSettings.epochZeroStartTimestamp,
+				nil,
+				3,
+				"eligibleReward",
+				"desc"
+			)
+
+			assert.are.same({
+				limit = 3,
+				sortBy = "eligibleReward",
+				sortOrder = "desc",
+				hasMore = true,
+				totalItems = 11,
+				nextCursor = "test-this-is-valid-arweave-wallet-address-2_test-this-is-valid-arweave-wallet-address-2",
+				items = {
+					{
+						cursorId = "test-this-is-valid-arweave-wallet-address-1_this-is-a-delegate-2",
+						eligibleReward = 2550,
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
+						recipient = "this-is-a-delegate-2",
+						type = "delegateReward",
+					},
+					{
+						cursorId = "test-this-is-valid-arweave-wallet-address-1_test-this-is-valid-arweave-wallet-address-1",
+						eligibleReward = 300,
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-1",
+						recipient = "test-this-is-valid-arweave-wallet-address-1",
+						type = "operatorReward",
+					},
+					{
+						cursorId = "test-this-is-valid-arweave-wallet-address-2_test-this-is-valid-arweave-wallet-address-2",
+						eligibleReward = 255,
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-2",
+						recipient = "test-this-is-valid-arweave-wallet-address-2",
+						type = "operatorReward",
+					},
+				},
+			}, result)
+
+			-- Test with a different cursor
+			result = epochs.getEligibleDistributions(
+				_G.EpochSettings.epochZeroStartTimestamp,
+				"test-this-is-valid-arweave-wallet-address-2_test-this-is-valid-arweave-wallet-address-2",
+				3,
+				"eligibleReward",
+				"desc"
+			)
+
+			assert.are.same({
+				limit = 3,
+				sortBy = "eligibleReward",
+				sortOrder = "desc",
+				hasMore = true,
+				nextCursor = "test-this-is-valid-arweave-wallet-address-4_test-this-is-valid-arweave-wallet-address-4",
+				totalItems = 11,
+				items = {
+					{
+						cursorId = "test-this-is-valid-arweave-wallet-address-3_test-this-is-valid-arweave-wallet-address-3",
+						eligibleReward = 125,
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-3",
+						recipient = "test-this-is-valid-arweave-wallet-address-3",
+						type = "operatorReward",
+					},
+					{
+						cursorId = "test-this-is-valid-arweave-wallet-address-2_this-is-a-delegate",
+						eligibleReward = 50,
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-2",
+						recipient = "this-is-a-delegate",
+						type = "delegateReward",
+					},
+
+					{
+						cursorId = "test-this-is-valid-arweave-wallet-address-4_test-this-is-valid-arweave-wallet-address-4",
+						eligibleReward = 40,
+						gatewayAddress = "test-this-is-valid-arweave-wallet-address-4",
+						recipient = "test-this-is-valid-arweave-wallet-address-4",
+						type = "operatorReward",
+					},
+				},
+			}, result)
 		end)
 	end)
 end)

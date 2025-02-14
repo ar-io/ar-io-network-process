@@ -77,13 +77,8 @@ local epochs = {}
 --- @field rewards DistributedEpochRewards The rewards for the epoch, including eligible and distributed rewards
 
 Epochs = Epochs or {}
-EpochSettings = EpochSettings
-	or {
-		prescribedNameCount = 2,
-		maxObservers = 50,
-		epochZeroStartTimestamp = 1719900000000, -- July 9th, 00:00:00 UTC
-		durationMs = constants.defaultEpochDurationMs, -- 24 hours
-	}
+EpochSettings = EpochSettings or constants.DEFAULT_EPOCH_SETTINGS
+DistributionSettings = DistributionSettings or constants.DEFAULT_DISTRIBUTION_SETTINGS
 
 --- Gets an epoch by index
 --- @param epochIndex number The epoch index
@@ -96,7 +91,7 @@ function epochs.getEpoch(epochIndex)
 	return epoch
 end
 
---- Gets an epoch by index without copying
+-- Gets an epoch by index, unsafe
 --- @param epochIndex number The epoch index
 --- @return PrescribedEpoch | nil # The prescribed epoch
 function epochs.getEpochUnsafe(epochIndex)
@@ -104,7 +99,7 @@ function epochs.getEpochUnsafe(epochIndex)
 end
 
 --- Gets the epoch settings
---- @return EpochSettings|nil # The epoch settings
+--- @return EpochSettings # The epoch settings
 function epochs.getSettings()
 	return utils.deepCopy(EpochSettings)
 end
@@ -165,22 +160,6 @@ function epochs.getEligibleRewardsForEpoch(epochIndex)
 	return eligible
 end
 
---- Gets the distributed rewards for an epoch
---- @param epochIndex number The epoch index
---- @return DistributedEpochRewards # The distributed rewards for the epoch
-function epochs.getDistributedRewardsForEpoch(epochIndex)
-	if epochIndex < 0 then
-		return {}
-	end
-	local epoch = epochs.getEpoch(epochIndex)
-	local distributed = epoch
-			and epoch.distributions
-			and epoch.distributions.rewards
-			and epoch.distributions.rewards.distributed
-		or {}
-	return distributed
-end
-
 --- Gets the observations for an epoch
 --- @param epochIndex number The epoch index
 --- @return Observations # The observations for the epoch
@@ -194,13 +173,36 @@ end
 
 --- Gets the distributions for an epoch
 --- @param epochIndex number The epoch index
---- @return DistributedEpochDistribution | PrescribedEpochDistribution # The distributions for the epoch
+--- @return PrescribedEpochDistribution # The distributions for the epoch
 function epochs.getDistributionsForEpoch(epochIndex)
 	if epochIndex < 0 then
 		return {}
 	end
 	local epoch = epochs.getEpoch(epochIndex)
 	return epoch and epoch.distributions or {}
+end
+
+--- @class EligibleRewardTotals
+--- @field totalEligibleGateways number The total eligible gateways
+--- @field totalEligibleRewards number The total eligible rewards
+--- @field totalEligibleGatewayReward number The total eligible gateway reward
+--- @field totalEligibleObserverReward number The total eligible observer reward
+
+-- TODO: Replace getDistributionsForEpoch function with this once network portal uses paginated handler
+--- @param epochIndex number The epoch index
+--- @return EligibleRewardTotals | nil # The totals for the eligible rewards for the epoch
+function epochs.getTotalEligibleRewardsForEpoch(epochIndex)
+	local epoch = epochs.getEpochUnsafe(epochIndex)
+	if not epoch or not epoch.distributions then
+		return nil
+	end
+
+	return {
+		totalEligibleGateways = epoch.distributions.totalEligibleGateways,
+		totalEligibleRewards = epoch.distributions.totalEligibleRewards,
+		totalEligibleGatewayReward = epoch.distributions.totalEligibleGatewayReward,
+		totalEligibleObserverReward = epoch.distributions.totalEligibleObserverReward,
+	}
 end
 
 --- Gets the prescribed names for an epoch
@@ -223,17 +225,6 @@ function epochs.getReportsForEpoch(epochIndex)
 	end
 	local epoch = epochs.getEpoch(epochIndex)
 	return epoch and epoch.observations.reports or {}
-end
-
---- Gets the distribution for an epoch
---- @param epochIndex number The epoch index
---- @return DistributedEpochDistribution | PrescribedEpochDistribution # The distribution for the epoch
-function epochs.getDistributionForEpoch(epochIndex)
-	if epochIndex < 0 then
-		return {}
-	end
-	local epoch = epochs.getEpoch(epochIndex)
-	return epoch and epoch.distributions or {}
 end
 
 --- Computes the prescribed names for an epoch
@@ -540,6 +531,17 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 	return epoch.observations
 end
 
+--- @class DistributionSettings
+--- @field gatewayOperatorRewardRatio number The gateway operator reward ratio
+--- @field observerRewardRatio number The observer reward ratio
+--- @field rewardDecayStartEpoch number The reward decay start epoch
+--- @field rewardDecayLastEpoch number The reward decay last epoch
+--- @field maximumRewardRate number The maximum reward rate
+--- @field minimumRewardRate number The minimum reward rate
+function epochs.getDistributionSettings()
+	return utils.deepCopy(DistributionSettings)
+end
+
 --- @class ComputedRewards
 --- @field totalEligibleGateways number The total eligible gateways
 --- @field totalEligibleRewards number The total eligible rewards
@@ -561,17 +563,22 @@ function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObserv
 			potentialRewards = {},
 		}
 	end
+	local distributionSettings = epochs.getDistributionSettings()
 	local epochStartTimestamp = epochs.getEpochTimestampsForIndex(epochIndex)
 	local activeGatewayAddresses = gar.getActiveGatewayAddressesBeforeTimestamp(epochStartTimestamp)
 	local protocolBalance = balances.getBalance(ao.id)
 	local rewardRate = epochs.getRewardRateForEpoch(epochIndex)
 	local totalEligibleRewards = math.floor(protocolBalance * rewardRate)
 	local eligibleGatewayReward = #activeGatewayAddresses > 0
-			and math.floor(totalEligibleRewards * constants.gatewayOperatorRewardRatio / #activeGatewayAddresses)
+			and math.floor(
+				totalEligibleRewards * distributionSettings.gatewayOperatorRewardRatio / #activeGatewayAddresses
+			)
 		or 0
 	local eligibleObserverReward = utils.lengthOfTable(prescribedObserversLookup) > 0
 			and math.floor(
-				totalEligibleRewards * constants.observerRewardRatio / utils.lengthOfTable(prescribedObserversLookup)
+				totalEligibleRewards
+					* distributionSettings.observerRewardRatio
+					/ utils.lengthOfTable(prescribedObserversLookup)
 			)
 		or 0
 	-- compute for each gateway what their potential rewards are and for their delegates
@@ -623,6 +630,7 @@ end
 --- 3. Distribute the rewards to the gateways and observers
 --- 4. Increment the epoch stats for the gateways
 --- @param epochIndexToDistribute number The epoch to distribute
+--- @param currentTimestamp number The current timestamp
 --- @return DistributedEpoch | nil # The updated epoch with the distributed rewards, or nil if no rewards were distributed
 function epochs.distributeEpoch(epochIndexToDistribute, currentTimestamp)
 	if epochIndexToDistribute < 0 then
@@ -630,6 +638,7 @@ function epochs.distributeEpoch(epochIndexToDistribute, currentTimestamp)
 		return nil
 	end
 
+	-- get the epoch reference to avoid extra copying, it will be set to nil after the distribution is complete
 	local epochToDistribute = epochs.getEpoch(epochIndexToDistribute)
 
 	if not epochToDistribute then
@@ -821,27 +830,85 @@ function convertPrescribedEpochToDistributedEpoch(epoch, currentTimestamp, distr
 	}
 end
 
-function epochs.scheduleNextEpochsPrune(timestamp)
-	NextEpochsPruneTimestamp = math.min(NextEpochsPruneTimestamp or timestamp, timestamp)
-end
-
-function epochs.nextEpochsPruneTimestamp()
-	return NextEpochsPruneTimestamp
-end
-
+--- Gets the reward rate for an epoch. The reward rate is the percentage of the protocol balance that is distributed to the gateways and observers.
+--- For the first year, the reward rate is 0.1% of the protocol balance.
+--- After the first year, the reward rate decays linearly to 0.05% of the protocol balance after 1.5 years.
 ---@param epochIndex number
 ---@returns number
 function epochs.getRewardRateForEpoch(epochIndex)
-	if epochIndex <= constants.rewardDecayStartEpoch then
-		return constants.minimumRewardRate
-	elseif epochIndex <= constants.rewardDecayLastEpoch then
-		local totalDecayPeriod = (constants.rewardDecayLastEpoch - constants.rewardDecayStartEpoch) + 1
-		local epochsAlreadyDecayed = (epochIndex - constants.rewardDecayStartEpoch)
-		local decayRatePerEpoch = (constants.maximumRewardRate - constants.minimumRewardRate) / totalDecayPeriod
-		return constants.maximumRewardRate - (decayRatePerEpoch * epochsAlreadyDecayed)
-	else
-		return constants.minimumRewardRate
+	local distributionSettings = epochs.getDistributionSettings()
+
+	-- if we are before the decay start, return the maximum reward rate (0.1%)
+	if epochIndex < distributionSettings.rewardDecayStartEpoch then
+		return distributionSettings.maximumRewardRate
 	end
+
+	-- if at the end of the decay period, return the minimum reward rate (0.05%)
+	if epochIndex > distributionSettings.rewardDecayLastEpoch then
+		return distributionSettings.minimumRewardRate
+	end
+	-- if we are in the decay period (1 year to 1.5 years), return the linearly decaying reward rate
+	local totalDecayPeriod = (distributionSettings.rewardDecayLastEpoch - distributionSettings.rewardDecayStartEpoch)
+	local epochsAlreadyDecayed = (epochIndex - distributionSettings.rewardDecayStartEpoch)
+	local decayRatePerEpoch = (distributionSettings.maximumRewardRate - distributionSettings.minimumRewardRate)
+		/ totalDecayPeriod
+	local totalRateDecayed = decayRatePerEpoch * epochsAlreadyDecayed
+	local totalRewardRateDecayed = distributionSettings.maximumRewardRate - totalRateDecayed
+	-- avoid floating point precision issues, round to 5 decimal places
+	return utils.roundToPrecision(totalRewardRateDecayed, 5)
+end
+
+--- @class EligibleRewards
+--- @field recipient WalletAddress
+--- @field eligibleReward mARIO
+--- @field gatewayAddress WalletAddress
+--- @field type "delegateReward"|"operatorReward"
+--- @field cursorId string gatewayAddress concatenated with recipient for pagination
+
+--- Gets the distributions for the current epoch
+--- @param currentTimestamp number
+--- @param cursor string|nil The cursor to paginate from
+--- @param limit number The limit of records to return
+--- @param sortBy string|nil The field to sort by
+--- @param sortOrder string The order to sort by
+--- @return PaginatedTable<PrescribedEpochDistribution> The paginated eligible distributions for the epoch
+function epochs.getEligibleDistributions(currentTimestamp, cursor, limit, sortBy, sortOrder)
+	local epochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp)
+	if epochIndex < 0 then
+		return {}
+	end
+	local epoch = epochs.getEpochUnsafe(epochIndex)
+	if
+		not epoch
+		or not epoch.distributions
+		or not epoch.distributions.rewards
+		or not epoch.distributions.rewards.eligible
+	then
+		return {}
+	end
+
+	local rewardsArray = {}
+	for gatewayAddress, reward in pairs(epoch.distributions.rewards.eligible) do
+		table.insert(rewardsArray, {
+			type = "operatorReward",
+			recipient = gatewayAddress,
+			eligibleReward = reward.operatorReward,
+			gatewayAddress = gatewayAddress,
+			cursorId = gatewayAddress .. "_" .. gatewayAddress,
+		})
+
+		for delegateAddress, delegateRewardQty in pairs(reward.delegateRewards) do
+			table.insert(rewardsArray, {
+				type = "delegateReward",
+				recipient = delegateAddress,
+				eligibleReward = delegateRewardQty,
+				gatewayAddress = gatewayAddress,
+				cursorId = gatewayAddress .. "_" .. delegateAddress,
+			})
+		end
+	end
+
+	return utils.paginateTableWithCursor(rewardsArray, cursor, "cursorId", limit, sortBy, sortOrder)
 end
 
 return epochs
