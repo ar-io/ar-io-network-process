@@ -72,8 +72,15 @@ fs.appendFileSync(
 );
 
 for (const record of activeRecords) {
-  const { name, processId, type, startTimestamp, endTimestamp, purchasePrice, undernameLimit } =
-    record;
+  const {
+    name,
+    processId,
+    type,
+    startTimestamp,
+    endTimestamp,
+    purchasePrice,
+    undernameLimit,
+  } = record;
 
   const csvRow = [
     name,

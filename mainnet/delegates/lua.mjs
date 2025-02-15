@@ -61,7 +61,7 @@ const assignedDelegates = fs
 
 for (const delegate of assignedDelegates) {
   const [
-    delegateAddress, 
+    delegateAddress,
     gatewayAddress,
     delegateStake,
     providedStartTimestamp,
