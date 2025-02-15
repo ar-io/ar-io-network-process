@@ -298,7 +298,8 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	local prescribedObserversLookup = {}
 	-- use ipairs as weightedObservers in array
 	for _, observer in ipairs(weightedGateways) do
-		if observer.normalizedCompositeWeight > 0 then
+		-- for the first epoch, we need to include all observers as there are no weights yet
+		if epochIndex == 0 or observer.normalizedCompositeWeight > 0 then
 			table.insert(filteredObservers, observer)
 		end
 	end
