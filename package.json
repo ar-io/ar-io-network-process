@@ -12,7 +12,7 @@
     "monitor": "yarn monitor:down && node --test tests/monitor/monitor.test.mjs",
     "monitor:devnet": "yarn monitor:down && ARIO_NETWORK_PROCESS_ID=GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc node --test tests/monitor/monitor.test.mjs",
     "monitor:testnet": "yarn monitor:down && ARIO_NETWORK_PROCESS_ID=agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA node --test tests/monitor/monitor.test.mjs",
-    "monitor:process": "yarn monitor:down && ARIO_NETWORK_PROCESS_ID=vGBEeCYVq03RC_Di_x865nGelN5WIxl3sSEyvGu0AWY node --test tests/monitor/monitor.test.mjs",
+    "monitor:process": "yarn monitor:down && ARIO_NETWORK_PROCESS_ID=oIiRrqvW7ZaX7wZbaz2YMmPJED_0aJLHsjTq_lZceKo node --test tests/monitor/monitor.test.mjs",
     "evolve": "yarn build && node tools/evolve.mjs",
     "prepare": "husky"
   },
