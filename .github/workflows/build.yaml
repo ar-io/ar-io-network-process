@@ -73,7 +73,7 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'yarn'
 
-      - run: git clone -b alpha https://github.com/ar-io/ar-io-sdk.git
+      - run: git clone -b release/v4.0.0-alpha https://github.com/ar-io/ar-io-sdk.git
       - run: yarn
         working-directory: ./ar-io-sdk
       - run: yarn test:esm # full e2e integration tests
