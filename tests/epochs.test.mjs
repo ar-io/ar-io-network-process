@@ -10,7 +10,7 @@ import {
   getEpochSettings,
   getBalance,
   getGateway,
-  getEligibleDistributions,
+  getEligibleRewardsForEpoch,
 } from './helpers.mjs';
 import { describe, it, before } from 'node:test';
 import assert from 'node:assert';
@@ -129,7 +129,7 @@ describe('epochs', () => {
         });
         firstEpoch = epoch;
 
-        const eligibleDistributions = await getEligibleDistributions({
+        const eligibleDistributions = await getEligibleRewardsForEpoch({
           memory: tickMemory,
           timestamp: epochSettings.epochZeroStartTimestamp,
         });

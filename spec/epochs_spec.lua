@@ -1009,8 +1009,8 @@ describe("epochs", function()
 		end)
 	end)
 
-	describe("getEligibleDistributionsForEpoch", function()
-		it("should return paginated eligible distributions", function()
+	describe("getEligibleRewardsForEpoch", function()
+		it("should return paginated eligible rewards for the current epoch", function()
 			_G.Epochs[0] = {
 				distributions = {
 					rewards = {
@@ -1043,7 +1043,7 @@ describe("epochs", function()
 				},
 			}
 
-			local result = epochs.getEligibleDistributions(
+			local result = epochs.getEligibleRewardsForEpoch(
 				_G.EpochSettings.epochZeroStartTimestamp,
 				nil,
 				3,
@@ -1084,7 +1084,7 @@ describe("epochs", function()
 			}, result)
 
 			-- Test with a different cursor
-			result = epochs.getEligibleDistributions(
+			result = epochs.getEligibleRewardsForEpoch(
 				_G.EpochSettings.epochZeroStartTimestamp,
 				"test-this-is-valid-arweave-wallet-address-2_test-this-is-valid-arweave-wallet-address-2",
 				3,

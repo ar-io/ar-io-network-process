@@ -1129,13 +1129,13 @@ export const increaseUndernameLimit = async ({
   };
 };
 
-export const getEligibleDistributions = async ({ memory, timestamp }) => {
+export const getEligibleRewardsForEpoch = async ({ memory, timestamp }) => {
   const result = await handle({
     options: {
       Tags: [
         {
           name: 'Action',
-          value: 'Eligible-Distributions',
+          value: 'Epoch-Eligible-Rewards',
         },
       ],
     },
