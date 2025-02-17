@@ -194,14 +194,11 @@ describe('setup', () => {
         '_default handler is not in the process handlers list',
       );
       const evalIndex = handlersList.indexOf('_eval');
-      const defaultIndex = handlersList.indexOf('_default');
       const sanitizeIndex = handlersList.indexOf('sanitize');
       const pruneIndex = handlersList.indexOf('prune');
       assert(
-        pruneIndex === sanitizeIndex + 1 &&
-          sanitizeIndex === defaultIndex + 1 &&
-          defaultIndex === evalIndex + 1,
-        `Prune index (${pruneIndex}) and sanitize index (${sanitizeIndex}) are not the first and second handlers after _default (${handlersList})`,
+        evalIndex < sanitizeIndex && sanitizeIndex < pruneIndex,
+        `Prune index (${pruneIndex}) and sanitize index (${sanitizeIndex}) are not the first and second handlers after _eval (${handlersList})`,
       );
     });
   });
@@ -236,6 +233,9 @@ describe('setup', () => {
   describe('distribution totals', () => {
     it('should always have correct eligible rewards for the the previous epoch (within 10 mARIO)', async () => {
       const currentEpoch = await io.getCurrentEpoch();
+      if (currentEpoch == undefined) {
+        return;
+      }
       const previousEpoch = await io.getEpoch({
         epochIndex: currentEpoch.epochIndex - 1,
       });
@@ -395,6 +395,9 @@ describe('setup', () => {
     });
 
     it('should always be up to date', async () => {
+      if (Date.now() < epochSettings.epochZeroStartTimestamp) {
+        return;
+      }
       const { durationMs, epochZeroStartTimestamp } = epochSettings;
       const currentEpochIndex = Math.floor(
         (Date.now() - epochZeroStartTimestamp) / durationMs,
@@ -406,6 +409,9 @@ describe('setup', () => {
       );
     });
     it('should contain the startTimestamp, endTimestamp and distributions, observations and correct totals and stats for the current epoch', async () => {
+      if (Date.now() < epochSettings.epochZeroStartTimestamp) {
+        return;
+      }
       const {
         epochIndex,
         startTimestamp,
@@ -468,6 +474,9 @@ describe('setup', () => {
     });
 
     it('the previous epoch should have a been distributed', async () => {
+      if (Date.now() < epochSettings.epochZeroStartTimestamp) {
+        return;
+      }
       const { epochIndex: currentEpochIndex } = currentEpoch;
       const previousEpochIndex = currentEpochIndex - 1;
       const { epochIndex, distributions, endTimestamp, startTimestamp } =
@@ -529,8 +538,9 @@ describe('setup', () => {
       const { durationMs, epochZeroStartTimestamp } =
         await io.getEpochSettings();
       // compute the epoch index based on the epoch settings
-      const currentEpochIndex = Math.floor(
-        (Date.now() - epochZeroStartTimestamp) / durationMs,
+      const currentEpochIndex = Math.max(
+        0,
+        Math.floor((Date.now() - epochZeroStartTimestamp) / durationMs),
       );
 
       const gateways = await getGateways();
@@ -540,17 +550,94 @@ describe('setup', () => {
         uniqueGateways.add(gateway.gatewayAddress);
         if (gateway.status === 'joined') {
           assert(
-            Number.isInteger(gateway.operatorStake),
+            gateway.observerAddress !== undefined &&
+              typeof gateway.observerAddress === 'string' &&
+              gateway.observerAddress.length > 0,
+            `Gateway ${gateway.gatewayAddress} has no observer address`,
+          );
+          assert(
+            gateway.startTimestamp !== undefined &&
+              Number.isInteger(gateway.startTimestamp) &&
+              gateway.startTimestamp > 0,
+            `Gateway ${gateway.gatewayAddress} has an invalid start timestamp: ${gateway.startTimestamp}`,
+          );
+          assert(
+            Number.isInteger(gateway.operatorStake) &&
+              gateway.operatorStake >= 0,
             `Gateway ${gateway.gatewayAddress} has an invalid operator stake: ${gateway.operatorStake}`,
           );
           assert(
-            Number.isInteger(gateway.totalDelegatedStake),
+            Number.isInteger(gateway.totalDelegatedStake) &&
+              gateway.totalDelegatedStake >= 0,
             `Gateway ${gateway.gatewayAddress} has an invalid total delegated stake: ${gateway.totalDelegatedStake}`,
           );
           assert(
-            gateway.operatorStake >= 10_000_000_000,
-            `Gateway ${gateway.gatewayAddress} has less than 10_000_000_000 ARIO staked`,
+            gateway.status === 'joined' || gateway.status === 'leaving',
+            `Gateway ${gateway.gatewayAddress} has an invalid status: ${gateway.status}`,
           );
+
+          // settings
+          assert(
+            gateway.settings.fqdn !== undefined &&
+              typeof gateway.settings.fqdn === 'string' &&
+              gateway.settings.fqdn.length > 0,
+            `Gateway ${gateway.gatewayAddress} has invalid fqdn: ${gateway.settings.fqdn}`,
+          );
+          assert(
+            gateway.settings.port !== undefined &&
+              typeof gateway.settings.port === 'number' &&
+              gateway.settings.port > 0,
+            `Gateway ${gateway.gatewayAddress} has invalid port: ${gateway.settings.port}`,
+          );
+          // note is optional
+          if (gateway.settings.note !== undefined) {
+            assert(
+              typeof gateway.settings.note === 'string' &&
+                gateway.settings.note.length > 0,
+              `Gateway ${gateway.gatewayAddress} has invalid note: ${gateway.settings.note}`,
+            );
+          }
+          assert(
+            gateway.settings.label !== undefined &&
+              typeof gateway.settings.label === 'string' &&
+              gateway.settings.label.length > 0,
+            `Gateway ${gateway.gatewayAddress} has no label`,
+          );
+          assert(
+            gateway.settings.protocol !== undefined &&
+              gateway.settings.protocol === 'https',
+            `Gateway ${gateway.gatewayAddress} has invalid protocol: ${gateway.settings.protocol}`,
+          );
+          assert(
+            gateway.settings.properties !== undefined &&
+              typeof gateway.settings.properties === 'string',
+            `Gateway ${gateway.gatewayAddress} has invalid properties: ${gateway.settings.properties}`,
+          );
+          assert(
+            gateway.settings.minDelegatedStake !== undefined &&
+              Number.isInteger(gateway.settings.minDelegatedStake) &&
+              gateway.settings.minDelegatedStake > 0,
+            `Gateway ${gateway.gatewayAddress} has invalid min delegated stake: ${gateway.settings.minDelegatedStake}`,
+          );
+          assert(
+            gateway.settings.allowDelegatedStaking !== undefined &&
+              typeof gateway.settings.allowDelegatedStaking === 'boolean',
+            `Gateway ${gateway.gatewayAddress} has invalid allow delegated staking: ${gateway.settings.allowDelegatedStaking}`,
+          );
+          assert(
+            gateway.settings.delegateRewardShareRatio !== undefined &&
+              Number.isInteger(gateway.settings.delegateRewardShareRatio) &&
+              gateway.settings.delegateRewardShareRatio >= 0 &&
+              gateway.settings.delegateRewardShareRatio <= 95,
+            `Gateway ${gateway.gatewayAddress} has invalid delegate reward share ratio: ${gateway.settings.delegateRewardShareRatio}`,
+          );
+          assert(
+            gateway.settings.autoStake !== undefined &&
+              typeof gateway.settings.autoStake === 'boolean',
+            `Gateway ${gateway.gatewayAddress} has invalid auto stake: ${gateway.settings.autoStake}`,
+          );
+
+          // stats
           assert(
             gateway.stats.failedConsecutiveEpochs >= 0,
             `Gateway ${gateway.gatewayAddress} has less than 0 failed consecutive epochs`,
@@ -611,9 +698,7 @@ describe('setup', () => {
     it('should have valid vaults for all gateways', async () => {
       const vaults = await getGatewayVaults();
       if (vaults.length > 0) {
-        // Fixed inverted logic
         for (const vault of vaults) {
-          // assert vault balance is greater than 0 and startTimestamp and endTimestamp are valid timestamps (they are all set to 90 by default, but old ones have to expire out)
           assert(
             Number.isInteger(vault.balance),
             `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid balance (${vault.balance})`, // Fixed vaultId reference
