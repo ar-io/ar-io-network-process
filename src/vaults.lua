@@ -43,7 +43,6 @@ function vaults.createVault(from, qty, lockLengthMs, currentTimestamp, vaultId)
 		startTimestamp = currentTimestamp,
 		endTimestamp = currentTimestamp + lockLengthMs,
 	})
-	vaults.scheduleNextVaultsPruning(newVault.endTimestamp)
 	return newVault
 end
 
@@ -212,12 +211,11 @@ end
 --- @param id string The vault id
 --- @return Vault|nil # The removed vault
 function vaults.removeVault(owner, id)
-	local vaultsForOwner = Vaults[owner]
-	if not vaultsForOwner then
+	if not Vaults[owner] then
 		return nil
 	end
-	local removedVault = vaultsForOwner[id]
-	vaultsForOwner[id] = nil
+	local removedVault = utils.deepCopy(Vaults[owner][id])
+	Vaults[owner][id] = nil
 	return removedVault
 end
 
@@ -233,6 +231,7 @@ function vaults.setVault(target, id, vault)
 	end
 	-- set the vault
 	Vaults[target][id] = vault
+	vaults.scheduleNextVaultsPruning(vault.endTimestamp)
 	return vault
 end
 

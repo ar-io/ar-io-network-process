@@ -341,6 +341,16 @@ describe("vaults", function()
 		end)
 	end)
 
+	describe("removeVault", function()
+		it("should remove a vault", function()
+			_G.Balances["owner"] = 100
+			local vault = vaults.createVault("owner", 100, constants.MIN_TOKEN_LOCK_TIME_MS, 0, "msgId")
+			local removedVault = vaults.removeVault("owner", "msgId")
+			assert.are.same(vault, removedVault)
+			assert.is_nil(_G.Vaults["owner"]["msgId"])
+		end)
+	end)
+
 	describe("pruneVaults", function()
 		it("should prune expired vaults and return balance to owners", function()
 			local currentTimestamp = 1000000

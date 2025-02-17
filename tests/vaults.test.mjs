@@ -14,6 +14,8 @@ import {
   createVaultedTransfer,
   totalTokenSupply,
   getBalance,
+  getInfo,
+  getVault,
 } from './helpers.mjs';
 import { assertNoInvariants } from './invariants.mjs';
 
@@ -150,6 +152,49 @@ describe('Vaults', async () => {
       });
       assert.deepEqual(balanceAfterVault, balanceBefore);
       endingMemory = createVaultResult.Memory;
+    });
+
+    it('should prune a created vault once the end timestamp is reached', async () => {
+      const lockLengthMs = 1209600000;
+      const quantity = 1000000000;
+
+      const { result: createVaultResult } = await createVault({
+        quantity,
+        lockLengthMs,
+        memory: sharedMemory,
+        msgId: 'unique-vault-id-'.padEnd(43, 'b'),
+      });
+
+      const vaultData = JSON.parse(createVaultResult.Messages[0].Data);
+
+      const balanceBeforeUnlocked = await getBalance({
+        address: PROCESS_OWNER,
+        memory: createVaultResult.Memory,
+        timestamp: vaultData.startTimestamp,
+      });
+
+      // any message after the end timestamp should prune the vault
+      const nextMessageTimestamp = vaultData.endTimestamp + 1;
+      const { result: getInfoResult } = await getInfo({
+        memory: createVaultResult.Memory,
+        timestamp: nextMessageTimestamp,
+      });
+
+      const vaultAfterPrune = await getVault({
+        address: PROCESS_OWNER,
+        memory: getInfoResult.Memory,
+        timestamp: nextMessageTimestamp,
+        vaultId: 'unique-vault-id-'.padEnd(43, 'b'),
+        assertNoResultError: false,
+      });
+      assert.deepEqual(vaultAfterPrune, undefined);
+
+      // after that message, assert the vault is gone and the balance is increased
+      const balanceAfterVault = await getBalance({
+        address: PROCESS_OWNER,
+        memory: getInfoResult.Memory,
+      });
+      assert.deepEqual(balanceAfterVault, balanceBeforeUnlocked + quantity);
     });
   });
 
@@ -485,6 +530,51 @@ describe('Vaults', async () => {
         STUB_TIMESTAMP + lockLengthMs,
       );
       endingMemory = createVaultedTransferResult.Memory;
+    });
+
+    it('should prune the vault after the end timestamp', async () => {
+      const { result: createVaultedTransferResult } =
+        await createVaultedTransfer({
+          quantity,
+          lockLengthMs,
+          memory: sharedMemory,
+          revokable: true,
+          recipient: 'unique-recipient-'.padEnd(43, 'a'),
+          msgId: 'unique-vault-id-'.padEnd(43, 'a'),
+        });
+
+      const vaultData = JSON.parse(
+        createVaultedTransferResult.Messages[0].Data,
+      );
+
+      const balanceBeforeUnlocked = await getBalance({
+        address: 'unique-recipient-'.padEnd(43, 'a'),
+        memory: createVaultedTransferResult.Memory,
+        timestamp: vaultData.startTimestamp,
+      });
+
+      // any message after the end timestamp should prune the vault
+      const nextMessageTimestamp = vaultData.endTimestamp + 1;
+      const { result: getInfoResult } = await getInfo({
+        memory: createVaultedTransferResult.Memory,
+        timestamp: nextMessageTimestamp,
+      });
+
+      const vaultAfterPrune = await getVault({
+        address: 'unique-recipient-'.padEnd(43, 'a'),
+        memory: getInfoResult.Memory,
+        timestamp: nextMessageTimestamp,
+        vaultId: 'unique-vault-id-'.padEnd(43, 'a'),
+        assertNoResultError: false,
+      });
+      assert.deepEqual(vaultAfterPrune, undefined);
+
+      const balanceAfterPrune = await getBalance({
+        address: 'unique-recipient-'.padEnd(43, 'a'),
+        memory: getInfoResult.Memory,
+        timestamp: nextMessageTimestamp,
+      });
+      assert.deepEqual(balanceAfterPrune, balanceBeforeUnlocked + quantity);
     });
   });
 
