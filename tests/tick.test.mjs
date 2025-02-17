@@ -714,6 +714,9 @@ describe('Tick', async () => {
   });
 
   it('should reset to baseRegistrationFee when demandFactor is 0.5 for consecutive epochs', async () => {
+    const currentDemandFactor = await getDemandFactor({
+      memory: sharedMemory,
+    });
     const demandFactorSettings = await getDemandFactorSettings({
       memory: sharedMemory,
     });
@@ -736,8 +739,7 @@ describe('Tick', async () => {
       Math.ceil(
         Math.log(demandFactorSettings.demandFactorMin) /
           Math.log(1 - demandFactorSettings.demandFactorDownAdjustmentRate),
-      ) * 2; // we multiply by 2 because we start with 2 demand factor
-    console.log('periodsUntilMinDemandFactor', periodsUntilMinDemandFactor);
+      ) * currentDemandFactor; // we multiply by 2 because we start with 2 demand factor
     const periodsUntilDemandFactorReset =
       periodsUntilMinDemandFactor +
       demandFactorSettings.maxPeriodsAtMinDemandFactor;
@@ -759,7 +761,7 @@ describe('Tick', async () => {
           memory: tickMemory,
           timestamp: nextDemandFactorPeriodTimestamp,
         });
-        assert.equal(demandFactor, 0.50551999999999996938); // rounded to 5 decimal places
+        assert.equal(demandFactor, 0.50552); // rounded to 5 decimal places
       }
 
       // the three periods before the demand factor resets to 0.5 should have a demand factor of 0.5
