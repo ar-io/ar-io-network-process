@@ -147,19 +147,6 @@ function epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 	return prescribedObserversWithWeights
 end
 
---- Gets the eligible rewards for an epoch
---- @param epochIndex number The epoch index
---- @return PrescribedEpochRewards # The eligible rewards for the epoch
-function epochs.getEligibleRewardsForEpoch(epochIndex)
-	local epoch = epochs.getEpoch(epochIndex)
-	local eligible = epoch
-			and epoch.distributions
-			and epoch.distributions.rewards
-			and epoch.distributions.rewards.eligible
-		or {}
-	return eligible
-end
-
 --- Gets the observations for an epoch
 --- @param epochIndex number The epoch index
 --- @return Observations # The observations for the epoch
@@ -180,29 +167,6 @@ function epochs.getDistributionsForEpoch(epochIndex)
 	end
 	local epoch = epochs.getEpoch(epochIndex)
 	return epoch and epoch.distributions or {}
-end
-
---- @class EligibleRewardTotals
---- @field totalEligibleGateways number The total eligible gateways
---- @field totalEligibleRewards number The total eligible rewards
---- @field totalEligibleGatewayReward number The total eligible gateway reward
---- @field totalEligibleObserverReward number The total eligible observer reward
-
--- TODO: Replace getDistributionsForEpoch function with this once network portal uses paginated handler
---- @param epochIndex number The epoch index
---- @return EligibleRewardTotals | nil # The totals for the eligible rewards for the epoch
-function epochs.getTotalEligibleRewardsForEpoch(epochIndex)
-	local epoch = epochs.getEpochUnsafe(epochIndex)
-	if not epoch or not epoch.distributions then
-		return nil
-	end
-
-	return {
-		totalEligibleGateways = epoch.distributions.totalEligibleGateways,
-		totalEligibleRewards = epoch.distributions.totalEligibleRewards,
-		totalEligibleGatewayReward = epoch.distributions.totalEligibleGatewayReward,
-		totalEligibleObserverReward = epoch.distributions.totalEligibleObserverReward,
-	}
 end
 
 --- Gets the prescribed names for an epoch
