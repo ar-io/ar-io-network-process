@@ -145,10 +145,10 @@ Get aos:
 yarn global add https://get_ao.g8way.io
 ```
 
-To load the module into the `aos`REPL, run the following command:
+To load the module into the `aos` REPL, run the following command:
 
 ```sh
-aos --load src/main.lua
+aos --load process.lua
 ```
 
 ### Code Formatting
