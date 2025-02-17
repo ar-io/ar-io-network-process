@@ -43,7 +43,6 @@ function vaults.createVault(from, qty, lockLengthMs, currentTimestamp, vaultId)
 		startTimestamp = currentTimestamp,
 		endTimestamp = currentTimestamp + lockLengthMs,
 	})
-	vaults.scheduleNextVaultsPruning(newVault.endTimestamp)
 	return newVault
 end
 
@@ -207,6 +206,19 @@ function vaults.getVault(target, id)
 	return Vaults[target] and Vaults[target][id]
 end
 
+--- Removes a vault
+--- @param owner string The address of the owner
+--- @param id string The vault id
+--- @return Vault|nil # The removed vault
+function vaults.removeVault(owner, id)
+	if not Vaults[owner] then
+		return nil
+	end
+	local removedVault = utils.deepCopy(Vaults[owner][id])
+	Vaults[owner][id] = nil
+	return removedVault
+end
+
 --- Sets a vault
 --- @param target string The address of the owner
 --- @param id string The vault id
@@ -219,6 +231,7 @@ function vaults.setVault(target, id, vault)
 	end
 	-- set the vault
 	Vaults[target][id] = vault
+	vaults.scheduleNextVaultsPruning(vault.endTimestamp)
 	return vault
 end
 
@@ -231,25 +244,22 @@ function vaults.pruneVaults(currentTimestamp)
 		return {}
 	end
 
-	local allVaults = vaults.getVaults()
 	local prunedVaults = {}
 
 	-- reset the next prune timestamp, below will populate it with the next prune timestamp minimum
 	NextBalanceVaultsPruneTimestamp = nil
 
-	for owner, ownersVaults in pairs(allVaults) do
+	-- note: use unsafe to avoid copying all the vaults, directly update the vaults table
+	for owner, ownersVaults in pairs(vaults.getVaultsUnsafe()) do
 		for id, nestedVault in pairs(ownersVaults) do
 			if currentTimestamp >= nestedVault.endTimestamp then
 				balances.increaseBalance(owner, nestedVault.balance)
-				ownersVaults[id] = nil
-				prunedVaults[id] = nestedVault
+				prunedVaults[id] = vaults.removeVault(owner, id)
 			else
 				vaults.scheduleNextVaultsPruning(nestedVault.endTimestamp)
 			end
 		end
 	end
-	-- set the vaults to the updated vaults
-	Vaults = allVaults
 	return prunedVaults
 end
 
