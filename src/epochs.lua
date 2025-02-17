@@ -839,7 +839,7 @@ end
 --- @param sortBy string|nil The field to sort by
 --- @param sortOrder string The order to sort by
 --- @return PaginatedTable<PrescribedEpochDistribution> The paginated eligible distributions for the epoch
-function epochs.getEligibleDistributions(currentTimestamp, cursor, limit, sortBy, sortOrder)
+function epochs.getEligibleRewardsForEpoch(currentTimestamp, cursor, limit, sortBy, sortOrder)
 	local epochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp)
 	if epochIndex < 0 then
 		return {}
