@@ -580,7 +580,10 @@ function arns.assertValidArNSName(name)
 			.. constants.MAX_NAME_LENGTH
 			.. " characters."
 	)
-	assert(name:match(constants.ARNS_NAME_REGEX), "Name pattern is invalid. Must match " .. constants.ARNS_NAME_REGEX)
+	assert(
+		name:match(constants.ARNS_NAME_REGEX),
+		"Name pattern for " .. name .. " is invalid. Must match " .. constants.ARNS_NAME_REGEX
+	)
 end
 
 --- Asserts that a buy record is valid
@@ -700,12 +703,14 @@ end
 --- @param intendedAction IntendedAction The intended action to get token cost for
 --- @return TokenCostResult tokenCostResult The token cost result of the intended action
 function arns.getTokenCost(intendedAction)
+	local intent = intendedAction.intent
 	local tokenCost = 0
 	local purchaseType = intendedAction.purchaseType or "lease"
 	local years = tonumber(intendedAction.years)
 	local name = intendedAction.name
-	local baseFee = demand.baseFeeForNameLength(#name)
-	local intent = intendedAction.intent
+	local baseFee = demand.baseFeeForNameLength(
+		intent == "Primary-Name-Request" and constants.PRIMARY_NAME_REQUEST_DEFAULT_NAME_LENGTH or #name
+	)
 	local qty = tonumber(intendedAction.quantity)
 	local record = intendedAction.record or arns.getRecord(name)
 	local currentTimestamp = tonumber(intendedAction.currentTimestamp)

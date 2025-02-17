@@ -14,6 +14,60 @@ describe("Primary Names", function()
 		}
 	end)
 
+	describe("assertValidPrimaryName", function()
+		local validPrimaryNames = {
+			"1",
+			"a",
+			"1a",
+			"1-1",
+			"a-1",
+			"1-a",
+			("").rep("1", 51),
+			("").rep("a", 51),
+			-- undernames
+			"1_test",
+			"1234_test",
+			"fsakdjhflkasjdhflkaf_test",
+			("").rep("1", 61) .. "_t",
+			("").rep("a", 61) .. "_t",
+			"a_" .. ("").rep("1", 51),
+			"9_" .. ("").rep("z", 51),
+		}
+
+		for _, primaryName in ipairs(validPrimaryNames) do
+			it("should be a valid primary name", function()
+				local status, res = pcall(primaryNames.assertValidPrimaryName, primaryName)
+
+				assert(status == true, "Failed to validate name: " .. primaryName .. " error: " .. (res or ""))
+			end)
+		end
+
+		local invalidPrimaryNames = {
+			"%",
+			"#",
+			".",
+			"()",
+			"-",
+			"_",
+			"-_-",
+			"_-_",
+			"-a",
+			"_a",
+			"a-",
+			"a_a_",
+			"_a_a",
+			("").rep("1", 62) .. "_t",
+			"1_" .. ("").rep("a", 52),
+		}
+		for _, primaryName in ipairs(invalidPrimaryNames) do
+			it("should be a assert primary name is invalid", function()
+				local status, _ = pcall(primaryNames.assertValidPrimaryName, primaryName)
+
+				assert(status == false, "Primary name " .. primaryName .. " incorrectly shows as valid")
+			end)
+		end
+	end)
+
 	describe("createPrimaryNameRequest", function()
 		it("should fail if the arns record does not exist for the name", function()
 			local status, err =
@@ -156,6 +210,60 @@ describe("Primary Names", function()
 				assert.are.equal(400000, _G.Balances[ao.id])
 			end
 		)
+
+		local validPrimaryUndernameNames = {
+			"1_test",
+			"1234_test",
+			"fsakdjhflkasjdhflkaf_test",
+			("").rep("1", 61) .. "_t",
+			"a_" .. ("").rep("1", 51),
+		}
+
+		for _, primaryName in ipairs(validPrimaryUndernameNames) do
+			it(
+				"should create a primary name request with undername and transfer the cost from the initiator to the protocol balance",
+				function()
+					local baseName = primaryNames.baseNameForName(primaryName)
+					_G.Balances = {
+						["user-requesting-primary-name"] = 10000000,
+					}
+					_G.NameRegistry.records = {
+						[baseName] = {
+							startTimestamp = 0,
+							processId = "processId",
+							type = "lease",
+							endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
+						},
+					}
+					local primaryNameRequest = primaryNames.createPrimaryNameRequest(
+						primaryName,
+						"user-requesting-primary-name",
+						1234567890,
+						"test-msg-id"
+					)
+					assert.are.same({
+						request = {
+							name = primaryName,
+							startTimestamp = 1234567890,
+							endTimestamp = 1234567890 + 7 * 24 * 60 * 60 * 1000,
+						},
+						baseNameOwner = "processId",
+						fundingPlan = {
+							address = "user-requesting-primary-name",
+							balance = 400000, -- cost should be the undername cost for 1 year on a 51 character name of the same type, against the current demand factor
+							shortfall = 0,
+							stakes = {},
+						},
+						fundingResult = {
+							newWithdrawVaults = {},
+							totalFunded = 400000,
+						},
+					}, primaryNameRequest)
+					assert.are.equal(9600000, _G.Balances["user-requesting-primary-name"])
+					assert.are.equal(400000, _G.Balances[ao.id])
+				end
+			)
+		end
 	end)
 
 	describe("approvePrimaryNameRequest", function()

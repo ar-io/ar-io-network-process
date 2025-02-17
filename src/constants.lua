@@ -113,6 +113,8 @@ constants.MIN_TOKEN_LOCK_TIME_MS = constants.daysToMs(14) -- The minimum amount 
 -- ARNS
 constants.DEFAULT_UNDERNAME_COUNT = 10
 constants.MAX_NAME_LENGTH = 51 -- protects against invalid URLs when resolving arns names on gateways
+constants.MAX_UNDERNAME_LENGTH = 61
+constants.MAX_PRIMARY_NAME_LENGTH = 63
 constants.MIN_NAME_LENGTH = 1
 -- Regex pattern to validate ARNS names:
 -- - Starts with an alphanumeric character (%w)
