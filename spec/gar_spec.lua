@@ -11,7 +11,7 @@ local minOperatorStake = 10000000000 -- 10,000 ARIO
 local operatorLeaveLengthMs = 90 * 24 * 60 * 60 * 1000 -- 90 days
 local delegateLeaveLengthMs = 90 * 24 * 60 * 60 * 1000 -- 90 days
 local minimumTenureWeightForDiscount = 1
-local minimumPerformanceRateForDiscount = 0.85
+local minimumPerformanceRateForDiscount = 0.90
 local testSettings = {
 	fqdn = "test.com",
 	protocol = "https",
@@ -1904,7 +1904,7 @@ describe("gar", function()
 				weights = testGateway.weights,
 			}
 			local timestamp = 100
-			local expectedTenureWeight = timestamp / gar.getSettings().observers.tenureWeightPeriod
+			local expectedTenureWeight = timestamp / gar.getSettings().observers.tenureWeightDurationMs
 			local expectedStakeWeight = 1
 			-- NOTE: we increment by one to avoid division by zero
 			local expectedObserverRatioWeight = 2 / 4 -- (the stats are 1/3)

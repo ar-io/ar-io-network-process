@@ -64,6 +64,9 @@ local function AOEvent(initialData)
 					.. type(value)
 					.. ". Supported types are string, number, boolean, or nil."
 			)
+			if type(value) == "table" then
+				print("Invalid field value: " .. json.encode(value))
+			end
 			return self
 		end
 		self.data[trainCase and utils.toTrainCase(key) or key] = value

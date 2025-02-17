@@ -77,8 +77,8 @@ local epochs = {}
 --- @field rewards DistributedEpochRewards The rewards for the epoch, including eligible and distributed rewards
 
 Epochs = Epochs or {}
-EpochSettings = EpochSettings or constants.DEFAULT_EPOCH_SETTINGS
-DistributionSettings = DistributionSettings or constants.DEFAULT_DISTRIBUTION_SETTINGS
+EpochSettings = EpochSettings or utils.deepCopy(constants.DEFAULT_EPOCH_SETTINGS)
+DistributionSettings = DistributionSettings or utils.deepCopy(constants.DEFAULT_DISTRIBUTION_SETTINGS)
 
 --- Gets an epoch by index
 --- @param epochIndex number The epoch index
@@ -147,19 +147,6 @@ function epochs.getPrescribedObserversWithWeightsForEpoch(epochIndex)
 	return prescribedObserversWithWeights
 end
 
---- Gets the eligible rewards for an epoch
---- @param epochIndex number The epoch index
---- @return PrescribedEpochRewards # The eligible rewards for the epoch
-function epochs.getEligibleRewardsForEpoch(epochIndex)
-	local epoch = epochs.getEpoch(epochIndex)
-	local eligible = epoch
-			and epoch.distributions
-			and epoch.distributions.rewards
-			and epoch.distributions.rewards.eligible
-		or {}
-	return eligible
-end
-
 --- Gets the observations for an epoch
 --- @param epochIndex number The epoch index
 --- @return Observations # The observations for the epoch
@@ -180,29 +167,6 @@ function epochs.getDistributionsForEpoch(epochIndex)
 	end
 	local epoch = epochs.getEpoch(epochIndex)
 	return epoch and epoch.distributions or {}
-end
-
---- @class EligibleRewardTotals
---- @field totalEligibleGateways number The total eligible gateways
---- @field totalEligibleRewards number The total eligible rewards
---- @field totalEligibleGatewayReward number The total eligible gateway reward
---- @field totalEligibleObserverReward number The total eligible observer reward
-
--- TODO: Replace getDistributionsForEpoch function with this once network portal uses paginated handler
---- @param epochIndex number The epoch index
---- @return EligibleRewardTotals | nil # The totals for the eligible rewards for the epoch
-function epochs.getTotalEligibleRewardsForEpoch(epochIndex)
-	local epoch = epochs.getEpochUnsafe(epochIndex)
-	if not epoch or not epoch.distributions then
-		return nil
-	end
-
-	return {
-		totalEligibleGateways = epoch.distributions.totalEligibleGateways,
-		totalEligibleRewards = epoch.distributions.totalEligibleRewards,
-		totalEligibleGatewayReward = epoch.distributions.totalEligibleGatewayReward,
-		totalEligibleObserverReward = epoch.distributions.totalEligibleObserverReward,
-	}
 end
 
 --- Gets the prescribed names for an epoch
@@ -298,7 +262,8 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	local prescribedObserversLookup = {}
 	-- use ipairs as weightedObservers in array
 	for _, observer in ipairs(weightedGateways) do
-		if observer.normalizedCompositeWeight > 0 then
+		-- for the first epoch, we need to include all observers as there are no weights yet
+		if epochIndex == 0 or observer.normalizedCompositeWeight > 0 then
 			table.insert(filteredObservers, observer)
 		end
 	end
@@ -532,8 +497,8 @@ function epochs.saveObservations(observerAddress, reportTxId, failedGatewayAddre
 end
 
 --- @class DistributionSettings
---- @field gatewayOperatorRewardRatio number The gateway operator reward ratio
---- @field observerRewardRatio number The observer reward ratio
+--- @field gatewayOperatorRewardRate number The gateway operator reward ratio
+--- @field observerRewardRate number The observer reward ratio
 --- @field rewardDecayStartEpoch number The reward decay start epoch
 --- @field rewardDecayLastEpoch number The reward decay last epoch
 --- @field maximumRewardRate number The maximum reward rate
@@ -571,13 +536,13 @@ function epochs.computeTotalEligibleRewardsForEpoch(epochIndex, prescribedObserv
 	local totalEligibleRewards = math.floor(protocolBalance * rewardRate)
 	local eligibleGatewayReward = #activeGatewayAddresses > 0
 			and math.floor(
-				totalEligibleRewards * distributionSettings.gatewayOperatorRewardRatio / #activeGatewayAddresses
+				totalEligibleRewards * distributionSettings.gatewayOperatorRewardRate / #activeGatewayAddresses
 			)
 		or 0
 	local eligibleObserverReward = utils.lengthOfTable(prescribedObserversLookup) > 0
 			and math.floor(
 				totalEligibleRewards
-					* distributionSettings.observerRewardRatio
+					* distributionSettings.observerRewardRate
 					/ utils.lengthOfTable(prescribedObserversLookup)
 			)
 		or 0
@@ -677,6 +642,7 @@ function epochs.distributeEpoch(epochIndexToDistribute, currentTimestamp)
 	local epochToDistributeFailureSummaries = epochToDistribute.observations
 			and epochToDistribute.observations.failureSummaries
 		or {}
+	local missedObservationPenaltyRate = epochs.getDistributionSettings().missedObservationPenaltyRate
 	local distributed = {}
 	for gatewayAddress, totalEligibleRewardsForGateway in pairs(eligibleGatewaysForEpoch) do
 		local gateway = gar.getGateway(gatewayAddress)
@@ -722,7 +688,8 @@ function epochs.distributeEpoch(epochIndexToDistribute, currentTimestamp)
 							math.floor(totalEligibleGatewayReward + totalEligibleObserverReward)
 					else
 						-- 2. gateway passed and was prescribed and did not submit an observation - it gets only the gateway reward, docked by 25%
-						earnedRewardForGatewayAndDelegates = math.floor(totalEligibleGatewayReward * 0.75)
+						earnedRewardForGatewayAndDelegates =
+							math.floor(totalEligibleGatewayReward * (1 - missedObservationPenaltyRate))
 					end
 				else
 					-- 3. gateway passed and was not prescribed -- it gets full gateway reward
@@ -872,7 +839,7 @@ end
 --- @param sortBy string|nil The field to sort by
 --- @param sortOrder string The order to sort by
 --- @return PaginatedTable<PrescribedEpochDistribution> The paginated eligible distributions for the epoch
-function epochs.getEligibleDistributions(currentTimestamp, cursor, limit, sortBy, sortOrder)
+function epochs.getEligibleRewardsForEpoch(currentTimestamp, cursor, limit, sortBy, sortOrder)
 	local epochIndex = epochs.getEpochIndexForTimestamp(currentTimestamp)
 	if epochIndex < 0 then
 		return {}

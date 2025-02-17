@@ -65,7 +65,7 @@ local ActionMap = {
 	PrescribedNames = "Epoch-Prescribed-Names",
 	Observations = "Epoch-Observations",
 	Distributions = "Epoch-Distributions",
-	EligibleDistributions = "Eligible-Distributions",
+	EpochRewards = "Epoch-Eligible-Rewards",
 	--- Vaults
 	Vault = "Vault",
 	Vaults = "Vaults",
@@ -1990,12 +1990,6 @@ addEventingHandler(ActionMap.Record, utils.hasMatchingTag("Action", ActionMap.Re
 	Send(msg, recordNotice)
 end)
 
----[[
---- TODO: this handler will not scale well as gateways and delegates increase,
---- slice out the larger pieces (e.g. distributions should be fetched via a paginated handler)
----
---- This has downstream effects on the network portal, which loads the entire epoch data for each epoch
----]]
 addEventingHandler(ActionMap.Epoch, utils.hasMatchingTag("Action", ActionMap.Epoch), function(msg)
 	-- check if the epoch number is provided, if not get the epoch number from the timestamp
 	local epochIndex = msg.Tags["Epoch-Index"] and tonumber(msg.Tags["Epoch-Index"])
@@ -2063,27 +2057,23 @@ addEventingHandler(ActionMap.Distributions, utils.hasMatchingTag("Action", Actio
 	})
 end)
 
-addEventingHandler(
-	"eligibleDistributions",
-	utils.hasMatchingTag("Action", ActionMap.EligibleDistributions),
-	function(msg)
-		local page = utils.parsePaginationTags(msg)
+addEventingHandler("epochRewards", utils.hasMatchingTag("Action", ActionMap.EpochRewards), function(msg)
+	local page = utils.parsePaginationTags(msg)
 
-		local eligibleDistributions = epochs.getEligibleDistributions(
-			msg.Timestamp,
-			page.cursor,
-			page.limit,
-			page.sortBy or "cursorId",
-			page.sortOrder
-		)
+	local epochRewards = epochs.getEligibleRewardsForEpoch(
+		msg.Timestamp,
+		page.cursor,
+		page.limit,
+		page.sortBy or "cursorId",
+		page.sortOrder
+	)
 
-		Send(msg, {
-			Target = msg.From,
-			Action = "Eligible-Distributions-Notice",
-			Data = json.encode(eligibleDistributions),
-		})
-	end
-)
+	Send(msg, {
+		Target = msg.From,
+		Action = "Epoch-Eligible-Rewards-Notice",
+		Data = json.encode(epochRewards),
+	})
+end)
 
 addEventingHandler("paginatedReservedNames", utils.hasMatchingTag("Action", ActionMap.ReservedNames), function(msg)
 	local page = utils.parsePaginationTags(msg)

@@ -9,7 +9,7 @@ describe('Balances', async () => {
       address: PROCESS_OWNER,
       memory: startMemory,
     });
-    assert.equal(balance, 950000000000000);
+    assert.equal(balance, 935000000000000);
   });
 
   it('should return 0 for a non-existent address', async () => {
@@ -22,6 +22,6 @@ describe('Balances', async () => {
 
   it('should return dictionary of all balances', async () => {
     const balances = await getBalances({ memory: startMemory });
-    assert.equal(balances[PROCESS_OWNER], 950000000000000);
+    assert.equal(balances[PROCESS_OWNER], 935000000000000);
   });
 });

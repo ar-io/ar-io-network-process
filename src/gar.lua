@@ -76,9 +76,8 @@ local gar = {}
 GatewayRegistry = GatewayRegistry or {}
 
 --- @class ObserverSettings
---- @field maxPerEpoch number
 --- @field tenureWeightDays number
---- @field tenureWeightPeriod number
+--- @field tenureWeightDurationMs number
 --- @field maxTenureWeight number
 
 --- @class OperatorSettings
@@ -86,8 +85,8 @@ GatewayRegistry = GatewayRegistry or {}
 --- @field withdrawLengthMs number
 --- @field leaveLengthMs number
 --- @field failedEpochCountMax number
---- @field failedEpochSlashRate number
---- @field maxDelegateRewardShareRatio number
+--- @field failedGatewaySlashRate number
+--- @field maxDelegateRewardSharePct number
 --- @class ExpeditedWithdrawalsSettings
 --- @field minExpeditedWithdrawalPenaltyRate number
 --- @field maxExpeditedWithdrawalPenaltyRate number
@@ -719,8 +718,9 @@ function gar.getGatewayWeightsAtTimestamp(gatewayAddresses, timestamp)
 			local totalTimeForGateway = timestamp >= gatewayStartTimestamp and (timestamp - gatewayStartTimestamp) or -1
 			local calculatedTenureWeightForGateway = totalTimeForGateway < 0 and 0
 				or (
-					totalTimeForGateway > 0 and totalTimeForGateway / gar.getSettings().observers.tenureWeightPeriod
-					or 1 / gar.getSettings().observers.tenureWeightPeriod
+					totalTimeForGateway > 0
+						and totalTimeForGateway / gar.getSettings().observers.tenureWeightDurationMs
+					or 1 / gar.getSettings().observers.tenureWeightDurationMs
 				)
 			local gatewayTenureWeight =
 				math.min(calculatedTenureWeightForGateway, gar.getSettings().observers.maxTenureWeight)
@@ -821,9 +821,9 @@ function gar.assertValidGatewayParameters(from, stake, settings, services, obser
 			type(settings.delegateRewardShareRatio) == "number"
 				and utils.isInteger(settings.delegateRewardShareRatio)
 				and settings.delegateRewardShareRatio >= 0
-				and settings.delegateRewardShareRatio <= gar.getSettings().operators.maxDelegateRewardShareRatio,
+				and settings.delegateRewardShareRatio <= gar.getSettings().operators.maxDelegateRewardSharePct,
 			"delegateRewardShareRatio must be an integer between 0 and "
-				.. gar.getSettings().operators.maxDelegateRewardShareRatio
+				.. gar.getSettings().operators.maxDelegateRewardSharePct
 		)
 	end
 	if settings.autoStake ~= nil then
@@ -1048,7 +1048,7 @@ function gar.pruneGateways(currentTimestamp, msgId)
 			then
 				-- slash the minimum operator stake and return it to the protocol balance; mark the gateway as leaving which will vault remaining stake
 				local slashableOperatorStake = math.min(gateway.operatorStake, garSettings.operators.minStake)
-				local slashAmount = math.floor(slashableOperatorStake * garSettings.operators.failedEpochSlashRate)
+				local slashAmount = math.floor(slashableOperatorStake * garSettings.operators.failedGatewaySlashRate)
 				result.delegateStakeWithdrawing = result.delegateStakeWithdrawing + gateway.totalDelegatedStake
 				result.gatewayStakeWithdrawing = result.gatewayStakeWithdrawing + (gateway.operatorStake - slashAmount)
 				gar.slashOperatorStake(gatewayAddress, slashAmount, currentTimestamp)

@@ -24,7 +24,10 @@
     "lint-staged": "^15.2.10",
     "p-limit": "^6.2.0",
     "prettier": "^3.3.2",
-    "testcontainers": "^10.13.1"
+    "testcontainers": "^10.13.1",
+    "ts-node": "^10.9.2",
+    "ts-node-esm": "^0.0.6",
+    "yargs": "^17.7.2"
   },
   "lint-staged": {
     "*.lua": [

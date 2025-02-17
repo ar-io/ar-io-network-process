@@ -7,6 +7,7 @@ describe("Primary Names", function()
 			names = {},
 			requests = {},
 		}
+		_G.DemandFactor.currentDemandFactor = 1
 		_G.Balances = {}
 		_G.NameRegistry = {
 			records = {},
@@ -142,7 +143,7 @@ describe("Primary Names", function()
 					baseNameOwner = "processId",
 					fundingPlan = {
 						address = "user-requesting-primary-name",
-						balance = 400000, -- cost should be the undername cost for 1 year on a 51 character name of the same type
+						balance = 400000, -- cost should be the undername cost for 1 year on a 51 character name of the same type, against the current demand factor
 						shortfall = 0,
 						stakes = {},
 					},

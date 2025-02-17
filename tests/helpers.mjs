@@ -1057,6 +1057,17 @@ export const extendLease = async ({
   };
 };
 
+export const getDemandFactorInfo = async ({ memory, timestamp }) => {
+  const result = await handle({
+    options: {
+      Tags: [{ name: 'Action', value: 'Demand-Factor-Info' }],
+      Timestamp: timestamp,
+    },
+    memory,
+  });
+  return JSON.parse(result.Messages[0].Data);
+};
+
 export const getTokenCost = async ({
   from = STUB_ADDRESS,
   memory,
@@ -1118,13 +1129,13 @@ export const increaseUndernameLimit = async ({
   };
 };
 
-export const getEligibleDistributions = async ({ memory, timestamp }) => {
+export const getEligibleRewardsForEpoch = async ({ memory, timestamp }) => {
   const result = await handle({
     options: {
       Tags: [
         {
           name: 'Action',
-          value: 'Eligible-Distributions',
+          value: 'Epoch-Eligible-Rewards',
         },
       ],
     },

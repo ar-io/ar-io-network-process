@@ -3,6 +3,7 @@ local balances = require("balances")
 local utils = require("utils")
 local gar = require("gar")
 local constants = require("constants")
+local demand = require("demand")
 local primaryNames = {}
 
 --- @alias WalletAddress string
@@ -95,11 +96,12 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 
 	--- transfer the primary name cost from the initiator to the protocol balance
 	balances.increaseBalance(ao.id, requestCost.tokenCost)
+	demand.tallyNamePurchase(requestCost.tokenCost)
 
 	local request = {
 		name = name,
 		startTimestamp = timestamp,
-		endTimestamp = timestamp + constants.daysToMs(7),
+		endTimestamp = timestamp + constants.PRIMARY_NAME_REQUEST_DURATION_MS,
 	}
 
 	--- if the initiator is base name owner, then just set the primary name and return

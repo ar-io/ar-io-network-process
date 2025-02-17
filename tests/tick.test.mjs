@@ -4,10 +4,8 @@ import {
   DEFAULT_HANDLE_OPTIONS,
   STUB_ADDRESS,
   PROCESS_ID,
-  STUB_TIMESTAMP,
   INITIAL_OPERATOR_STAKE,
   INITIAL_DELEGATE_STAKE,
-  STUB_HASH_CHAIN,
 } from '../tools/constants.mjs';
 import {
   getBaseRegistrationFeeForName,
@@ -77,7 +75,7 @@ describe('Tick', async () => {
     const buyRecordData = JSON.parse(realRecord.Messages[0].Data);
     assert.deepEqual(buyRecordData, {
       processId: ''.padEnd(43, 'a'),
-      purchasePrice: 600000000,
+      purchasePrice: 1200000000,
       type: 'lease',
       undernameLimit: 10,
       startTimestamp: buyRecordData.startTimestamp,
@@ -394,7 +392,7 @@ describe('Tick', async () => {
     });
 
     // get the epoch timestamp and assert it is in 24 hours
-    const protocolBalanceAtStartOfEpoch = 50_000_000_000_000; // 50M ARIO
+    const protocolBalanceAtStartOfEpoch = 65_000_000_000_000; // 65M ARIO
     const totalEligibleRewards = protocolBalanceAtStartOfEpoch * 0.001; // 0.1% of the protocol balance for the first 365 epochs
     const totalGatewayRewards = Math.ceil(totalEligibleRewards * 0.9); // 90% go to gateways
     const totalObserverRewards = Math.floor(totalEligibleRewards * 0.1); // 10% go to observers
@@ -509,9 +507,9 @@ describe('Tick', async () => {
           eligible: {
             '2222222222222222222222222222222222222222222': {
               delegateRewards: {
-                'delegate-address-11111111111111111111111111': 12500000000,
+                'delegate-address-11111111111111111111111111': 16250000000,
               },
-              operatorReward: 37500000000,
+              operatorReward: 48750000000,
             },
           },
           distributed: {
@@ -637,14 +635,14 @@ describe('Tick', async () => {
       memory: firstDemandFactorPeriodTick.memory,
       timestamp: demandFactorSettings.periodZeroStartTimestamp,
     });
-    assert.equal(initialDemandFactor, 1);
+    assert.equal(initialDemandFactor, 2);
 
     // get the base registration fee at the beginning of the demand factor period
     const genesisFee = await getBaseRegistrationFeeForName({
       memory: firstDemandFactorPeriodTick.memory,
       timestamp: demandFactorSettings.periodZeroStartTimestamp,
     });
-    assert.equal(genesisFee, 600_000_000);
+    assert.equal(genesisFee, 1_200_000_000);
 
     const fundedUser = 'funded-user-'.padEnd(43, '1');
     const processId = 'process-id-'.padEnd(43, '1');
@@ -689,12 +687,12 @@ describe('Tick', async () => {
         timestamp: nextDemandFactorPeriodTimestamp / 2,
       });
 
-    assert.equal(feeDuringFirstDemandFactorPeriod, 600_000_000);
+    assert.equal(feeDuringFirstDemandFactorPeriod, 1_200_000_000);
     const firstPeriodDemandFactor = await getDemandFactor({
       memory: firstDemandFactorPeriodMidTick.memory,
       timestamp: nextDemandFactorPeriodTimestamp,
     });
-    assert.equal(firstPeriodDemandFactor, 1);
+    assert.equal(firstPeriodDemandFactor, 2);
 
     // Tick to the end of the first demand factor period
     const nextDemandFactorPeriodTick = await tick({
@@ -706,16 +704,19 @@ describe('Tick', async () => {
       memory: nextDemandFactorPeriodTick.memory,
       timestamp: nextDemandFactorPeriodTimestamp,
     });
-    assert.equal(nextDemandFactorPeriodDemandFactor, 1.0500000000000000444);
+    assert.equal(nextDemandFactorPeriodDemandFactor, 2.1000000000000000888);
     // assert the demand factor is applied to the base registration fee for a name
     const nextDemandFactorPeriodFee = await getBaseRegistrationFeeForName({
       memory: nextDemandFactorPeriodTick.memory,
       timestamp: nextDemandFactorPeriodTimestamp,
     });
-    assert.equal(nextDemandFactorPeriodFee, 630_000_000);
+    assert.equal(nextDemandFactorPeriodFee, 1_260_000_000);
   });
 
   it('should reset to baseRegistrationFee when demandFactor is 0.5 for consecutive epochs', async () => {
+    const currentDemandFactor = await getDemandFactor({
+      memory: sharedMemory,
+    });
     const demandFactorSettings = await getDemandFactorSettings({
       memory: sharedMemory,
     });
@@ -729,12 +730,22 @@ describe('Tick', async () => {
         memory: zeroPeriodDemandFactorTick.memory,
         timestamp: demandFactorSettings.periodZeroStartTimestamp,
       });
-    assert.equal(baseFeeAtFirstDemandFactorPeriod, 600_000_000);
+    assert.equal(baseFeeAtFirstDemandFactorPeriod, 1_200_000_000);
 
     let tickMemory = zeroPeriodDemandFactorTick.memory;
 
+    // compute the periods until we get to 0.5 from the current demand factor
+    const periodsUntilMinDemandFactor =
+      Math.ceil(
+        Math.log(demandFactorSettings.demandFactorMin) /
+          Math.log(1 - demandFactorSettings.demandFactorDownAdjustmentRate),
+      ) * currentDemandFactor; // we multiply by 2 because we start with 2 demand factor
+    const periodsUntilDemandFactorReset =
+      periodsUntilMinDemandFactor +
+      demandFactorSettings.maxPeriodsAtMinDemandFactor;
+
     // Tick to the epoch where demandFactor is 0.5
-    for (let i = 0; i <= 49; i++) {
+    for (let i = 0; i <= periodsUntilDemandFactorReset; i++) {
       const nextDemandFactorPeriodTimestamp =
         demandFactorSettings.periodZeroStartTimestamp +
         demandFactorSettings.periodLengthMs * i;
@@ -745,15 +756,22 @@ describe('Tick', async () => {
 
       tickMemory = nextDemandFactorPeriodTick.memory;
 
-      if (i === 45) {
+      if (i === periodsUntilMinDemandFactor - 1) {
         const demandFactor = await getDemandFactor({
           memory: tickMemory,
           timestamp: nextDemandFactorPeriodTimestamp,
         });
-        assert.equal(demandFactor, 0.50656); // rounded to 5 decimal places
+        assert.equal(demandFactor, 0.50552); // rounded to 5 decimal places
       }
 
-      if ([46, 47, 48].includes(i)) {
+      // the three periods before the demand factor resets to 0.5 should have a demand factor of 0.5
+      if (
+        [
+          periodsUntilDemandFactorReset - 1,
+          periodsUntilDemandFactorReset - 2,
+          periodsUntilDemandFactorReset - 3,
+        ].includes(i)
+      ) {
         const demandFactor = await getDemandFactor({
           memory: tickMemory,
           timestamp: nextDemandFactorPeriodTimestamp,
