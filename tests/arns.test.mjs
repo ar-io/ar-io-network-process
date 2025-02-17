@@ -379,7 +379,7 @@ describe('ArNS', async () => {
         fundingPlan: {
           address: testNewAddress,
           balance: 400_000_000,
-          shortfall: 800_000_000,
+          shortfall: 560_000_000,
           stakes: [],
         },
       });
@@ -416,7 +416,7 @@ describe('ArNS', async () => {
         fundingPlan: {
           address: testNewAddress,
           balance: 400_000_000,
-          shortfall: 800_000_000,
+          shortfall: 560_000_000,
           stakes: [],
         },
       });
@@ -438,7 +438,7 @@ describe('ArNS', async () => {
         intent: 'Increase-Undername-Limit',
         memory: buyRecordResult.Memory,
       });
-      const expectedPrice = 500000000 * 0.001 * 2; // one year lease at 0.1% for an undername * demand factor of 2
+      const expectedPrice = 400000000 * 0.001 * 2; // one year lease at 0.1% for an undername * demand factor of 2
       assert.equal(result.tokenCost, expectedPrice);
     });
 
@@ -459,7 +459,7 @@ describe('ArNS', async () => {
         years: 2,
         memory: buyRecordResult.Memory,
       });
-      assert.equal(result.tokenCost, 400000000); // known cost for extending a 9 character name by 2 years (500 ARIO * 0.2 * 2) * 2 (DemandFactor)
+      assert.equal(result.tokenCost, 320000000); // known cost for extending a 9 character name by 2 years (400 ARIO * 0.2 * 2) * 2 (DemandFactor)
     });
 
     it('should get the cost of upgrading an existing leased record to permanently owned', async () => {
@@ -726,7 +726,7 @@ describe('ArNS', async () => {
           startTimestamp: buyRecordTimestamp,
           processId: ''.padEnd(43, 'a'),
           undernameLimit: 10,
-          purchasePrice: 5000000000, // expected price for a permanent 9 character name
+          purchasePrice: 4000000000, // expected price for a permanent 9 character name
         },
       );
       sharedMemory = upgradeNameResult.Memory;
@@ -837,7 +837,7 @@ describe('ArNS', async () => {
         startTimestamp: newBuyTimestamp,
         undernameLimit: 10,
         type: 'permabuy',
-        baseRegistrationFee: 500000000,
+        baseRegistrationFee: 400000000,
         returnedName: {
           initiator: 'ant-owner-000000000000000000000000000000000',
           rewardForInitiator: Math.floor(expectedPurchasePrice * 0.5),
@@ -1089,7 +1089,7 @@ describe('ArNS', async () => {
             rewardForProtocol: expectedPurchasePrice,
           },
           remainingBalance: 0,
-          baseRegistrationFee: 500000000,
+          baseRegistrationFee: 400000000,
         },
       });
 
@@ -1514,7 +1514,7 @@ describe('ArNS', async () => {
     describe('for an existing record', () => {
       let buyRecordMemory;
       let buyRecordTimestamp;
-      const baseFeeForName = 500000000;
+      const baseFeeForTenLetterName = 350000000;
       before(async () => {
         buyRecordTimestamp = afterDistributionTimestamp;
         const { result: buyRecordResult } = await buyRecord({
@@ -1575,7 +1575,8 @@ describe('ArNS', async () => {
             memory: buyRecordMemory,
             timestamp: extendLeaseTimestamp,
           });
-          baseFeeForOneYearExtension = baseFeeForName * 0.2 * demandFactor;
+          baseFeeForOneYearExtension =
+            baseFeeForTenLetterName * 0.2 * demandFactor;
         });
 
         it('should apply the discount to extending the lease for an eligible gateway', async () => {
@@ -1711,7 +1712,10 @@ describe('ArNS', async () => {
             timestamp: afterDistributionTimestamp,
           });
           undernameCostForName =
-            baseFeeForName * 0.001 * increaseUndernameQty * demandFactor;
+            baseFeeForTenLetterName *
+            0.001 *
+            increaseUndernameQty *
+            demandFactor;
         });
 
         it('should apply the discount to increasing the undername limit for an eligible gateway', async () => {

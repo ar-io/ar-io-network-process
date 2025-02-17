@@ -75,7 +75,7 @@ describe('Tick', async () => {
     const buyRecordData = JSON.parse(realRecord.Messages[0].Data);
     assert.deepEqual(buyRecordData, {
       processId: ''.padEnd(43, 'a'),
-      purchasePrice: 1200000000,
+      purchasePrice: 960000000,
       type: 'lease',
       undernameLimit: 10,
       startTimestamp: buyRecordData.startTimestamp,
@@ -642,7 +642,7 @@ describe('Tick', async () => {
       memory: firstDemandFactorPeriodTick.memory,
       timestamp: demandFactorSettings.periodZeroStartTimestamp,
     });
-    assert.equal(genesisFee, 1_200_000_000);
+    assert.equal(genesisFee, 840_000_000);
 
     const fundedUser = 'funded-user-'.padEnd(43, '1');
     const processId = 'process-id-'.padEnd(43, '1');
@@ -687,7 +687,7 @@ describe('Tick', async () => {
         timestamp: nextDemandFactorPeriodTimestamp / 2,
       });
 
-    assert.equal(feeDuringFirstDemandFactorPeriod, 1_200_000_000);
+    assert.equal(feeDuringFirstDemandFactorPeriod, 840_000_000);
     const firstPeriodDemandFactor = await getDemandFactor({
       memory: firstDemandFactorPeriodMidTick.memory,
       timestamp: nextDemandFactorPeriodTimestamp,
@@ -710,7 +710,7 @@ describe('Tick', async () => {
       memory: nextDemandFactorPeriodTick.memory,
       timestamp: nextDemandFactorPeriodTimestamp,
     });
-    assert.equal(nextDemandFactorPeriodFee, 1_260_000_000);
+    assert.equal(nextDemandFactorPeriodFee, 882_000_000);
   });
 
   it('should reset to baseRegistrationFee when demandFactor is 0.5 for consecutive epochs', async () => {
@@ -730,7 +730,7 @@ describe('Tick', async () => {
         memory: zeroPeriodDemandFactorTick.memory,
         timestamp: demandFactorSettings.periodZeroStartTimestamp,
       });
-    assert.equal(baseFeeAtFirstDemandFactorPeriod, 1_200_000_000);
+    assert.equal(baseFeeAtFirstDemandFactorPeriod, 840_000_000);
 
     let tickMemory = zeroPeriodDemandFactorTick.memory;
 
@@ -793,7 +793,7 @@ describe('Tick', async () => {
       });
 
     assert.equal(demandFactorAfterFeeAdjustment, 1);
-    assert.equal(baseFeeAfterConsecutiveTicksWithNoPurchases, 300_000_000);
+    assert.equal(baseFeeAfterConsecutiveTicksWithNoPurchases, 210_000_000);
     sharedMemory = tickMemory;
     lastTimestamp = demandFactorReadjustFeesTimestamp;
   });
