@@ -453,7 +453,7 @@ local function assertAndSanitizeInputs(msg)
 		-- assert data size is less than or equal to 100 bytes, we dont use msg.Data
 
 		if type(msg.Data) == "table" then
-			assertTableBytesLowerThan(msg.Data, 101)
+			assertTableBytesLowerThan(msg.Data, 100)
 		else
 			assert(#msg.Data <= 100, "Data size is too large")
 		end
