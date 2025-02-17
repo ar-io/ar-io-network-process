@@ -1686,7 +1686,7 @@ addEventingHandler("totalSupply", utils.hasMatchingTag("Action", ActionMap.Total
 	msg.ioEvent:addField("Last-Known-Total-Token-Supply", token.lastKnownTotalTokenSupply())
 	Send(msg, {
 		Action = "Total-Supply",
-		Data = tostring(10),
+		Data = tostring(totalSupplyDetails.totalSupply),
 		Ticker = Ticker,
 	})
 end)
