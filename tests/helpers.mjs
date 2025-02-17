@@ -364,6 +364,34 @@ export const getDelegations = async ({ memory, address, timestamp }) => {
   return JSON.parse(result.Messages?.[0]?.Data);
 };
 
+export const getVault = async ({
+  memory,
+  address,
+  vaultId,
+  timestamp = STUB_TIMESTAMP,
+  assertNoResultError = true,
+}) => {
+  const result = await handle({
+    options: {
+      Tags: [
+        { name: 'Action', value: 'Vault' },
+        { name: 'Address', value: address },
+        { name: 'Vault-Id', value: vaultId },
+      ],
+    },
+    memory,
+    timestamp,
+    shouldAssertNoResultError: assertNoResultError,
+  });
+  if (
+    !result.Messages?.[0]?.Data ||
+    result.Messages[0].Data.includes('not found')
+  ) {
+    return undefined;
+  }
+  return JSON.parse(result.Messages[0].Data);
+};
+
 export const getVaults = async ({
   memory,
   cursor,
