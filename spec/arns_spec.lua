@@ -47,6 +47,8 @@ local testGateway = {
 	status = "joined",
 	observerAddress = stubObserverAddress,
 }
+local baseFee = 400000000
+local basePriceForNineLetterName = 480000000
 
 describe("arns", function()
 	local timestamp = 0
@@ -144,7 +146,7 @@ describe("arns", function()
 						arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId, "msgId")
 
 					assert.are.same({
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						type = "lease",
 						undernameLimit = 10,
 						processId = testProcessId,
@@ -153,7 +155,7 @@ describe("arns", function()
 					}, result.record)
 					assert.are.same({
 						["test-name"] = {
-							purchasePrice = 600000000,
+							purchasePrice = basePriceForNineLetterName,
 							type = "lease",
 							undernameLimit = 10,
 							processId = testProcessId,
@@ -161,9 +163,9 @@ describe("arns", function()
 							endTimestamp = timestamp + constants.yearsToMs(1),
 						},
 					}, _G.NameRegistry.records)
-					assert.are.equal(startBalance - 600000000, _G.Balances[testAddress])
-					assert.are.equal(600000000, _G.Balances[_G.ao.id])
-					assert.are.equal(demandBefore + 600000000, demand.getCurrentPeriodRevenue())
+					assert.are.equal(startBalance - basePriceForNineLetterName, _G.Balances[testAddress])
+					assert.are.equal(basePriceForNineLetterName, _G.Balances[_G.ao.id])
+					assert.are.equal(demandBefore + basePriceForNineLetterName, demand.getCurrentPeriodRevenue())
 					assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 				end
 			)
@@ -185,7 +187,8 @@ describe("arns", function()
 
 					local demandBefore = demand.getCurrentPeriodRevenue()
 					local purchasesBefore = demand.getCurrentPeriodPurchases()
-					local discountTotal = 600000000 - (math.floor(600000000 * operatorDiscountRate))
+					local discountTotal = basePriceForNineLetterName
+						- (math.floor(basePriceForNineLetterName * operatorDiscountRate))
 
 					local buyRecordResult =
 						arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId, "msg-id")
@@ -222,7 +225,7 @@ describe("arns", function()
 					local result =
 						arns.buyRecord("test-name", nil, nil, testAddress, timestamp, testProcessId, "msg-id")
 					assert.are.same({
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						type = "lease",
 						undernameLimit = 10,
 						processId = testProcessId,
@@ -230,7 +233,7 @@ describe("arns", function()
 						endTimestamp = timestamp + constants.yearsToMs(1),
 					}, result.record)
 					assert.are.same({
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						type = "lease",
 						undernameLimit = 10,
 						processId = testProcessId,
@@ -240,15 +243,15 @@ describe("arns", function()
 
 					assert.is.equal(
 						_G.Balances[testAddress],
-						startBalance - 600000000,
+						startBalance - basePriceForNineLetterName,
 						"Balance should be reduced by the purchase price"
 					)
 					assert.is.equal(
 						_G.Balances[_G.ao.id],
-						600000000,
+						basePriceForNineLetterName,
 						"Protocol balance should be increased by the purchase price"
 					)
-					assert.are.equal(demandBefore + 600000000, demand.getCurrentPeriodRevenue())
+					assert.are.equal(demandBefore + basePriceForNineLetterName, demand.getCurrentPeriodRevenue())
 					assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 				end
 			)
@@ -264,7 +267,7 @@ describe("arns", function()
 				local existingRecord = {
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -303,7 +306,7 @@ describe("arns", function()
 				local expectation = {
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -313,17 +316,17 @@ describe("arns", function()
 
 				assert.is.equal(
 					_G.Balances[testAddress],
-					startBalance - 600000000,
+					startBalance - basePriceForNineLetterName,
 					"Balance should be reduced by the purchase price"
 				)
 
 				assert.is.equal(
 					_G.Balances[_G.ao.id],
-					600000000,
+					basePriceForNineLetterName,
 					"Protocol balance should be increased by the purchase price"
 				)
 
-				assert.are.equal(demandBefore + 600000000, demand.getCurrentPeriodRevenue())
+				assert.are.equal(demandBefore + basePriceForNineLetterName, demand.getCurrentPeriodRevenue())
 				assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 			end)
 
@@ -337,7 +340,7 @@ describe("arns", function()
 					}
 					local result =
 						arns.buyRecord("test-name", "lease", 1, testAddress, timestamp, testProcessId, "msd-id")
-					local expectedPrice = math.floor(600000000 * 50)
+					local expectedPrice = math.floor(basePriceForNineLetterName * 50)
 					local expectation = {
 						endTimestamp = timestamp + constants.yearsToMs(1),
 						processId = testProcessId,
@@ -380,7 +383,7 @@ describe("arns", function()
 				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -396,7 +399,7 @@ describe("arns", function()
 				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -418,7 +421,7 @@ describe("arns", function()
 				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -429,7 +432,7 @@ describe("arns", function()
 				local expectation = {
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 60,
@@ -438,18 +441,18 @@ describe("arns", function()
 				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
 
 				assert.is.equal(
-					startBalance - 25000000,
+					startBalance - 20000000,
 					_G.Balances[testAddress],
 					"Balance should be reduced by the purchase price"
 				)
 
 				assert.is.equal(
 					_G.Balances[_G.ao.id],
-					25000000,
+					20000000,
 					"Protocol balance should be increased by the purchase price"
 				)
 
-				assert.are.equal(demandBefore + 25000000, demand.getCurrentPeriodRevenue())
+				assert.are.equal(demandBefore + 20000000, demand.getCurrentPeriodRevenue())
 				assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 			end)
 
@@ -468,7 +471,7 @@ describe("arns", function()
 				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -479,7 +482,7 @@ describe("arns", function()
 				local expectation = {
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 60,
@@ -487,7 +490,7 @@ describe("arns", function()
 				assert.are.same(expectation, result.record)
 				assert.are.same({ ["test-name"] = expectation }, _G.NameRegistry.records)
 
-				local discountTotal = 25000000 - (math.floor(25000000 * operatorDiscountRate))
+				local discountTotal = 20000000 - (math.floor(20000000 * operatorDiscountRate))
 
 				assert.is.equal(
 					_G.Balances[testAddress],
@@ -519,7 +522,7 @@ describe("arns", function()
 					_G.NameRegistry.records["test-name"] = {
 						endTimestamp = timestamp + constants.yearsToMs(1),
 						processId = testProcessId,
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						startTimestamp = 0,
 						type = "lease",
 						undernameLimit = 10,
@@ -540,7 +543,7 @@ describe("arns", function()
 				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = nil,
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "permabuy",
 					undernameLimit = 10,
@@ -555,7 +558,7 @@ describe("arns", function()
 				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -571,7 +574,7 @@ describe("arns", function()
 					-- 1 year lease
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -582,7 +585,7 @@ describe("arns", function()
 				assert.are.same({
 					endTimestamp = timestamp + constants.yearsToMs(5),
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -591,7 +594,7 @@ describe("arns", function()
 					["test-name"] = {
 						endTimestamp = timestamp + constants.yearsToMs(5),
 						processId = testProcessId,
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						startTimestamp = 0,
 						type = "lease",
 						undernameLimit = 10,
@@ -600,26 +603,26 @@ describe("arns", function()
 
 				assert.is.equal(
 					_G.Balances[testAddress],
-					startBalance - 400000000,
+					startBalance - 320000000,
 					"Balance should be reduced by the purchase price"
 				)
 				assert.is.equal(
 					_G.Balances[_G.ao.id],
-					400000000,
+					320000000,
 					"Protocol balance should be increased by the purchase price"
 				)
 
-				assert.are.equal(demandBefore + 400000000, demand.getCurrentPeriodRevenue())
+				assert.are.equal(demandBefore + 320000000, demand.getCurrentPeriodRevenue())
 				assert.are.equal(purchasesBefore + 1, demand.getCurrentPeriodPurchases())
 
 				assert.are.same({
 					address = testAddress,
-					balance = 400000000,
+					balance = 320000000,
 					stakes = {},
 					shortfall = 0,
 				}, result.fundingPlan)
 				assert.are.same({
-					totalFunded = 400000000,
+					totalFunded = 320000000,
 					newWithdrawVaults = {},
 				}, result.fundingResult)
 			end)
@@ -629,7 +632,7 @@ describe("arns", function()
 					-- 1 year lease
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -656,7 +659,7 @@ describe("arns", function()
 					-- 1 year lease
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -667,7 +670,7 @@ describe("arns", function()
 				assert.are.same({
 					endTimestamp = timestamp + constants.yearsToMs(5),
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -676,14 +679,14 @@ describe("arns", function()
 					["test-name"] = {
 						endTimestamp = timestamp + constants.yearsToMs(5),
 						processId = testProcessId,
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						startTimestamp = 0,
 						type = "lease",
 						undernameLimit = 10,
 					},
 				}, _G.NameRegistry.records)
 
-				local discountTotal = 400000000 - (math.floor(400000000 * operatorDiscountRate))
+				local discountTotal = 320000000 - (math.floor(320000000 * operatorDiscountRate))
 
 				assert.is.equal(
 					_G.Balances[testAddress],
@@ -704,13 +707,13 @@ describe("arns", function()
 
 		describe("calculateRegistrationFee [" .. addressType .. "]", function()
 			it("should return the correct fee for a lease", function()
-				local baseFee = 500000000 -- base fee is 500 ARIO
+				-- base fee is 500 ARIO
 				local fee = arns.calculateRegistrationFee("lease", baseFee, 1, 1)
-				assert.are.equal(600000000, fee)
+				assert.are.equal(basePriceForNineLetterName, fee)
 			end)
 
 			it("should return the correct fee for registring a name permanently [" .. addressType .. "]", function()
-				local baseFee = 500000000 -- base fee is 500 ARIO
+				-- base fee is 500 ARIO
 				local fee = arns.calculateRegistrationFee("permabuy", baseFee, 1, 1)
 				local expected = (baseFee * 0.2 * 20) + baseFee
 				assert.are.equal(expected, fee)
@@ -723,7 +726,7 @@ describe("arns", function()
 				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -748,7 +751,7 @@ describe("arns", function()
 				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = timestamp + constants.yearsToMs(1),
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -768,7 +771,7 @@ describe("arns", function()
 				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = timestamp - 1, -- expired
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -788,7 +791,7 @@ describe("arns", function()
 				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = 123456789,
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -816,7 +819,6 @@ describe("arns", function()
 
 	describe("getTokenCost", function()
 		it("should return the correct token cost for a buying a lease", function()
-			local baseFee = 500000000
 			local years = 2
 			local demandFactor = 0.974
 			local expectedCost = math.floor((years * baseFee * operatorDiscountRate) + baseFee) * demandFactor
@@ -831,7 +833,6 @@ describe("arns", function()
 			assert.are.equal(expectedCost, arns.getTokenCost(intendedAction).tokenCost)
 		end)
 		it("should return the correct token cost for a buying name permanently", function()
-			local baseFee = 500000000
 			local demandFactor = 1.052
 			local expectedCost = math.floor((baseFee * 0.2 * 20) + baseFee) * demandFactor
 			local intendedAction = {
@@ -847,12 +848,12 @@ describe("arns", function()
 			_G.NameRegistry.records["test-name"] = {
 				endTimestamp = constants.yearsToMs(1),
 				processId = testProcessId,
-				purchasePrice = 600000000,
+				purchasePrice = basePriceForNineLetterName,
 				startTimestamp = 0,
 				type = "lease",
 				undernameLimit = 10,
 			}
-			local baseFee = 500000000
+
 			local undernamePercentageFee = 0.001
 			local increaseQty = 5
 			local demandFactor = 0.60137
@@ -870,12 +871,12 @@ describe("arns", function()
 			_G.NameRegistry.records["test-name"] = {
 				endTimestamp = timestamp + constants.yearsToMs(1),
 				processId = testProcessId,
-				purchasePrice = 600000000,
+				purchasePrice = basePriceForNineLetterName,
 				startTimestamp = 0,
 				type = "lease",
 				undernameLimit = 10,
 			}
-			local baseFee = 500000000
+
 			local years = 2
 			local demandFactor = 1.2405
 			local expectedCost = math.floor((years * baseFee * operatorDiscountRate) * demandFactor)
@@ -895,7 +896,7 @@ describe("arns", function()
 				name = "test-name",
 				initiator = "test-initiator",
 			}
-			local baseFee = 500000000
+
 			local years = 2
 			local demandFactor = 0.974
 			local expectedCost = math.floor((((years * baseFee * operatorDiscountRate) + baseFee) * demandFactor) * 50)
@@ -923,7 +924,6 @@ describe("arns", function()
 			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
 			assert.is_true(result)
 
-			local baseFee = 500000000
 			local demandFactor = 1.052
 			local expectedCost = math.floor((baseFee * 0.2 * 20) + baseFee) * demandFactor
 			local intendedAction = {
@@ -952,7 +952,6 @@ describe("arns", function()
 			local result = gar.isEligibleForArNSDiscount(stubRandomAddress)
 			assert.is_false(result)
 
-			local baseFee = 500000000
 			local demandFactor = 1.052
 			local expectedCost = math.floor((baseFee * 0.2 * 20) + baseFee) * demandFactor
 			local intendedAction = {
@@ -973,7 +972,7 @@ describe("arns", function()
 				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = 10000000,
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -994,7 +993,7 @@ describe("arns", function()
 				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = timestamp - 1, -- expired
 					processId = testProcessId,
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "lease",
 					undernameLimit = 10,
@@ -1013,7 +1012,7 @@ describe("arns", function()
 			_G.NameRegistry.records["test-name"] = {
 				endTimestamp = nil,
 				processId = testProcessId,
-				purchasePrice = 600000000,
+				purchasePrice = basePriceForNineLetterName,
 				startTimestamp = 0,
 				type = "permabuy",
 				undernameLimit = 10,
@@ -1031,7 +1030,6 @@ describe("arns", function()
 
 	describe("getCostDetailsForAction", function()
 		it("should match getTokenCost logic but with { tokenCost: number, discounts: table } shape", function()
-			local baseFee = 500000000
 			local years = 2
 			local demandFactor = 0.974
 			local expectedCost = math.floor((years * baseFee * operatorDiscountRate) + baseFee) * demandFactor
@@ -1060,7 +1058,7 @@ describe("arns", function()
 						["active-record"] = {
 							endTimestamp = 2001000000, -- far in the future
 							processId = "active-process-id",
-							purchasePrice = 600000000,
+							purchasePrice = basePriceForNineLetterName,
 							startTimestamp = 0,
 							type = "lease",
 							undernameLimit = 10,
@@ -1068,7 +1066,7 @@ describe("arns", function()
 						["active-record-2"] = {
 							endTimestamp = 10005000000, -- far in the future
 							processId = "active-process-id-2",
-							purchasePrice = 600000000,
+							purchasePrice = basePriceForNineLetterName,
 							startTimestamp = 0,
 							type = "lease",
 							undernameLimit = 10,
@@ -1092,7 +1090,7 @@ describe("arns", function()
 						["permabuy-record"] = {
 							endTimestamp = nil,
 							processId = "permabuy-process-id",
-							purchasePrice = 600000000,
+							purchasePrice = basePriceForNineLetterName,
 							startTimestamp = 0,
 							type = "permabuy",
 							undernameLimit = 10,
@@ -1105,7 +1103,7 @@ describe("arns", function()
 					["active-record"] = {
 						endTimestamp = 2001000000, -- far in the future
 						processId = "active-process-id",
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						startTimestamp = 0,
 						type = "lease",
 						undernameLimit = 10,
@@ -1113,7 +1111,7 @@ describe("arns", function()
 					["active-record-2"] = {
 						endTimestamp = 10005000000, -- very far in the future
 						processId = "active-process-id-2",
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						startTimestamp = 0,
 						type = "lease",
 						undernameLimit = 10,
@@ -1129,7 +1127,7 @@ describe("arns", function()
 					["permabuy-record"] = {
 						endTimestamp = nil,
 						processId = "permabuy-process-id",
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						startTimestamp = 0,
 						type = "permabuy",
 						undernameLimit = 10,
@@ -1165,7 +1163,7 @@ describe("arns", function()
 					["active-record"] = {
 						endTimestamp = 2001000000,
 						processId = "active-process-id",
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						startTimestamp = 0,
 						type = "lease",
 						undernameLimit = 10,
@@ -1173,7 +1171,7 @@ describe("arns", function()
 					["active-record-2"] = {
 						endTimestamp = 10005000000, -- very far in the future
 						processId = "active-process-id-2",
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						startTimestamp = 0,
 						type = "lease",
 						undernameLimit = 10,
@@ -1181,7 +1179,7 @@ describe("arns", function()
 					["permabuy-record"] = {
 						endTimestamp = nil,
 						processId = "permabuy-process-id",
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						startTimestamp = 0,
 						type = "permabuy",
 						undernameLimit = 10,
@@ -1202,7 +1200,7 @@ describe("arns", function()
 					["active-record"] = {
 						endTimestamp = 2001000000,
 						processId = "active-process-id",
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						startTimestamp = 0,
 						type = "lease",
 						undernameLimit = 10,
@@ -1393,11 +1391,11 @@ describe("arns", function()
 
 			-- check first, middle and last name lengths
 			assert.are.equal(utils.lengthOfTable(registrationFees), 51)
-			assert.are.equal(registrationFees["1"].lease["1"], 2400000000000)
-			assert.are.equal(registrationFees["5"].lease["3"], 6400000000)
-			assert.are.equal(registrationFees["10"].permabuy, 2500000000)
-			assert.are.equal(registrationFees["10"].lease["5"], 1000000000)
-			assert.are.equal(registrationFees["51"].lease["1"], 480000000)
+			assert.are.equal(registrationFees["1"].lease["1"], 1200000000000)
+			assert.are.equal(registrationFees["5"].lease["3"], 4000000000)
+			assert.are.equal(registrationFees["10"].permabuy, 1750000000)
+			assert.are.equal(registrationFees["10"].lease["5"], 700000000)
+			assert.are.equal(registrationFees["51"].lease["1"], 240000000)
 		end)
 	end)
 
@@ -1437,7 +1435,7 @@ describe("arns", function()
 				_G.NameRegistry.records["test-name"] = {
 					endTimestamp = nil,
 					processId = "test-process-id",
-					purchasePrice = 600000000,
+					purchasePrice = basePriceForNineLetterName,
 					startTimestamp = 0,
 					type = "permabuy",
 					undernameLimit = 10,
@@ -1496,31 +1494,31 @@ describe("arns", function()
 					type = "lease",
 					undernameLimit = 10,
 				}
-				_G.Balances[testAddressArweave] = 2500000000
+				_G.Balances[testAddressArweave] = 1250000000
 				local updatedRecord = arns.upgradeRecord(testAddressArweave, "upgrade-name", 1000000, "msgId")
 				assert.are.same({
 					name = "upgrade-name",
 					record = {
 						endTimestamp = nil,
 						processId = "test-process-id",
-						purchasePrice = 2500000000,
+						purchasePrice = 1250000000,
 						startTimestamp = 0,
 						type = "permabuy",
 						undernameLimit = 10,
 					},
-					totalFee = 2500000000,
-					baseRegistrationFee = 500000000,
+					totalFee = 1250000000,
+					baseRegistrationFee = 250000000,
 					remainingBalance = 0,
-					protocolBalance = 2500000000,
+					protocolBalance = 1250000000,
 					df = demand.getDemandFactorInfo(),
 					fundingPlan = {
 						address = testAddressArweave,
-						balance = 2500000000,
+						balance = 1250000000,
 						stakes = {},
 						shortfall = 0,
 					},
 					fundingResult = {
-						totalFunded = 2500000000,
+						totalFunded = 1250000000,
 						newWithdrawVaults = {},
 					},
 				}, updatedRecord)
@@ -1545,11 +1543,11 @@ describe("arns", function()
 					type = "lease",
 					undernameLimit = 10,
 				}
-				_G.Balances[stubRandomAddress] = 2500000000
+				_G.Balances[stubRandomAddress] = 1250000000
 				assert(gar.isEligibleForArNSDiscount(stubRandomAddress))
 				local updatedRecord = arns.upgradeRecord(stubRandomAddress, "upgrade-name", 1000000, "msgId")
 
-				local expectedCost = 2500000000 - (math.floor(2500000000 * operatorDiscountRate))
+				local expectedCost = 1250000000 - (math.floor(1250000000 * operatorDiscountRate))
 
 				assert.are.same({
 					name = "upgrade-name",
@@ -1562,8 +1560,8 @@ describe("arns", function()
 						undernameLimit = 10,
 					},
 					totalFee = expectedCost,
-					baseRegistrationFee = 500000000,
-					remainingBalance = 500000000,
+					baseRegistrationFee = 250000000,
+					remainingBalance = 250000000,
 					protocolBalance = expectedCost,
 					df = demand.getDemandFactorInfo(),
 					fundingPlan = {
@@ -1624,7 +1622,7 @@ describe("arns", function()
 					type = "lease",
 					undernameLimit = 10,
 				}
-				_G.Balances[testAddressArweave] = 2500000000 - 1 -- 1 less than the upgrade cost
+				_G.Balances[testAddressArweave] = 1250000000 - 1 -- 1 less than the upgrade cost for a 12-letter name
 				local status, error = pcall(arns.upgradeRecord, testAddressArweave, "upgrade-name", 1000000)
 				assert.is_false(status)
 				assert.match("Insufficient balance", error)
@@ -1639,7 +1637,7 @@ describe("arns", function()
 					["active-record"] = {
 						endTimestamp = 100, -- far in the future
 						processId = "oldest-process-id",
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						startTimestamp = 0,
 						type = "lease",
 						undernameLimit = 10,
@@ -1663,7 +1661,7 @@ describe("arns", function()
 					["permabuy-record"] = {
 						endTimestamp = nil,
 						processId = "permabuy-process-id",
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						startTimestamp = 0,
 						type = "permabuy",
 						undernameLimit = 10,
@@ -1686,7 +1684,7 @@ describe("arns", function()
 						name = "active-record",
 						endTimestamp = 100,
 						processId = "oldest-process-id",
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						startTimestamp = 0,
 						type = "lease",
 						undernameLimit = 10,
@@ -1746,7 +1744,7 @@ describe("arns", function()
 						name = "permabuy-record",
 						endTimestamp = nil,
 						processId = "permabuy-process-id",
-						purchasePrice = 600000000,
+						purchasePrice = basePriceForNineLetterName,
 						startTimestamp = 0,
 						type = "permabuy",
 						undernameLimit = 10,

@@ -198,17 +198,17 @@ describe("Primary Names", function()
 					baseNameOwner = "processId",
 					fundingPlan = {
 						address = "user-requesting-primary-name",
-						balance = 400000, -- cost should be the undername cost for 1 year on a 51 character name of the same type, against the current demand factor
+						balance = 200000, -- cost should be the undername cost for 1 year on a 51 character name of the same type, against the current demand factor
 						shortfall = 0,
 						stakes = {},
 					},
 					fundingResult = {
 						newWithdrawVaults = {},
-						totalFunded = 400000,
+						totalFunded = 200000,
 					},
 				}, primaryNameRequest)
-				assert.are.equal(9600000, _G.Balances["user-requesting-primary-name"])
-				assert.are.equal(400000, _G.Balances[ao.id])
+				assert.are.equal(9800000, _G.Balances["user-requesting-primary-name"])
+				assert.are.equal(200000, _G.Balances[ao.id])
 			end
 		)
 
