@@ -41,7 +41,7 @@ export const AO_LOADER_OPTIONS = {
 };
 
 export const AOS_WASM = fs.readFileSync(
-  path.join(__dirname, 'fixtures/bootstrap-process.wasm'),
+  path.join(__dirname, 'fixtures/process.wasm'),
 );
 
 export const BUNDLED_SOURCE_CODE = fs.readFileSync(
