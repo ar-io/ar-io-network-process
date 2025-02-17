@@ -1,4 +1,5 @@
 local primaryNames = require("primary_names")
+local utils = require("utils")
 
 describe("Primary Names", function()
 	before_each(function()
@@ -223,7 +224,7 @@ describe("Primary Names", function()
 			it(
 				"should create a primary name request with undername and transfer the cost from the initiator to the protocol balance",
 				function()
-					local baseName = primaryNames.baseNameForName(primaryName)
+					local baseName = utils.baseNameForName(primaryName)
 					_G.Balances = {
 						["user-requesting-primary-name"] = 10000000,
 					}

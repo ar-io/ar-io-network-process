@@ -3,7 +3,6 @@ local utils = require("utils")
 local constants = require("constants")
 local balances = require("balances")
 local demand = require("demand")
-local primaryNames = require("primary_names")
 local arns = {}
 local gar = require("gar")
 
@@ -710,7 +709,7 @@ function arns.getTokenCost(intendedAction)
 	local years = tonumber(intendedAction.years)
 	local name = intendedAction.name
 	-- We get the base name in case its a primary name request - which, because of undername primary names, can be longer than the longest arns base fee
-	local baseFee = demand.baseFeeForNameLength(#primaryNames.baseNameForName(name))
+	local baseFee = demand.baseFeeForNameLength(#utils.baseNameForName(name))
 	local qty = tonumber(intendedAction.quantity)
 	local record = intendedAction.record or arns.getRecord(name)
 	local currentTimestamp = tonumber(intendedAction.currentTimestamp)

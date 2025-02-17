@@ -711,4 +711,8 @@ function utils.booleanOrBooleanStringToBoolean(value)
 	return type(value) == "string" and string.lower(value) == "true"
 end
 
+function utils.baseNameForName(name)
+	return (name or ""):match("[^_]+$") or name
+end
+
 return utils
