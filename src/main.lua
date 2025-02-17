@@ -422,6 +422,11 @@ end
 local function assertAndSanitizeInputs(msg)
 	if msg.Tags.Action ~= "Eval" and msg.Data then
 		-- assert data size is less than or equal to 100 bytes, we dont use msg.Data
+
+		if type(msg.Data) == "table" then
+			msg.Data = json.encode(msg.Data)
+		end
+
 		assert(#msg.Data <= 100, "Data size is too large")
 	end
 
