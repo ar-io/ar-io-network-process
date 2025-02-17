@@ -68,12 +68,19 @@ fs.writeFileSync(output, '');
 // write the header
 fs.appendFileSync(
   output,
-  'name,processId,type,startTimestamp,endTimestamp,purchasePrice\n',
+  'name,processId,type,startTimestamp,endTimestamp,purchasePrice,undernameLimit\n',
 );
 
 for (const record of activeRecords) {
-  const { name, processId, type, startTimestamp, endTimestamp, purchasePrice } =
-    record;
+  const {
+    name,
+    processId,
+    type,
+    startTimestamp,
+    endTimestamp,
+    purchasePrice,
+    undernameLimit,
+  } = record;
 
   const csvRow = [
     name,
@@ -82,6 +89,7 @@ for (const record of activeRecords) {
     startTimestamp,
     endTimestamp,
     purchasePrice,
+    undernameLimit,
   ].join(',');
   if (dryRun) {
     console.log(csvRow);

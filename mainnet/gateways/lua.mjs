@@ -27,13 +27,19 @@ const argv = yargs(hideBin(process.argv))
     description: 'Input CSV file path',
     default: './outputs/gateways.csv',
   })
+  .option('startTimestamp', {
+    alias: 's',
+    type: 'number',
+    description: 'Start timestamp (defaults to 2025-02-20 00:00:00 UTC)',
+    default: 1740009600000,
+  })
   .help()
   .parseSync();
 
 const dryRun = argv.dryRun;
 const output = path.join(__dirname, argv.output);
 const input = path.join(__dirname, argv.input);
-
+const startTimestamp = argv.startTimestamp; // the gateways starting timestamp
 console.log(
   'Creating raw lua gateways with assigned delegates from',
   input,
@@ -72,7 +78,7 @@ for (const gateway of gateways) {
     autoStake,
     label,
     note,
-    properties,
+    properties = 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
     status,
     failedConsecutiveEpochsCount,
   ] = gateway;
@@ -81,6 +87,7 @@ GatewayRegistry["${gatewayAddress}"] = {
     observerAddress = "${observerAddress}",
     operatorStake = ${operatorStake},
     totalDelegatedStake = 0,
+    startTimestamp = ${startTimestamp},
     settings = {
         fqdn = "${fqdn}",
         port = ${port},
@@ -95,6 +102,7 @@ GatewayRegistry["${gatewayAddress}"] = {
         allowedDelegates = {},
     },
     delegates = {},
+    vaults = {},
     services = {},
     status = "joined",
     weights = {
@@ -111,7 +119,8 @@ GatewayRegistry["${gatewayAddress}"] = {
         totalEpochCount = 0,
         passedEpochCount = 0,
         failedEpochCount = 0,
-        failedConsecutiveEpochsCount = 0,
+        failedConsecutiveEpochs = 0,
+        passedConsecutiveEpochs = 0,
     }
 }
   `;

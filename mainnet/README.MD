@@ -72,6 +72,7 @@ Resulting lua file: [./gateways/outputs/gateways.lua](./gateways/outputs/gateway
 GatewayRegistry["<gatewayAddress>"] = {
     observerAddress = "<observerAddress>",
     operatorStake = <operatorStake>,
+    startTimestamp = <startTimestamp>,
     totalDelegatedStake = 0,
     settings = {
         fqdn = "<fqdn>",
@@ -87,6 +88,7 @@ GatewayRegistry["<gatewayAddress>"] = {
         allowedDelegates = {},
     },
     delegates = {},
+    vaults = {},
     services = {},
     status = "<status>",
     weights = {
@@ -103,7 +105,8 @@ GatewayRegistry["<gatewayAddress>"] = {
         totalEpochCount = <totalEpochCount>,
         passedEpochCount = <passedEpochCount>,
         failedEpochCount = <failedEpochCount>,
-        failedConsecutiveEpochsCount = <failedConsecutiveEpochsCount>,
+        failedConsecutiveEpochs = <failedConsecutiveEpochs>,
+        passedConsecutiveEpochs = <passedConsecutiveEpochs>,
     },
 }
 ```

@@ -92,7 +92,7 @@ const gatewayAddresses = fs
   .split('\n')
   .slice(1) // Skip header row
   .filter(Boolean) // Remove empty lines
-  .map((line) => line.split(',')[1]); // Get just the address column
+  .map((line) => line.split(',')[0]); // Get just the address column
 const stakedRegistrants = registrants.filter((r) => r.type === 'stake');
 
 console.log(

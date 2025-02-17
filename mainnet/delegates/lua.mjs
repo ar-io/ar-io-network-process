@@ -60,13 +60,17 @@ const assignedDelegates = fs
   .map((row) => row.split(','));
 
 for (const delegate of assignedDelegates) {
-  const [address, delegateAddress, delegateStake, providedStartTimestamp] =
-    delegate;
-  if (!gatewayDelegatedStakeTotals[address]) {
-    gatewayDelegatedStakeTotals[address] = 0;
+  const [
+    delegateAddress,
+    gatewayAddress,
+    delegateStake,
+    providedStartTimestamp,
+  ] = delegate;
+  if (!gatewayDelegatedStakeTotals[gatewayAddress]) {
+    gatewayDelegatedStakeTotals[gatewayAddress] = 0;
   }
-  gatewayDelegatedStakeTotals[address] += parseInt(delegateStake);
-  const luaRecord = `GatewayRegistry["${address}"].delegates["${delegateAddress}"] = { delegatedStake = ${delegateStake}, startTimestamp = ${providedStartTimestamp || startTimestamp}, vaults = {} }\n`;
+  gatewayDelegatedStakeTotals[gatewayAddress] += parseInt(delegateStake);
+  const luaRecord = `GatewayRegistry["${gatewayAddress}"].delegates["${delegateAddress}"] = { delegatedStake = ${delegateStake}, startTimestamp = ${providedStartTimestamp || startTimestamp}, vaults = {} }\n`;
   if (dryRun) {
     console.log(luaRecord);
   } else {
@@ -74,10 +78,10 @@ for (const delegate of assignedDelegates) {
   }
 }
 
-for (const [address, totalDelegatedStake] of Object.entries(
+for (const [gatewayAddress, totalDelegatedStake] of Object.entries(
   gatewayDelegatedStakeTotals,
 )) {
-  const luaRecord = `GatewayRegistry["${address}"].totalDelegatedStake = ${totalDelegatedStake};\n`;
+  const luaRecord = `GatewayRegistry["${gatewayAddress}"].totalDelegatedStake = ${totalDelegatedStake};\n`;
   if (dryRun) {
     console.log(luaRecord);
   } else {

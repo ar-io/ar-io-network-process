@@ -63,7 +63,10 @@ const primaryNames = fs
 for (const primaryName of primaryNames) {
   const [name, address] = primaryName;
   // add both the owner and the name to the lua file
-  const luaRecord = `PrimaryNames.owners["${address}"] = { name = "${name}", startTimestamp = ${startTimestamp} }\nPrimaryNames.names["${name}"] = "${address}"\n`;
+  const luaRecord = `
+PrimaryNames.owners["${address}"] = { name = "${name}", startTimestamp = ${startTimestamp} }
+PrimaryNames.names["${name}"] = "${address}"
+`;
 
   if (dryRun) {
     console.log(luaRecord);

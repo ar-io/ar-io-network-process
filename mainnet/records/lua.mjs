@@ -42,19 +42,33 @@ fs.mkdirSync(path.dirname(output), { recursive: true });
 fs.writeFileSync(output, '');
 
 // read all the records from the input file
-const records = fs.readFileSync(input, 'utf8').split('\n').slice(1);
+const records = fs
+  .readFileSync(input, 'utf8')
+  .split('\n')
+  .slice(1)
+  .filter(Boolean)
+  .map((line) => line.split(','));
 
 for (const record of records) {
-  const [name, processId, type, startTimestamp, endTimestamp, purchasePrice] =
-    record.split(',');
+  const [
+    name,
+    processId,
+    type,
+    startTimestamp,
+    endTimestamp,
+    purchasePrice,
+    undernameLimit,
+  ] = record;
   // // append to lua file
-  const luaRecord = `NameRegistry.records["${name}"] = {
-      processId = "${processId}",
-      type = "${type}",
-      startTimestamp = ${startTimestamp},
-      endTimestamp = ${endTimestamp || 'nil'},
-      purchasePrice = ${purchasePrice}
-    }\n`;
+  const luaRecord = `
+NameRegistry.records["${name}"] = {
+    processId = "${processId}",
+    type = "${type}",
+    startTimestamp = ${startTimestamp},
+    endTimestamp = ${endTimestamp || 'nil'},
+    purchasePrice = ${purchasePrice},
+    undernameLimit = ${undernameLimit}
+  }\n`;
 
   if (dryRun) {
     console.log(luaRecord);
