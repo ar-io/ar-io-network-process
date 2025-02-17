@@ -66,8 +66,8 @@ function primaryNames.assertValidUndername(name)
 
 	local validLength = #name <= constants.MAX_UNDERNAME_LENGTH
 	assert(validLength, "Undername is too long, recieved length of " .. tostring(#name))
-	local validRegex = string.match(name, "^[a-zA-Z0-9]*$") ~= nil
-		or string.match(name, "^[a-zA-Z0-9]+[a-zA-Z0-9_-]*$") ~= nil
+	local validRegex = string.match(name, constants.ARNS_NAME_SINGLE_CHAR_REGEX) ~= nil
+		or string.match(name, constants.UNDERNAME_REGEX) ~= nil
 	local valid = validLength and validRegex
 	assert(valid, "Invalid undername " .. name)
 end
@@ -85,8 +85,8 @@ function primaryNames.assertValidPrimaryName(name)
 
 	-- Ensure name starts and ends with alphanumeric, and only allows `_` or `-` in between
 	assert(
-		string.match(name, "^[a-zA-Z0-9]$") ~= nil
-			or string.match(name, "^[a-zA-Z0-9][a-zA-Z0-9_-]*[a-zA-Z0-9]$") ~= nil,
+		string.match(name, constants.ARNS_NAME_SINGLE_CHAR_REGEX) ~= nil
+			or string.match(name, constants.PRIMARY_NAME_REGEX) ~= nil,
 		"Invalid Primary Name: " .. name
 	)
 
