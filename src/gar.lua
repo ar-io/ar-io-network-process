@@ -1,7 +1,6 @@
-require("globals")
-local balances = require("balances")
-local constants = require("constants")
-local utils = require("utils")
+local balances = require(".src.balances")
+local constants = require(".src.constants")
+local utils = require(".src.utils")
 local gar = {}
 
 --- @class GatewayRegistrySettings

@@ -1,7 +1,6 @@
-require("globals")
-local balances = require("balances")
-local utils = require("utils")
-local constants = require("constants")
+local balances = require(".src.balances")
+local utils = require(".src.utils")
+local constants = require(".src.constants")
 local vaults = {}
 
 --- @alias Vaults table<WalletAddress, table<VaultId, Vault>> -- A table of vaults indexed by owner address, then by vault id

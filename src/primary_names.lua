@@ -1,10 +1,9 @@
-require("globals")
-local arns = require("arns")
-local balances = require("balances")
-local utils = require("utils")
-local gar = require("gar")
-local constants = require("constants")
-local demand = require("demand")
+local arns = require(".src.arns")
+local balances = require(".src.balances")
+local utils = require(".src.utils")
+local gar = require(".src.gar")
+local constants = require(".src.constants")
+local demand = require(".src.demand")
 local primaryNames = {}
 
 --- @alias WalletAddress string

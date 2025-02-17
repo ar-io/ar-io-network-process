@@ -1,5 +1,5 @@
-local utils = require("utils")
-local json = require("json")
+local utils = require(".src.utils")
+local json = require(".src.json")
 
 --- @class AOEvent
 --- @field data table<string, any> The data table holding the event fields.

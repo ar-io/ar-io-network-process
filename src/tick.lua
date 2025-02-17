@@ -1,6 +1,5 @@
-require("globals")
-local epochs = require("epochs")
-local gar = require("gar")
+local epochs = require(".src.epochs")
+local gar = require(".src.gar")
 local tick = {}
 
 --- @class TickResult

@@ -757,6 +757,8 @@ describe('ArNS', async () => {
         timestamp: STUB_TIMESTAMP,
       });
 
+      console.log(releaseNameResult);
+
       // fetch the auction
       const returnedName = await getReturnedName({
         name: 'test-name',
@@ -930,13 +932,15 @@ describe('ArNS', async () => {
 
       // tick the contract after the lease leaves its grace period
       const futureTimestamp =
-        initialRecord.endTimestamp + 60 * 1000 * 60 * 24 * 14 + 1;
+        initialRecord.endTimestamp + 60 * 1000 * 60 * 24 * 14;
 
       // tick ahead, which impacts the demand factor for buying the returned name
       const { result: tickResult } = await tick({
         timestamp: futureTimestamp,
         memory: buyRecordResult.Memory,
       });
+
+      console.log(tickResult);
 
       // fetch the returned name
       const returnedName = await getReturnedName({

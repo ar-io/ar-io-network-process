@@ -1,6 +1,5 @@
-require("globals")
+local utils = require(".src.utils")
 local balances = {}
-local utils = require("utils")
 
 --- @alias mARIO number
 

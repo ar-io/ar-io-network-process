@@ -1,11 +1,10 @@
 -- arns.lua
-require("globals")
-local utils = require("utils")
-local constants = require("constants")
-local balances = require("balances")
-local demand = require("demand")
+local utils = require(".src.utils")
+local constants = require(".src.constants")
+local balances = require(".src.balances")
+local demand = require(".src.demand")
+local gar = require(".src.gar")
 local arns = {}
-local gar = require("gar")
 
 --- @class NameRegistry
 --- @field reserved table<string, ReservedName> The reserved names

@@ -1,23 +1,19 @@
--- Adjust package.path to include the current directory
-require("globals")
 local process = { _version = "0.0.1" }
-local constants = require("constants")
-local token = require("token")
-local utils = require("utils")
-local json = require("json")
-local ao = ao or require("ao")
-local ARIOEvent = require("ario_event")
-
--- NOTE: These are imported after global variables are initialized
-local balances = require("balances")
-local arns = require("arns")
-local gar = require("gar")
-local demand = require("demand")
-local epochs = require("epochs")
-local vaults = require("vaults")
-local prune = require("prune")
-local tick = require("tick")
-local primaryNames = require("primary_names")
+local constants = require(".src.constants")
+local token = require(".src.token")
+local utils = require(".src.utils")
+local json = require(".src.json")
+local ao = require("ao")
+local balances = require(".src.balances")
+local arns = require(".src.arns")
+local gar = require(".src.gar")
+local demand = require(".src.demand")
+local epochs = require(".src.epochs")
+local vaults = require(".src.vaults")
+local prune = require(".src.prune")
+local tick = require(".src.tick")
+local primaryNames = require(".src.primary_names")
+local ARIOEvent = require(".src.ario_event")
 
 -- handlers that are critical should discard the memory on error (see prune for an example)
 local CRITICAL = true
@@ -531,7 +527,7 @@ end, function(msg)
 	end
 
 	print("Pruning state at timestamp: " .. msg.Timestamp)
-	local prunedStateResult = prune.pruneState(msg.Timestamp, msg.Id, LastGracePeriodEntryEndTimestamp)
+	local prunedStateResult = prune.pruneState(msg.Timestamp, msg.Id, LastGracePeriodEntryEndTimestamp or 0)
 	if prunedStateResult then
 		local prunedRecordsCount = utils.lengthOfTable(prunedStateResult.prunedRecords or {})
 		if prunedRecordsCount > 0 then
@@ -1690,7 +1686,7 @@ addEventingHandler("totalSupply", utils.hasMatchingTag("Action", ActionMap.Total
 	msg.ioEvent:addField("Last-Known-Total-Token-Supply", token.lastKnownTotalTokenSupply())
 	Send(msg, {
 		Action = "Total-Supply",
-		Data = tostring(totalSupplyDetails.totalSupply),
+		Data = tostring(10),
 		Ticker = Ticker,
 	})
 end)

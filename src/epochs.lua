@@ -1,9 +1,8 @@
-require("globals")
-local gar = require("gar")
-local crypto = require("crypto.init")
-local utils = require("utils")
-local balances = require("balances")
-local arns = require("arns")
+local gar = require(".src.gar")
+local crypto = require(".crypto.init")
+local utils = require(".src.utils")
+local balances = require(".src.balances")
+local arns = require(".src.arns")
 local epochs = {}
 
 --- @alias ObserverAddress string

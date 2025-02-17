@@ -1,5 +1,5 @@
-local constants = require("constants")
-local utils = require("utils")
+local constants = require(".src.constants")
+local utils = require(".src.utils")
 local ao = ao or require("ao")
 local globals = {}
 
@@ -10,22 +10,19 @@ Name = Name or constants.NAME
 Ticker = Ticker or constants.TICKER
 Logo = Logo or constants.LOGO
 Denomination = Denomination or constants.DENOMINATION
-Owner = Owner or ao.id -- TODO: this may already be set
-
+Owner = Owner or ao.env and ao.env.Process and ao.env.Process.Owner
 --[[
     Balances
 ]]
-Balances = Balances
-	or {
-		[ao.id] = constants.DEFAULT_PROTOCOL_BALANCE,
-		[Owner] = constants.TOTAL_TOKEN_SUPPLY - constants.DEFAULT_PROTOCOL_BALANCE,
-	}
+Balances = Balances or {}
+Balances[ao.id] = constants.DEFAULT_PROTOCOL_BALANCE
+Balances[Owner] = constants.TOTAL_TOKEN_SUPPLY - constants.DEFAULT_PROTOCOL_BALANCE
 
 --[[
     Token Supply
 ]]
 --- @type number
-TotalSupply = TotalSupply or constants.totalTokenSupply
+TotalSupply = TotalSupply or constants.TOTAL_TOKEN_SUPPLY
 
 --[[
     Gateway Registry

@@ -1,5 +1,4 @@
-require("globals")
-local utils = require("utils")
+local utils = require(".src.utils")
 local demand = {}
 
 --- @class DemandFactor

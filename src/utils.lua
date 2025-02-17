@@ -1,7 +1,7 @@
-local base64 = require("base64")
-local crypto = require("crypto.init")
-local json = require("json")
-local constants = require("constants")
+local base64 = require(".src.base64")
+local crypto = require(".crypto.init")
+local json = require(".src.json")
+local constants = require(".src.constants")
 local utils = {}
 
 function utils.hasMatchingTag(tag, value)
