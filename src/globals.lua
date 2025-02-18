@@ -1,6 +1,5 @@
 local constants = require(".src.constants")
 local utils = require(".src.utils")
-local ao = ao or require("ao")
 local globals = {}
 
 --[[
