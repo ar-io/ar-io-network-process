@@ -41,8 +41,48 @@ local primaryNames = {}
 --- @field fundingPlan table
 --- @field fundingResult table
 
-local function baseNameForName(name)
-	return (name or ""):match("[^_]+$") or name
+-- NOTE: lua 5.3 has limited regex support, particularly for lookaheads and negative lookaheads or use of {n}
+---@param name string
+---@description Asserts that the provided name is a valid undername
+---@example
+---```lua
+---utils.assertValidateUndername("my-undername")
+---```
+function primaryNames.assertValidUndername(name)
+	--- RULES FOR UNDERNAMES
+	--- min 1 char
+	--- max 61 chars
+	--- no starting dashes or underscores
+	--- alphanumeric, dashes, underscores OR one '@' sign
+
+	local validLength = #name <= constants.MAX_UNDERNAME_LENGTH
+	assert(validLength, "Undername is too long, recieved length of " .. tostring(#name))
+	local validRegex = string.match(name, constants.ARNS_NAME_SINGLE_CHAR_REGEX) ~= nil
+		or string.match(name, constants.UNDERNAME_REGEX) ~= nil
+	local valid = validLength and validRegex
+	assert(valid, "Invalid undername " .. name)
+end
+
+--- Asserts that a name is a valid Primary name
+--- Validates the undername and base name
+--- @param name string The name to check
+function primaryNames.assertValidPrimaryName(name)
+	assert(name and type(name) == "string", "Name is required and must be a string.")
+
+	assert(
+		#name <= constants.MAX_PRIMARY_NAME_LENGTH,
+		"Primary Name with length "
+			.. #name
+			.. " exceeds maximum allowable length of "
+			.. constants.MAX_PRIMARY_NAME_LENGTH
+	)
+
+	local baseName = utils.baseNameForName(name)
+	arns.assertValidArNSName(baseName)
+	local undername = utils.undernameForName(name)
+	if undername then
+		primaryNames.assertValidUndername(undername)
+	end
 end
 
 --- Creates a transient request for a primary name. This is done by a user and must be approved by the name owner of the base name.
@@ -54,8 +94,11 @@ end
 --- @return CreatePrimaryNameResult # the request created, or the primary name with owner data if the request is approved
 function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
+
+	primaryNames.assertValidPrimaryName(name)
+
 	name = string.lower(name)
-	local baseName = baseNameForName(name)
+	local baseName = utils.baseNameForName(name)
 
 	--- check the primary name request for the initiator does not already exist for the same name
 	--- this allows the caller to create a new request and pay the fee again, so long as it is for a different name
@@ -153,7 +196,7 @@ function primaryNames.approvePrimaryNameRequest(recipient, name, from, timestamp
 	assert(name == request.name, "Provided name does not match the primary name request")
 
 	-- assert the process id in the initial request still owns the name
-	local baseName = baseNameForName(request.name)
+	local baseName = utils.baseNameForName(request.name)
 	local record = arns.getRecord(baseName)
 	assert(record, "ArNS record '" .. baseName .. "' does not exist")
 	assert(record.processId == from, "Primary name request must be approved by the owner of the base name")
@@ -215,7 +258,7 @@ function primaryNames.removePrimaryName(name, from)
 	--- assert the from is the current owner of the name
 	local primaryName = primaryNames.getPrimaryNameDataWithOwnerFromName(name)
 	assert(primaryName, "Primary name '" .. name .. "' does not exist")
-	local baseName = baseNameForName(name)
+	local baseName = utils.baseNameForName(name)
 	local record = arns.getRecord(baseName)
 	assert(
 		primaryName.owner == from or (record and record.processId == from),
@@ -254,7 +297,7 @@ function primaryNames.getPrimaryNameDataWithOwnerFromAddress(address)
 		owner = address,
 		name = nameData.name,
 		startTimestamp = nameData.startTimestamp,
-		processId = arns.getProcessIdForRecord(baseNameForName(nameData.name)),
+		processId = arns.getProcessIdForRecord(utils.baseNameForName(nameData.name)),
 	}
 end
 
@@ -280,7 +323,7 @@ function primaryNames.getPrimaryNamesForBaseName(baseName)
 	local primaryNamesForArNSName = {}
 	for name, _ in pairs(primaryNames.getUnsafePrimaryNames()) do
 		local nameData = primaryNames.getPrimaryNameDataWithOwnerFromName(name)
-		if nameData and baseNameForName(name) == baseName then
+		if nameData and utils.baseNameForName(name) == baseName then
 			table.insert(primaryNamesForArNSName, nameData)
 		end
 	end
@@ -322,7 +365,7 @@ function primaryNames.getPaginatedPrimaryNames(cursor, limit, sortBy, sortOrder)
 			name = primaryName.name,
 			owner = owner,
 			startTimestamp = primaryName.startTimestamp,
-			processId = arns.getProcessIdForRecord(baseNameForName(primaryName.name)),
+			processId = arns.getProcessIdForRecord(utils.baseNameForName(primaryName.name)),
 		})
 	end
 	return utils.paginateTableWithCursor(primaryNamesArray, cursor, cursorField, limit, sortBy, sortOrder)

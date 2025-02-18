@@ -115,14 +115,18 @@ constants.MIN_TOKEN_LOCK_TIME_MS = constants.daysToMs(14) -- The minimum amount 
 
 -- ARNS
 constants.DEFAULT_UNDERNAME_COUNT = 10
-constants.MAX_NAME_LENGTH = 51 -- protects against invalid URLs when resolving arns names on gateways
+constants.MAX_BASE_NAME_LENGTH = 51 -- gateways utilize sandbox subdomains of 52 characters in length. This reduces complexity of sandboxing.
+constants.MAX_PRIMARY_NAME_LENGTH = 63 -- The max length of a domain label (any part separated by dots)
+constants.MAX_UNDERNAME_LENGTH = 61 -- MAX_PRIMARY_NAME_LENGTH - 1 (for underscore) - 1 (minimum base name length)
 constants.MIN_NAME_LENGTH = 1
 -- Regex pattern to validate ARNS names:
 -- - Starts with an alphanumeric character (%w)
 -- - Can contain alphanumeric characters and hyphens (%w-)
 -- - Ends with an alphanumeric character (%w)
 -- - Does not allow names to start or end with a hyphen
-constants.ARNS_NAME_REGEX = "^%w[%w-]*%w?$" -- TODO: validate tests around this
+constants.ARNS_NAME_SINGLE_CHAR_REGEX = "^%w$"
+constants.ARNS_NAME_MULTICHARACTER_REGEX = "^%w[%w-]*%w$"
+constants.UNDERNAME_REGEX = "^%w+[%w_-]*$"
 constants.PERMABUY_LEASE_FEE_LENGTH_YEARS = 20 -- buying a permabuy record is equal to leasing the name for 20 years
 constants.ANNUAL_PERCENTAGE_FEE = 0.2 -- the fee applied for leases against the base name
 constants.UNDERNAME_LEASE_FEE_PERCENTAGE = 0.001 -- for leased names the undername fee is 0.1% for one undername
