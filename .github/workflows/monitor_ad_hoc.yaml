@@ -1,4 +1,5 @@
-name: Ad-Hoc AR.IO Process Monitoring
+name: Ad-Hoc AR.IO Process Evaluation
+description: 'Evaluate a forked AR.IO process, looking for type issues and invariant state violations'
 
 on:
   workflow_dispatch:
@@ -54,6 +55,7 @@ jobs:
           ARIO_NETWORK_PROCESS_ID: ${{ env.ARIO_NETWORK_PROCESS_ID }}
 
   notify:
+    if: always()
     needs: [monitor, sdk]
     runs-on: ubuntu-latest
     steps:
@@ -62,16 +64,16 @@ jobs:
         uses: rtCamp/action-slack-notify@v2.3.0
         env:
           SLACK_COLOR: ${{ job.status }}
-          SLACK_TITLE: IO Process Observation Failed!
+          SLACK_TITLE: ARIO Process Evaluation Failed!
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_CUSTOM_PAYLOAD: |
             {
               "attachments": [
                 {
-                  "fallback": "IO Process Observation Failed",
+                  "fallback": "AR.IO Process Evaluation Failed",
                   "color": "danger",
                   "title": "Details",
-                  "text": "The IO Process has failed at least one test!",
+                  "text": "The AR.IO Process has failed at least one test!",
                   "fields": [
                     {
                       "title": "Process ID",
@@ -90,34 +92,29 @@ jobs:
 
       # on sucess send a slack message
       - name: Notify Success
-        if: success() && vars.NOTIFY_SUCCESS == 'true'
+        if: success()
         uses: rtCamp/action-slack-notify@v2.3.0
         env:
           SLACK_COLOR: ${{ job.status }}
-          SLACK_TITLE: IO Process Observation Success!
+          SLACK_TITLE: ARIO Process Observation Success!
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_CUSTOM_PAYLOAD: |
             {
               "attachments": [{
-                "fallback": "IO Process Observation Success!",
+                "fallback": "AR.IO Process Evaluation Success!",
                 "color": "good",
                 "title": "Test Results",
-                "text": 'The IO Process has passed all observation tests!',
-                "fields": [{
-                  "title": "Network",
-                  "value": "${{ matrix.network }}",
-                  "short": true
-                },
-                {
-                  "title": "Process ID",
-                  "value": "${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}",
-                  "short": true
+                "text": 'The AR.IO Process has passed all evaluation tests!',
+                "fields": [
+                  {
+                    "title": "Process ID",
+                    "value": "${{ env.ARIO_NETWORK_PROCESS_ID }}",
+                    "short": true
                 },
                 {
                   "title": "GitHub Action",
                   "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
                   "short": false
                 }
-                ]
-              }]
+              ]
             }
