@@ -938,6 +938,66 @@ describe("arns", function()
 			local discountTotal = expectedCost - (math.floor(expectedCost * operatorDiscountRate))
 			assert.are.equal(discountTotal, arns.getTokenCost(intendedAction).tokenCost)
 		end)
+		describe("Primary-Name-Request Cost", function()
+			local testCriteria = {
+				-- leased names
+				{
+					name = "basename1",
+					basename = "basename1",
+					purchaseType = "lease",
+				},
+				{
+					-- convert to basename with baseNameForName in intent
+					name = "undername_basename2",
+					-- use to set the record
+					basename = "basename2",
+					purchaseType = "lease",
+				},
+				-- permabought names
+				{
+					name = "basename3",
+					basename = "basename3",
+					purchaseType = "permabuy",
+				},
+				{
+					name = "undername_basename4",
+					basename = "basename4",
+					purchaseType = "permabuy",
+				},
+			}
+
+			for _, criteria in ipairs(testCriteria) do
+				it("should return token cost for " .. criteria.purchaseType .. " " .. criteria.name, function()
+					-- Reset demand factor
+					local demandFactor = 1.052
+					_G.DemandFactor.currentDemandFactor = demandFactor
+					local baseNameFee = _G.DemandFactor.fees[constants.PRIMARY_NAME_REQUEST_DEFAULT_NAME_LENGTH]
+					local primaryNameExpectedFees = {
+						lease = math.floor(baseNameFee * 1 * 0.001) * demandFactor,
+						permabuy = math.floor(baseNameFee * 1 * 0.005) * demandFactor,
+					}
+					_G.NameRegistry.records[criteria.basename] = {
+						endTimestamp = criteria.purchaseType == "lease" and 10000000 or nil,
+						processId = testProcessId,
+						purchasePrice = basePriceForNineLetterName,
+						startTimestamp = 0,
+						type = criteria.purchaseType,
+						undernameLimit = 10,
+					}
+
+					local intendedAction = {
+						intent = "Primary-Name-Request",
+						name = utils.baseNameForName(criteria.name),
+						currentTimestamp = 0,
+					}
+
+					assert.are.equal(
+						primaryNameExpectedFees[criteria.purchaseType],
+						arns.getTokenCost(intendedAction).tokenCost
+					)
+				end)
+			end
+		end)
 
 		it("should not apply discount on a gateway that is found but does not meet the requirements", function()
 			_G.GatewayRegistry[stubRandomAddress] = testGateway

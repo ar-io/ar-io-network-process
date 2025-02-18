@@ -934,4 +934,14 @@ describe("utils", function()
 			assert.is_false(utils.booleanOrBooleanStringToBoolean(1))
 		end)
 	end)
+	describe("baseNameForName", function()
+		it("should get base name for name with an undername", function()
+			local undername = "undername"
+			local basename = "basename"
+			local name = undername .. "_" .. basename
+
+			local baseNameFromName = utils.baseNameForName(name)
+			assert.are.same(baseNameFromName, basename)
+		end)
+	end)
 end)

@@ -69,6 +69,73 @@ describe("Primary Names", function()
 		end
 	end)
 
+	describe("assertValidUndername", function()
+		it("should return false for invalid undernames", function()
+			local invalidNames = {
+				"", -- empty string
+				nil, -- nil value
+				{}, -- table
+				123, -- number
+				true, -- boolean
+				"test ar", -- space
+				"test!.ar", -- !
+				"test@.ar", -- @
+				"test#.ar", -- #
+				"test$.ar", -- $
+				"test%.ar", -- %
+				"test^.ar", -- ^
+				"test&.ar", -- &
+				"test*.ar", -- *
+				"test(.ar", -- (
+				"test).ar", -- )
+				"test+.ar", -- +
+				"test=.ar", -- =
+				"test{.ar", -- {
+				"test}.ar", -- }
+				string.rep("a", 62), -- too long
+				"_ab",
+				"ba_",
+				"_ab_ab_",
+				"-ab_ab",
+				"ab_ab-",
+			}
+
+			for _, name in ipairs(invalidNames) do
+				local status, err = pcall(primaryNames.assertValidUndername, name)
+				assert.is_false(status, "Expected " .. name .. " to be invalid")
+				assert.not_nil(err)
+			end
+		end)
+
+		it("should return true for valid undername", function()
+			local validNames = {
+				"a", -- single character
+				"z", -- single character
+				"0", -- single numeric
+				"9", -- single numeric
+				"test123", -- alphanumeric
+				"123test", -- starts with number
+				"test-123", -- with hyphen
+				"a123456789", -- multiple numbers
+				string.rep("a", 61), -- max length
+				"abcdefghijklmnopqrstuvwxyz0123456789", -- all valid chars
+				"UPPERCASE", -- uppercase allowed
+				"MixedCase123", -- mixed case
+				"with-hyphens-123", -- multiple hyphens
+				"1-2-3", -- numbers and hyphens
+				"a-b-c", -- letters and hyphens
+				"ab_ab",
+				"ab-ab_ab",
+			}
+
+			for _, name in ipairs(validNames) do
+				local status, err = pcall(primaryNames.assertValidUndername, name)
+				assert.is_true(status, "Expected " .. name .. " to be valid")
+				assert.is_nil(err)
+			end
+		end)
+	end)
+
 	describe("createPrimaryNameRequest", function()
 		it("should fail if the arns record does not exist for the name", function()
 			local status, err =
