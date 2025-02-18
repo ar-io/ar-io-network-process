@@ -1011,7 +1011,7 @@ describe("arns", function()
 
 					local intendedAction = {
 						intent = "Primary-Name-Request",
-						name = utils.baseNameForName(criteria.name),
+						name = criteria.name,
 						currentTimestamp = 0,
 					}
 

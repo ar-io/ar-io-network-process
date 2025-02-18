@@ -717,27 +717,27 @@ function arns.getTokenCost(intendedAction)
 	local tokenCost = 0
 	local purchaseType = intendedAction.purchaseType or "lease"
 	local years = tonumber(intendedAction.years)
-	local name = intendedAction.name
 	-- We get the base name in case its a primary name request - which, because of undername primary names, can be longer than the longest arns base fee
-	local baseFee = demand.baseFeeForNameLength(#utils.baseNameForName(name))
+	local baseName = utils.baseNameForName(intendedAction.name)
+	local baseFee = demand.baseFeeForNameLength(#baseName)
 	local qty = tonumber(intendedAction.quantity)
-	local record = intendedAction.record or arns.getRecord(name)
+	local record = intendedAction.record or arns.getRecord(baseName)
 	local currentTimestamp = tonumber(intendedAction.currentTimestamp)
 	local returnedNameDetails = nil
 
 	assert(type(intent) == "string", "Intent is required and must be a string.")
-	assert(type(name) == "string", "Name is required and must be a string.")
+	assert(type(baseName) == "string", "Name is required and must be a string.")
 	if intent == "Buy-Name" then
 		-- stub the process id as it is not required for this intent
 		local processId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-		arns.assertValidBuyRecord(name, years, purchaseType, processId, false)
+		arns.assertValidBuyRecord(baseName, years, purchaseType, processId, false)
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
-		local returnedName = arns.getReturnedNameUnsafe(name)
+		local returnedName = arns.getReturnedNameUnsafe(baseName)
 		if returnedName then
 			local premiumMultiplier =
 				arns.getReturnedNamePremiumMultiplier(returnedName.startTimestamp, currentTimestamp)
 			returnedNameDetails = {
-				name = name,
+				name = baseName,
 				initiator = returnedName.initiator,
 				startTimestamp = returnedName.startTimestamp,
 				endTimestamp = returnedName.startTimestamp + constants.RETURNED_NAME_DURATION_MS,
