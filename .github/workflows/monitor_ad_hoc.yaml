@@ -1,0 +1,118 @@
+name: IO Process Status
+
+on:
+  workflow_dispatch:
+
+env:
+  ARIO_NETWORK_PROCESS_ID: ${{ vars.ARIO_NETWORK_PROCESS_ID || inputs.process_id }}
+
+jobs:
+  sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'yarn'
+
+      - run: git clone -b alpha https://github.com/ar-io/ar-io-sdk.git
+      - run: yarn
+        working-directory: ./ar-io-sdk
+      - run: yarn test:esm # full e2e integration tests
+        working-directory: ./ar-io-sdk
+        env:
+          ARIO_NETWORK_PROCESS_ID: ${{ env.ARIO_NETWORK_PROCESS_ID }}
+
+  monitor:
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'yarn'
+
+      - name: Setup
+        run: yarn
+
+      - name: Monitor
+        run: yarn monitor
+        id: monitor
+        env:
+          ARIO_NETWORK_PROCESS_ID: ${{ env.ARIO_NETWORK_PROCESS_ID }}
+
+  notify:
+    needs: [monitor, sdk]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2.3.0
+        env:
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: IO Process Observation Failed!
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CUSTOM_PAYLOAD: |
+            {
+              "attachments": [
+                {
+                  "fallback": "IO Process Observation Failed",
+                  "color": "danger",
+                  "title": "Details",
+                  "text": "The IO Process has failed at least one test!",
+                  "fields": [
+                    {
+                      "title": "Process ID",
+                      "value": "${{ env.ARIO_NETWORK_PROCESS_ID }}",
+                      "short": true
+                    },
+                    {
+                      "title": "GitHub Action",
+                      "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                      "short": false
+                    },
+                  ]
+                }
+              ]
+            }
+
+      # on sucess send a slack message
+      - name: Notify Success
+        if: success() && vars.NOTIFY_SUCCESS == 'true'
+        uses: rtCamp/action-slack-notify@v2.3.0
+        env:
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: IO Process Observation Success!
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CUSTOM_PAYLOAD: |
+            {
+              "attachments": [{
+                "fallback": "IO Process Observation Success!",
+                "color": "good",
+                "title": "Test Results",
+                "text": 'The IO Process has passed all observation tests!',
+                "fields": [{
+                  "title": "Network",
+                  "value": "${{ matrix.network }}",
+                  "short": true
+                },
+                {
+                  "title": "Process ID",
+                  "value": "${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}",
+                  "short": true
+                },
+                {
+                  "title": "GitHub Action",
+                  "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                  "short": false
+                }
+                ]
+              }]
+            }
