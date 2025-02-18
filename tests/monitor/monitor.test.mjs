@@ -849,7 +849,6 @@ describe('setup', () => {
     );
 
     it('should not have any returned names older than two weeks', async () => {
-      const twoWeeksMs = 2 * 7 * 24 * 60 * 60 * 1000;
       const { items: returnedNames } = await io.getArNSReturnedNames({
         limit: 1000,
       });
