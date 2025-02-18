@@ -1,3 +1,5 @@
+package.path = "./src/?.lua;" .. package.path
+
 _G.ao = {
 	send = function(val)
 		return val
