@@ -9,6 +9,8 @@ Logger.default.setLogLevel('info');
 
 export const mARIOPerARIO = 1_000_000;
 export const ARIOToMARIO = (amount) => amount * mARIOPerARIO;
+
+const twoWeeksMs = 2 * 7 * 24 * 60 * 60 * 1000;
 const processId = process.env.ARIO_NETWORK_PROCESS_ID || ARIO_DEVNET_PROCESS_ID;
 const io = ARIO.init({
   process: new AOProcess({
@@ -192,6 +194,14 @@ describe('setup', () => {
       assert(
         handlersList.includes('_default'),
         '_default handler is not in the process handlers list',
+      );
+      assert(
+        handlersList.includes('sanitize'),
+        'sanitize handler is not in the process handlers list',
+      );
+      assert(
+        handlersList.includes('prune'),
+        'prune handler is not in the process handlers list',
       );
       const evalIndex = handlersList.indexOf('_eval');
       const sanitizeIndex = handlersList.indexOf('sanitize');
@@ -534,6 +544,12 @@ describe('setup', () => {
 
   // gateway registry - ensure no invalid gateways
   describe('gateway registry', () => {
+    let gateways;
+
+    before(async () => {
+      gateways = await getGateways();
+    });
+
     it('should only have valid gateways', { timeout: 60000 }, async () => {
       const { durationMs, epochZeroStartTimestamp } =
         await io.getEpochSettings();
@@ -542,8 +558,6 @@ describe('setup', () => {
         0,
         Math.floor((Date.now() - epochZeroStartTimestamp) / durationMs),
       );
-
-      const gateways = await getGateways();
 
       const uniqueGateways = new Set();
       for (const gateway of gateways) {
@@ -682,6 +696,23 @@ describe('setup', () => {
       );
     });
 
+    it('should have the correct totalDelegatedStake for every gateway', async () => {
+      const allDelegates = await getDelegates();
+      for (const gateway of gateways) {
+        const filteredForGateway = allDelegates.filter(
+          (delegate) => delegate.gatewayAddress === gateway.gatewayAddress,
+        );
+        const totalDelegatedStake = filteredForGateway.reduce(
+          (acc, delegate) => acc + delegate.delegatedStake,
+          0,
+        );
+        assert(
+          totalDelegatedStake === gateway.totalDelegatedStake,
+          `Gateway ${gateway.gatewayAddress} has an invalid total delegated stake: ${gateway.totalDelegatedStake}`,
+        );
+      }
+    });
+
     it('should have valid delegates for all gateways', async () => {
       const delegates = await getDelegates();
       for (const delegate of delegates) {
@@ -769,8 +800,6 @@ describe('setup', () => {
 
   // arns registry - ensure no invalid arns
   describe('arns names', () => {
-    const twoWeeks = 2 * 7 * 24 * 60 * 60 * 1000;
-
     it(
       'should not have any arns records older than two weeks',
       { timeout: 60000 },
@@ -800,7 +829,7 @@ describe('setup', () => {
               `ArNS name '${arn.name}' has no end timestamp`,
             );
             assert(
-              arn.endTimestamp > Date.now() - twoWeeks,
+              arn.endTimestamp > Date.now() - twoWeeksMs,
               `ArNS name '${arn.name}' is older than two weeks`,
             );
           }
@@ -808,7 +837,7 @@ describe('setup', () => {
           if (arn.type === 'permabuy') {
             assert(
               !arn.endTimestamp,
-              `ArNS name '${arn.name}' has an end timestamp`,
+              `ArNS name '${arn.name}' has an end timestamp but is a permabuy`,
             );
           }
         }
@@ -820,7 +849,7 @@ describe('setup', () => {
     );
 
     it('should not have any returned names older than two weeks', async () => {
-      const twoWeekMs = 2 * 7 * 24 * 60 * 60 * 1000;
+      const twoWeeksMs = 2 * 7 * 24 * 60 * 60 * 1000;
       const { items: returnedNames } = await io.getArNSReturnedNames({
         limit: 1000,
       });
@@ -835,7 +864,7 @@ describe('setup', () => {
           returnedName.endTimestamp &&
             returnedName.endTimestamp > Date.now() &&
             returnedName.endTimestamp ==
-              returnedName.startTimestamp + twoWeekMs,
+              returnedName.startTimestamp + twoWeeksMs,
           `Returned name ${returnedName.name} has unexpected end timestamp ${returnedName.endTimestamp} (${new Date(returnedName.endTimestamp).toLocaleString()})`,
         );
         assert(
@@ -872,7 +901,6 @@ describe('setup', () => {
 
   describe('primary name', () => {
     it('should not have any expired primary name requests', async () => {
-      const twoWeeks = 2 * 7 * 24 * 60 * 60 * 1000;
       const { items: primaryNameRequests } = await io.getPrimaryNameRequests({
         limit: 1000,
       });
@@ -884,7 +912,7 @@ describe('setup', () => {
           `Primary name request ${primaryNameRequest.name} has unexpected start timestamp ${primaryNameRequest.startTimestamp} (${new Date(primaryNameRequest.startTimestamp).toLocaleString()})`,
         );
         assert(
-          primaryNameRequest.startTimestamp + twoWeeks > Date.now(),
+          primaryNameRequest.startTimestamp + twoWeeksMs > Date.now(),
           `Primary name request ${primaryNameRequest.name} has unexpected start timestamp ${primaryNameRequest.startTimestamp} (${new Date(primaryNameRequest.startTimestamp).toLocaleString()})`,
         );
       }
@@ -895,6 +923,18 @@ describe('setup', () => {
         limit: 1000,
       });
       for (const primaryName of primaryNames) {
+        // assert the base name is a valid arns name
+        const baseName = primaryName.name.split('_').pop(); // get the last part of the name
+        const record = await io.getArNSRecord({
+          name: baseName,
+        });
+        if (record.type === 'lease') {
+          assert(
+            record.endTimestamp + twoWeeksMs > Date.now(),
+            `Primary name ${primaryName.name} base name of ${baseName} has expired (including grace period)`,
+          );
+        }
+        assert(record, `Primary name ${primaryName.name} has no record`);
         assert(primaryName.owner, 'Primary name has no owner');
         assert(primaryName.name, 'Primary name has no name');
         assert(
