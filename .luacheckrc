@@ -7,6 +7,7 @@ local default_globals = {
 	"Handlers",
 	"ao",
 }
+globals = default_globals
 
 local file_globals = dofile("src/globals.lua")
 
