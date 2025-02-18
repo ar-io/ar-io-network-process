@@ -3,9 +3,27 @@ name: IO Process Status
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 0-5,8-23 * * *' # Run every hour except 6AM UTC
+    - cron: '0 * * * *' # Run every hour
 
 jobs:
+  sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'yarn'
+
+      - run: git clone -b alpha https://github.com/ar-io/ar-io-sdk.git
+      - run: yarn
+        working-directory: ./ar-io-sdk
+      - run: yarn test:esm # full e2e integration tests
+        working-directory: ./ar-io-sdk
+        env:
+          ARIO_NETWORK_PROCESS_ID: ${{ vars.ARIO_NETWORK_PROCESS_ID }}
+          AO_CU_URL: ${{ vars.AO_CU_URL }}
+
   monitor:
     permissions:
       contents: read
@@ -34,6 +52,10 @@ jobs:
         env:
           ARIO_NETWORK_PROCESS_ID: ${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}
 
+  notify:
+    needs: [monitor, sdk]
+    runs-on: ubuntu-latest
+    steps:
       - name: Notify Failure
         if: failure()
         uses: rtCamp/action-slack-notify@v2.3.0
@@ -48,7 +70,7 @@ jobs:
                   "fallback": "IO Process Observation Failed",
                   "color": "danger",
                   "title": "Details",
-                  "text": "The IO Process has failed at least one observation test!",
+                  "text": "The IO Process has failed at least one test!",
                   "fields": [
                     {
                       "title": "Network",
