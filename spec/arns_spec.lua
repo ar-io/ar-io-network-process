@@ -75,6 +75,18 @@ describe("arns", function()
 		it("should return false for invalid ArNS names", function()
 			local invalidNames = {
 				"", -- empty string
+				"-", -- single character name should be only alphanumeric
+				"_", -- single character name should be only alphanumeric
+				"a-", -- must end with alphanumeric
+				"Z--", -- must end with alphanumeric
+				"00-", -- must end with alphanumeric
+				"-a", -- must start with alphanumeric
+				"--a", -- must start with alphanumeric
+				"_a", -- must start with alphanumeric
+				"---", -- must start and end with alphanumeric
+				"-a-", -- must start and end with alphanumeric
+				"_a_", -- must start and end with alphanumeric
+				"a_a", -- must start and end with alphanumerics, all other positions can also contain a dash
 				nil, -- nil value
 				{}, -- table
 				123, -- number
@@ -110,6 +122,18 @@ describe("arns", function()
 				"z", -- single character
 				"0", -- single numeric
 				"9", -- single numeric
+				"A", -- single character
+				"aa", -- start and end with alphabetical characters
+				"0a", -- start with numeric, end with alphabetical character
+				"a0", -- start with alphabetical, end with numeric character
+				"a-a", -- allow dashes between start and end characters
+				"0-a", -- allow dashes between start and end characters
+				"a-0", -- allow dashes between start and end characters
+				"A-a", -- allow dashes between start and end characters
+				"A-0", -- allow dashes between start and end characters
+				"0-a", -- allow dashes between start and end characters
+				"0-A", -- allow dashes between start and end characters
+				"a--a", -- allow dashes between start and end characters
 				"test123", -- alphanumeric
 				"123test", -- starts with number
 				"test-123", -- with hyphen
@@ -937,6 +961,66 @@ describe("arns", function()
 
 			local discountTotal = expectedCost - (math.floor(expectedCost * operatorDiscountRate))
 			assert.are.equal(discountTotal, arns.getTokenCost(intendedAction).tokenCost)
+		end)
+		describe("Primary-Name-Request Cost", function()
+			local testCriteria = {
+				-- leased names
+				{
+					name = "basename1",
+					basename = "basename1",
+					purchaseType = "lease",
+				},
+				{
+					-- convert to basename with baseNameForName in intent
+					name = "undername_basename2",
+					-- use to set the record
+					basename = "basename2",
+					purchaseType = "lease",
+				},
+				-- permabought names
+				{
+					name = "basename3",
+					basename = "basename3",
+					purchaseType = "permabuy",
+				},
+				{
+					name = "undername_basename4",
+					basename = "basename4",
+					purchaseType = "permabuy",
+				},
+			}
+
+			for _, criteria in ipairs(testCriteria) do
+				it("should return token cost for " .. criteria.purchaseType .. " " .. criteria.name, function()
+					-- Reset demand factor
+					local demandFactor = 1.052
+					_G.DemandFactor.currentDemandFactor = demandFactor
+					local baseNameFee = _G.DemandFactor.fees[constants.PRIMARY_NAME_REQUEST_DEFAULT_NAME_LENGTH]
+					local primaryNameExpectedFees = {
+						lease = math.floor(baseNameFee * 1 * 0.001) * demandFactor,
+						permabuy = math.floor(baseNameFee * 1 * 0.005) * demandFactor,
+					}
+					_G.NameRegistry.records[criteria.basename] = {
+						endTimestamp = criteria.purchaseType == "lease" and 10000000 or nil,
+						processId = testProcessId,
+						purchasePrice = basePriceForNineLetterName,
+						startTimestamp = 0,
+						type = criteria.purchaseType,
+						undernameLimit = 10,
+					}
+
+					local intendedAction = {
+						intent = "Primary-Name-Request",
+						name = criteria.name,
+						currentTimestamp = 0,
+					}
+
+					assert.are.equal(
+						primaryNameExpectedFees[criteria.purchaseType],
+						arns.getTokenCost(intendedAction).tokenCost
+					)
+				end)
+			end
 		end)
 
 		it("should not apply discount on a gateway that is found but does not meet the requirements", function()

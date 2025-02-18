@@ -1,4 +1,5 @@
 local primaryNames = require("primary_names")
+local utils = require("utils")
 
 describe("Primary Names", function()
 	before_each(function()
@@ -12,6 +13,179 @@ describe("Primary Names", function()
 		_G.NameRegistry = {
 			records = {},
 		}
+	end)
+
+	describe("assertValidPrimaryName", function()
+		local validPrimaryNames = {
+			"1",
+			"a",
+			"1a",
+			"1-1",
+			"a-1",
+			"1-a",
+			"1__1",
+			("").rep("1", 51),
+			("").rep("a", 51),
+			-- undernames
+			"1_1",
+			"test_1",
+			"1_test",
+			"1234_test",
+			"fsakdjhflkasjdhflkaf_test",
+			("").rep("1", 61) .. "_t",
+			("").rep("a", 61) .. "_t",
+			"a_" .. ("").rep("1", 51),
+			"9_" .. ("").rep("z", 51),
+		}
+
+		for _, primaryName in ipairs(validPrimaryNames) do
+			it("should be a valid primary name", function()
+				local status, res = pcall(primaryNames.assertValidPrimaryName, primaryName)
+
+				assert(status == true, "Failed to validate name: " .. primaryName .. " error: " .. (res or ""))
+			end)
+		end
+
+		local invalidPrimaryNames = {
+			"%",
+			"#",
+			".",
+			"()",
+			"-",
+			"_",
+			"-_-",
+			"_-_",
+			"-a",
+			"_a",
+			"a-",
+			"a_a_",
+			"_a_a",
+			("").rep("1", 62) .. "_t",
+			"1_" .. ("").rep("a", 52),
+			-- valid single character undernames with invalid base names
+			"a_",
+			"a__",
+			"a_!",
+			"a_-",
+			"a_A-",
+			"a_A_",
+			"a_A!",
+			"a_!a",
+			"a_-a",
+			-- valid mulitcharacter undernames with invalid base names
+			"aa_",
+			"a__",
+			"00_",
+			"0-_",
+			"aa_!",
+			"a__-",
+			"00__",
+			"aa_A-",
+			"a__A!",
+			"00_!a",
+			"0-_-a",
+			-- invalid single character undernames with valid base names
+			"!_a",
+			"__a",
+			"-_a",
+			"!_aa",
+			"__aa",
+			"-_aa",
+			"!_a-a",
+			"__a-a",
+			"-_a-a",
+			-- invalid multicharacter undernames with valid base names
+			"!a_a",
+			"_a_a",
+			"-a_a",
+			"a!_a",
+			"a!a_a",
+			"a a_a",
+			-- invalid undernames with invalid base names
+			"!_!",
+			"!_!a",
+			"!_a!",
+			"!_a-",
+			"!_-a",
+			"!_a!a",
+			"!a_!",
+			"a!_!a",
+			"a!a_a!",
+		}
+		for _, primaryName in ipairs(invalidPrimaryNames) do
+			it("should be a assert primary name is invalid", function()
+				local status, _ = pcall(primaryNames.assertValidPrimaryName, primaryName)
+
+				assert(status == false, "Primary name " .. primaryName .. " incorrectly shows as valid")
+			end)
+		end
+	end)
+
+	describe("assertValidUndername", function()
+		it("should return false for invalid undernames", function()
+			local invalidNames = {
+				"", -- empty string
+				nil, -- nil value
+				{}, -- table
+				123, -- number
+				true, -- boolean
+				"test ar", -- space
+				"test!.ar", -- !
+				"test@.ar", -- @
+				"test#.ar", -- #
+				"test$.ar", -- $
+				"test%.ar", -- %
+				"test^.ar", -- ^
+				"test&.ar", -- &
+				"test*.ar", -- *
+				"test(.ar", -- (
+				"test).ar", -- )
+				"test+.ar", -- +
+				"test=.ar", -- =
+				"test{.ar", -- {
+				"test}.ar", -- }
+				string.rep("a", 62), -- too long
+				"_ab",
+				"ba_",
+				"_ab_ab_",
+				"-ab_ab",
+				"ab_ab-",
+			}
+
+			for _, name in ipairs(invalidNames) do
+				local status, err = pcall(primaryNames.assertValidUndername, name)
+				assert.is_false(status, "Expected " .. name .. " to be invalid")
+				assert.not_nil(err)
+			end
+		end)
+
+		it("should return true for valid undername", function()
+			local validNames = {
+				"a", -- single character
+				"z", -- single character
+				"0", -- single numeric
+				"9", -- single numeric
+				"test123", -- alphanumeric
+				"123test", -- starts with number
+				"test-123", -- with hyphen
+				"a123456789", -- multiple numbers
+				string.rep("a", 61), -- max length
+				"abcdefghijklmnopqrstuvwxyz0123456789", -- all valid chars
+				"UPPERCASE", -- uppercase allowed
+				"MixedCase123", -- mixed case
+				"with-hyphens-123", -- multiple hyphens
+				"1-2-3", -- numbers and hyphens
+				"a-b-c", -- letters and hyphens
+				"ab_ab",
+				"ab-ab_ab",
+			}
+
+			for _, name in ipairs(validNames) do
+				local status, err = pcall(primaryNames.assertValidUndername, name)
+				assert.is_true(status, "Expected " .. name .. " to be valid")
+				assert.is_nil(err)
+			end
+		end)
 	end)
 
 	describe("createPrimaryNameRequest", function()
@@ -156,6 +330,60 @@ describe("Primary Names", function()
 				assert.are.equal(200000, _G.Balances[ao.id])
 			end
 		)
+
+		local validPrimaryUndernameNames = {
+			"1_test",
+			"1234_test",
+			"fsakdjhflkasjdhflkaf_test",
+			("").rep("1", 61) .. "_t",
+			"a_" .. ("").rep("1", 51),
+		}
+
+		for _, primaryName in ipairs(validPrimaryUndernameNames) do
+			it(
+				"should create a primary name request with undername and transfer the cost from the initiator to the protocol balance",
+				function()
+					local baseName = utils.baseNameForName(primaryName)
+					_G.Balances = {
+						["user-requesting-primary-name"] = 10000000,
+					}
+					_G.NameRegistry.records = {
+						[baseName] = {
+							startTimestamp = 0,
+							processId = "processId",
+							type = "lease",
+							endTimestamp = 1234567890 + 30 * 24 * 60 * 60 * 1000,
+						},
+					}
+					local primaryNameRequest = primaryNames.createPrimaryNameRequest(
+						primaryName,
+						"user-requesting-primary-name",
+						1234567890,
+						"test-msg-id"
+					)
+					assert.are.same({
+						request = {
+							name = primaryName,
+							startTimestamp = 1234567890,
+							endTimestamp = 1234567890 + 7 * 24 * 60 * 60 * 1000,
+						},
+						baseNameOwner = "processId",
+						fundingPlan = {
+							address = "user-requesting-primary-name",
+							balance = 200000, -- cost should be the undername cost for 1 year on a 51 character name of the same type, against the current demand factor
+							shortfall = 0,
+							stakes = {},
+						},
+						fundingResult = {
+							newWithdrawVaults = {},
+							totalFunded = 200000,
+						},
+					}, primaryNameRequest)
+					assert.are.equal(9800000, _G.Balances["user-requesting-primary-name"])
+					assert.are.equal(200000, _G.Balances[ao.id])
+				end
+			)
+		end
 	end)
 
 	describe("approvePrimaryNameRequest", function()
