@@ -418,45 +418,32 @@ local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
 	addPrimaryNameCounts(ioEvent)
 end
 
-local function assertTableBytesLowerThan(tbl, max_bytes)
-	local seen = {}
-	local current_size = 0
+local function assertValueBytesLowerThan(value, remainingBytes, tables_seen)
+	local tablesSeen = tables_seen or {}
 
-	local function sizeof(val)
-		if current_size > max_bytes then
-			error("Data size exceeds " .. max_bytes .. " bytes")
-		end
-
-		local t = type(val)
-		if t == "string" then
-			current_size = current_size + #val
-		elseif t == "number" or t == "boolean" then
-			current_size = current_size + 8 -- Approximate size for numbers/booleans
-		elseif t == "table" and not seen[val] then
-			seen[val] = true
-			for k, v in pairs(val) do
-				sizeof(k)
-				sizeof(v)
-				if current_size > max_bytes then
-					error("Data size is too large")
-				end
-			end
+	local t = type(value)
+	if t == "string" then
+		remainingBytes = remainingBytes - #value
+	elseif t == "number" or t == "boolean" then
+		remainingBytes = remainingBytes - 8 -- Approximate size for numbers/booleans
+	elseif t == "table" and not tablesSeen[value] then
+		tablesSeen[value] = true
+		for k, v in pairs(value) do
+			remainingBytes = assertValueBytesLowerThan(k, remainingBytes, tablesSeen)
+			remainingBytes = assertValueBytesLowerThan(v, remainingBytes, tablesSeen)
 		end
 	end
 
-	sizeof(tbl)
+	if remainingBytes <= 0 then
+		error("Data size is too large")
+	end
+	return remainingBytes
 end
 
 -- Sanitize inputs before every interaction
 local function assertAndSanitizeInputs(msg)
 	if msg.Tags.Action ~= "Eval" and msg.Data then
-		-- assert data size is less than or equal to 100 bytes, we dont use msg.Data
-
-		if type(msg.Data) == "table" then
-			assertTableBytesLowerThan(msg.Data, 100)
-		else
-			assert(#msg.Data <= 100, "Data size is too large")
-		end
+		assertValueBytesLowerThan(msg.Data, 100)
 	end
 
 	assert(
