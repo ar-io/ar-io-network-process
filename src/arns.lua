@@ -573,11 +573,11 @@ end
 function arns.assertValidArNSName(name)
 	assert(name and type(name) == "string", "Name is required and must be a string.")
 	assert(
-		#name >= constants.MIN_NAME_LENGTH and #name <= constants.MAX_NAME_LENGTH,
+		#name >= constants.MIN_NAME_LENGTH and #name <= constants.MAX_BASE_NAME_LENGTH,
 		"Name length is invalid. Must be between "
 			.. constants.MIN_NAME_LENGTH
 			.. " and "
-			.. constants.MAX_NAME_LENGTH
+			.. constants.MAX_BASE_NAME_LENGTH
 			.. " characters."
 	)
 	assert(
