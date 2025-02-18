@@ -1,9 +1,9 @@
 allow_defined = true
-max_line_length = 185
 exclude_files = {
-	"src/crypto",
+    "src/crypto"
 }
 globals = {
-	"Handlers",
-	"ao",
+    "Handlers",
+    "ao"
 }
+max_line_length = 185
