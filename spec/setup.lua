@@ -1,5 +1,3 @@
-package.path = "../?.lua;./?.lua;../src/?.lua;" .. package.path
-
 _G.ao = {
 	send = function(val)
 		return val
@@ -22,6 +20,6 @@ _G.Handlers = {
 }
 
 -- setup all process globals
-require("src/globals")
+require(".src.globals")
 
 print("Setup global ao mocks successfully...")
