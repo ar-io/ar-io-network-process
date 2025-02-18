@@ -80,7 +80,10 @@ function primaryNames.assertValidPrimaryName(name)
 
 	assert(
 		#name <= constants.MAX_PRIMARY_NAME_LENGTH,
-		"Primary Name is too long, received length of " .. tostring(#name)
+		"Primary Name with length "
+			.. #name
+			.. " exceeds maximum allowable length of "
+			.. constants.MAX_PRIMARY_NAME_LENGTH
 	)
 
 	-- Ensure name starts and ends with alphanumeric, and only allows `_` or `-` in between

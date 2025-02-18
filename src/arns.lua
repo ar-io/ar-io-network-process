@@ -580,10 +580,20 @@ function arns.assertValidArNSName(name)
 			.. constants.MAX_BASE_NAME_LENGTH
 			.. " characters."
 	)
-	assert(
-		name:match(constants.ARNS_NAME_REGEX),
-		"Name pattern for " .. name .. " is invalid. Must match " .. constants.ARNS_NAME_REGEX
-	)
+	if #name == 1 then
+		assert(
+			name:match(constants.ARNS_NAME_SINGLE_CHAR_REGEX),
+			"Single-character name pattern for "
+				.. name
+				.. " is invalid. Must match "
+				.. constants.ARNS_NAME_SINGLE_CHAR_REGEX
+		)
+	else
+		assert(
+			name:match(constants.ARNS_NAME_MULTICHARACTER_REGEX),
+			"Name pattern for " .. name .. " is invalid. Must match " .. constants.ARNS_NAME_MULTICHARACTER_REGEX
+		)
+	end
 end
 
 --- Asserts that a buy record is valid

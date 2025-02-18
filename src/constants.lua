@@ -121,9 +121,9 @@ constants.MIN_NAME_LENGTH = 1
 -- - Can contain alphanumeric characters and hyphens (%w-)
 -- - Ends with an alphanumeric character (%w)
 -- - Does not allow names to start or end with a hyphen
-constants.ARNS_NAME_REGEX = "^%w[%w-]*%w?$" -- TODO: validate tests around this
+constants.ARNS_NAME_SINGLE_CHAR_REGEX = "^%w$"
+constants.ARNS_NAME_MULTICHARACTER_REGEX = "^%w[%w-]*%w$"
 constants.PRIMARY_NAME_REGEX = "^[a-zA-Z0-9][a-zA-Z0-9_-]*[a-zA-Z0-9]$"
-constants.ARNS_NAME_SINGLE_CHAR_REGEX = "^[a-zA-Z0-9]$"
 constants.UNDERNAME_REGEX = "^[a-zA-Z0-9]+[a-zA-Z0-9_-]*$"
 constants.PERMABUY_LEASE_FEE_LENGTH_YEARS = 20 -- buying a permabuy record is equal to leasing the name for 20 years
 constants.ANNUAL_PERCENTAGE_FEE = 0.2 -- the fee applied for leases against the base name

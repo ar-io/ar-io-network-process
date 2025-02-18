@@ -75,6 +75,18 @@ describe("arns", function()
 		it("should return false for invalid ArNS names", function()
 			local invalidNames = {
 				"", -- empty string
+				"-", -- single character name should be only alphanumeric
+				"_", -- single character name should be only alphanumeric
+				"a-", -- must end with alphanumeric
+				"Z--", -- must end with alphanumeric
+				"00-", -- must end with alphanumeric
+				"-a", -- must start with alphanumeric
+				"--a", -- must start with alphanumeric
+				"_a", -- must start with alphanumeric
+				"---", -- must start and end with alphanumeric
+				"-a-", -- must start and end with alphanumeric
+				"_a_", -- must start and end with alphanumeric
+				"a_a", -- must start and end with alphanumerics, all other positions can also contain a dash
 				nil, -- nil value
 				{}, -- table
 				123, -- number
@@ -110,6 +122,18 @@ describe("arns", function()
 				"z", -- single character
 				"0", -- single numeric
 				"9", -- single numeric
+				"A", -- single character
+				"aa", -- start and end with alphabetical characters
+				"0a", -- start with numeric, end with alphabetical character
+				"a0", -- start with alphabetical, end with numeric character
+				"a-a", -- allow dashes between start and end characters
+				"0-a", -- allow dashes between start and end characters
+				"a-0", -- allow dashes between start and end characters
+				"A-a", -- allow dashes between start and end characters
+				"A-0", -- allow dashes between start and end characters
+				"0-a", -- allow dashes between start and end characters
+				"0-A", -- allow dashes between start and end characters
+				"a--a", -- allow dashes between start and end characters
 				"test123", -- alphanumeric
 				"123test", -- starts with number
 				"test-123", -- with hyphen
