@@ -1,9 +1,11 @@
+local epochs = {}
+
 local gar = require(".src.gar")
-local crypto = require(".crypto.init")
 local utils = require(".src.utils")
 local balances = require(".src.balances")
 local arns = require(".src.arns")
-local epochs = {}
+-- note: crypto is provided by the module, we could remove the local copy and import as `.crypto.init`
+local crypto = require(".src.crypto.init")
 
 --- @alias ObserverAddress string
 --- @alias DelegateAddress string

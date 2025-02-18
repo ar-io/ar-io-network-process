@@ -1,4 +1,4 @@
-local Queue = require(".crypto.util.queue")
+local Queue = require(".src.crypto.util.queue")
 
 local Stream = {}
 

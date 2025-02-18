@@ -1,8 +1,8 @@
-local Bit = require(".crypto.util.bit")
-local Queue = require(".crypto.util.queue")
-local Stream = require(".crypto.util.stream")
-local Hex = require(".crypto.util.hex")
-local Array = require(".crypto.util.array")
+local Bit = require(".src.crypto.util.bit")
+local Queue = require(".src.crypto.util.queue")
+local Stream = require(".src.crypto.util.stream")
+local Hex = require(".src.crypto.util.hex")
+local Array = require(".src.crypto.util.array")
 
 local util = {
 	_version = "0.0.1",

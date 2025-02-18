@@ -1,4 +1,4 @@
-local process = { _version = "0.0.1" }
+local main = {}
 local constants = require(".src.constants")
 local token = require(".src.token")
 local utils = require(".src.utils")
@@ -2655,4 +2655,4 @@ addEventingHandler("allPaginatedGatewayVaults", utils.hasMatchingTag("Action", "
 	Send(msg, { Target = msg.From, Action = "All-Gateway-Vaults-Notice", Data = json.encode(result) })
 end)
 
-return process
+return main

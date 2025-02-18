@@ -11,6 +11,7 @@ Ticker = Ticker or constants.TICKER
 Logo = Logo or constants.LOGO
 Denomination = Denomination or constants.DENOMINATION
 Owner = Owner or ao.env and ao.env.Process and ao.env.Process.Owner or "owner"
+
 --[[
     Balances
 ]]

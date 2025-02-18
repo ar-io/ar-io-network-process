@@ -905,12 +905,8 @@ function arns.recordIsActive(record, timestamp)
 		return true
 	end
 
-	-- record starts before the current timestamp and ends after the current timestamp
-	return record.startTimestamp
-			and record.startTimestamp <= timestamp
-			and record.endTimestamp
-			and record.endTimestamp >= timestamp
-		or false
+	-- to avoid pruning on forked state for records that start int he future, only check the end timestamp against the current timestamp
+	return record.endTimestamp and record.endTimestamp >= timestamp or false
 end
 
 --- Asserts that a record is valid for increasing the undername limit

@@ -1,8 +1,9 @@
+local utils = {}
 local base64 = require(".src.base64")
-local crypto = require(".crypto.init")
 local json = require(".src.json")
 local constants = require(".src.constants")
-local utils = {}
+-- note: crypto is provided by the module, we could remove the local copy and import as `.crypto.init`
+local crypto = require(".src.crypto.init")
 
 function utils.hasMatchingTag(tag, value)
 	return Handlers.utils.hasMatchingTag(tag, value)
