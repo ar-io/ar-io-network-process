@@ -1,10 +1,16 @@
-package.path = "./contract/src/?.lua;" .. package.path
+package.path = "./src/?.lua;" .. package.path
 
 _G.ao = {
 	send = function(val)
 		return val
 	end,
 	id = "test",
+	env = {
+		Process = {
+			Id = "test",
+			Owner = "test",
+		},
+	},
 }
 
 _G.Handlers = {
@@ -14,5 +20,8 @@ _G.Handlers = {
 		end,
 	},
 }
+
+-- setup all process globals
+require(".src.globals")
 
 print("Setup global ao mocks successfully...")

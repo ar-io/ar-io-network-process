@@ -1,6 +1,6 @@
+local epochs = require(".src.epochs")
+local gar = require(".src.gar")
 local tick = {}
-local epochs = require("epochs")
-local gar = require("gar")
 
 --- @class TickResult
 --- @field maybeNewEpoch PrescribedEpoch | nil The new epoch

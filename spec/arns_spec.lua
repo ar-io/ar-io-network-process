@@ -1374,7 +1374,7 @@ describe("arns", function()
 						type = "lease",
 						endTimestamp = 0,
 					},
-					-- this should not be counted as an active name since it starts after the current timestamp
+					-- this will be counted as an active name even though it starts after the current timestamp, we only enforce the end timestamp against the current timestamp
 					["future-record"] = {
 						startTimestamp = currentTimestamp + 1,
 						type = "lease",
@@ -1394,7 +1394,7 @@ describe("arns", function()
 				},
 			}
 			local arnsStats = arns.getArNSStatsAtTimestamp(currentTimestamp)
-			assert.are.equal(2, arnsStats.totalActiveNames)
+			assert.are.equal(3, arnsStats.totalActiveNames)
 			assert.are.equal(1, arnsStats.totalGracePeriodNames)
 			assert.are.equal(2, arnsStats.totalReservedNames)
 			assert.are.equal(1, arnsStats.totalReturnedNames)

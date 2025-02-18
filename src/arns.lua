@@ -1,31 +1,15 @@
 -- arns.lua
-local utils = require("utils")
-local constants = require("constants")
-local balances = require("balances")
-local demand = require("demand")
+local utils = require(".src.utils")
+local constants = require(".src.constants")
+local balances = require(".src.balances")
+local demand = require(".src.demand")
+local gar = require(".src.gar")
 local arns = {}
-local gar = require("gar")
-
---- @type Timestamp|nil
-NextRecordsPruneTimestamp = NextRecordsPruneTimestamp or 0
-
---- @type Timestamp|nil
-NextReturnedNamesPruneTimestamp = NextReturnedNamesPruneTimestamp or 0
 
 --- @class NameRegistry
 --- @field reserved table<string, ReservedName> The reserved names
 --- @field records table<string, Record> The records
 --- @field returned table<string, ReturnedName> The returned records
-
-NameRegistry = NameRegistry or {
-	reserved = {},
-	records = {},
-	returned = {},
-}
-
-if not NameRegistry.returned then
-	NameRegistry.returned = {}
-end
 
 --- @class StoredRecord
 --- @field processId string The process id of the record
@@ -935,12 +919,8 @@ function arns.recordIsActive(record, timestamp)
 		return true
 	end
 
-	-- record starts before the current timestamp and ends after the current timestamp
-	return record.startTimestamp
-			and record.startTimestamp <= timestamp
-			and record.endTimestamp
-			and record.endTimestamp >= timestamp
-		or false
+	-- to avoid pruning on forked state for records that start int he future, only check the end timestamp against the current timestamp
+	return record.endTimestamp and record.endTimestamp >= timestamp or false
 end
 
 --- Asserts that a record is valid for increasing the undername limit
@@ -1038,7 +1018,7 @@ end
 
 --- Prunes records that have expired
 --- @param currentTimestamp number The current timestamp
---- @param lastGracePeriodEntryEndTimestamp number The end timestamp of the last known record to have entered its grace period
+--- @param lastGracePeriodEntryEndTimestamp number|nil The end timestamp of the last known record to have entered its grace period
 --- @return table<string, Record> prunedRecords - the pruned records
 --- @return table<string, Record> recordsInGracePeriod - the records that have entered their grace period
 function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)

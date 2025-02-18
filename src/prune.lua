@@ -1,8 +1,8 @@
+local arns = require(".src.arns")
+local gar = require(".src.gar")
+local vaults = require(".src.vaults")
+local primaryNames = require(".src.primary_names")
 local prune = {}
-local arns = require("arns")
-local gar = require("gar")
-local vaults = require("vaults")
-local primaryNames = require("primary_names")
 
 ---@class PruneStateResult
 ---@field prunedRecords table<string, Record>
@@ -18,7 +18,7 @@ local primaryNames = require("primary_names")
 --- Prunes the state
 --- @param timestamp number The timestamp
 --- @param msgId string The message ID
---- @param lastGracePeriodEntryEndTimestamp number The end timestamp of the last known record to enter grace period
+--- @param lastGracePeriodEntryEndTimestamp number|nil The end timestamp of the last known record to enter grace period
 --- @return PruneStateResult pruneStateResult - the result of the state pruning
 function prune.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 	local prunedRecords, newGracePeriodRecords = arns.pruneRecords(timestamp, lastGracePeriodEntryEndTimestamp)

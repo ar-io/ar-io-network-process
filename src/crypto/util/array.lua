@@ -1,5 +1,5 @@
-local Bit = require(".crypto.util.bit")
-local Queue = require(".crypto.util.queue")
+local Bit = require(".src.crypto.util.bit")
+local Queue = require(".src.crypto.util.queue")
 
 local XOR = Bit.bxor
 
