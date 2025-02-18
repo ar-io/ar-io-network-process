@@ -418,8 +418,34 @@ local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
 	addPrimaryNameCounts(ioEvent)
 end
 
+local function assertValueBytesLowerThan(value, remainingBytes, tablesSeen)
+	tablesSeen = tablesSeen or {}
+
+	local t = type(value)
+	if t == "string" then
+		remainingBytes = remainingBytes - #value
+	elseif t == "number" or t == "boolean" then
+		remainingBytes = remainingBytes - 8 -- Approximate size for numbers/booleans
+	elseif t == "table" and not tablesSeen[value] then
+		tablesSeen[value] = true
+		for k, v in pairs(value) do
+			remainingBytes = assertValueBytesLowerThan(k, remainingBytes, tablesSeen)
+			remainingBytes = assertValueBytesLowerThan(v, remainingBytes, tablesSeen)
+		end
+	end
+
+	if remainingBytes <= 0 then
+		error("Data size is too large")
+	end
+	return remainingBytes
+end
+
 -- Sanitize inputs before every interaction
 local function assertAndSanitizeInputs(msg)
+	if msg.Tags.Action ~= "Eval" and msg.Data then
+		assertValueBytesLowerThan(msg.Data, 100)
+	end
+
 	assert(
 		-- TODO: replace this with LastKnownMessageTimestamp after node release 23.0.0
 		msg.Timestamp and tonumber(msg.Timestamp) >= 0,
