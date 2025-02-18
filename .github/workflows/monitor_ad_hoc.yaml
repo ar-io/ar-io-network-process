@@ -1,7 +1,12 @@
-name: IO Process Status
+name: Ad-Hoc AR.IO Process Monitoring
 
 on:
   workflow_dispatch:
+    inputs:
+      process_id:
+        description: 'The AR.IO Network Process ID to monitor'
+        required: true
+        type: string
 
 env:
   ARIO_NETWORK_PROCESS_ID: ${{ vars.ARIO_NETWORK_PROCESS_ID || inputs.process_id }}
