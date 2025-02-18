@@ -527,7 +527,7 @@ end, function(msg)
 	end
 
 	print("Pruning state at timestamp: " .. msg.Timestamp)
-	local prunedStateResult = prune.pruneState(msg.Timestamp, msg.Id, LastGracePeriodEntryEndTimestamp or 0)
+	local prunedStateResult = prune.pruneState(msg.Timestamp, msg.Id, LastGracePeriodEntryEndTimestamp)
 	if prunedStateResult then
 		local prunedRecordsCount = utils.lengthOfTable(prunedStateResult.prunedRecords or {})
 		if prunedRecordsCount > 0 then

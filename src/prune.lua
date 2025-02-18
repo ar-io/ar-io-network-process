@@ -18,7 +18,7 @@ local prune = {}
 --- Prunes the state
 --- @param timestamp number The timestamp
 --- @param msgId string The message ID
---- @param lastGracePeriodEntryEndTimestamp number The end timestamp of the last known record to enter grace period
+--- @param lastGracePeriodEntryEndTimestamp number|nil The end timestamp of the last known record to enter grace period
 --- @return PruneStateResult pruneStateResult - the result of the state pruning
 function prune.pruneState(timestamp, msgId, lastGracePeriodEntryEndTimestamp)
 	local prunedRecords, newGracePeriodRecords = arns.pruneRecords(timestamp, lastGracePeriodEntryEndTimestamp)
