@@ -103,6 +103,9 @@ end
 --- @return CreatePrimaryNameResult # the request created, or the primary name with owner data if the request is approved
 function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId, fundFrom)
 	fundFrom = fundFrom or "balance"
+
+	primaryNames.assertValidPrimaryName(name)
+
 	name = string.lower(name)
 	local baseName = utils.baseNameForName(name)
 
