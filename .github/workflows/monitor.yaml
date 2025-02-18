@@ -5,6 +5,9 @@ on:
   schedule:
     - cron: '0 * * * *' # Run every hour
 
+env:
+  ARIO_NETWORK_PROCESS_ID: ${{ vars.ARIO_NETWORK_PROCESS_ID || inputs.process_id }}
+
 jobs:
   sdk:
     runs-on: ubuntu-latest
@@ -21,17 +24,12 @@ jobs:
       - run: yarn test:esm # full e2e integration tests
         working-directory: ./ar-io-sdk
         env:
-          ARIO_NETWORK_PROCESS_ID: ${{ vars.ARIO_NETWORK_PROCESS_ID }}
-          AO_CU_URL: ${{ vars.AO_CU_URL }}
+          ARIO_NETWORK_PROCESS_ID: ${{ env.ARIO_NETWORK_PROCESS_ID }}
 
   monitor:
     permissions:
       contents: read
       actions: read
-    strategy:
-      matrix:
-        network: [testnet, devnet]
-      fail-fast: false
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -50,7 +48,7 @@ jobs:
         run: yarn monitor
         id: monitor
         env:
-          ARIO_NETWORK_PROCESS_ID: ${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}
+          ARIO_NETWORK_PROCESS_ID: ${{ env.ARIO_NETWORK_PROCESS_ID }}
 
   notify:
     needs: [monitor, sdk]
@@ -73,13 +71,8 @@ jobs:
                   "text": "The IO Process has failed at least one test!",
                   "fields": [
                     {
-                      "title": "Network",
-                      "value": "${{ matrix.network }}",
-                      "short": true
-                    },
-                    {
                       "title": "Process ID",
-                      "value": "${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}",
+                      "value": "${{ env.ARIO_NETWORK_PROCESS_ID }}",
                       "short": true
                     },
                     {
