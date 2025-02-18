@@ -418,8 +418,8 @@ local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
 	addPrimaryNameCounts(ioEvent)
 end
 
-local function assertValueBytesLowerThan(value, remainingBytes, tables_seen)
-	local tablesSeen = tables_seen or {}
+local function assertValueBytesLowerThan(value, remainingBytes, tablesSeen)
+	tablesSeen = tablesSeen or {}
 
 	local t = type(value)
 	if t == "string" then
