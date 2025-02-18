@@ -21,6 +21,9 @@ _G.Handlers = {
 	},
 }
 
+-- add .crypto.init to globals - this directory is copied from permaweb/aos
+require(".crypto.init")
+
 -- setup all process globals
 require(".src.globals")
 

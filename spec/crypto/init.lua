@@ -1,0 +1,13 @@
+local util = require(".src.crypto.util.init")
+local digest = require(".src.crypto.digest.init")
+local cipher = require(".src.crypto.cipher.init")
+
+local crypto = {
+	_version = "0.0.1",
+	digest = digest,
+	utils = util,
+	cipher = cipher,
+	random = cipher.issac.random,
+}
+
+return crypto
