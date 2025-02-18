@@ -1068,7 +1068,12 @@ function assertTokenCostTags(msg)
 		"Intent must be valid registry interaction (e.g. Buy-Name, Extend-Lease, Increase-Undername-Limit, Upgrade-Name, Primary-Name-Request). Provided intent: "
 			.. (intentType or "nil")
 	)
-	arns.assertValidArNSName(msg.Tags.Name)
+	if intentType == ActionMap.PrimaryNameRequest then
+		primaryNames.assertValidPrimaryName(msg.Tags.Name)
+	else
+		arns.assertValidArNSName(msg.Tags.Name)
+	end
+
 	-- if years is provided, assert it is a number and integer between 1 and 5
 	if msg.Tags.Years then
 		assert(utils.isInteger(msg.Tags.Years), "Invalid years. Must be integer")
