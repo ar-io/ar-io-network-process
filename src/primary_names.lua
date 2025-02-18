@@ -86,25 +86,10 @@ function primaryNames.assertValidPrimaryName(name)
 			.. constants.MAX_PRIMARY_NAME_LENGTH
 	)
 
-	-- Ensure name starts and ends with alphanumeric, and only allows `_` or `-` in between
-	assert(
-		string.match(name, constants.ARNS_NAME_SINGLE_CHAR_REGEX) ~= nil
-			or string.match(name, constants.PRIMARY_NAME_REGEX) ~= nil,
-		"Invalid Primary Name: " .. name
-	)
-
-	local nameParts = {}
-	for part in string.gmatch(name, "([^_]+)") do
-		table.insert(nameParts, part)
-	end
-
-	local baseName = nameParts[#nameParts]
-	local undername = #nameParts > 1 and name:sub(1, #name - #baseName - 1) or ""
-
+	local baseName = utils.baseNameForName(name)
 	arns.assertValidArNSName(baseName)
-
-	-- Ensure undername is validated only when it's non-empty
-	if #undername > 0 then
+	local undername = utils.undernameForName(name)
+	if undername then
 		primaryNames.assertValidUndername(undername)
 	end
 end

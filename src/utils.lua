@@ -715,4 +715,15 @@ function utils.baseNameForName(name)
 	return (name or ""):match("[^_]+$") or name
 end
 
+--- @param name string An ArNS name with or without an undername
+--- @return string|nil # The undername, if present, or nil
+function utils.undernameForName(name)
+	if not name:match("_") then
+		return nil
+	end
+
+	local baseName = utils.baseNameForName(name)
+	return string.gsub(name:reverse(), baseName:reverse() .. "_", "", 1):reverse()
+end
+
 return utils
