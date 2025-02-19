@@ -15,8 +15,8 @@ Owner = Owner or ao.env and ao.env.Process and ao.env.Process.Owner or "owner"
     Balances
 ]]
 Balances = Balances or {}
-Balances[ao.id] = constants.DEFAULT_PROTOCOL_BALANCE
-Balances[Owner] = constants.TOTAL_TOKEN_SUPPLY - constants.DEFAULT_PROTOCOL_BALANCE
+Balances[ao.id] = Balances[ao.id] or constants.DEFAULT_PROTOCOL_BALANCE
+Balances[Owner] = Balances[Owner] or (constants.TOTAL_TOKEN_SUPPLY - constants.DEFAULT_PROTOCOL_BALANCE)
 
 --[[
     Token Supply
