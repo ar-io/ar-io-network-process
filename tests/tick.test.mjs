@@ -797,4 +797,63 @@ describe('Tick', async () => {
     sharedMemory = tickMemory;
     lastTimestamp = demandFactorReadjustFeesTimestamp;
   });
+
+  it('should send demand factor updated notice only when the demand factor is updated', async () => {
+    const demandFactorSettings = await getDemandFactorSettings({
+      memory: sharedMemory,
+    });
+
+    const demandFactor = await getDemandFactor({
+      memory: sharedMemory,
+      timestamp: demandFactorSettings.periodZeroStartTimestamp,
+    });
+    assert.equal(demandFactor, 2);
+
+    const demandFactorTickTimestamp =
+      demandFactorSettings.periodZeroStartTimestamp +
+      demandFactorSettings.periodLengthMs;
+    // demand factor starts at 2, but will drop as no activity happened
+    const { result: demandFactorTickResult } = await tick({
+      memory: sharedMemory,
+      timestamp: demandFactorTickTimestamp,
+    });
+
+    // validate the demand factor notice was sent
+    const firstDemandFactorNotice = demandFactorTickResult.Messages.find(
+      (message) =>
+        message.Tags.find((tag) => tag.name === 'Action')?.value ===
+        'Demand-Factor-Updated-Notice',
+    );
+    assert.ok(firstDemandFactorNotice, 'Demand factor notice was not sent');
+    const updatedDemandFactor = JSON.parse(firstDemandFactorNotice.Data);
+    const demandFactorAfterFirstTick = await getDemandFactor({
+      memory: demandFactorTickResult.Memory,
+      timestamp: demandFactorTickTimestamp,
+    });
+    assert.equal(demandFactorAfterFirstTick, updatedDemandFactor);
+
+    // now tick half way through the period
+    const middleOfDemandFactorPeriodTimestamp =
+      demandFactorTickTimestamp + demandFactorSettings.periodLengthMs / 2;
+    const { result: middleOfDemandFactorPeriodTickResult } = await tick({
+      memory: demandFactorTickResult.Memory,
+      timestamp: middleOfDemandFactorPeriodTimestamp,
+    });
+    // validate the demand factor notice was not sent
+    const secondDemandFactorNotice =
+      middleOfDemandFactorPeriodTickResult.Messages.find(
+        (message) =>
+          message.Tags.find((tag) => tag.name === 'Action')?.value ===
+          'Demand-Factor-Updated-Notice',
+      );
+    // no notice should be sent as the period has not ended
+    assert.equal(secondDemandFactorNotice, undefined);
+
+    // confirm the demand factor is the same as the first demand factor notice
+    const demandFactorAfterTick = await getDemandFactor({
+      memory: middleOfDemandFactorPeriodTickResult.Memory,
+      timestamp: middleOfDemandFactorPeriodTimestamp,
+    });
+    assert.equal(demandFactorAfterTick, updatedDemandFactor);
+  });
 });
