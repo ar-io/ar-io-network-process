@@ -1,4 +1,4 @@
-package.path = "./src/?.lua;" .. package.path
+package.path = "./src/?.lua;./crypto/?.lua;" .. package.path
 
 _G.ao = {
 	send = function(val)
@@ -20,9 +20,6 @@ _G.Handlers = {
 		end,
 	},
 }
-
--- add .crypto.init to globals - this directory is copied from permaweb/aos
-_G.package.loaded[".crypto.init"] = require(".spec.crypto.init")
 
 -- setup all process globals
 require(".src.globals")
