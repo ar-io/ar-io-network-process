@@ -75,7 +75,7 @@ describe('Tick', async () => {
     const buyRecordData = JSON.parse(realRecord.Messages[0].Data);
     assert.deepEqual(buyRecordData, {
       processId: ''.padEnd(43, 'a'),
-      purchasePrice: 960000000,
+      purchasePrice: 480000000,
       type: 'lease',
       undernameLimit: 10,
       startTimestamp: buyRecordData.startTimestamp,
@@ -635,14 +635,14 @@ describe('Tick', async () => {
       memory: firstDemandFactorPeriodTick.memory,
       timestamp: demandFactorSettings.periodZeroStartTimestamp,
     });
-    assert.equal(initialDemandFactor, 2);
+    assert.equal(initialDemandFactor, 1);
 
     // get the base registration fee at the beginning of the demand factor period
     const genesisFee = await getBaseRegistrationFeeForName({
       memory: firstDemandFactorPeriodTick.memory,
       timestamp: demandFactorSettings.periodZeroStartTimestamp,
     });
-    assert.equal(genesisFee, 840_000_000);
+    assert.equal(genesisFee, 420_000_000);
 
     const fundedUser = 'funded-user-'.padEnd(43, '1');
     const processId = 'process-id-'.padEnd(43, '1');
@@ -687,12 +687,12 @@ describe('Tick', async () => {
         timestamp: nextDemandFactorPeriodTimestamp / 2,
       });
 
-    assert.equal(feeDuringFirstDemandFactorPeriod, 840_000_000);
+    assert.equal(feeDuringFirstDemandFactorPeriod, 420_000_000);
     const firstPeriodDemandFactor = await getDemandFactor({
       memory: firstDemandFactorPeriodMidTick.memory,
       timestamp: nextDemandFactorPeriodTimestamp,
     });
-    assert.equal(firstPeriodDemandFactor, 2);
+    assert.equal(firstPeriodDemandFactor, 1);
 
     // Tick to the end of the first demand factor period
     const nextDemandFactorPeriodTick = await tick({
@@ -704,13 +704,13 @@ describe('Tick', async () => {
       memory: nextDemandFactorPeriodTick.memory,
       timestamp: nextDemandFactorPeriodTimestamp,
     });
-    assert.equal(nextDemandFactorPeriodDemandFactor, 2.1000000000000000888);
+    assert.equal(nextDemandFactorPeriodDemandFactor, '1.0500000000000000444');
     // assert the demand factor is applied to the base registration fee for a name
     const nextDemandFactorPeriodFee = await getBaseRegistrationFeeForName({
       memory: nextDemandFactorPeriodTick.memory,
       timestamp: nextDemandFactorPeriodTimestamp,
     });
-    assert.equal(nextDemandFactorPeriodFee, 882_000_000);
+    assert.equal(nextDemandFactorPeriodFee, 441_000_000);
   });
 
   it('should reset to baseRegistrationFee when demandFactor is 0.5 for consecutive epochs', async () => {
@@ -730,7 +730,7 @@ describe('Tick', async () => {
         memory: zeroPeriodDemandFactorTick.memory,
         timestamp: demandFactorSettings.periodZeroStartTimestamp,
       });
-    assert.equal(baseFeeAtFirstDemandFactorPeriod, 840_000_000);
+    assert.equal(baseFeeAtFirstDemandFactorPeriod, 420_000_000);
 
     let tickMemory = zeroPeriodDemandFactorTick.memory;
 
@@ -739,7 +739,7 @@ describe('Tick', async () => {
       Math.ceil(
         Math.log(demandFactorSettings.demandFactorMin) /
           Math.log(1 - demandFactorSettings.demandFactorDownAdjustmentRate),
-      ) * currentDemandFactor; // we multiply by 2 because we start with 2 demand factor
+      ) * currentDemandFactor;
     const periodsUntilDemandFactorReset =
       periodsUntilMinDemandFactor +
       demandFactorSettings.maxPeriodsAtMinDemandFactor;
@@ -761,7 +761,7 @@ describe('Tick', async () => {
           memory: tickMemory,
           timestamp: nextDemandFactorPeriodTimestamp,
         });
-        assert.equal(demandFactor, 0.50552); // rounded to 5 decimal places
+        assert.equal(demandFactor, 0.50656); // rounded to 5 decimal places
       }
 
       // the three periods before the demand factor resets to 0.5 should have a demand factor of 0.5
@@ -807,7 +807,7 @@ describe('Tick', async () => {
       memory: sharedMemory,
       timestamp: demandFactorSettings.periodZeroStartTimestamp,
     });
-    assert.equal(demandFactor, 2);
+    assert.equal(demandFactor, 1);
 
     const demandFactorTickTimestamp =
       demandFactorSettings.periodZeroStartTimestamp +
