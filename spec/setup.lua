@@ -21,6 +21,10 @@ _G.Handlers = {
 	},
 }
 
+-- Then stash it in package.loaded under the name ".crypto.init"
+-- so that any 'require(".crypto.init")' finds it:
+_G.package.loaded[".crypto.init"] = require("crypto.init")
+
 -- setup all process globals
 require(".src.globals")
 
