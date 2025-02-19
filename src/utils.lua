@@ -2,8 +2,9 @@ local utils = {}
 local base64 = require(".src.base64")
 local json = require(".src.json")
 local constants = require(".src.constants")
--- note: crypto is provided by the module, we could remove the local copy and import as `.crypto.init`
-local crypto = require(".src.crypto.init")
+
+-- note: crypto is provided by the module so we reference it relative to process.lua in the module
+local crypto = require(".crypto.init")
 
 function utils.hasMatchingTag(tag, value)
 	return Handlers.utils.hasMatchingTag(tag, value)
