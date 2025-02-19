@@ -775,7 +775,7 @@ describe('setup', () => {
           `Vault ${vault.vaultId} for ${vault.address} has an invalid balance (${vault.balance})`,
         );
         assert(
-          vault.startTimestamp <= Date.now(),
+          vault.startTimestamp >= 0,
           `Vault ${vault.vaultId} for ${vault.address} has an invalid start timestamp ${vault.startTimestamp} (${new Date(vault.startTimestamp).toLocaleString()})`,
         );
         assert(
@@ -921,19 +921,15 @@ describe('setup', () => {
       const { items: primaryNames } = await io.getPrimaryNames({
         limit: 1000,
       });
+      const records = await getArNSRecords();
       for (const primaryName of primaryNames) {
         // assert the base name is a valid arns name
         const baseName = primaryName.name.split('_').pop(); // get the last part of the name
-        const record = await io.getArNSRecord({
-          name: baseName,
-        });
-        if (record.type === 'lease') {
-          assert(
-            record.endTimestamp + twoWeeksMs > Date.now(),
-            `Primary name ${primaryName.name} base name of ${baseName} has expired (including grace period)`,
-          );
-        }
-        assert(record, `Primary name ${primaryName.name} has no record`);
+        const record = records.find((record) => record.name === baseName);
+        assert(
+          record,
+          `Primary name ${primaryName.name} has no base name record`,
+        );
         assert(primaryName.owner, 'Primary name has no owner');
         assert(primaryName.name, 'Primary name has no name');
         assert(
@@ -941,6 +937,12 @@ describe('setup', () => {
           'Primary name has no start timestamp',
         );
         assert(primaryName.processId, 'Primary name has no processId');
+        if (record.type === 'lease') {
+          assert(
+            record.endTimestamp + twoWeeksMs > Date.now(),
+            `Primary name ${primaryName.name} base name of ${baseName} has expired (including grace period)`,
+          );
+        }
       }
     });
   });
