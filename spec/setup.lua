@@ -22,7 +22,7 @@ _G.Handlers = {
 }
 
 -- add .crypto.init to globals - this directory is copied from permaweb/aos
-_G.package.loaded[".crypto.init"] = require(".crypto.init")
+_G.package.loaded[".crypto.init"] = require(".spec.crypto.init")
 
 -- setup all process globals
 require(".src.globals")
