@@ -1,4 +1,4 @@
-package.path = "./src/?.lua;./crypto/?.lua;" .. package.path
+package.path = "spec/?.lua;spec/?/init.lua;" .. package.path
 
 _G.ao = {
 	send = function(val)
