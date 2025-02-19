@@ -863,6 +863,9 @@ addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", Actio
 end)
 
 addEventingHandler(ActionMap.BuyName, utils.hasMatchingTag("Action", ActionMap.BuyName), function(msg)
+	if msg.Timestamp > BlockWriteInteractionTimestamps then
+		error("Buy-Name interaction is disabled until mainnet is ready")
+	end
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
 	local purchaseType = msg.Tags["Purchase-Type"] and string.lower(msg.Tags["Purchase-Type"]) or "lease"
 	local years = msg.Tags.Years or nil
@@ -936,6 +939,9 @@ addEventingHandler(ActionMap.BuyName, utils.hasMatchingTag("Action", ActionMap.B
 end)
 
 addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.UpgradeName), function(msg)
+	if msg.Timestamp > BlockWriteInteractionTimestamps then
+		error("Upgrade-Name interaction is disabled until mainnet is ready")
+	end
 	local fundFrom = msg.Tags["Fund-From"]
 	local name = string.lower(msg.Tags.Name)
 	assert(type(name) == "string", "Invalid name")
@@ -966,6 +972,9 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 end)
 
 addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.ExtendLease), function(msg)
+	if msg.Timestamp > BlockWriteInteractionTimestamps then
+		error("Extend-Lease interaction is disabled until mainnet is ready")
+	end
 	local fundFrom = msg.Tags["Fund-From"]
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
 	local years = msg.Tags.Years
@@ -1126,6 +1135,9 @@ addEventingHandler(ActionMap.RegistrationFees, utils.hasMatchingTag("Action", Ac
 end)
 
 addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionMap.JoinNetwork), function(msg)
+	if msg.Timestamp > BlockWriteInteractionTimestamps then
+		error("Join-Network interaction is disabled until mainnet is ready")
+	end
 	local updatedSettings = {
 		label = msg.Tags.Label,
 		note = msg.Tags.Note,
