@@ -134,6 +134,11 @@ function demand.updateDemandFactor(currentTimestamp)
 	local lastKnownPeriod = demand.getCurrentPeriod()
 	local updatedDemandFactors = {} --- table tracking the period and the generated demand factor for each period
 
+	-- we didn't update the demand factor for this period, return nil to prevent a notice being sent
+	if periodForCurrentTimestamp == lastKnownPeriod then
+		return nil, {}
+	end
+
 	-- update the demand factor for each period between the last known period and the current period
 	for periodToUpdate = lastKnownPeriod + 1, periodForCurrentTimestamp do
 		local timestamp = demand.getTimestampForPeriod(periodToUpdate)
