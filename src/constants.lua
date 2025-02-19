@@ -227,7 +227,7 @@ constants.DEFAULT_DEMAND_FACTOR = {
 	trailingPeriodRevenues = { 0, 0, 0, 0, 0, 0, 0 }, -- Acts as a ring buffer of trailing period revenues
 	purchasesThisPeriod = 0,
 	revenueThisPeriod = 0,
-	currentDemandFactor = 2,
+	currentDemandFactor = 1,
 	consecutivePeriodsWithMinDemandFactor = 0,
 	fees = constants.DEFAULT_GENESIS_FEES,
 }

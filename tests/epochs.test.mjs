@@ -140,7 +140,7 @@ describe('epochs', () => {
             {
               cursorId:
                 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE_EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
-              eligibleReward: 65002000000,
+              eligibleReward: 65001000000,
               gatewayAddress: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
               recipient: 'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE',
               type: 'operatorReward',
@@ -236,17 +236,17 @@ describe('epochs', () => {
             ...firstEpoch.distributions,
             distributedTimestamp:
               epochSettings.epochZeroStartTimestamp + epochSettings.durationMs,
-            totalDistributedRewards: 43876350000, // the result of the first tick
+            totalDistributedRewards: 43875675000, // the result of the first tick
             rewards: {
               ...firstEpoch.distributions.rewards,
               eligible: {
                 [STUB_OPERATOR_ADDRESS]: {
                   delegateRewards: [],
-                  operatorReward: 65002000000,
+                  operatorReward: 65001000000,
                 },
               },
               distributed: {
-                [STUB_OPERATOR_ADDRESS]: 43876350000, // received the full operator reward, but docked 25% for not observing
+                [STUB_OPERATOR_ADDRESS]: 43875675000, // received the full operator reward, but docked 25% for not observing
               },
             },
           },
@@ -273,7 +273,9 @@ describe('epochs', () => {
         const expectedEligibleRewards =
           protocolBalanceBeforeSecondEpochTick * 0.001; // 0.1% of the protocol balance after the transfers and name purchase
         const expectedGatewayRewards = expectedEligibleRewards * 0.9; // 90% go to gateways
-        const expectedDistributedRewards = expectedGatewayRewards * 0.75; // the operator received 75% of the gateway rewards because they did not observe the first epoch
+        const expectedDistributedRewards = Math.floor(
+          expectedGatewayRewards * 0.75,
+        ); // the operator received 75% of the gateway rewards because they did not observe the first epoch
         const updatedOperatorStake =
           gatewayBeforeTick.operatorStake + expectedDistributedRewards;
         const expectedStakeWeight =
@@ -290,10 +292,12 @@ describe('epochs', () => {
         const expectedNewEligibleRewards =
           (protocolBalanceBeforeSecondEpochTick - expectedDistributedRewards) *
           0.001;
-        const expectedSecondEpochObserverReward =
-          expectedNewEligibleRewards * 0.1;
-        const expectedSecondEpochGatewayReward =
-          expectedNewEligibleRewards * 0.9;
+        const expectedSecondEpochObserverReward = Math.floor(
+          expectedNewEligibleRewards * 0.1,
+        );
+        const expectedSecondEpochGatewayReward = Math.floor(
+          expectedNewEligibleRewards * 0.9,
+        );
         assert.deepStrictEqual(secondEpoch, {
           epochIndex: 1,
           hashchain: 'hashchain-'.padEnd(43, 'g'),
