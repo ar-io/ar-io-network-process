@@ -1,31 +1,15 @@
 -- arns.lua
-local utils = require("utils")
-local constants = require("constants")
-local balances = require("balances")
-local demand = require("demand")
+local utils = require(".src.utils")
+local constants = require(".src.constants")
+local balances = require(".src.balances")
+local demand = require(".src.demand")
+local gar = require(".src.gar")
 local arns = {}
-local gar = require("gar")
-
---- @type Timestamp|nil
-NextRecordsPruneTimestamp = NextRecordsPruneTimestamp or 0
-
---- @type Timestamp|nil
-NextReturnedNamesPruneTimestamp = NextReturnedNamesPruneTimestamp or 0
 
 --- @class NameRegistry
 --- @field reserved table<string, ReservedName> The reserved names
 --- @field records table<string, Record> The records
 --- @field returned table<string, ReturnedName> The returned records
-
-NameRegistry = NameRegistry or {
-	reserved = {},
-	records = {},
-	returned = {},
-}
-
-if not NameRegistry.returned then
-	NameRegistry.returned = {}
-end
 
 --- @class StoredRecord
 --- @field processId string The process id of the record
@@ -573,14 +557,27 @@ end
 function arns.assertValidArNSName(name)
 	assert(name and type(name) == "string", "Name is required and must be a string.")
 	assert(
-		#name >= constants.MIN_NAME_LENGTH and #name <= constants.MAX_NAME_LENGTH,
+		#name >= constants.MIN_NAME_LENGTH and #name <= constants.MAX_BASE_NAME_LENGTH,
 		"Name length is invalid. Must be between "
 			.. constants.MIN_NAME_LENGTH
 			.. " and "
-			.. constants.MAX_NAME_LENGTH
+			.. constants.MAX_BASE_NAME_LENGTH
 			.. " characters."
 	)
-	assert(name:match(constants.ARNS_NAME_REGEX), "Name pattern is invalid. Must match " .. constants.ARNS_NAME_REGEX)
+	if #name == 1 then
+		assert(
+			name:match(constants.ARNS_NAME_SINGLE_CHAR_REGEX),
+			"Single-character name pattern for "
+				.. name
+				.. " is invalid. Must match "
+				.. constants.ARNS_NAME_SINGLE_CHAR_REGEX
+		)
+	else
+		assert(
+			name:match(constants.ARNS_NAME_MULTICHARACTER_REGEX),
+			"Name pattern for " .. name .. " is invalid. Must match " .. constants.ARNS_NAME_MULTICHARACTER_REGEX
+		)
+	end
 end
 
 --- Asserts that a buy record is valid
@@ -700,30 +697,31 @@ end
 --- @param intendedAction IntendedAction The intended action to get token cost for
 --- @return TokenCostResult tokenCostResult The token cost result of the intended action
 function arns.getTokenCost(intendedAction)
+	local intent = intendedAction.intent
 	local tokenCost = 0
 	local purchaseType = intendedAction.purchaseType or "lease"
 	local years = tonumber(intendedAction.years)
-	local name = intendedAction.name
-	local baseFee = demand.baseFeeForNameLength(#name)
-	local intent = intendedAction.intent
+	-- We get the base name in case its a primary name request - which, because of undername primary names, can be longer than the longest arns base fee
+	local baseName = utils.baseNameForName(intendedAction.name)
+	local baseFee = demand.baseFeeForNameLength(#baseName)
 	local qty = tonumber(intendedAction.quantity)
-	local record = intendedAction.record or arns.getRecord(name)
+	local record = intendedAction.record or arns.getRecord(baseName)
 	local currentTimestamp = tonumber(intendedAction.currentTimestamp)
 	local returnedNameDetails = nil
 
 	assert(type(intent) == "string", "Intent is required and must be a string.")
-	assert(type(name) == "string", "Name is required and must be a string.")
+	assert(type(baseName) == "string", "Name is required and must be a string.")
 	if intent == "Buy-Name" then
 		-- stub the process id as it is not required for this intent
 		local processId = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-		arns.assertValidBuyRecord(name, years, purchaseType, processId, false)
+		arns.assertValidBuyRecord(baseName, years, purchaseType, processId, false)
 		tokenCost = arns.calculateRegistrationFee(purchaseType, baseFee, years, demand.getDemandFactor())
-		local returnedName = arns.getReturnedNameUnsafe(name)
+		local returnedName = arns.getReturnedNameUnsafe(baseName)
 		if returnedName then
 			local premiumMultiplier =
 				arns.getReturnedNamePremiumMultiplier(returnedName.startTimestamp, currentTimestamp)
 			returnedNameDetails = {
-				name = name,
+				name = baseName,
 				initiator = returnedName.initiator,
 				startTimestamp = returnedName.startTimestamp,
 				endTimestamp = returnedName.startTimestamp + constants.RETURNED_NAME_DURATION_MS,
@@ -921,12 +919,8 @@ function arns.recordIsActive(record, timestamp)
 		return true
 	end
 
-	-- record starts before the current timestamp and ends after the current timestamp
-	return record.startTimestamp
-			and record.startTimestamp <= timestamp
-			and record.endTimestamp
-			and record.endTimestamp >= timestamp
-		or false
+	-- to avoid pruning on forked state for records that start int he future, only check the end timestamp against the current timestamp
+	return record.endTimestamp and record.endTimestamp >= timestamp or false
 end
 
 --- Asserts that a record is valid for increasing the undername limit
@@ -1024,7 +1018,7 @@ end
 
 --- Prunes records that have expired
 --- @param currentTimestamp number The current timestamp
---- @param lastGracePeriodEntryEndTimestamp number The end timestamp of the last known record to have entered its grace period
+--- @param lastGracePeriodEntryEndTimestamp number|nil The end timestamp of the last known record to have entered its grace period
 --- @return table<string, Record> prunedRecords - the pruned records
 --- @return table<string, Record> recordsInGracePeriod - the records that have entered their grace period
 function arns.pruneRecords(currentTimestamp, lastGracePeriodEntryEndTimestamp)

@@ -1,5 +1,4 @@
-local constants = require("constants")
-local utils = require("utils")
+local utils = require(".src.utils")
 local demand = {}
 
 --- @class DemandFactor
@@ -11,7 +10,6 @@ local demand = {}
 --- @field currentDemandFactor number The current demand factor
 --- @field consecutivePeriodsWithMinDemandFactor number The number of consecutive periods with the minimum demand factor
 --- @field fees table<number, number> The fees for each name length
-DemandFactor = DemandFactor or utils.deepCopy(constants.DEFAULT_DEMAND_FACTOR)
 
 --- @class DemandFactorSettings
 --- @field periodZeroStartTimestamp number The timestamp of the start of period zero
@@ -23,7 +21,6 @@ DemandFactor = DemandFactor or utils.deepCopy(constants.DEFAULT_DEMAND_FACTOR)
 --- @field demandFactorDownAdjustmentRate number The adjustment to the demand factor when it is decreasing
 --- @field maxPeriodsAtMinDemandFactor number The threshold for the number of consecutive periods with the minimum demand factor before adjusting the demand factor
 --- @field criteria 'revenue' | 'purchases' The criteria to use for determining if the demand is increasing
-DemandFactorSettings = DemandFactorSettings or utils.deepCopy(constants.DEFAULT_DEMAND_FACTOR_SETTINGS)
 
 --- Tally a name purchase
 --- @param qty number The quantity of the purchase
@@ -136,6 +133,11 @@ function demand.updateDemandFactor(currentTimestamp)
 	local periodForCurrentTimestamp = demand.getPeriodForTimestamp(currentTimestamp)
 	local lastKnownPeriod = demand.getCurrentPeriod()
 	local updatedDemandFactors = {} --- table tracking the period and the generated demand factor for each period
+
+	-- we didn't update the demand factor for this period, return nil to prevent a notice being sent
+	if periodForCurrentTimestamp == lastKnownPeriod then
+		return nil, {}
+	end
 
 	-- update the demand factor for each period between the last known period and the current period
 	for periodToUpdate = lastKnownPeriod + 1, periodForCurrentTimestamp do

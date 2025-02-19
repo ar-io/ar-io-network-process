@@ -1,48 +1,18 @@
--- Adjust package.path to include the current directory
-local process = { _version = "0.0.1" }
-local constants = require("constants")
-local token = require("token")
-local utils = require("utils")
-local json = require("json")
-local ao = ao or require("ao")
-local ARIOEvent = require("ario_event")
-
-Name = Name or "Testnet ARIO"
-Ticker = Ticker or "tARIO"
-Logo = Logo or "qUjrTmHdVjXX4D6rU6Fik02bUOzWkOR6oOqUg39g4-s"
-Denomination = constants.DENOMINATION
-DemandFactor = DemandFactor or {}
-Owner = Owner or ao.env.Process.Owner
-Protocol = Protocol or ao.env.Process.Id
-Vaults = Vaults or {}
-GatewayRegistry = GatewayRegistry or {}
-NameRegistry = NameRegistry or {}
-Epochs = Epochs or {}
-Balances = Balances or {}
--- NOTE: this is primary for test setup and balances will be set in the module for the process
-if not Balances[Protocol] then
-	Balances = {
-		[Protocol] = constants.DEFAULT_PROTOCOL_BALANCE, -- 50M ARIO
-		[Owner] = math.floor(constants.TOTAL_TOKEN_SUPPLY - constants.DEFAULT_PROTOCOL_BALANCE), -- 950M ARIO
-	}
-end
--- last known variables in the state, these help control tick, prune, and distribute behavior
-LastCreatedEpochIndex = LastCreatedEpochIndex or -1 -- TODO: we will move to a 1-based index in a separate PR
-LastDistributedEpochIndex = LastDistributedEpochIndex or 0
-LastGracePeriodEntryEndTimestamp = LastGracePeriodEntryEndTimestamp or 0
-LastKnownMessageTimestamp = LastKnownMessageTimestamp or 0
-LastKnownMessageId = LastKnownMessageId or ""
-
--- NOTE: These are imported after global variables are initialized
-local balances = require("balances")
-local arns = require("arns")
-local gar = require("gar")
-local demand = require("demand")
-local epochs = require("epochs")
-local vaults = require("vaults")
-local prune = require("prune")
-local tick = require("tick")
-local primaryNames = require("primary_names")
+local main = {}
+local constants = require(".src.constants")
+local token = require(".src.token")
+local utils = require(".src.utils")
+local json = require(".src.json")
+local balances = require(".src.balances")
+local arns = require(".src.arns")
+local gar = require(".src.gar")
+local demand = require(".src.demand")
+local epochs = require(".src.epochs")
+local vaults = require(".src.vaults")
+local prune = require(".src.prune")
+local tick = require(".src.tick")
+local primaryNames = require(".src.primary_names")
+local ARIOEvent = require(".src.ario_event")
 
 -- handlers that are critical should discard the memory on error (see prune for an example)
 local CRITICAL = true
@@ -268,7 +238,7 @@ local function addSupplyData(ioEvent, supplyData)
 	ioEvent:addField("Delegated-Supply", supplyData.delegatedSupply or LastKnownDelegatedSupply)
 	ioEvent:addField("Withdraw-Supply", supplyData.withdrawSupply or LastKnownWithdrawSupply)
 	ioEvent:addField("Total-Token-Supply", supplyData.totalTokenSupply or token.lastKnownTotalTokenSupply())
-	ioEvent:addField("Protocol-Balance", Balances[Protocol])
+	ioEvent:addField("Protocol-Balance", Balances[ao.id])
 end
 
 --- @param ioEvent ARIOEvent
@@ -418,8 +388,34 @@ local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
 	addPrimaryNameCounts(ioEvent)
 end
 
+local function assertValueBytesLowerThan(value, remainingBytes, tablesSeen)
+	tablesSeen = tablesSeen or {}
+
+	local t = type(value)
+	if t == "string" then
+		remainingBytes = remainingBytes - #value
+	elseif t == "number" or t == "boolean" then
+		remainingBytes = remainingBytes - 8 -- Approximate size for numbers/booleans
+	elseif t == "table" and not tablesSeen[value] then
+		tablesSeen[value] = true
+		for k, v in pairs(value) do
+			remainingBytes = assertValueBytesLowerThan(k, remainingBytes, tablesSeen)
+			remainingBytes = assertValueBytesLowerThan(v, remainingBytes, tablesSeen)
+		end
+	end
+
+	if remainingBytes <= 0 then
+		error("Data size is too large")
+	end
+	return remainingBytes
+end
+
 -- Sanitize inputs before every interaction
 local function assertAndSanitizeInputs(msg)
+	if msg.Tags.Action ~= "Eval" and msg.Data then
+		assertValueBytesLowerThan(msg.Data, 100)
+	end
+
 	assert(
 		-- TODO: replace this with LastKnownMessageTimestamp after node release 23.0.0
 		msg.Timestamp and tonumber(msg.Timestamp) >= 0,
@@ -510,7 +506,7 @@ end, function(msg)
 	msg.ioEvent:addField("Epoch-Index", epochIndex)
 
 	local previousStateSupplies = {
-		protocolBalance = Balances[Protocol],
+		protocolBalance = Balances[ao.id],
 		lastKnownCirculatingSupply = LastKnownCirculatingSupply,
 		lastKnownLockedSupply = LastKnownLockedSupply,
 		lastKnownStakedSupply = LastKnownStakedSupply,
@@ -596,7 +592,7 @@ end, function(msg)
 		or LastKnownStakedSupply ~= previousStateSupplies.lastKnownStakedSupply
 		or LastKnownDelegatedSupply ~= previousStateSupplies.lastKnownDelegatedSupply
 		or LastKnownWithdrawSupply ~= previousStateSupplies.lastKnownWithdrawSupply
-		or Balances[Protocol] ~= previousStateSupplies.protocolBalance
+		or Balances[ao.id] ~= previousStateSupplies.protocolBalance
 		or token.lastKnownTotalTokenSupply() ~= previousStateSupplies.lastKnownTotalSupply
 	then
 		addSupplyData(msg.ioEvent)
@@ -1042,7 +1038,12 @@ function assertTokenCostTags(msg)
 		"Intent must be valid registry interaction (e.g. Buy-Name, Extend-Lease, Increase-Undername-Limit, Upgrade-Name, Primary-Name-Request). Provided intent: "
 			.. (intentType or "nil")
 	)
-	arns.assertValidArNSName(msg.Tags.Name)
+	if intentType == ActionMap.PrimaryNameRequest then
+		primaryNames.assertValidPrimaryName(msg.Tags.Name)
+	else
+		arns.assertValidArNSName(msg.Tags.Name)
+	end
+
 	-- if years is provided, assert it is a number and integer between 1 and 5
 	if msg.Tags.Years then
 		assert(utils.isInteger(msg.Tags.Years), "Invalid years. Must be integer")
@@ -2658,4 +2659,4 @@ addEventingHandler("allPaginatedGatewayVaults", utils.hasMatchingTag("Action", "
 	Send(msg, { Target = msg.From, Action = "All-Gateway-Vaults-Notice", Data = json.encode(result) })
 end)
 
-return process
+return main

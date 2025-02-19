@@ -4,7 +4,10 @@
 --
 local constants = {}
 
---- CONVERSION HELPERS
+--- Process constants
+constants.LOGO = "qUjrTmHdVjXX4D6rU6Fik02bUOzWkOR6oOqUg39g4-s"
+constants.TICKER = "ARIO"
+constants.NAME = "ARIO"
 constants.DENOMINATION = 6
 
 -- intentionally not exposed so all callers use ARIOToMARIO for consistency
@@ -112,14 +115,18 @@ constants.MIN_TOKEN_LOCK_TIME_MS = constants.daysToMs(14) -- The minimum amount 
 
 -- ARNS
 constants.DEFAULT_UNDERNAME_COUNT = 10
-constants.MAX_NAME_LENGTH = 51 -- protects against invalid URLs when resolving arns names on gateways
+constants.MAX_BASE_NAME_LENGTH = 51 -- gateways utilize sandbox subdomains of 52 characters in length. This reduces complexity of sandboxing.
+constants.MAX_PRIMARY_NAME_LENGTH = 63 -- The max length of a domain label (any part separated by dots)
+constants.MAX_UNDERNAME_LENGTH = 61 -- MAX_PRIMARY_NAME_LENGTH - 1 (for underscore) - 1 (minimum base name length)
 constants.MIN_NAME_LENGTH = 1
 -- Regex pattern to validate ARNS names:
 -- - Starts with an alphanumeric character (%w)
 -- - Can contain alphanumeric characters and hyphens (%w-)
 -- - Ends with an alphanumeric character (%w)
 -- - Does not allow names to start or end with a hyphen
-constants.ARNS_NAME_REGEX = "^%w[%w-]*%w?$" -- TODO: validate tests around this
+constants.ARNS_NAME_SINGLE_CHAR_REGEX = "^%w$"
+constants.ARNS_NAME_MULTICHARACTER_REGEX = "^%w[%w-]*%w$"
+constants.UNDERNAME_REGEX = "^%w+[%w_-]*$"
 constants.PERMABUY_LEASE_FEE_LENGTH_YEARS = 20 -- buying a permabuy record is equal to leasing the name for 20 years
 constants.ANNUAL_PERCENTAGE_FEE = 0.2 -- the fee applied for leases against the base name
 constants.UNDERNAME_LEASE_FEE_PERCENTAGE = 0.001 -- for leased names the undername fee is 0.1% for one undername
@@ -137,59 +144,75 @@ constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_TENURE_WEIGHT_ELIGIBILITY_THRESHOLD = 1
 -- the gateway performance ratio threshold for eligibility for the arns discount (you need to have a 85% performance ratio to qualify)
 constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_PERFORMANCE_RATIO_ELIGIBILITY_THRESHOLD = 0.90 -- gateway must achieve a 90% performance ratio to qualify
 constants.GATEWAY_OPERATOR_ARNS_DISCOUNT_NAME = "Gateway Operator ArNS Discount" -- the name of the discount applied to arns requests
--- TODO: these will likely be adjusted for mainnet
+
+-- Genesis Fees -- Mainnet
+-- Characters	(ARIO)	(mARIO)
+-- 1	 1,000,000 	 1,000,000,000,000
+-- 2	 200,000 	 200,000,000,000
+-- 3	 20,000 	 20,000,000,000
+-- 4	 10,000 	 10,000,000,000
+-- 5	 2,500 	 2,500,000,000
+-- 6	 1,500 	 1,500,000,000
+-- 7	 800 	 800,000,000
+-- 8	 500 	 500,000,000
+-- 9	 400 	 400,000,000
+-- 10	 350 	 350,000,000
+-- 11	 300 	 300,000,000
+-- 12	 250 	 250,000,000
+-- 13+	 200 	 200,000,000
+
 constants.DEFAULT_GENESIS_FEES = {
-	[1] = constants.ARIOToMARIO(2000000),
+	[1] = constants.ARIOToMARIO(1000000),
 	[2] = constants.ARIOToMARIO(200000),
-	[3] = constants.ARIOToMARIO(40000),
+	[3] = constants.ARIOToMARIO(20000),
 	[4] = constants.ARIOToMARIO(10000),
-	[5] = constants.ARIOToMARIO(4000),
-	[6] = constants.ARIOToMARIO(2000),
-	[7] = constants.ARIOToMARIO(1000),
-	[8] = constants.ARIOToMARIO(600),
-	[9] = constants.ARIOToMARIO(500),
-	[10] = constants.ARIOToMARIO(500),
-	[11] = constants.ARIOToMARIO(500),
-	[12] = constants.ARIOToMARIO(500),
-	[13] = constants.ARIOToMARIO(400),
-	[14] = constants.ARIOToMARIO(400),
-	[15] = constants.ARIOToMARIO(400),
-	[16] = constants.ARIOToMARIO(400),
-	[17] = constants.ARIOToMARIO(400),
-	[18] = constants.ARIOToMARIO(400),
-	[19] = constants.ARIOToMARIO(400),
-	[20] = constants.ARIOToMARIO(400),
-	[21] = constants.ARIOToMARIO(400),
-	[22] = constants.ARIOToMARIO(400),
-	[23] = constants.ARIOToMARIO(400),
-	[24] = constants.ARIOToMARIO(400),
-	[25] = constants.ARIOToMARIO(400),
-	[26] = constants.ARIOToMARIO(400),
-	[27] = constants.ARIOToMARIO(400),
-	[28] = constants.ARIOToMARIO(400),
-	[29] = constants.ARIOToMARIO(400),
-	[30] = constants.ARIOToMARIO(400),
-	[31] = constants.ARIOToMARIO(400),
-	[32] = constants.ARIOToMARIO(400),
-	[33] = constants.ARIOToMARIO(400),
-	[34] = constants.ARIOToMARIO(400),
-	[35] = constants.ARIOToMARIO(400),
-	[36] = constants.ARIOToMARIO(400),
-	[37] = constants.ARIOToMARIO(400),
-	[38] = constants.ARIOToMARIO(400),
-	[39] = constants.ARIOToMARIO(400),
-	[40] = constants.ARIOToMARIO(400),
-	[41] = constants.ARIOToMARIO(400),
-	[42] = constants.ARIOToMARIO(400),
-	[43] = constants.ARIOToMARIO(400),
-	[44] = constants.ARIOToMARIO(400),
-	[45] = constants.ARIOToMARIO(400),
-	[46] = constants.ARIOToMARIO(400),
-	[47] = constants.ARIOToMARIO(400),
-	[48] = constants.ARIOToMARIO(400),
-	[49] = constants.ARIOToMARIO(400),
-	[50] = constants.ARIOToMARIO(400),
-	[51] = constants.ARIOToMARIO(400),
+	[5] = constants.ARIOToMARIO(2500),
+	[6] = constants.ARIOToMARIO(1500),
+	[7] = constants.ARIOToMARIO(800),
+	[8] = constants.ARIOToMARIO(500),
+	[9] = constants.ARIOToMARIO(400),
+	[10] = constants.ARIOToMARIO(350),
+	[11] = constants.ARIOToMARIO(300),
+	[12] = constants.ARIOToMARIO(250),
+	[13] = constants.ARIOToMARIO(200),
+	[14] = constants.ARIOToMARIO(200),
+	[15] = constants.ARIOToMARIO(200),
+	[16] = constants.ARIOToMARIO(200),
+	[17] = constants.ARIOToMARIO(200),
+	[18] = constants.ARIOToMARIO(200),
+	[19] = constants.ARIOToMARIO(200),
+	[20] = constants.ARIOToMARIO(200),
+	[21] = constants.ARIOToMARIO(200),
+	[22] = constants.ARIOToMARIO(200),
+	[23] = constants.ARIOToMARIO(200),
+	[24] = constants.ARIOToMARIO(200),
+	[25] = constants.ARIOToMARIO(200),
+	[26] = constants.ARIOToMARIO(200),
+	[27] = constants.ARIOToMARIO(200),
+	[28] = constants.ARIOToMARIO(200),
+	[29] = constants.ARIOToMARIO(200),
+	[30] = constants.ARIOToMARIO(200),
+	[31] = constants.ARIOToMARIO(200),
+	[32] = constants.ARIOToMARIO(200),
+	[33] = constants.ARIOToMARIO(200),
+	[34] = constants.ARIOToMARIO(200),
+	[35] = constants.ARIOToMARIO(200),
+	[36] = constants.ARIOToMARIO(200),
+	[37] = constants.ARIOToMARIO(200),
+	[38] = constants.ARIOToMARIO(200),
+	[39] = constants.ARIOToMARIO(200),
+	[40] = constants.ARIOToMARIO(200),
+	[41] = constants.ARIOToMARIO(200),
+	[42] = constants.ARIOToMARIO(200),
+	[43] = constants.ARIOToMARIO(200),
+	[44] = constants.ARIOToMARIO(200),
+	[45] = constants.ARIOToMARIO(200),
+	[46] = constants.ARIOToMARIO(200),
+	[47] = constants.ARIOToMARIO(200),
+	[48] = constants.ARIOToMARIO(200),
+	[49] = constants.ARIOToMARIO(200),
+	[50] = constants.ARIOToMARIO(200),
+	[51] = constants.ARIOToMARIO(200),
 }
 
 --[[

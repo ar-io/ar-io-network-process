@@ -1,8 +1,13 @@
--- gar.lua
-local balances = require("balances")
-local constants = require("constants")
-local utils = require("utils")
+local balances = require(".src.balances")
+local constants = require(".src.constants")
+local utils = require(".src.utils")
 local gar = {}
+
+--- @class GatewayRegistrySettings
+--- @field observers ObserverSettings
+--- @field operators OperatorSettings
+--- @field delegates DelegateSettings
+--- @field expeditedWithdrawals ExpeditedWithdrawalsSettings
 
 --- @class CompactGatewaySettings
 --- @field allowDelegatedStaking boolean
@@ -71,10 +76,6 @@ local gar = {}
 --- @field startTimestamp Timestamp
 --- @field vaults table<MessageId, Vault>
 
---- @alias Gateways table<WalletAddress, Gateway>
---- @type Gateways
-GatewayRegistry = GatewayRegistry or {}
-
 --- @class ObserverSettings
 --- @field tenureWeightDays number
 --- @field tenureWeightDurationMs number
@@ -95,19 +96,6 @@ GatewayRegistry = GatewayRegistry or {}
 --- @class DelegateSettings
 --- @field minStake number
 --- @field withdrawLengthMs number
-
---- @class GatewayRegistrySettings
---- @field observers ObserverSettings
---- @field operators OperatorSettings
---- @field delegates DelegateSettings
---- @field expeditedWithdrawals ExpeditedWithdrawalsSettings
-GatewayRegistrySettings = GatewayRegistrySettings or constants.DEFAULT_GAR_SETTINGS
-
---- @type Timestamp|nil
-NextGatewaysPruneTimestamp = NextGatewaysPruneTimestamp or 0
-
---- @type Timestamp|nil
-NextRedelegationsPruneTimestamp = NextRedelegationsPruneTimestamp or 0
 
 --- @class JoinGatewaySettings
 --- @field allowDelegatedStaking boolean | nil

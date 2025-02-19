@@ -364,6 +364,34 @@ export const getDelegations = async ({ memory, address, timestamp }) => {
   return JSON.parse(result.Messages?.[0]?.Data);
 };
 
+export const getVault = async ({
+  memory,
+  address,
+  vaultId,
+  timestamp = STUB_TIMESTAMP,
+  assertNoResultError = true,
+}) => {
+  const result = await handle({
+    options: {
+      Tags: [
+        { name: 'Action', value: 'Vault' },
+        { name: 'Address', value: address },
+        { name: 'Vault-Id', value: vaultId },
+      ],
+    },
+    memory,
+    timestamp,
+    shouldAssertNoResultError: assertNoResultError,
+  });
+  if (
+    !result.Messages?.[0]?.Data ||
+    result.Messages[0].Data.includes('not found')
+  ) {
+    return undefined;
+  }
+  return JSON.parse(result.Messages[0].Data);
+};
+
 export const getVaults = async ({
   memory,
   cursor,
@@ -881,17 +909,39 @@ export const tick = async ({
   };
 };
 
-export const getInfo = async ({ memory, timestamp }) => {
+export const getInfo = async ({
+  memory,
+  timestamp,
+  data = undefined,
+  shouldAssertNoResultError = true,
+}) => {
   const nameResult = await handle({
     options: {
       Tags: [{ name: 'Action', value: 'Info' }],
       Timestamp: timestamp,
+      Data: data,
     },
     memory,
+    shouldAssertNoResultError,
   });
   return {
     memory: nameResult.Memory,
     result: nameResult,
+  };
+};
+
+export const sendEval = async ({ memory, data }) => {
+  const evalResult = await handle({
+    options: {
+      Tags: [{ name: 'Action', value: 'Eval' }],
+      Data: data,
+    },
+    memory,
+    shouldAssertNoResultError: false,
+  });
+  return {
+    memory: evalResult.Memory,
+    result: evalResult,
   };
 };
 

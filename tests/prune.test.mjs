@@ -22,6 +22,8 @@ import {
   parseEventsFromResult,
   transfer,
   totalTokenSupply,
+  sendEval,
+  handle,
 } from './helpers.mjs';
 import { STUB_ADDRESS } from '../tools/constants.mjs';
 
@@ -44,6 +46,53 @@ describe('ARNS Record Pruning', () => {
       memory: totalTokenSupplyMemory,
     });
     sharedMemory = transferMemory;
+  });
+
+  it('Eval action messages with more than 100 bytes of data will not throw an error', async () => {
+    const { result } = await sendEval({
+      memory: sharedMemory,
+      data: "print('hello')\n-- ".padEnd(101, 'a'),
+    });
+
+    assert(result.Error === undefined, 'Expected error to not be thrown');
+    assert(
+      (result.Output.data.output = 'hello'),
+      'Expected hello to be printed',
+    );
+  });
+
+  it('messages with more than 100 bytes of data will throw an error', async () => {
+    const longMessage = 'a'.repeat(101);
+
+    const { result } = await getInfo({
+      memory: sharedMemory,
+      timestamp: STUB_TIMESTAMP,
+      data: longMessage,
+    });
+
+    assert(
+      result.Error.includes('Data size is too large'),
+      'Expected error to be thrown',
+    );
+  });
+
+  it('messages with more than 100 bytes of JSON data will throw an error', async () => {
+    const jsonOfMoreThan100Bytes = JSON.stringify({
+      a: 'a'.repeat(1001),
+    });
+    const result = await handle({
+      options: {
+        Tags: [
+          { name: 'Action', value: 'Info' },
+          { name: 'Content-Type', value: 'application/json' },
+        ],
+        Data: jsonOfMoreThan100Bytes,
+      },
+    });
+    assert(
+      result.Error.includes('Data size is too large'),
+      'Expected error to be thrown',
+    );
   });
 
   it('should prune expired records after grace period', async () => {

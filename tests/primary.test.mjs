@@ -179,175 +179,204 @@ describe('primary names', function () {
     };
   };
 
-  it('should allow creating and approving a primary name for an existing base name when the recipient is not the base name owner and is funding from stakes', async function () {
-    const processId = ''.padEnd(43, 'a');
-    const recipient = ''.padEnd(43, 'b');
-    const requestTimestamp = 1234567890;
-    const { result: buyRecordResult } = await buyRecord({
-      name: 'test-name',
-      processId,
-      timestamp: requestTimestamp,
-      memory: sharedMemory,
-      type: 'permabuy',
-    });
+  const validPrimaryNames = [
+    '1',
+    'a',
+    '1a',
+    '1-1',
+    'a-1',
+    '1-a',
+    ''.padEnd(51, '1'),
+    ''.padEnd(51, 'a'),
+    // undernames
+    '1_test',
+    '1234_test',
+    'fsakdjhflkasjdhflkaf_test',
+    ''.padEnd(61, '1') + '_t',
+    ''.padEnd(61, 'a') + '_t',
+    'a_' + ''.padEnd(51, '1'),
+    '9_' + ''.padEnd(51, 'z'),
+  ];
 
-    const stakeResult = await setUpStake({
-      memory: buyRecordResult.Memory,
-      stakerAddress: recipient,
-      transferQty: 550000000,
-      stakeQty: 500000000,
-      timestamp: requestTimestamp,
-    });
-
-    const { result: requestPrimaryNameResult } = await requestPrimaryName({
-      name: 'test-name',
-      caller: recipient,
-      timestamp: requestTimestamp,
-      memory: stakeResult.memory,
-      fundFrom: 'stakes',
-    });
-
-    const parsedEvents = parseEventsFromResult(requestPrimaryNameResult);
-    assert.equal(parsedEvents.length, 1);
-    assert.deepStrictEqual(parsedEvents[0], {
-      _e: 1,
-      Action: 'Request-Primary-Name',
-      'Base-Name-Owner': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      Cast: false,
-      Cron: false,
-      'Request-End-Timestamp': 1839367890,
-      'Epoch-Index': -5864,
-      'FP-Balance': 0,
-      'FP-Stakes-Amount': 4000000,
-      From: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-      'From-Formatted': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-      'Fund-From': 'stakes',
-      'Message-Id': 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
-      Name: 'test-name',
-      'Request-Start-Timestamp': 1234567890,
-      Timestamp: 1234567890,
-      'Total-Primary-Name-Requests': 1,
-      'Total-Primary-Names': 0,
-      'Memory-KiB-Used': parsedEvents[0]['Memory-KiB-Used'],
-      'Handler-Memory-KiB-Used': parsedEvents[0]['Handler-Memory-KiB-Used'],
-      'Final-Memory-KiB-Used': parsedEvents[0]['Final-Memory-KiB-Used'],
-    });
-
-    const { result: getPrimaryNameRequestResult } = await getPrimaryNameRequest(
-      {
-        initiator: recipient,
-        memory: requestPrimaryNameResult.Memory,
+  for (const validPrimaryName of validPrimaryNames) {
+    it(`should allow creating and approving a primary name for an existing base name (${validPrimaryName}) when the recipient is not the base name owner and is funding from stakes`, async function () {
+      const processId = ''.padEnd(43, 'a');
+      const recipient = ''.padEnd(43, 'b');
+      const requestTimestamp = 1234567890;
+      const { result: buyRecordResult } = await buyRecord({
+        name: validPrimaryName.includes('_')
+          ? validPrimaryName.split('_')[1]
+          : validPrimaryName,
+        processId,
         timestamp: requestTimestamp,
-      },
-    );
-
-    const requestData = JSON.parse(
-      getPrimaryNameRequestResult.Messages[0].Data,
-    );
-    assert.deepStrictEqual(requestData, {
-      name: 'test-name',
-      startTimestamp: 1234567890,
-      endTimestamp: 1839367890,
-      initiator: recipient,
-    });
-
-    const approvedTimestamp = 1234567899;
-    const { result: approvePrimaryNameRequestResult } =
-      await approvePrimaryNameRequest({
-        name: 'test-name',
-        caller: processId,
-        recipient: recipient,
-        timestamp: approvedTimestamp,
-        memory: requestPrimaryNameResult.Memory,
+        memory: sharedMemory,
+        type: 'permabuy',
       });
 
-    assertNoResultError(approvePrimaryNameRequestResult);
-    const parsedApproveEvents = parseEventsFromResult(
-      approvePrimaryNameRequestResult,
-    );
-    assert.equal(parsedApproveEvents.length, 1);
-    assert.deepStrictEqual(parsedApproveEvents[0], {
-      _e: 1,
-      Action: 'Approve-Primary-Name-Request',
-      Cast: false,
-      Cron: false,
-      'Epoch-Index': -5864,
-      From: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      'From-Formatted': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      'Message-Id': 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
-      Name: 'test-name',
-      Owner: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-      Recipient: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-      'Request-End-Timestamp': 1839367890,
-      'Request-Start-Timestamp': 1234567890,
-      'Start-Timestamp': 1234567899,
-      Timestamp: 1234567899,
-      'Total-Primary-Names': 1,
-      'Total-Primary-Name-Requests': 0,
-      'Memory-KiB-Used': parsedApproveEvents[0]['Memory-KiB-Used'],
-      'Handler-Memory-KiB-Used':
-        parsedApproveEvents[0]['Handler-Memory-KiB-Used'],
-      'Final-Memory-KiB-Used': parsedApproveEvents[0]['Final-Memory-KiB-Used'],
-    });
+      const stakeResult = await setUpStake({
+        memory: buyRecordResult.Memory,
+        stakerAddress: recipient,
+        transferQty: 550000000,
+        stakeQty: 500000000,
+        timestamp: requestTimestamp,
+      });
 
-    // there should be two messages, one to the ant and one to the owner
-    assert.equal(approvePrimaryNameRequestResult.Messages.length, 2);
-    assert.equal(approvePrimaryNameRequestResult.Messages[0].Target, processId);
-    assert.equal(approvePrimaryNameRequestResult.Messages[1].Target, recipient);
+      const { result: requestPrimaryNameResult } = await requestPrimaryName({
+        name: validPrimaryName,
+        caller: recipient,
+        timestamp: requestTimestamp,
+        memory: stakeResult.memory,
+        fundFrom: 'stakes',
+      });
 
-    // find the action tag in the messages
-    const actionTag = approvePrimaryNameRequestResult.Messages[0].Tags.find(
-      (tag) => tag.name === 'Action',
-    ).value;
-    assert.equal(actionTag, 'Approve-Primary-Name-Request-Notice');
+      const parsedEvents = parseEventsFromResult(requestPrimaryNameResult);
+      assert.equal(parsedEvents.length, 1);
+      assert.deepStrictEqual(parsedEvents[0], {
+        _e: 1,
+        Action: 'Request-Primary-Name',
+        'Base-Name-Owner': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        Cast: false,
+        Cron: false,
+        'Request-End-Timestamp': 1839367890,
+        'Epoch-Index': -5864,
+        'FP-Balance': 0,
+        'FP-Stakes-Amount': 2000000,
+        From: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        'From-Formatted': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        'Fund-From': 'stakes',
+        'Message-Id': 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
+        Name: validPrimaryName,
+        'Request-Start-Timestamp': 1234567890,
+        Timestamp: 1234567890,
+        'Total-Primary-Name-Requests': 1,
+        'Total-Primary-Names': 0,
+        'Memory-KiB-Used': parsedEvents[0]['Memory-KiB-Used'],
+        'Handler-Memory-KiB-Used': parsedEvents[0]['Handler-Memory-KiB-Used'],
+        'Final-Memory-KiB-Used': parsedEvents[0]['Final-Memory-KiB-Used'],
+      });
 
-    // the primary name should be set
-    const approvedPrimaryNameResult = JSON.parse(
-      approvePrimaryNameRequestResult.Messages[0].Data,
-    );
-    const expectedNewPrimaryName = {
-      name: 'test-name',
-      owner: recipient,
-      startTimestamp: approvedTimestamp,
-    };
-    assert.deepStrictEqual(approvedPrimaryNameResult, {
-      newPrimaryName: expectedNewPrimaryName,
-      request: {
-        endTimestamp: 1839367890,
-        name: 'test-name',
+      const { result: getPrimaryNameRequestResult } =
+        await getPrimaryNameRequest({
+          initiator: recipient,
+          memory: requestPrimaryNameResult.Memory,
+          timestamp: requestTimestamp,
+        });
+
+      const requestData = JSON.parse(
+        getPrimaryNameRequestResult.Messages[0].Data,
+      );
+      assert.deepStrictEqual(requestData, {
+        name: validPrimaryName,
         startTimestamp: 1234567890,
-      },
-    });
-    const { result: primaryNameForAddressResult } =
-      await getPrimaryNameForAddress({
-        address: recipient,
-        memory: approvePrimaryNameRequestResult.Memory,
-        timestamp: approvedTimestamp,
+        endTimestamp: 1839367890,
+        initiator: recipient,
       });
 
-    const primaryNameLookupResult = JSON.parse(
-      primaryNameForAddressResult.Messages[0].Data,
-    );
-    assert.deepStrictEqual(primaryNameLookupResult, {
-      ...expectedNewPrimaryName,
-      processId,
-    });
+      const approvedTimestamp = 1234567899;
+      const { result: approvePrimaryNameRequestResult } =
+        await approvePrimaryNameRequest({
+          name: validPrimaryName,
+          caller: processId,
+          recipient: recipient,
+          timestamp: approvedTimestamp,
+          memory: requestPrimaryNameResult.Memory,
+        });
 
-    // reverse lookup the owner of the primary name
-    const { result: ownerOfPrimaryNameResult, memory } =
-      await getOwnerOfPrimaryName({
-        name: 'test-name',
-        memory: approvePrimaryNameRequestResult.Memory,
-        timestamp: approvedTimestamp,
+      assertNoResultError(approvePrimaryNameRequestResult);
+      const parsedApproveEvents = parseEventsFromResult(
+        approvePrimaryNameRequestResult,
+      );
+      assert.equal(parsedApproveEvents.length, 1);
+      assert.deepStrictEqual(parsedApproveEvents[0], {
+        _e: 1,
+        Action: 'Approve-Primary-Name-Request',
+        Cast: false,
+        Cron: false,
+        'Epoch-Index': -5864,
+        From: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'From-Formatted': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'Message-Id': 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
+        Name: validPrimaryName,
+        Owner: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        Recipient: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        'Request-End-Timestamp': 1839367890,
+        'Request-Start-Timestamp': 1234567890,
+        'Start-Timestamp': 1234567899,
+        Timestamp: 1234567899,
+        'Total-Primary-Names': 1,
+        'Total-Primary-Name-Requests': 0,
+        'Memory-KiB-Used': parsedApproveEvents[0]['Memory-KiB-Used'],
+        'Handler-Memory-KiB-Used':
+          parsedApproveEvents[0]['Handler-Memory-KiB-Used'],
+        'Final-Memory-KiB-Used':
+          parsedApproveEvents[0]['Final-Memory-KiB-Used'],
       });
 
-    const ownerResult = JSON.parse(ownerOfPrimaryNameResult.Messages[0].Data);
-    assert.deepStrictEqual(ownerResult, {
-      ...expectedNewPrimaryName,
-      processId,
+      // there should be two messages, one to the ant and one to the owner
+      assert.equal(approvePrimaryNameRequestResult.Messages.length, 2);
+      assert.equal(
+        approvePrimaryNameRequestResult.Messages[0].Target,
+        processId,
+      );
+      assert.equal(
+        approvePrimaryNameRequestResult.Messages[1].Target,
+        recipient,
+      );
+
+      // find the action tag in the messages
+      const actionTag = approvePrimaryNameRequestResult.Messages[0].Tags.find(
+        (tag) => tag.name === 'Action',
+      ).value;
+      assert.equal(actionTag, 'Approve-Primary-Name-Request-Notice');
+
+      // the primary name should be set
+      const approvedPrimaryNameResult = JSON.parse(
+        approvePrimaryNameRequestResult.Messages[0].Data,
+      );
+      const expectedNewPrimaryName = {
+        name: validPrimaryName,
+        owner: recipient,
+        startTimestamp: approvedTimestamp,
+      };
+      assert.deepStrictEqual(approvedPrimaryNameResult, {
+        newPrimaryName: expectedNewPrimaryName,
+        request: {
+          endTimestamp: 1839367890,
+          name: validPrimaryName,
+          startTimestamp: 1234567890,
+        },
+      });
+      const { result: primaryNameForAddressResult } =
+        await getPrimaryNameForAddress({
+          address: recipient,
+          memory: approvePrimaryNameRequestResult.Memory,
+          timestamp: approvedTimestamp,
+        });
+
+      const primaryNameLookupResult = JSON.parse(
+        primaryNameForAddressResult.Messages[0].Data,
+      );
+      assert.deepStrictEqual(primaryNameLookupResult, {
+        ...expectedNewPrimaryName,
+        processId,
+      });
+
+      // reverse lookup the owner of the primary name
+      const { result: ownerOfPrimaryNameResult, memory } =
+        await getOwnerOfPrimaryName({
+          name: validPrimaryName,
+          memory: approvePrimaryNameRequestResult.Memory,
+          timestamp: approvedTimestamp,
+        });
+
+      const ownerResult = JSON.parse(ownerOfPrimaryNameResult.Messages[0].Data);
+      assert.deepStrictEqual(ownerResult, {
+        ...expectedNewPrimaryName,
+        processId,
+      });
+      endingMemory = memory;
     });
-    endingMemory = memory;
-  });
+  }
 
   it('should immediately approve a primary name for an existing base name when the caller of the request is the base name owner', async function () {
     const processId = ''.padEnd(43, 'a');
@@ -379,7 +408,7 @@ describe('primary names', function () {
       Cron: false,
       'Request-End-Timestamp': 1839367899,
       'Epoch-Index': -5864,
-      'FP-Balance': 4000000,
+      'FP-Balance': 2000000,
       From: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       'From-Formatted': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       'Message-Id': 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
@@ -418,13 +447,13 @@ describe('primary names', function () {
       baseNameOwner: processId,
       fundingPlan: {
         address: processId,
-        balance: 4000000,
+        balance: 2000000,
         shortfall: 0,
         stakes: [],
       },
       fundingResult: {
         newWithdrawVaults: [],
-        totalFunded: 4000000,
+        totalFunded: 2000000,
       },
       newPrimaryName: expectedNewPrimaryName,
       request: {
