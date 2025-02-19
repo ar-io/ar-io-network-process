@@ -1,7 +1,6 @@
 local balances = require(".src.balances")
 local gar = require(".src.gar")
 local vaults = require(".src.vaults")
-local ao = require("ao")
 local token = {}
 
 --- @return mARIO # returns the last computed total supply, this is to avoid recomputing the total supply every time, and only when requested
