@@ -1,15 +1,7 @@
+local balances = require(".src.balances")
+local gar = require(".src.gar")
+local vaults = require(".src.vaults")
 local token = {}
-local constants = require("constants")
-local balances = require("balances")
-local gar = require("gar")
-local vaults = require("vaults")
-
-TotalSupply = TotalSupply or constants.totalTokenSupply
-LastKnownCirculatingSupply = LastKnownCirculatingSupply or 0 -- total circulating supply (e.g. balances - protocol balance)
-LastKnownLockedSupply = LastKnownLockedSupply or 0 -- total vault balance across all vaults
-LastKnownStakedSupply = LastKnownStakedSupply or 0 -- total operator stake across all gateways
-LastKnownDelegatedSupply = LastKnownDelegatedSupply or 0 -- total delegated stake across all gateways
-LastKnownWithdrawSupply = LastKnownWithdrawSupply or 0 -- total withdraw supply across all gateways (gateways and delegates)
 
 --- @return mARIO # returns the last computed total supply, this is to avoid recomputing the total supply every time, and only when requested
 function token.lastKnownTotalTokenSupply()
@@ -18,7 +10,7 @@ function token.lastKnownTotalTokenSupply()
 		+ LastKnownStakedSupply
 		+ LastKnownDelegatedSupply
 		+ LastKnownWithdrawSupply
-		+ Balances[Protocol]
+		+ Balances[ao.id]
 end
 
 --- @class BalanceObjectTallies
@@ -59,7 +51,7 @@ function token.computeTotalSupply()
 	local stakedSupply = 0
 	local delegatedSupply = 0
 	local withdrawSupply = 0
-	local protocolBalance = balances.getBalance(Protocol)
+	local protocolBalance = balances.getBalance(ao.id)
 	local userBalances = balances.getBalancesUnsafe()
 	--- @type StateObjectTallies
 	local stateObjectTallies = {

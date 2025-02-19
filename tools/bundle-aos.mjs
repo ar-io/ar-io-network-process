@@ -10,7 +10,7 @@ async function main() {
   console.log('Bundling Lua...');
 
   // Bundle the main Lua file
-  const bundledLua = bundle(path.join(__dirname, '../src/main.lua'));
+  const bundledLua = bundle(path.join(__dirname, '../process.lua'));
 
   // Read the LICENSE file
   const licensePath = path.join(__dirname, '../LICENSE');

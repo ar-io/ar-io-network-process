@@ -934,4 +934,31 @@ describe("utils", function()
 			assert.is_false(utils.booleanOrBooleanStringToBoolean(1))
 		end)
 	end)
+	describe("baseNameForName", function()
+		it("should get base name for name with an undername", function()
+			local undername = "undername"
+			local basename = "basename"
+			local name = undername .. "_" .. basename
+
+			local baseNameFromName = utils.baseNameForName(name)
+			assert.are.same(baseNameFromName, basename)
+		end)
+	end)
+
+	describe("undernameForName", function()
+		it("should get the undername name for a name with an undername", function()
+			local undername = "undername"
+			local basename = "basename"
+			local name = undername .. "_" .. basename
+
+			local undernameFromName = utils.undernameForName(name)
+			assert.are.same(undernameFromName, undername)
+		end)
+
+		it("should return nil for a name with no undername", function()
+			local basename = "basename"
+			local undernameFromName = utils.undernameForName(basename)
+			assert.are.same(undernameFromName, nil)
+		end)
+	end)
 end)

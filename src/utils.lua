@@ -1,8 +1,10 @@
-local base64 = require("base64")
-local crypto = require("crypto.init")
-local json = require("json")
-local constants = require("constants")
 local utils = {}
+local base64 = require(".src.base64")
+local json = require(".src.json")
+local constants = require(".src.constants")
+
+-- note: crypto is provided by the module so we reference it relative to process.lua in the module
+local crypto = require(".crypto.init")
 
 function utils.hasMatchingTag(tag, value)
 	return Handlers.utils.hasMatchingTag(tag, value)
@@ -709,6 +711,21 @@ function utils.booleanOrBooleanStringToBoolean(value)
 		return value
 	end
 	return type(value) == "string" and string.lower(value) == "true"
+end
+
+function utils.baseNameForName(name)
+	return (name or ""):match("[^_]+$") or name
+end
+
+--- @param name string An ArNS name with or without an undername
+--- @return string|nil # The undername, if present, or nil
+function utils.undernameForName(name)
+	if not name:match("_") then
+		return nil
+	end
+
+	local baseName = utils.baseNameForName(name)
+	return string.gsub(name:reverse(), baseName:reverse() .. "_", "", 1):reverse()
 end
 
 return utils

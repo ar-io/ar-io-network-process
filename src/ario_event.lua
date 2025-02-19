@@ -1,5 +1,5 @@
-local AOEvent = require("ao_event")
-local utils = require("utils")
+local AOEvent = require(".src.ao_event")
+local utils = require(".src.utils")
 
 --- @alias ARIOEvent AOEvent
 
