@@ -10,7 +10,7 @@ on:
         type: string
 
 env:
-  ARIO_NETWORK_PROCESS_ID: ${{ vars.ARIO_NETWORK_PROCESS_ID || inputs.process_id }}
+  ARIO_NETWORK_PROCESS_ID: ${{ inputs.process_id }}
 
 jobs:
   sdk:
@@ -28,7 +28,7 @@ jobs:
       - run: yarn test:esm # full e2e integration tests
         working-directory: ./ar-io-sdk
         env:
-          ARIO_NETWORK_PROCESS_ID: ${{ env.ARIO_NETWORK_PROCESS_ID }}
+          ARIO_PROCESS_ID: ${{ env.ARIO_NETWORK_PROCESS_ID }}
 
   monitor:
     permissions:
