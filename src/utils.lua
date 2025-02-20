@@ -207,12 +207,11 @@ end
 --- @return PaginatedTable paginatedTable - the paginated table result
 function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, sortBy, sortOrder)
 	-- Sort first by cursorField for a stable sort
-	table.sort(tableArray, function(a, b)
-		if cursorField == nil then
-			return a < b
-		end
-		return a[cursorField] < b[cursorField]
-	end)
+	if cursorField ~= nil then
+		table.sort(tableArray, function(a, b)
+			return a[cursorField] < b[cursorField]
+		end)
+	end
 
 	local sortedArray = utils.sortTableByFields(tableArray, { { order = sortOrder, field = sortBy } })
 
