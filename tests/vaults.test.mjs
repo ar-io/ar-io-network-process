@@ -725,5 +725,57 @@ describe('Vaults', async () => {
         },
       ]);
     });
+
+    it('should get paginated vaults sorted by ascending balance', async () => {
+      let cursor = '';
+      let fetchedVaults = [];
+      while (true) {
+        const { result: paginatedVaultsResult, memory } = await getVaults({
+          memory: paginatedVaultMemory,
+          cursor,
+          limit: 1,
+          sortBy: 'address',
+          sortOrder: 'asc',
+        });
+
+        // parse items, nextCursor
+        const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
+          JSON.parse(paginatedVaultsResult.Messages?.[0]?.Data);
+
+        assert.equal(totalItems, 3);
+        assert.equal(items.length, 1);
+        assert.equal(sortBy, 'address');
+        assert.equal(sortOrder, 'asc');
+        assert.equal(hasMore, !!nextCursor);
+        cursor = nextCursor;
+        fetchedVaults.push(...items);
+        endingMemory = memory;
+        if (!cursor) break;
+      }
+
+      assert.deepEqual(fetchedVaults, [
+        {
+          address: PROCESS_OWNER,
+          vaultId: vaultId1,
+          balance: 500000000,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
+        },
+        {
+          address: secondVaulter,
+          vaultId: vaultId2,
+          balance: 600000000,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
+        },
+        {
+          address: secondVaulter,
+          vaultId: vaultId3,
+          balance: 700000000,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
+        },
+      ]);
+    });
   });
 });
