@@ -173,12 +173,13 @@ end
 --- @return WalletVault[] - array of wallet vaults indexed by address and vault id
 function vaults.getPaginatedVaults(cursor, limit, sortOrder, sortBy)
 	local allVaults = vaults.getVaultsUnsafe()
-	local cursorField = "address" -- the cursor will be the wallet address
+	local cursorField = "vaultId"
 
 	local vaultsArray = utils.reduce(allVaults, function(acc, address, vaultsForAddress)
 		for vaultId, vault in pairs(vaultsForAddress) do
 			table.insert(acc, {
 				address = address,
+				controller = vault.controller,
 				vaultId = vaultId,
 				balance = vault.balance,
 				startTimestamp = vault.startTimestamp,

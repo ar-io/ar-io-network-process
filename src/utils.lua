@@ -206,6 +206,13 @@ end
 --- @param sortOrder string The order to sort by ("asc" or "desc")
 --- @return PaginatedTable paginatedTable - the paginated table result
 function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, sortBy, sortOrder)
+	-- Sort first by cursorField for a stable sort
+	if cursorField ~= nil then
+		table.sort(tableArray, function(a, b)
+			return a[cursorField] < b[cursorField]
+		end)
+	end
+
 	local sortedArray = utils.sortTableByFields(tableArray, { { order = sortOrder, field = sortBy } })
 
 	if not sortedArray or #sortedArray == 0 then
