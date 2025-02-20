@@ -179,6 +179,7 @@ function vaults.getPaginatedVaults(cursor, limit, sortOrder, sortBy)
 		for vaultId, vault in pairs(vaultsForAddress) do
 			table.insert(acc, {
 				address = address,
+				controller = vault.controller,
 				vaultId = vaultId,
 				balance = vault.balance,
 				startTimestamp = vault.startTimestamp,

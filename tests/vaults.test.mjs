@@ -630,6 +630,7 @@ describe('Vaults', async () => {
         const { result: paginatedVaultsResult, memory } = await getVaults({
           memory: paginatedVaultMemory,
           cursor,
+          sortBy: 'vaultId',
           limit: 1,
         });
 
@@ -639,7 +640,7 @@ describe('Vaults', async () => {
 
         assert.equal(totalItems, 3);
         assert.equal(items.length, 1);
-        assert.equal(sortBy, 'address');
+        assert.equal(sortBy, 'vaultId');
         assert.equal(sortOrder, 'desc');
         assert.equal(hasMore, !!nextCursor);
         cursor = nextCursor;
