@@ -612,11 +612,12 @@ describe('Vaults', async () => {
         from: secondVaulter,
         msgId: vaultId2,
       });
-      const { memory: updatedMemory3 } = await createVault({
+      const { memory: updatedMemory3 } = await createVaultedTransfer({
         quantity: 700000000,
         lockLengthMs: 1209600000,
         memory: updatedMemory2,
-        from: secondVaulter,
+        recipient: secondVaulter,
+        revokable: true,
         msgId: vaultId3,
       });
 
@@ -656,6 +657,7 @@ describe('Vaults', async () => {
           balance: 700000000,
           startTimestamp: 21600000,
           endTimestamp: 1231200000,
+          controller: PROCESS_OWNER,
         },
         {
           address: secondVaulter,
@@ -722,6 +724,7 @@ describe('Vaults', async () => {
           balance: 700000000,
           startTimestamp: 21600000,
           endTimestamp: 1231200000,
+          controller: PROCESS_OWNER,
         },
       ]);
     });
@@ -774,6 +777,7 @@ describe('Vaults', async () => {
           balance: 700000000,
           startTimestamp: 21600000,
           endTimestamp: 1231200000,
+          controller: PROCESS_OWNER,
         },
       ]);
     });
