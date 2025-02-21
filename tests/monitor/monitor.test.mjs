@@ -31,6 +31,7 @@ describe('setup', () => {
   let gatewayVaults;
   let records;
   let vaults;
+  let supplyData;
 
   before(async () => {
     compose = await new DockerComposeEnvironment(
@@ -40,6 +41,8 @@ describe('setup', () => {
       .withWaitStrategy('ao-cu', Wait.forHttp(`/state/${processId}`, 6363))
       .up();
 
+    // fetch all these at the beginning to avoid race conditions
+    supplyData = await io.getTokenSupply();
     balances = await getBalances();
     gateways = await getGateways();
     delegates = await getDelegates();
@@ -301,7 +304,6 @@ describe('setup', () => {
 
   describe('token supply', () => {
     it('should always be 1 billion ARIO', async () => {
-      const supplyData = await io.getTokenSupply();
       assert(
         supplyData.total === ARIOToMARIO(1000000000),
         `Total supply is not 1 billion ARIO: ${supplyData.total}`,
@@ -349,9 +351,6 @@ describe('setup', () => {
         circulating === supplyData.circulating,
         `Circulating supply is not equal to the sum of the balances minus the protocol balance: ${circulating} !== ${supplyData.circulating}`,
       );
-
-      // get the supply staked
-      const gateways = await getGateways();
 
       const staked = gateways.reduce(
         (acc, curr) => acc + curr.operatorStake,
@@ -697,9 +696,8 @@ describe('setup', () => {
     });
 
     it('should have the correct totalDelegatedStake for every gateway', async () => {
-      const allDelegates = await getDelegates();
       for (const gateway of gateways) {
-        const filteredForGateway = allDelegates.filter(
+        const filteredForGateway = delegates.filter(
           (delegate) => delegate.gatewayAddress === gateway.gatewayAddress,
         );
         const totalDelegatedStake = filteredForGateway.reduce(
@@ -714,7 +712,6 @@ describe('setup', () => {
     });
 
     it('should have valid delegates for all gateways', async () => {
-      const delegates = await getDelegates();
       for (const delegate of delegates) {
         assert(
           delegate.delegatedStake >= 0 && delegate.startTimestamp > 0,
@@ -727,9 +724,8 @@ describe('setup', () => {
     });
 
     it('should have valid vaults for all gateways', async () => {
-      const vaults = await getGatewayVaults();
-      if (vaults.length > 0) {
-        for (const vault of vaults) {
+      if (gatewayVaults.length > 0) {
+        for (const vault of gatewayVaults) {
           assert(
             Number.isInteger(vault.balance),
             `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid balance (${vault.balance})`, // Fixed vaultId reference
