@@ -32,6 +32,7 @@ describe('setup', () => {
   let records;
   let vaults;
   let supplyData;
+  let protocolBalance;
 
   before(async () => {
     compose = await new DockerComposeEnvironment(
@@ -42,6 +43,9 @@ describe('setup', () => {
       .up();
 
     // fetch all these at the beginning to avoid race conditions
+    protocolBalance = await io.getBalance({
+      address: processId,
+    });
     supplyData = await io.getTokenSupply();
     balances = await getBalances();
     gateways = await getGateways();
@@ -332,10 +336,6 @@ describe('setup', () => {
         supplyData.delegated >= 0,
         `Delegated supply is undefined: ${supplyData.delegated}`,
       );
-
-      const protocolBalance = await io.getBalance({
-        address: processId,
-      });
 
       assert(
         protocolBalance === supplyData.protocolBalance,
