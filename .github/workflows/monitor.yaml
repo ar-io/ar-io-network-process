@@ -3,7 +3,7 @@ name: IO Process Status
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 0-5,8-23 * * *' # Run every hour except 6AM UTC
+    - cron: '0 * * * *' # Run every hour
 
 jobs:
   monitor:
@@ -12,9 +12,16 @@ jobs:
       actions: read
     strategy:
       matrix:
-        network: [testnet, devnet]
+        network: [testnet, devnet, mainnet]
       fail-fast: false
     runs-on: ubuntu-latest
+    env:
+      NETWORK_MAP: |
+        {
+          "devnet": "GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc",
+          "testnet": "agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA",
+          "mainnet": "qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE"
+        }
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -32,7 +39,7 @@ jobs:
         run: yarn monitor
         id: monitor
         env:
-          ARIO_NETWORK_PROCESS_ID: ${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}
+          ARIO_NETWORK_PROCESS_ID: ${{ fromJson(env.NETWORK_MAP)[matrix.network] }}
 
       - name: Notify Failure
         if: failure()
@@ -57,7 +64,7 @@ jobs:
                     },
                     {
                       "title": "Process ID",
-                      "value": "${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}",
+                      "value": "${{ fromJson(env.NETWORK_MAP)[matrix.network] }}",
                       "short": true
                     },
                     {
@@ -92,7 +99,7 @@ jobs:
                 },
                 {
                   "title": "Process ID",
-                  "value": "${{ matrix.network == 'testnet' && 'agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA' || 'GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc' }}",
+                  "value": "${{ fromJson(env.NETWORK_MAP)[matrix.network] }}",
                   "short": true
                 },
                 {
