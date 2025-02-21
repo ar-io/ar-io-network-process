@@ -25,6 +25,13 @@ const projectRootPath = process.cwd();
 
 describe('setup', () => {
   let compose;
+  let balances;
+  let gateways;
+  let delegates;
+  let gatewayVaults;
+  let records;
+  let vaults;
+
   before(async () => {
     compose = await new DockerComposeEnvironment(
       projectRootPath,
@@ -32,6 +39,13 @@ describe('setup', () => {
     )
       .withWaitStrategy('ao-cu', Wait.forHttp(`/state/${processId}`, 6363))
       .up();
+
+    balances = await getBalances();
+    gateways = await getGateways();
+    delegates = await getDelegates();
+    gatewayVaults = await getGatewayVaults();
+    records = await getArNSRecords();
+    vaults = await getVaults();
   });
 
   after(async () => {
@@ -214,10 +228,6 @@ describe('setup', () => {
   });
 
   describe('balances', () => {
-    let balances = [];
-    before(async () => {
-      balances = await getBalances();
-    });
     it('should always be up to date', async () => {
       // assert they are all integers
       for (const balance of balances) {
@@ -321,8 +331,6 @@ describe('setup', () => {
         `Delegated supply is undefined: ${supplyData.delegated}`,
       );
 
-      const balances = await getBalances();
-
       const protocolBalance = await io.getBalance({
         address: processId,
       });
@@ -396,12 +404,10 @@ describe('setup', () => {
   describe('epochs', () => {
     let epochSettings;
     let currentEpoch;
-    let gateways;
 
     before(async () => {
       epochSettings = await io.getEpochSettings();
       currentEpoch = await io.getCurrentEpoch();
-      gateways = await getGateways();
     });
 
     it('should always be up to date', async () => {
@@ -544,12 +550,6 @@ describe('setup', () => {
 
   // gateway registry - ensure no invalid gateways
   describe('gateway registry', () => {
-    let gateways;
-
-    before(async () => {
-      gateways = await getGateways();
-    });
-
     it('should only have valid gateways', { timeout: 60000 }, async () => {
       const { durationMs, epochZeroStartTimestamp } =
         await io.getEpochSettings();
@@ -760,7 +760,6 @@ describe('setup', () => {
     const minLockTimeMs = 14 * 24 * 60 * 60 * 1000;
     const maxLockTimeMs = 12 * 365 * 24 * 60 * 60 * 1000;
     it('should have valid vaults with non-zero balance and startTimestamp and endTimestamp', async () => {
-      const vaults = await getVaults();
       for (const vault of vaults) {
         assert(
           vault.address,
@@ -804,40 +803,43 @@ describe('setup', () => {
       'should not have any arns records older than two weeks',
       { timeout: 60000 },
       async () => {
-        const arnsRecords = await getArNSRecords();
-        const totalArNSRecords = arnsRecords.length;
+        const totalArNSRecords = records.length;
         const uniqueNames = new Set();
-        for (const arn of arnsRecords) {
-          uniqueNames.add(arn.name);
-          assert(arn.processId, `ArNS name '${arn.name}' has no processId`);
-          assert(arn.type, `ArNS name '${arn.name}' has no type`);
+        for (const record of records) {
+          uniqueNames.add(record.name);
           assert(
-            arn.startTimestamp,
-            `ArNS name '${arn.name}' has no start timestamp`,
+            record.processId,
+            `ArNS name '${record.name}' has no processId`,
+          );
+          assert(record.type, `ArNS name '${record.name}' has no type`);
+          assert(
+            record.startTimestamp,
+            `ArNS name '${record.name}' has no start timestamp`,
           );
           assert(
-            Number.isInteger(arn.purchasePrice) && arn.purchasePrice >= 0,
-            `ArNS name '${arn.name}' has invalid purchase price: ${arn.purchasePrice}`,
+            Number.isInteger(record.purchasePrice) && record.purchasePrice >= 0,
+            `ArNS name '${record.name}' has invalid purchase price: ${record.purchasePrice}`,
           );
           assert(
-            Number.isInteger(arn.undernameLimit) && arn.undernameLimit >= 10,
-            `ArNS name '${arn.name}' has invalid undername limit: ${arn.undernameLimit}`,
+            Number.isInteger(record.undernameLimit) &&
+              record.undernameLimit >= 10,
+            `ArNS name '${record.name}' has invalid undername limit: ${record.undernameLimit}`,
           );
-          if (arn.type === 'lease') {
+          if (record.type === 'lease') {
             assert(
-              arn.endTimestamp,
-              `ArNS name '${arn.name}' has no end timestamp`,
+              record.endTimestamp,
+              `ArNS name '${record.name}' has no end timestamp`,
             );
             assert(
-              arn.endTimestamp > Date.now() - twoWeeksMs,
-              `ArNS name '${arn.name}' is older than two weeks`,
+              record.endTimestamp > Date.now() - twoWeeksMs,
+              `ArNS name '${record.name}' is older than two weeks`,
             );
           }
           // if permabuy, assert no endTimestamp
-          if (arn.type === 'permabuy') {
+          if (record.type === 'permabuy') {
             assert(
-              !arn.endTimestamp,
-              `ArNS name '${arn.name}' has an end timestamp but is a permabuy`,
+              !record.endTimestamp,
+              `ArNS name '${record.name}' has an end timestamp but is a permabuy`,
             );
           }
         }
