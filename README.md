@@ -1,10 +1,33 @@
-# AO/IO Contract
+# AO/IO Network Process
 
 [![codecov](https://codecov.io/gh/ar-io/ar-io-network-process/graph/badge.svg?token=DMM8LQO8KL)](https://codecov.io/gh/ar-io/ar-io-network-process)
 
 [![IO Process Status](https://github.com/ar-io/ar-io-network-process/actions/workflows/monitor.yaml/badge.svg)](https://github.com/ar-io/ar-io-network-process/actions/workflows/monitor.yaml)
 
 The implementation of the ar.io network contract is written in lua and deployed as an AO process on Arweave. The contract is responsible for managing the network state, handling transactions, and enforcing the network rules. Refer to the [contract whitepaper] for more details on the network rules and the contract design.
+
+<!-- toc -->
+
+- [Networks](#networks)
+- [Contract Spec](#contract-spec)
+  - [General Structure](#general-structure)
+- [Developers](#developers)
+  - [Requirements](#requirements)
+  - [Lua Setup (MacOS)](#lua-setup-macos)
+  - [LuaRocks Setup](#luarocks-setup)
+  - [aos](#aos)
+  - [Code Formatting](#code-formatting)
+  - [Testing](#testing)
+  - [Dependencies](#dependencies)
+  - [Deployment](#deployment)
+
+<!-- tocstop -->
+
+## Networks
+
+- [Mainnet](https://ao.link/qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE)
+- [Testnet](https://ao.link/agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA)
+- [Devnet](https://ao.link/GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc)
 
 ## Contract Spec
 
@@ -180,6 +203,12 @@ To run the tests, execute the following command:
 busted .
 ```
 
+To run the tests with debugging (includes print statements), set the `DEBUG` environment variable to `true`:
+
+```sh
+DEBUG=true busted .
+```
+
 To see the test coverage, get luacov:
 
 ```sh
@@ -213,6 +242,7 @@ dependencies = {
 
 ### Deployment
 
-Merging to develop or main will evolve the devnet or testnet contract to the next version. The script managing the logic is located at `tools/evolve.mjs`, which uses aoconnect to perform an `Eval` action. The deployment process is automated using Github Actions.
+Merging to develop or main will evolve the devnet or testnet contract to the next version. The script managing the logic is located at `tools/evolve.mjs`, which uses [aoconnect]to perform an `Eval` action. The deployment process is automated using Github Actions.
 
 [contract whitepaper]: https://whitepaper.ar.io
+[aoconnect]: https://github.com/permaweb/ao/tree/main/connect

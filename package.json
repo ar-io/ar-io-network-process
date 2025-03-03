@@ -6,6 +6,7 @@
     "lint": "luacheck src spec",
     "test": "yarn format:fix && yarn test:unit && yarn test:integration",
     "test:unit": "rm -rf coverage && mkdir -p coverage && busted . && luacov",
+    "test:unit:debug": "rm -rf coverage && mkdir -p coverage && DEBUG=true busted . && luacov",
     "test:coverage": "rm -rf luacov-html && yarn test:unit && luacov --reporter html && open luacov-html/index.html",
     "test:integration": "yarn build && node --test --experimental-wasm-memory64 **/*.test.mjs",
     "monitor:down": "docker compose -f tests/monitor/docker-compose.test.yml down",
@@ -23,6 +24,7 @@
     "arweave": "^1.15.1",
     "husky": "^9.1.6",
     "lint-staged": "^15.2.10",
+    "markdown-toc-gen": "^1.1.0",
     "p-limit": "^6.2.0",
     "prettier": "^3.3.2",
     "testcontainers": "^10.13.1",
@@ -33,6 +35,9 @@
   "lint-staged": {
     "*.lua": [
       "stylua"
+    ],
+    "*.md": [
+      "markdown-toc-gen insert"
     ],
     "*": [
       "prettier --write ."
