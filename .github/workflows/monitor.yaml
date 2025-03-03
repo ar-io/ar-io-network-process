@@ -1,4 +1,4 @@
-name: IO Process Status
+name: $ARIO Network Status
 
 on:
   workflow_dispatch:
