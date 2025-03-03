@@ -55,7 +55,7 @@ Devnet ARIO@aos-2.0.1[Inbox:270]>  .load process.lua (or some other lua code)
 
 ### Mainnet
 
-Mainnet deployment is managed manually by the AR.IO team via modules in [ar-io/ao](https://github.com/ar-io/aos) forked repository. The process is owned by a [multi-sig process](https://github.com/ar-io/vaot) available at [vaot.ar.io](https://vaot.ar.io) and requires majority of controllers to approve evals before the update is applied.
+Mainnet deployment is managed manually by the AR.IO team via modules in [ar-io/aos](https://github.com/ar-io/aos) forked repository. The process is owned by a [multi-sig process](https://github.com/ar-io/vaot) available at [vaot.ar.io](https://vaot.ar.io) and requires majority of controllers to approve evals before the update is applied.
 
 ## Monitoring
 
