@@ -55,11 +55,11 @@ Devnet ARIO@aos-2.0.1[Inbox:270]>  .load process.lua (or some other lua code)
 
 ### Mainnet
 
-Mainnet deployment is managed manually by the AR.IO team via modules in [ar-io/aos](https://github.com/ar-io/aos) forked repository. The process is owned by a [multi-sig process](https://github.com/ar-io/vaot) available at [vaot.ar.io](https://vaot.ar.io) and requires majority of controllers to approve evals before the update is applied.
+Mainnet deployment is managed manually by the AR.IO team via modules in [ar-io/aos] forked repository. The process is owned by a an [ar-io/vaot] multi-sig process (available at [vaot.ar.io](https://vaot.ar.io)) and requires majority of controllers to approve evals before the update is applied.
 
 ## Monitoring
 
-Monitor tests leverage the [ar-io-sdk](https://github.com/ar-io/ar-io-sdk) to evaluate the state of the network and intended to detect invariant states on the network process. These tests spin up a local AO CU service via [testcontainers](https://www.testcontainers.org/) and evaluate the state of the network process.
+Monitor tests leverage the [ar-io-sdk] to evaluate the state of the network and intended to detect invariant states on the network process. These tests spin up a local AO CU service via [testcontainers] and evaluate the state of the network process.
 
 To run the monitor tests, execute the following command:
 
@@ -79,7 +79,7 @@ You can also use the ad-hoc workflow to evaluate a forked process by setting the
 
 ### Unit Tests
 
-Unit tests are written using the [Busted](https://olivinelabs.github.io/busted/) framework. To run the tests, execute the following command:
+Unit tests are written using the [Busted] framework. To run the tests, execute the following command:
 
 ```sh
 busted . or yarn test:unit
@@ -209,3 +209,9 @@ dependencies = {
 
 [contract whitepaper]: https://whitepaper.ar.io
 [aoconnect]: https://github.com/permaweb/ao/tree/main/connect
+[ar-io/aos]: https://github.com/ar-io/aos
+[ar-io/vaot]: https://github.com/ar-io/vaot
+[ar-io/ar-io-sdk]: https://github.com/ar-io/ar-io-sdk
+[Busted]: https://olivinelabs.github.io/busted/
+[ao-loader]: https://github.com/permaweb/ao/tree/main/loader
+[testcontainers]: https://www.testcontainers.org/
