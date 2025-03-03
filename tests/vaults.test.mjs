@@ -583,6 +583,7 @@ describe('Vaults', async () => {
     const vaultId1 = 'unique-id-1-'.padEnd(43, 'a');
     const secondVaulter = 'unique-second-address-'.padEnd(43, 'a');
     const vaultId2 = 'unique-id-2-'.padEnd(43, 'a');
+    const vaultId3 = 'unique-id-3-'.padEnd(43, 'a');
 
     before(async () => {
       const { memory: updatedMemory } = await createVault({
@@ -597,7 +598,7 @@ describe('Vaults', async () => {
           Tags: [
             { name: 'Action', value: 'Transfer' },
             { name: 'Recipient', value: secondVaulter },
-            { name: 'Quantity', value: 600000000 },
+            { name: 'Quantity', value: 1300000000 },
             { name: 'Cast', value: true },
           ],
         },
@@ -611,7 +612,16 @@ describe('Vaults', async () => {
         from: secondVaulter,
         msgId: vaultId2,
       });
-      paginatedVaultMemory = updatedMemory2;
+      const { memory: updatedMemory3 } = await createVaultedTransfer({
+        quantity: 700000000,
+        lockLengthMs: 1209600000,
+        memory: updatedMemory2,
+        recipient: secondVaulter,
+        revokable: true,
+        msgId: vaultId3,
+      });
+
+      paginatedVaultMemory = updatedMemory3;
     });
 
     it('should get paginated vaults', async () => {
@@ -621,6 +631,7 @@ describe('Vaults', async () => {
         const { result: paginatedVaultsResult, memory } = await getVaults({
           memory: paginatedVaultMemory,
           cursor,
+          sortBy: 'vaultId',
           limit: 1,
         });
 
@@ -628,9 +639,9 @@ describe('Vaults', async () => {
         const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
           JSON.parse(paginatedVaultsResult.Messages?.[0]?.Data);
 
-        assert.equal(totalItems, 2);
+        assert.equal(totalItems, 3);
         assert.equal(items.length, 1);
-        assert.equal(sortBy, 'address');
+        assert.equal(sortBy, 'vaultId');
         assert.equal(sortOrder, 'desc');
         assert.equal(hasMore, !!nextCursor);
         cursor = nextCursor;
@@ -640,6 +651,14 @@ describe('Vaults', async () => {
       }
 
       assert.deepEqual(fetchedVaults, [
+        {
+          address: secondVaulter,
+          vaultId: vaultId3,
+          balance: 700000000,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
+          controller: PROCESS_OWNER,
+        },
         {
           address: secondVaulter,
           vaultId: vaultId2,
@@ -673,7 +692,7 @@ describe('Vaults', async () => {
         const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
           JSON.parse(paginatedVaultsResult.Messages?.[0]?.Data);
 
-        assert.equal(totalItems, 2);
+        assert.equal(totalItems, 3);
         assert.equal(items.length, 1);
         assert.equal(sortBy, 'balance');
         assert.equal(sortOrder, 'asc');
@@ -698,6 +717,67 @@ describe('Vaults', async () => {
           balance: 600000000,
           startTimestamp: 21600000,
           endTimestamp: 1231200000,
+        },
+        {
+          address: secondVaulter,
+          vaultId: vaultId3,
+          balance: 700000000,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
+          controller: PROCESS_OWNER,
+        },
+      ]);
+    });
+
+    it('should get paginated vaults sorted by ascending balance', async () => {
+      let cursor = '';
+      let fetchedVaults = [];
+      while (true) {
+        const { result: paginatedVaultsResult, memory } = await getVaults({
+          memory: paginatedVaultMemory,
+          cursor,
+          limit: 1,
+          sortBy: 'address',
+          sortOrder: 'asc',
+        });
+
+        // parse items, nextCursor
+        const { items, nextCursor, hasMore, sortBy, sortOrder, totalItems } =
+          JSON.parse(paginatedVaultsResult.Messages?.[0]?.Data);
+
+        assert.equal(totalItems, 3);
+        assert.equal(items.length, 1);
+        assert.equal(sortBy, 'address');
+        assert.equal(sortOrder, 'asc');
+        assert.equal(hasMore, !!nextCursor);
+        cursor = nextCursor;
+        fetchedVaults.push(...items);
+        endingMemory = memory;
+        if (!cursor) break;
+      }
+
+      assert.deepEqual(fetchedVaults, [
+        {
+          address: PROCESS_OWNER,
+          vaultId: vaultId1,
+          balance: 500000000,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
+        },
+        {
+          address: secondVaulter,
+          vaultId: vaultId2,
+          balance: 600000000,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
+        },
+        {
+          address: secondVaulter,
+          vaultId: vaultId3,
+          balance: 700000000,
+          startTimestamp: 21600000,
+          endTimestamp: 1231200000,
+          controller: PROCESS_OWNER,
         },
       ]);
     });

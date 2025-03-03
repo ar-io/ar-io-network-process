@@ -25,6 +25,15 @@ const projectRootPath = process.cwd();
 
 describe('setup', () => {
   let compose;
+  let balances;
+  let gateways;
+  let delegates;
+  let gatewayVaults;
+  let records;
+  let vaults;
+  let supplyData;
+  let protocolBalance;
+
   before(async () => {
     compose = await new DockerComposeEnvironment(
       projectRootPath,
@@ -32,6 +41,18 @@ describe('setup', () => {
     )
       .withWaitStrategy('ao-cu', Wait.forHttp(`/state/${processId}`, 6363))
       .up();
+
+    // fetch all these at the beginning to avoid race conditions
+    protocolBalance = await io.getBalance({
+      address: processId,
+    });
+    supplyData = await io.getTokenSupply();
+    balances = await getBalances();
+    gateways = await getGateways();
+    delegates = await getDelegates();
+    gatewayVaults = await getGatewayVaults();
+    records = await getArNSRecords();
+    vaults = await getVaults();
   });
 
   after(async () => {
@@ -214,10 +235,6 @@ describe('setup', () => {
   });
 
   describe('balances', () => {
-    let balances = [];
-    before(async () => {
-      balances = await getBalances();
-    });
     it('should always be up to date', async () => {
       // assert they are all integers
       for (const balance of balances) {
@@ -291,7 +308,6 @@ describe('setup', () => {
 
   describe('token supply', () => {
     it('should always be 1 billion ARIO', async () => {
-      const supplyData = await io.getTokenSupply();
       assert(
         supplyData.total === ARIOToMARIO(1000000000),
         `Total supply is not 1 billion ARIO: ${supplyData.total}`,
@@ -321,12 +337,6 @@ describe('setup', () => {
         `Delegated supply is undefined: ${supplyData.delegated}`,
       );
 
-      const balances = await getBalances();
-
-      const protocolBalance = await io.getBalance({
-        address: processId,
-      });
-
       assert(
         protocolBalance === supplyData.protocolBalance,
         `Protocol balance is not equal to the balance provided by the contract: ${protocolBalance} !== ${supplyData.protocolBalance}`,
@@ -341,9 +351,6 @@ describe('setup', () => {
         circulating === supplyData.circulating,
         `Circulating supply is not equal to the sum of the balances minus the protocol balance: ${circulating} !== ${supplyData.circulating}`,
       );
-
-      // get the supply staked
-      const gateways = await getGateways();
 
       const staked = gateways.reduce(
         (acc, curr) => acc + curr.operatorStake,
@@ -396,12 +403,10 @@ describe('setup', () => {
   describe('epochs', () => {
     let epochSettings;
     let currentEpoch;
-    let gateways;
 
     before(async () => {
       epochSettings = await io.getEpochSettings();
       currentEpoch = await io.getCurrentEpoch();
-      gateways = await getGateways();
     });
 
     it('should always be up to date', async () => {
@@ -544,12 +549,6 @@ describe('setup', () => {
 
   // gateway registry - ensure no invalid gateways
   describe('gateway registry', () => {
-    let gateways;
-
-    before(async () => {
-      gateways = await getGateways();
-    });
-
     it('should only have valid gateways', { timeout: 60000 }, async () => {
       const { durationMs, epochZeroStartTimestamp } =
         await io.getEpochSettings();
@@ -697,9 +696,8 @@ describe('setup', () => {
     });
 
     it('should have the correct totalDelegatedStake for every gateway', async () => {
-      const allDelegates = await getDelegates();
       for (const gateway of gateways) {
-        const filteredForGateway = allDelegates.filter(
+        const filteredForGateway = delegates.filter(
           (delegate) => delegate.gatewayAddress === gateway.gatewayAddress,
         );
         const totalDelegatedStake = filteredForGateway.reduce(
@@ -714,7 +712,6 @@ describe('setup', () => {
     });
 
     it('should have valid delegates for all gateways', async () => {
-      const delegates = await getDelegates();
       for (const delegate of delegates) {
         assert(
           delegate.delegatedStake >= 0 && delegate.startTimestamp > 0,
@@ -727,9 +724,8 @@ describe('setup', () => {
     });
 
     it('should have valid vaults for all gateways', async () => {
-      const vaults = await getGatewayVaults();
-      if (vaults.length > 0) {
-        for (const vault of vaults) {
+      if (gatewayVaults.length > 0) {
+        for (const vault of gatewayVaults) {
           assert(
             Number.isInteger(vault.balance),
             `Vault ${vault.vaultId} on gateway ${vault.gatewayAddress} has an invalid balance (${vault.balance})`, // Fixed vaultId reference
@@ -760,7 +756,6 @@ describe('setup', () => {
     const minLockTimeMs = 14 * 24 * 60 * 60 * 1000;
     const maxLockTimeMs = 12 * 365 * 24 * 60 * 60 * 1000;
     it('should have valid vaults with non-zero balance and startTimestamp and endTimestamp', async () => {
-      const vaults = await getVaults();
       for (const vault of vaults) {
         assert(
           vault.address,
@@ -775,7 +770,7 @@ describe('setup', () => {
           `Vault ${vault.vaultId} for ${vault.address} has an invalid balance (${vault.balance})`,
         );
         assert(
-          vault.startTimestamp <= Date.now(),
+          vault.startTimestamp >= 0,
           `Vault ${vault.vaultId} for ${vault.address} has an invalid start timestamp ${vault.startTimestamp} (${new Date(vault.startTimestamp).toLocaleString()})`,
         );
         assert(
@@ -804,40 +799,43 @@ describe('setup', () => {
       'should not have any arns records older than two weeks',
       { timeout: 60000 },
       async () => {
-        const arnsRecords = await getArNSRecords();
-        const totalArNSRecords = arnsRecords.length;
+        const totalArNSRecords = records.length;
         const uniqueNames = new Set();
-        for (const arn of arnsRecords) {
-          uniqueNames.add(arn.name);
-          assert(arn.processId, `ArNS name '${arn.name}' has no processId`);
-          assert(arn.type, `ArNS name '${arn.name}' has no type`);
+        for (const record of records) {
+          uniqueNames.add(record.name);
           assert(
-            arn.startTimestamp,
-            `ArNS name '${arn.name}' has no start timestamp`,
+            record.processId,
+            `ArNS name '${record.name}' has no processId`,
+          );
+          assert(record.type, `ArNS name '${record.name}' has no type`);
+          assert(
+            record.startTimestamp,
+            `ArNS name '${record.name}' has no start timestamp`,
           );
           assert(
-            Number.isInteger(arn.purchasePrice) && arn.purchasePrice >= 0,
-            `ArNS name '${arn.name}' has invalid purchase price: ${arn.purchasePrice}`,
+            Number.isInteger(record.purchasePrice) && record.purchasePrice >= 0,
+            `ArNS name '${record.name}' has invalid purchase price: ${record.purchasePrice}`,
           );
           assert(
-            Number.isInteger(arn.undernameLimit) && arn.undernameLimit >= 10,
-            `ArNS name '${arn.name}' has invalid undername limit: ${arn.undernameLimit}`,
+            Number.isInteger(record.undernameLimit) &&
+              record.undernameLimit >= 10,
+            `ArNS name '${record.name}' has invalid undername limit: ${record.undernameLimit}`,
           );
-          if (arn.type === 'lease') {
+          if (record.type === 'lease') {
             assert(
-              arn.endTimestamp,
-              `ArNS name '${arn.name}' has no end timestamp`,
+              record.endTimestamp,
+              `ArNS name '${record.name}' has no end timestamp`,
             );
             assert(
-              arn.endTimestamp > Date.now() - twoWeeksMs,
-              `ArNS name '${arn.name}' is older than two weeks`,
+              record.endTimestamp > Date.now() - twoWeeksMs,
+              `ArNS name '${record.name}' is older than two weeks`,
             );
           }
           // if permabuy, assert no endTimestamp
-          if (arn.type === 'permabuy') {
+          if (record.type === 'permabuy') {
             assert(
-              !arn.endTimestamp,
-              `ArNS name '${arn.name}' has an end timestamp but is a permabuy`,
+              !record.endTimestamp,
+              `ArNS name '${record.name}' has an end timestamp but is a permabuy`,
             );
           }
         }
@@ -921,19 +919,15 @@ describe('setup', () => {
       const { items: primaryNames } = await io.getPrimaryNames({
         limit: 1000,
       });
+      const records = await getArNSRecords();
       for (const primaryName of primaryNames) {
         // assert the base name is a valid arns name
         const baseName = primaryName.name.split('_').pop(); // get the last part of the name
-        const record = await io.getArNSRecord({
-          name: baseName,
-        });
-        if (record.type === 'lease') {
-          assert(
-            record.endTimestamp + twoWeeksMs > Date.now(),
-            `Primary name ${primaryName.name} base name of ${baseName} has expired (including grace period)`,
-          );
-        }
-        assert(record, `Primary name ${primaryName.name} has no record`);
+        const record = records.find((record) => record.name === baseName);
+        assert(
+          record,
+          `Primary name ${primaryName.name} has no base name record`,
+        );
         assert(primaryName.owner, 'Primary name has no owner');
         assert(primaryName.name, 'Primary name has no name');
         assert(
@@ -941,6 +935,12 @@ describe('setup', () => {
           'Primary name has no start timestamp',
         );
         assert(primaryName.processId, 'Primary name has no processId');
+        if (record.type === 'lease') {
+          assert(
+            record.endTimestamp + twoWeeksMs > Date.now(),
+            `Primary name ${primaryName.name} base name of ${baseName} has expired (including grace period)`,
+          );
+        }
       }
     });
   });

@@ -240,7 +240,7 @@ describe('primary names', function () {
         'Request-End-Timestamp': 1839367890,
         'Epoch-Index': -5864,
         'FP-Balance': 0,
-        'FP-Stakes-Amount': 2000000,
+        'FP-Stakes-Amount': 1000000,
         From: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
         'From-Formatted': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
         'Fund-From': 'stakes',
@@ -408,7 +408,7 @@ describe('primary names', function () {
       Cron: false,
       'Request-End-Timestamp': 1839367899,
       'Epoch-Index': -5864,
-      'FP-Balance': 2000000,
+      'FP-Balance': 1000000,
       From: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       'From-Formatted': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       'Message-Id': 'mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm',
@@ -447,13 +447,13 @@ describe('primary names', function () {
       baseNameOwner: processId,
       fundingPlan: {
         address: processId,
-        balance: 2000000,
+        balance: 1000000,
         shortfall: 0,
         stakes: [],
       },
       fundingResult: {
         newWithdrawVaults: [],
-        totalFunded: 2000000,
+        totalFunded: 1000000,
       },
       newPrimaryName: expectedNewPrimaryName,
       request: {
