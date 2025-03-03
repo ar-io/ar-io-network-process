@@ -8,6 +8,9 @@ The implementation of the ar.io network contract is written in lua and deployed 
 
 - [Networks](#networks)
 - [Specs](#specs)
+- [Deployments](#deployments)
+  - [Testnet & Devnet](#testnet--devnet)
+  - [Mainnet](#mainnet)
 - [Monitoring](#monitoring)
 - [Tests](#tests)
   - [Unit Tests](#unit-tests)
@@ -19,19 +22,40 @@ The implementation of the ar.io network contract is written in lua and deployed 
   - [aos](#aos)
   - [Code Formatting](#code-formatting)
   - [Dependencies](#dependencies)
-  - [Deployment](#deployment)
 
 <!-- tocstop -->
 
 ## Networks
 
-- [Mainnet](https://ao.link/qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE)
-- [Testnet](https://ao.link/agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA)
-- [Devnet](https://ao.link/GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc)
+- [Mainnet - qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE](https://ao.link/qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE)
+- [Testnet - agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA](https://ao.link/agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA)
+- [Devnet - GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc](https://ao.link/GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc)
 
 ## Specs
 
-Refer to the AR.IO Network[Spec](SPEC.md) for more details on the contract actions and their inputs and outputs.
+Refer to the AR.IO Network [Spec](SPEC.md) document for more details on the contract actions and their inputs and outputs.
+
+## Deployments
+
+### Testnet & Devnet
+
+Merging to develop or main will evolve the devnet or testnet contract to the latest source code. The script managing the logic is located at `tools/evolve.mjs`, which uses [aoconnect] to perform an `Eval` action. The deployment process is automated using Github Actions.
+
+To manually apply updates to the devnet or testnet contract, run the following command:
+
+```sh
+aos <network-process-id> --cu-url https://cu.ardrive.io --wallet /path/to/wallet.json
+```
+
+From there, you can perform an `Eval` action to apply the updates:
+
+```sh
+Devnet ARIO@aos-2.0.1[Inbox:270]>  .load process.lua (or some other lua code)
+```
+
+### Mainnet
+
+Mainnet deployment is managed manually by the AR.IO team via modules in [ar-io/ao](https://github.com/ar-io/aos) forked repository. The process is owned by a [multi-sig process](https://github.com/ar-io/vaot) available at [vaot.ar.io](https://vaot.ar.io) and requires majority of controllers to approve evals before the update is applied.
 
 ## Monitoring
 
@@ -183,11 +207,5 @@ dependencies = {
 }
 ```
 
-### Deployment
-
-Merging to develop or main will evolve the devnet or testnet contract to the next version. The script managing the logic is located at `tools/evolve.mjs`, which uses [aoconnect]to perform an `Eval` action. The deployment process is automated using Github Actions.
-
 [contract whitepaper]: https://whitepaper.ar.io
 [aoconnect]: https://github.com/permaweb/ao/tree/main/connect
-
-[IO Process Status]: (https://github.com/ar-io/ar-io-network-process/actions/workflows/monitor.yaml/badge.svg)](https://github.com/ar-io/ar-io-network-process/actions/workflows/monitor.yaml)
