@@ -1829,14 +1829,15 @@ end, function(msg)
 	end
 	local updatedDemandFactorCount = utils.lengthOfTable(newDemandFactors)
 	if updatedDemandFactorCount > 0 then
-		local updatedDemandFactorPeriods = utils.map(newDemandFactors, function(_, df)
-			return df.period
-		end)
-		local updatedDemandFactorValues = utils.map(newDemandFactors, function(_, df)
-			return df.demandFactor
-		end)
+		local updatedDemandFactorPeriods = {}
+		local updatedDemandFactorValues = {}
+		for _, df in ipairs(newDemandFactors) do
+			table.insert(updatedDemandFactorPeriods, df.period)
+			table.insert(updatedDemandFactorValues, df.demandFactor)
+		end
 		msg.ioEvent:addField("New-Demand-Factor-Periods", updatedDemandFactorPeriods)
 		msg.ioEvent:addField("New-Demand-Factor-Values", updatedDemandFactorValues)
+		msg.ioEvent:addField("New-Demand-Factor-Count", updatedDemandFactorCount)
 	end
 	if #newPruneGatewaysResults > 0 then
 		-- Reduce the prune gateways results and then track changes
@@ -2511,6 +2512,7 @@ addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMa
 	local primaryNameResult = primaryNames.createPrimaryNameRequest(name, initiator, msg.Timestamp, msg.Id, fundFrom)
 
 	addPrimaryNameRequestData(msg.ioEvent, primaryNameResult)
+	-- update demand factor data
 
 	--- if the from is the new owner, then send an approved notice to the from
 	if primaryNameResult.newPrimaryName then
