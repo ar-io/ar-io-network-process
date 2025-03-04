@@ -9,6 +9,7 @@
     "test:unit:debug": "rm -rf coverage && mkdir -p coverage && DEBUG=true busted . && luacov",
     "test:coverage": "rm -rf luacov-html && yarn test:unit && luacov --reporter html && open luacov-html/index.html",
     "test:integration": "yarn build && node --test --experimental-wasm-memory64 **/*.test.mjs",
+    "patch:new": "node patch.mjs $1",
     "monitor:down": "docker compose -f tests/monitor/docker-compose.test.yml down",
     "monitor": "yarn monitor:down && node --test tests/monitor/monitor.test.mjs",
     "monitor:devnet": "yarn monitor:down && ARIO_NETWORK_PROCESS_ID=GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc node --test tests/monitor/monitor.test.mjs",
