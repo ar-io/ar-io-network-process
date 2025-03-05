@@ -260,9 +260,10 @@ describe('setup', () => {
   describe('distribution totals', () => {
     it('should always have correct eligible rewards for the the previous epoch (within 10 mARIO)', async () => {
       const currentEpoch = await io.getCurrentEpoch();
-      if (currentEpoch == undefined) {
+      if (currentEpoch == undefined || currentEpoch.epochIndex === 0) {
         return;
       }
+
       const previousEpoch = await io.getEpoch({
         epochIndex: currentEpoch.epochIndex - 1,
       });
@@ -489,9 +490,18 @@ describe('setup', () => {
     });
 
     it('the previous epoch should have a been distributed', async () => {
-      if (Date.now() < epochSettings.epochZeroStartTimestamp) {
+      if (
+        Date.now() < epochSettings.epochZeroStartTimestamp ||
+        currentEpoch.epochIndex === 0
+      ) {
         return;
       }
+
+      // if genesis epoch, there is no previous epoch
+      if (currentEpoch.epochIndex === 0) {
+        return;
+      }
+
       const { epochIndex: currentEpochIndex } = currentEpoch;
       const previousEpochIndex = currentEpochIndex - 1;
       const { epochIndex, distributions, endTimestamp, startTimestamp } =
