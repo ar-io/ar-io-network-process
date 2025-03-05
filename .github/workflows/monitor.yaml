@@ -35,11 +35,11 @@ jobs:
       - name: Setup
         run: yarn
 
-      - name: Monitor
-        run: yarn monitor
+      - name: Run Monitor Tests
+        run: |
+          mkdir -p logs
+          yarn monitor 2>&1 | tee logs/${{ matrix.network }}-${{ github.run_id }}.log
         id: monitor
-        env:
-          ARIO_NETWORK_PROCESS_ID: ${{ fromJson(env.NETWORK_MAP)[matrix.network] }}
 
       - name: Notify Failure
         if: failure()
@@ -48,6 +48,7 @@ jobs:
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: IO Process Observation Failed!
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_FILE_UPLOAD: logs/${{ matrix.network }}-${{ github.run_id }}.log
           SLACK_CUSTOM_PAYLOAD: |
             {
               "attachments": [
@@ -85,6 +86,7 @@ jobs:
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: IO Process Observation Success!
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_FILE_UPLOAD: logs/${{ matrix.network }}-${{ github.run_id }}.log
           SLACK_CUSTOM_PAYLOAD: |
             {
               "attachments": [{
