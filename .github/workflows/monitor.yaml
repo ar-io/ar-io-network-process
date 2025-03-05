@@ -73,6 +73,11 @@ jobs:
                       "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
                       "short": false
                     },
+                    {
+                      "title": "Rerun",
+                      "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}/rerun|Click here to Rerun>",
+                      "short": false
+                    }
                   ]
                 }
               ]
