@@ -497,11 +497,6 @@ describe('setup', () => {
         return;
       }
 
-      // if genesis epoch, there is no previous epoch
-      if (currentEpoch.epochIndex === 0) {
-        return;
-      }
-
       const { epochIndex: currentEpochIndex } = currentEpoch;
       const previousEpochIndex = currentEpochIndex - 1;
       const { epochIndex, distributions, endTimestamp, startTimestamp } =
