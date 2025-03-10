@@ -75,7 +75,7 @@ primaryNames.createPrimaryNameRequest = function(name, initiator, timestamp, msg
 		baseNameOwner = record.processId,
 		fundingPlan = fundingPlan,
 		fundingResult = fundingResult,
-		df = demand.getDemandFactorInfo(),
+		demandFactor = demand.getDemandFactorInfo(),
 	}
 end
 
@@ -184,10 +184,10 @@ local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
 	addPrimaryNameCounts(ioEvent)
 
 	-- add the demand factor data to the ioEvent
-	if primaryNameResult.df and type(primaryNameResult.df) == "table" then
-		ioEvent:addField("DF-Trailing-Period-Purchases", (primaryNameResult.df.trailingPeriodPurchases or {}))
-		ioEvent:addField("DF-Trailing-Period-Revenues", (primaryNameResult.df.trailingPeriodRevenues or {}))
-		ioEvent:addFieldsWithPrefixIfExist(primaryNameResult.df, "DF-", {
+	if primaryNameResult.demandFactor and type(primaryNameResult.demandFactor) == "table" then
+		ioEvent:addField("DF-Trailing-Period-Purchases", (primaryNameResult.demandFactor.trailingPeriodPurchases or {}))
+		ioEvent:addField("DF-Trailing-Period-Revenues", (primaryNameResult.demandFactor.trailingPeriodRevenues or {}))
+		ioEvent:addFieldsWithPrefixIfExist(primaryNameResult.demandFactor, "DF-", {
 			"currentPeriod",
 			"currentDemandFactor",
 			"consecutivePeriodsWithMinDemandFactor",

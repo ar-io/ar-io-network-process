@@ -40,7 +40,7 @@ local primaryNames = {}
 --- @field baseNameOwner WalletAddress
 --- @field fundingPlan table
 --- @field fundingResult table
---- @field df table
+--- @field demandFactor table
 ---
 -- NOTE: lua 5.3 has limited regex support, particularly for lookaheads and negative lookaheads or use of {n}
 ---@param name string
@@ -155,7 +155,7 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 		baseNameOwner = record.processId,
 		fundingPlan = fundingPlan,
 		fundingResult = fundingResult,
-		df = demand.getDemandFactorInfo(),
+		demandFactor = demand.getDemandFactorInfo(),
 	}
 end
 

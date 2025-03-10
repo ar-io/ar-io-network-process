@@ -1,5 +1,6 @@
 local primaryNames = require("primary_names")
 local utils = require("utils")
+local demand = require("demand")
 
 describe("Primary Names", function()
 	before_each(function()
@@ -308,6 +309,7 @@ describe("Primary Names", function()
 					1234567890,
 					"test-msg-id"
 				)
+				local demandFactor = demand.getDemandFactorInfo()
 				assert.are.same({
 					request = {
 						name = "test",
@@ -325,6 +327,7 @@ describe("Primary Names", function()
 						newWithdrawVaults = {},
 						totalFunded = 200000,
 					},
+					demandFactor = demandFactor,
 				}, primaryNameRequest)
 				assert.are.equal(9800000, _G.Balances["user-requesting-primary-name"])
 				assert.are.equal(200000, _G.Balances[ao.id])
@@ -361,6 +364,7 @@ describe("Primary Names", function()
 						1234567890,
 						"test-msg-id"
 					)
+					local demandFactor = demand.getDemandFactorInfo()
 					assert.are.same({
 						request = {
 							name = primaryName,
@@ -378,6 +382,7 @@ describe("Primary Names", function()
 							newWithdrawVaults = {},
 							totalFunded = 200000,
 						},
+						demandFactor = demandFactor,
 					}, primaryNameRequest)
 					assert.are.equal(9800000, _G.Balances["user-requesting-primary-name"])
 					assert.are.equal(200000, _G.Balances[ao.id])

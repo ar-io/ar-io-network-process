@@ -1,6 +1,7 @@
 import {
   assertNoResultError,
   buyRecord,
+  getDemandFactorInfo,
   handle,
   parseEventsFromResult,
   setUpStake,
@@ -213,6 +214,8 @@ describe('primary names', function () {
         type: 'permabuy',
       });
 
+      const buyRecordData = JSON.parse(buyRecordResult.Messages[0].Data);
+
       const stakeResult = await setUpStake({
         memory: buyRecordResult.Memory,
         stakerAddress: recipient,
@@ -228,6 +231,10 @@ describe('primary names', function () {
         memory: stakeResult.memory,
         fundFrom: 'stakes',
       });
+
+      const requestPrimaryNameData = JSON.parse(
+        requestPrimaryNameResult.Messages[0].Data,
+      );
 
       const parsedEvents = parseEventsFromResult(requestPrimaryNameResult);
       assert.equal(parsedEvents.length, 1);
@@ -253,6 +260,15 @@ describe('primary names', function () {
         'Memory-KiB-Used': parsedEvents[0]['Memory-KiB-Used'],
         'Handler-Memory-KiB-Used': parsedEvents[0]['Handler-Memory-KiB-Used'],
         'Final-Memory-KiB-Used': parsedEvents[0]['Final-Memory-KiB-Used'],
+        'DF-Consecutive-Periods-With-Min-Demand-Factor': 0,
+        'DF-Trailing-Period-Purchases': [0, 0, 0, 0, 0, 0, 0],
+        'DF-Trailing-Period-Revenues': [0, 0, 0, 0, 0, 0, 0],
+        'DF-Current-Demand-Factor': 1,
+        'DF-Current-Period': 1,
+        'DF-Purchases-This-Period': 2,
+        'DF-Revenue-This-Period':
+          buyRecordData.purchasePrice +
+          requestPrimaryNameData.fundingResult.totalFunded,
       });
 
       const { result: getPrimaryNameRequestResult } =
@@ -397,6 +413,11 @@ describe('primary names', function () {
       memory: buyRecordResult.Memory,
     });
 
+    const demandFactor = await getDemandFactorInfo({
+      memory: requestPrimaryNameResult.Memory,
+      timestamp: approvalTimestamp,
+    });
+
     assertNoResultError(requestPrimaryNameResult);
     const parsedEvents = parseEventsFromResult(requestPrimaryNameResult);
     assert.equal(parsedEvents.length, 1);
@@ -422,6 +443,14 @@ describe('primary names', function () {
       'Memory-KiB-Used': parsedEvents[0]['Memory-KiB-Used'],
       'Handler-Memory-KiB-Used': parsedEvents[0]['Handler-Memory-KiB-Used'],
       'Final-Memory-KiB-Used': parsedEvents[0]['Final-Memory-KiB-Used'],
+      // validate the demand factor data was updated
+      'DF-Consecutive-Periods-With-Min-Demand-Factor': 0,
+      'DF-Trailing-Period-Purchases': [0, 0, 0, 0, 0, 0, 0],
+      'DF-Trailing-Period-Revenues': [0, 0, 0, 0, 0, 0, 0],
+      'DF-Current-Demand-Factor': 1,
+      'DF-Current-Period': 1,
+      'DF-Purchases-This-Period': 2,
+      'DF-Revenue-This-Period': 2001000000, // buy name + request primary name
     });
 
     // there should be only one message with the Approve-Primary-Name-Request-Notice action
@@ -461,6 +490,7 @@ describe('primary names', function () {
         name: 'test-name',
         startTimestamp: approvalTimestamp,
       },
+      demandFactor,
     });
 
     // now fetch the primary name using the owner address

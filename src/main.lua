@@ -388,10 +388,10 @@ local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
 	addPrimaryNameCounts(ioEvent)
 
 	-- demand factor data
-	if primaryNameResult.df and type(primaryNameResult.df) == "table" then
-		ioEvent:addField("DF-Trailing-Period-Purchases", (primaryNameResult.df.trailingPeriodPurchases or {}))
-		ioEvent:addField("DF-Trailing-Period-Revenues", (primaryNameResult.df.trailingPeriodRevenues or {}))
-		ioEvent:addFieldsWithPrefixIfExist(primaryNameResult.df, "DF-", {
+	if primaryNameResult.demandFactor and type(primaryNameResult.demandFactor) == "table" then
+		ioEvent:addField("DF-Trailing-Period-Purchases", (primaryNameResult.demandFactor.trailingPeriodPurchases or {}))
+		ioEvent:addField("DF-Trailing-Period-Revenues", (primaryNameResult.demandFactor.trailingPeriodRevenues or {}))
+		ioEvent:addFieldsWithPrefixIfExist(primaryNameResult.demandFactor, "DF-", {
 			"currentPeriod",
 			"currentDemandFactor",
 			"consecutivePeriodsWithMinDemandFactor",
