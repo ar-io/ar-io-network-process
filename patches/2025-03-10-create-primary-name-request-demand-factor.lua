@@ -13,6 +13,7 @@ local gar = require(".src.gar")
 local balances = require(".src.balances")
 local demand = require(".src.demand")
 local constants = require(".src.constants")
+local json = require(".src.json")
 
 -- Update the primaryNames global function to return the demand factor data
 primaryNames.createPrimaryNameRequest = function(name, initiator, timestamp, msgId, fundFrom)
@@ -200,7 +201,7 @@ local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
 end
 
 -- Update the handler to use the new function and add the demand factor data
-createPrimaryNameRequestHandler.handler = function(msg)
+createPrimaryNameRequestHandler.handle = function(msg)
 	local fundFrom = msg.Tags["Fund-From"]
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
 	local initiator = msg.From
@@ -216,7 +217,7 @@ createPrimaryNameRequestHandler.handler = function(msg)
 	if primaryNameResult.newPrimaryName then
 		Send(msg, {
 			Target = msg.From,
-			Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
+			Action = "Approve-Primary-Name-Request-Notice",
 			Data = json.encode(primaryNameResult),
 		})
 		return
@@ -226,12 +227,12 @@ createPrimaryNameRequestHandler.handler = function(msg)
 		--- send a notice to the msg.From, and the base name owner
 		Send(msg, {
 			Target = msg.From,
-			Action = ActionMap.PrimaryNameRequest .. "-Notice",
+			Action = "Request-Primary-Name-Notice",
 			Data = json.encode(primaryNameResult),
 		})
 		Send(msg, {
 			Target = primaryNameResult.baseNameOwner,
-			Action = ActionMap.PrimaryNameRequest .. "-Notice",
+			Action = "Request-Primary-Name-Notice",
 			Data = json.encode(primaryNameResult),
 		})
 	end
