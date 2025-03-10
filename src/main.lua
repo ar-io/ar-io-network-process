@@ -386,6 +386,19 @@ local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
 	ioEvent:addFieldsWithPrefixIfExist(primaryNameResult.request, "Request-", { "startTimestamp", "endTimestamp" })
 	addResultFundingPlanFields(ioEvent, primaryNameResult)
 	addPrimaryNameCounts(ioEvent)
+
+	-- demand factor data
+	if primaryNameResult.demandFactor and type(primaryNameResult.demandFactor) == "table" then
+		ioEvent:addField("DF-Trailing-Period-Purchases", (primaryNameResult.demandFactor.trailingPeriodPurchases or {}))
+		ioEvent:addField("DF-Trailing-Period-Revenues", (primaryNameResult.demandFactor.trailingPeriodRevenues or {}))
+		ioEvent:addFieldsWithPrefixIfExist(primaryNameResult.demandFactor, "DF-", {
+			"currentPeriod",
+			"currentDemandFactor",
+			"consecutivePeriodsWithMinDemandFactor",
+			"revenueThisPeriod",
+			"purchasesThisPeriod",
+		})
+	end
 end
 
 local function assertValueBytesLowerThan(value, remainingBytes, tablesSeen)
