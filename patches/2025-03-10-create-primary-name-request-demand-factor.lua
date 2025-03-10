@@ -13,6 +13,8 @@ local gar = require(".src.gar")
 local balances = require(".src.balances")
 local demand = require(".src.demand")
 local constants = require(".src.constants")
+local json = require(".src.json")
+local ARIOEvent = require(".src.ario_event")
 
 -- Update the primaryNames global function to return the demand factor data
 primaryNames.createPrimaryNameRequest = function(name, initiator, timestamp, msgId, fundFrom)
@@ -81,20 +83,12 @@ primaryNames.createPrimaryNameRequest = function(name, initiator, timestamp, msg
 	}
 end
 
--- Now update main.lua to use the new function and add the demand factor data
-local createPrimaryNameRequestHandlerIndex = utils.findInArray(Handlers.list, function(handler)
-	return handler.name == "requestPrimaryName"
-end)
+--[[
+	These changes update the handler defined in main.lua. All local functions are defined in this patch as they are not available in global scope.
 
-if not createPrimaryNameRequestHandlerIndex then
-	error("Failed to find requestPrimaryName handler")
-end
-
-local createPrimaryNameRequestHandler = Handlers.list[createPrimaryNameRequestHandlerIndex]
-if not createPrimaryNameRequestHandler then
-	error("Failed to find requestPrimaryName handler")
-end
-
+	We also must use the `addEventingHandler` function to add the handler to the Handlers table and ensure we continue to get event data.
+]]
+--
 local function Send(msg, response)
 	if msg.reply then
 		--- Reference: https://github.com/permaweb/aos/blob/main/blueprints/patch-legacy-reply.lua
@@ -102,6 +96,53 @@ local function Send(msg, response)
 	else
 		ao.send(response)
 	end
+end
+
+local function eventingPcall(ioEvent, onError, fnToCall, ...)
+	local status, result = pcall(fnToCall, ...)
+	if not status then
+		onError(result)
+		ioEvent:addField("Error", result)
+		return status, result
+	end
+	return status, result
+end
+
+local function addEventingHandler(handlerName, pattern, handleFn, critical, printEvent)
+	critical = critical or false
+	printEvent = printEvent == nil and true or printEvent
+	Handlers.add(handlerName, pattern, function(msg)
+		-- add an ARIOEvent to the message if it doesn't exist
+		msg.ioEvent = msg.ioEvent or ARIOEvent(msg)
+		-- global handler for all eventing errors, so we can log them and send a notice to the sender for non critical errors and discard the memory on critical errors
+		local status, resultOrError = eventingPcall(msg.ioEvent, function(error)
+			--- non critical errors will send an invalid notice back to the caller with the error information, memory is not discarded
+			Send(msg, {
+				Target = msg.From,
+				Action = "Invalid-" .. utils.toTrainCase(handlerName) .. "-Notice",
+				Error = tostring(error),
+				Data = tostring(error),
+			})
+		end, handleFn, msg)
+		if not status and critical then
+			local errorEvent = ARIOEvent(msg)
+			-- For critical handlers we want to make sure the event data gets sent to the CU for processing, but that the memory is discarded on failures
+			-- These handlers (distribute, prune) severely modify global state, and partial updates are dangerous.
+			-- So we json encode the error and the event data and then throw, so the CU will discard the memory and still process the event data.
+			-- An alternative approach is to modify the implementation of ao.result - to also return the Output on error.
+			-- Reference: https://github.com/permaweb/ao/blob/76a618722b201430a372894b3e2753ac01e63d3d/dev-cli/src/starters/lua/ao.lua#L284-L287
+			local errorWithEvent = tostring(resultOrError) .. "\n" .. errorEvent:toJSON()
+			error(errorWithEvent, 0) -- 0 ensures not to include this line number in the error message
+		end
+
+		msg.ioEvent:addField("Handler-Memory-KiB-Used", collectgarbage("count"), false)
+		collectgarbage("collect")
+		msg.ioEvent:addField("Final-Memory-KiB-Used", collectgarbage("count"), false)
+
+		if printEvent then
+			msg.ioEvent:printEvent()
+		end
+	end)
 end
 
 local function assertValidFundFrom(fundFrom)
@@ -199,8 +240,7 @@ local function addPrimaryNameRequestData(ioEvent, primaryNameResult)
 	end
 end
 
--- Update the handler to use the new function and add the demand factor data
-createPrimaryNameRequestHandler.handler = function(msg)
+addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", "Request-Primary-Name"), function(msg)
 	local fundFrom = msg.Tags["Fund-From"]
 	local name = msg.Tags.Name and string.lower(msg.Tags.Name) or nil
 	local initiator = msg.From
@@ -216,7 +256,7 @@ createPrimaryNameRequestHandler.handler = function(msg)
 	if primaryNameResult.newPrimaryName then
 		Send(msg, {
 			Target = msg.From,
-			Action = ActionMap.ApprovePrimaryNameRequest .. "-Notice",
+			Action = "Approve-Primary-Name-Request-Notice",
 			Data = json.encode(primaryNameResult),
 		})
 		return
@@ -226,13 +266,13 @@ createPrimaryNameRequestHandler.handler = function(msg)
 		--- send a notice to the msg.From, and the base name owner
 		Send(msg, {
 			Target = msg.From,
-			Action = ActionMap.PrimaryNameRequest .. "-Notice",
+			Action = "Request-Primary-Name-Notice",
 			Data = json.encode(primaryNameResult),
 		})
 		Send(msg, {
 			Target = primaryNameResult.baseNameOwner,
-			Action = ActionMap.PrimaryNameRequest .. "-Notice",
+			Action = "Request-Primary-Name-Notice",
 			Data = json.encode(primaryNameResult),
 		})
 	end
-end
+end)
