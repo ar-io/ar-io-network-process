@@ -10,6 +10,7 @@ local arns = require(".src.arns")
 local gar = require(".src.gar")
 local balances = require(".src.balances")
 local demand = require(".src.demand")
+local constants = require(".src.constants")
 
 -- Update the primaryNames global function to return the demand factor data
 primaryNames.createPrimaryNameRequest = function(name, initiator, timestamp, msgId, fundFrom)
@@ -88,12 +89,8 @@ if not createPrimaryNameRequestHandlerIndex then
 end
 
 local createPrimaryNameRequestHandler = Handlers.list[createPrimaryNameRequestHandlerIndex]
-
-local previousHandlerCopy = string.dump(createPrimaryNameRequestHandler.handler)
-local previousHandler = load(previousHandlerCopy)
-
-if not previousHandler then
-	error("Failed to load previous handler")
+if not createPrimaryNameRequestHandler then
+	error("Failed to find requestPrimaryName handler")
 end
 
 local function Send(msg, response)
