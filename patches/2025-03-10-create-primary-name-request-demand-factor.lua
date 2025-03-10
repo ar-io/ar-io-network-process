@@ -1,6 +1,8 @@
 --[[
 	Adds demand factor data to the ioEvent for the requestPrimaryName handler.
 
+	NOTE: we have to include all the local functions in this patch as they are not available in global scope.
+
 	Reviewers: Dylan, Ariel, Atticus, Jon, Phil, Derek
 ]]
 --
