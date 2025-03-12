@@ -2,10 +2,10 @@
 # yarn lockfile v1
 
 
-"@ar.io/sdk@3.5.1":
-  version "3.5.1"
-  resolved "https://registry.yarnpkg.com/@ar.io/sdk/-/sdk-3.5.1.tgz#7ec212efd12cf3af873da26cc7f5d3aabe726cfd"
-  integrity sha512-qwAgHAEiodaajoIY6YcRPj4WI4qK+ofBADtOXqV2W5Hs+oQmgP+OV0fi8k6/4+2XwHszYsojiZGlOt9YbTDLcQ==
+"@ar.io/sdk@3.8.4":
+  version "3.8.4"
+  resolved "https://registry.yarnpkg.com/@ar.io/sdk/-/sdk-3.8.4.tgz#1cab7cdf18c5b8e8720cbaf81241225df078ca5a"
+  integrity sha512-VVFynJEfv5PjBddxJFXlMO3vKynvZM+TsbkZ0NWk/+5nF04Q0W7iqpsHEyACVfydJBNiYLtMLxYdT5ARv+OQFA==
   dependencies:
     "@dha-team/arbundles" "^1.0.1"
     "@permaweb/aoconnect" "^0.0.57"

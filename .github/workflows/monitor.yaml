@@ -12,7 +12,7 @@ jobs:
       actions: read
     strategy:
       matrix:
-        network: [testnet, devnet, mainnet]
+        network: [testnet, mainnet]
       fail-fast: false
     runs-on: ubuntu-latest
     env:

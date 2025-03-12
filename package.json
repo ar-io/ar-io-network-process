@@ -19,7 +19,7 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@ar.io/sdk": "3.5.1",
+    "@ar.io/sdk": "3.8.4",
     "@permaweb/ao-loader": "^0.0.36",
     "@permaweb/aoconnect": "^0.0.59",
     "arweave": "^1.15.1",
