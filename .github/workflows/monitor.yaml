@@ -51,6 +51,7 @@ jobs:
           SLACK_TITLE: IO Process Observation Failed!
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+          SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
           SLACK_FILE_UPLOAD: logs/${{ matrix.network }}-${{ github.run_id }}.log
           SLACK_CUSTOM_PAYLOAD: |
             {
@@ -86,7 +87,7 @@ jobs:
               ]
             }
 
-      # on sucess send a slack message
+      # on sucesss send a slack message
       - name: Notify Success
         if: success() && vars.NOTIFY_SUCCESS == 'true'
         uses: rtCamp/action-slack-notify@v2.3.0
@@ -95,6 +96,7 @@ jobs:
           SLACK_TITLE: IO Process Observation Success!
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+          SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
           SLACK_FILE_UPLOAD: logs/${{ matrix.network }}-${{ github.run_id }}.log
           SLACK_CUSTOM_PAYLOAD: |
             {
