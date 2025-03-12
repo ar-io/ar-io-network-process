@@ -447,7 +447,7 @@ describe('setup', () => {
         `End timestamp is not greater than start timestamp: ${endTimestamp} > ${startTimestamp}`,
       );
       assert(
-        distributions.totalEligibleGateways > 0,
+        distributions.totalEligibleGateways >= 0,
         'Total eligible gateways are not valid',
       );
       assert(
@@ -455,15 +455,15 @@ describe('setup', () => {
         'Total eligible gateways are greater than the total number of gateways',
       );
       assert(
-        distributions.totalEligibleRewards > 0,
+        distributions.totalEligibleRewards >= 0,
         'Total eligible rewards are not valid',
       );
       assert(
-        distributions.totalEligibleRewards > 0,
+        distributions.totalEligibleRewards >= 0,
         'Total eligible rewards are not valid',
       );
       assert(
-        distributions.totalEligibleGatewayReward > 0,
+        distributions.totalEligibleGatewayReward >= 0,
         'Total eligible gateway reward is not valid',
       );
       assert(

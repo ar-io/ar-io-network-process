@@ -39,6 +39,7 @@ jobs:
         run: |
           mkdir -p logs
           yarn monitor 2>&1 | tee logs/${{ matrix.network }}-${{ github.run_id }}.log
+          exit ${PIPESTATUS[0]}
         id: monitor
 
       - name: Notify Failure
