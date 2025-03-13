@@ -1766,7 +1766,7 @@ describe('ArNS', async () => {
       assert.ok(cursor === undefined);
       assert.equal(sortBy, 'name');
       assert.equal(sortOrder, 'desc');
-      assert.equal(totalItems, 0);
+      assert.equal(totalItems, 1);
     });
   });
 });

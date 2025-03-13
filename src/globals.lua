@@ -48,11 +48,12 @@ DistributionSettings = DistributionSettings or utils.deepCopy(constants.DEFAULT_
     NameRegistry
 ]]
 --- @type NameRegistry
-NameRegistry = NameRegistry or {
-	reserved = {},
-	records = {},
-	returned = {},
-}
+NameRegistry = NameRegistry
+	or {
+		reserved = { www = {} }, -- www is reserved by default
+		records = {},
+		returned = {},
+	}
 
 --[[
     Primary Names
