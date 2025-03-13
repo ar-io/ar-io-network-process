@@ -49,9 +49,9 @@ jobs:
         env:
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: IO Process Observation Failed!
-          SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
-          SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
-          SLACK_FILE_UPLOAD: logs/${{ matrix.network }}-${{ github.run_id }}.log
+          # SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+          # SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
+          # SLACK_FILE_UPLOAD: logs/${{ matrix.network }}-${{ github.run_id }}.log
           SLACK_CUSTOM_PAYLOAD: |
             {
               "attachments": [
@@ -93,9 +93,9 @@ jobs:
         env:
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: IO Process Observation Success!
-          SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
-          SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
-          SLACK_FILE_UPLOAD: logs/${{ matrix.network }}-${{ github.run_id }}.log
+          # SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+          # SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
+          # SLACK_FILE_UPLOAD: logs/${{ matrix.network }}-${{ github.run_id }}.log
           SLACK_CUSTOM_PAYLOAD: |
             {
               "attachments": [{
