@@ -185,6 +185,24 @@ describe('setup', () => {
     return vaults;
   };
 
+  const getEpochEligibleRewards = async (epochIndex) => {
+    let cursor;
+    let eligibleRewards = [];
+    while (true) {
+      const {
+        items: eligibleRewardsPage,
+        nextCursor,
+        hasMore,
+      } = await io.getEligibleEpochRewards({ epochIndex }, { cursor });
+      eligibleRewards = [...eligibleRewards, ...eligibleRewardsPage];
+      cursor = nextCursor;
+      if (!hasMore) {
+        break;
+      }
+    }
+    return eligibleRewards;
+  };
+
   describe('handlers', () => {
     it('should always have correct handler order', async () => {
       const { Handlers: handlersList } = await io.getInfo();
@@ -267,24 +285,14 @@ describe('setup', () => {
       const previousEpoch = await io.getEpoch({
         epochIndex: currentEpoch.epochIndex - 1,
       });
-      const { distributions: previousEpochDistributions } = previousEpoch;
-
-      // No eligible rewards for the current epoch
-      if (
-        Object.keys(previousEpochDistributions.rewards.eligible).length === 0
-      ) {
-        return;
-      }
+      const previousEpochDistributions = previousEpoch.distributions;
+      const previousEpochRewards = await getEpochEligibleRewards(
+        currentEpoch.epochIndex - 1,
+      );
 
       // add up all the eligible operators and delegates
-      const assignedRewards = Object.values(
-        previousEpochDistributions.rewards.eligible,
-      ).reduce((acc, curr) => {
-        const delegateRewards = Object.values(curr.delegateRewards).reduce(
-          (d, c) => d + c,
-          0,
-        );
-        return acc + curr.operatorReward + delegateRewards;
+      const assignedRewards = previousEpochRewards.reduce((acc, curr) => {
+        return acc + curr.eligibleReward;
       }, 0);
 
       // handle any rounding errors
@@ -501,6 +509,9 @@ describe('setup', () => {
       const previousEpochIndex = currentEpochIndex - 1;
       const { epochIndex, distributions, endTimestamp, startTimestamp } =
         await io.getEpoch({ epochIndex: previousEpochIndex });
+      const previousEpochRewards =
+        await getEpochEligibleRewards(previousEpochIndex);
+
       assert(
         epochIndex === previousEpochIndex,
         'Previous epoch index is not valid',
@@ -515,16 +526,14 @@ describe('setup', () => {
         'Distributed timestamp is not greater than epoch end timestamp',
       );
       assert(
-        distributions.rewards.eligible !== undefined,
+        previousEpochRewards !== undefined,
         'Eligible rewards are not valid',
       );
       assert(
-        Object.values(distributions.rewards.eligible).every(
+        previousEpochRewards.every(
           (reward) =>
-            Number.isInteger(reward.operatorReward) &&
-            Object.values(reward.delegateRewards).every((delegateReward) =>
-              Number.isInteger(delegateReward),
-            ),
+            Number.isInteger(reward.eligibleReward) &&
+            reward.eligibleReward >= 0,
         ),
         `Eligible rewards for the previous epoch (${previousEpochIndex}) are not integers`,
       );

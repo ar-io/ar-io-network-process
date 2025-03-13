@@ -45,7 +45,7 @@ jobs:
 
       - name: Notify Failure
         if: failure()
-        uses: rtCamp/action-slack-notify@v2.3.0
+        uses: rtCamp/action-slack-notify@v2.3.2
         env:
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: IO Process Observation Failed!
@@ -89,7 +89,7 @@ jobs:
       # on sucesss send a slack message
       - name: Notify Success
         if: success() && vars.NOTIFY_SUCCESS == 'true'
-        uses: rtCamp/action-slack-notify@v2.3.0
+        uses: rtCamp/action-slack-notify@v2.3.2
         env:
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: IO Process Observation Success!
