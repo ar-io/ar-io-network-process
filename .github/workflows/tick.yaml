@@ -40,15 +40,15 @@ jobs:
         uses: rtCamp/action-slack-notify@v2.3.0
         env:
           SLACK_COLOR: ${{ job.status }}
-          SLACK_TITLE: Successfully ticked AR-IO Network Process (${{ fromJson(env.NETWORK_MAP)[matrix.network] }})
+          SLACK_TITLE: Successfully ticked ${{ matrix.network }} $ARIO Network Process (${{ fromJson(env.NETWORK_MAP)[matrix.network] }})
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_MESSAGE: 'Successfully ticked AR-IO Network Process!'
+          SLACK_MESSAGE: 'Successfully ticked ${{ matrix.network }} $ARIO Network Process!'
 
       - name: Notify Failure
         if: failure()
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: danger
-          SLACK_TITLE: Failed to tick AR-IO Network Process (${{ fromJson(env.NETWORK_MAP)[matrix.network] }})
+          SLACK_TITLE: Failed to tick ${{ matrix.network }} $ARIO Network Process (${{ fromJson(env.NETWORK_MAP)[matrix.network] }})
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_MESSAGE: 'Failed to send tick to AR-IO Network Process!'
+          SLACK_MESSAGE: 'Failed to send tick to ${{ matrix.network }} $ARIO Network Process!'
