@@ -7,8 +7,18 @@ on:
 
 jobs:
   tick:
+    strategy:
+      matrix:
+        network: [testnet, mainnet]
+      fail-fast: false
     runs-on: ubuntu-latest
-    environment: main
+    env:
+      NETWORK_MAP: |
+        {
+          "devnet": "GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc",
+          "testnet": "agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA",
+          "mainnet": "qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE"
+        }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,7 +31,7 @@ jobs:
         run: yarn tick
         env:
           WALLET: ${{ secrets.WALLET }}
-          ARIO_NETWORK_PROCESS_ID: ${{ vars.ARIO_NETWORK_PROCESS_ID }}
+          ARIO_NETWORK_PROCESS_ID: ${{ fromJson(env.NETWORK_MAP)[matrix.network]}}
           AO_CU_URL: ${{ vars.AO_CU_URL }}
 
       - name: Notify Success
@@ -29,7 +39,7 @@ jobs:
         uses: rtCamp/action-slack-notify@v2.3.0
         env:
           SLACK_COLOR: ${{ job.status }}
-          SLACK_TITLE: Successfully ticked AR-IO Network Process (${{ vars.ARIO_NETWORK_PROCESS_ID }})
+          SLACK_TITLE: Successfully ticked AR-IO Network Process (${{ fromJson(env.NETWORK_MAP)[matrix.network] }})
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_MESSAGE: 'Successfully ticked AR-IO Network Process!'
 
@@ -38,6 +48,6 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: danger
-          SLACK_TITLE: Failed to tick AR-IO Network Process (${{ vars.ARIO_NETWORK_PROCESS_ID }})
+          SLACK_TITLE: Failed to tick AR-IO Network Process (${{ fromJson(env.NETWORK_MAP)[matrix.network] }})
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_MESSAGE: 'Failed to send tick to AR-IO Network Process!'
