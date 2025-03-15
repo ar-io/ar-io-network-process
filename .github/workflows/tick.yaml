@@ -12,7 +12,6 @@ jobs:
         network: [testnet, mainnet]
       fail-fast: false
     runs-on: ubuntu-latest
-    environment: main
     env:
       NETWORK_MAP: |
         {
@@ -31,7 +30,7 @@ jobs:
       - name: Run tick script
         run: yarn tick
         env:
-          WALLET: ${{ secrets.WALLET }}
+          WALLET: ${{ secrets.TICK_WALLET }}
           ARIO_NETWORK_PROCESS_ID: ${{ fromJson(env.NETWORK_MAP)[matrix.network]}}
           AO_CU_URL: ${{ vars.AO_CU_URL }}
 
