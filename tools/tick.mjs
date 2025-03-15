@@ -24,8 +24,8 @@ const networkProcess = new AOProcess({
   }),
 });
 
-const { id } = await networkProcess.send({
+const { id, result } = await networkProcess.send({
   tags: [{ name: 'Action', value: 'Tick' }],
   signer,
 });
-console.log(`Tick result tx: ${id}`);
+console.log(`Tick result tx: ${id}\n${JSON.stringify(result, null, 2)}`);

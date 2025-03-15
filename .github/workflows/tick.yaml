@@ -25,19 +25,19 @@ jobs:
           AO_CU_URL: ${{ vars.AO_CU_URL }}
 
       - name: Notify Success
-        if: success()
+        if: success() && vars.NOTIFY_SUCCESS == 'true'
         uses: rtCamp/action-slack-notify@v2.3.0
         env:
           SLACK_COLOR: ${{ job.status }}
-          SLACK_TITLE: Tick Successful
+          SLACK_TITLE: Successfully ticked AR-IO Network Process (${{ vars.ARIO_NETWORK_PROCESS_ID }})
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_MESSAGE: 'Successfully sent Tick to AR-IO Network Process'
+          SLACK_MESSAGE: 'Successfully ticked AR-IO Network Process!'
 
       - name: Notify Failure
         if: failure()
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_COLOR: danger
-          SLACK_TITLE: Tick Failed
+          SLACK_TITLE: Failed to tick AR-IO Network Process (${{ vars.ARIO_NETWORK_PROCESS_ID }})
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_MESSAGE: 'Failed to send Tick to AR-IO Network Process'
+          SLACK_MESSAGE: 'Failed to send tick to AR-IO Network Process!'
