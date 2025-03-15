@@ -1,0 +1,43 @@
+name: Tick
+
+on:
+  schedule:
+    - cron: '0 12 * * *' # Run every day at 8AM ET (12:00 UTC)
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    environment: main
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'yarn'
+
+      - run: yarn --frozen-lockfile
+      - name: Run tick script
+        run: yarn tick
+        env:
+          WALLET: ${{ secrets.WALLET }}
+          ARIO_NETWORK_PROCESS_ID: ${{ vars.ARIO_NETWORK_PROCESS_ID }}
+          AO_CU_URL: ${{ vars.AO_CU_URL }}
+
+      - name: Notify Success
+        if: success()
+        uses: rtCamp/action-slack-notify@v2.3.0
+        env:
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: Tick Successful
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_MESSAGE: 'Successfully sent Tick to AR-IO Network Process'
+
+      - name: Notify Failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: danger
+          SLACK_TITLE: Tick Failed
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_MESSAGE: 'Failed to send Tick to AR-IO Network Process'
