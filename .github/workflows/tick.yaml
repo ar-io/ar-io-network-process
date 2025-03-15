@@ -12,6 +12,7 @@ jobs:
         network: [testnet, mainnet]
       fail-fast: false
     runs-on: ubuntu-latest
+    environment: main
     env:
       NETWORK_MAP: |
         {
