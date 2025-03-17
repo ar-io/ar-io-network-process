@@ -38,7 +38,7 @@ jobs:
       - name: Run Monitor Tests
         run: |
           mkdir -p logs
-          yarn monitor 2>&1 | tee logs/${{ matrix.network }}-${{ github.run_id }}.log
+          yarn monitor:${{ matrix.network }} 2>&1 | tee logs/${{ matrix.network }}-${{ github.run_id }}.log
           exit ${PIPESTATUS[0]}
         id: monitor
         shell: bash
@@ -48,7 +48,7 @@ jobs:
         uses: rtCamp/action-slack-notify@v2.3.2
         env:
           SLACK_COLOR: ${{ job.status }}
-          SLACK_TITLE: IO Process Observation Failed!
+          SLACK_TITLE: $ARIO (${{ matrix.network }}) Process Observation Failed!
           # SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
           # SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
           # SLACK_FILE_UPLOAD: logs/${{ matrix.network }}-${{ github.run_id }}.log
@@ -59,7 +59,7 @@ jobs:
                   "fallback": "IO Process Observation Failed",
                   "color": "danger",
                   "title": "Details",
-                  "text": "The IO Process has failed at least one observation test!",
+                  "text": "The $ARIO (${{ matrix.network }}) Process has failed at least one observation test!",
                   "fields": [
                     {
                       "title": "Network",
@@ -86,13 +86,13 @@ jobs:
               ]
             }
 
-      # on sucesss send a slack message
+      # on success send a slack message
       - name: Notify Success
         if: success() && vars.NOTIFY_SUCCESS == 'true'
         uses: rtCamp/action-slack-notify@v2.3.2
         env:
           SLACK_COLOR: ${{ job.status }}
-          SLACK_TITLE: IO Process Observation Success!
+          SLACK_TITLE: $ARIO (${{ matrix.network }}) Process Observation Success!
           # SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
           # SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
           # SLACK_FILE_UPLOAD: logs/${{ matrix.network }}-${{ github.run_id }}.log
@@ -102,7 +102,7 @@ jobs:
                 "fallback": "IO Process Observation Success!",
                 "color": "good",
                 "title": "Test Results",
-                "text": 'The IO Process has passed all observation tests!',
+                "text": 'The $ARIO (${{ matrix.network }}) Process has passed all observation tests!',
                 "fields": [{
                   "title": "Network",
                   "value": "${{ matrix.network }}",
