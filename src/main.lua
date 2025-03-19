@@ -1721,6 +1721,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.
 		Action = ActionMap.TotalTokenSupply .. "-Notice",
 		["Total-Supply"] = tostring(totalSupplyDetails.totalSupply),
 		["Circulating-Supply"] = tostring(totalSupplyDetails.circulatingSupply),
+		["Liquid-Supply"] = tostring(totalSupplyDetails.liquidSupply),
 		["Locked-Supply"] = tostring(totalSupplyDetails.lockedSupply),
 		["Staked-Supply"] = tostring(totalSupplyDetails.stakedSupply),
 		["Delegated-Supply"] = tostring(totalSupplyDetails.delegatedSupply),
@@ -1735,6 +1736,7 @@ addEventingHandler("totalTokenSupply", utils.hasMatchingTag("Action", ActionMap.
 			delegated = totalSupplyDetails.delegatedSupply,
 			withdrawn = totalSupplyDetails.withdrawSupply,
 			protocolBalance = totalSupplyDetails.protocolBalance,
+			liquidSupply = totalSupplyDetails.liquidSupply,
 		}),
 	})
 end)

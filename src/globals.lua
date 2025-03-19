@@ -93,7 +93,9 @@ LastCreatedEpochIndex = LastCreatedEpochIndex or -1
 --- @type number
 LastDistributedEpochIndex = LastDistributedEpochIndex or 0
 --- @type number
-LastKnownCirculatingSupply = LastKnownCirculatingSupply or 0 -- total circulating supply (e.g. balances - protocol balance)
+LastKnownCirculatingSupply = LastKnownCirculatingSupply or 0 -- total circulating supply (i.e. total supply - protocol balance - locked supply)
+--- @type number
+LastKnownLiquidSupply = LastKnownLiquidSupply or 0 -- total liquid supply (i.e. all balances - protocol balance)
 --- @type number
 LastKnownLockedSupply = LastKnownLockedSupply or 0 -- total vault balance across all vaults
 --- @type number

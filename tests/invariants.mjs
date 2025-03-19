@@ -95,6 +95,7 @@ async function assertNoTotalSupplyInvariants({ timestamp, memory }) {
   assertValidBalance(supplyData.delegated, 0);
   assertValidBalance(supplyData.withdrawn, 0);
   assertValidBalance(supplyData.protocolBalance, 0);
+  assertValidBalance(supplyData.liquidSupply, 0);
 }
 
 // TODO: Add Gateway invariants
