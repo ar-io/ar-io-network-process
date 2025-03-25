@@ -34,6 +34,7 @@ end
 --- @class TotalSupplyDetails
 --- @field totalSupply number
 --- @field circulatingSupply number
+--- @field liquidSupply number
 --- @field lockedSupply number
 --- @field stakedSupply number
 --- @field delegatedSupply number
@@ -47,6 +48,7 @@ function token.computeTotalSupply()
 	-- add all the balances
 	local totalSupply = 0
 	local circulatingSupply = 0
+	local liquidSupply = 0
 	local lockedSupply = 0
 	local stakedSupply = 0
 	local delegatedSupply = 0
@@ -73,14 +75,16 @@ function token.computeTotalSupply()
 	for walletAddress, balance in pairs(userBalances) do
 		-- clean up 0 balances opportunistically
 		if balance > 0 then
+			liquidSupply = liquidSupply + balance
 			circulatingSupply = circulatingSupply + balance
 			stateObjectTallies.numBalances = stateObjectTallies.numBalances + 1
 		else
 			Balances[walletAddress] = nil
 		end
 	end
+	liquidSupply = liquidSupply - protocolBalance
 	circulatingSupply = circulatingSupply - protocolBalance
-	totalSupply = totalSupply + protocolBalance + circulatingSupply
+	totalSupply = totalSupply + protocolBalance + liquidSupply
 
 	-- tally supply stashed in gateways and delegates
 	local uniqueDelegates = {}
@@ -93,6 +97,7 @@ function token.computeTotalSupply()
 		totalSupply = totalSupply + gateway.operatorStake + gateway.totalDelegatedStake
 		stakedSupply = stakedSupply + gateway.operatorStake
 		delegatedSupply = delegatedSupply + gateway.totalDelegatedStake
+		circulatingSupply = circulatingSupply + gateway.operatorStake
 		for delegateAddress, delegate in pairs(gateway.delegates) do
 			if delegate.delegatedStake == 0 then
 				stateObjectTallies.numExitingDelegations = stateObjectTallies.numExitingDelegations + 1
@@ -109,6 +114,7 @@ function token.computeTotalSupply()
 				stateObjectTallies.numDelegateVaults = stateObjectTallies.numDelegateVaults + 1
 				totalSupply = totalSupply + vault.balance
 				withdrawSupply = withdrawSupply + vault.balance
+				circulatingSupply = circulatingSupply + vault.balance
 			end
 			if next(delegate.vaults) then
 				stateObjectTallies.numDelegatesVaulting = stateObjectTallies.numDelegatesVaulting + 1
@@ -119,6 +125,7 @@ function token.computeTotalSupply()
 			stateObjectTallies.numGatewayVaults = stateObjectTallies.numGatewayVaults + 1
 			totalSupply = totalSupply + vault.balance
 			withdrawSupply = withdrawSupply + vault.balance
+			circulatingSupply = circulatingSupply + vault.balance
 		end
 		if next(gateway.vaults) then
 			stateObjectTallies.numGatewaysVaulting = stateObjectTallies.numGatewaysVaulting + 1
@@ -139,6 +146,7 @@ function token.computeTotalSupply()
 		end
 	end
 
+	LastKnownLiquidSupply = liquidSupply
 	LastKnownCirculatingSupply = circulatingSupply
 	LastKnownLockedSupply = lockedSupply
 	LastKnownStakedSupply = stakedSupply
@@ -148,6 +156,7 @@ function token.computeTotalSupply()
 	return {
 		totalSupply = totalSupply,
 		circulatingSupply = circulatingSupply,
+		liquidSupply = liquidSupply,
 		lockedSupply = lockedSupply,
 		stakedSupply = stakedSupply,
 		delegatedSupply = delegatedSupply,
