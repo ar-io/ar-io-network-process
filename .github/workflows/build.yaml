@@ -100,9 +100,7 @@ jobs:
           cache: 'yarn'
 
       - run: yarn --frozen-lockfile
-      - run: yarn monitor
-        env:
-          ARIO_NETWORK_PROCESS_ID: ${{ vars.ARIO_NETWORK_PROCESS_ID }}
+      - run: yarn monitor:${{ github.ref_name == 'main' && 'testnet' || 'devnet' }}
 
   evolve:
     runs-on: ubuntu-latest
