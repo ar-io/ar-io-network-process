@@ -411,7 +411,7 @@ describe('Tick', async () => {
       arnsStats: {
         totalActiveNames: 0,
         totalGracePeriodNames: 0,
-        totalReservedNames: 0,
+        totalReservedNames: 1,
         totalReturnedNames: 0,
       },
       observations: {

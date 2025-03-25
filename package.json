@@ -6,23 +6,27 @@
     "lint": "luacheck src spec",
     "test": "yarn format:fix && yarn test:unit && yarn test:integration",
     "test:unit": "rm -rf coverage && mkdir -p coverage && busted . && luacov",
+    "test:unit:debug": "rm -rf coverage && mkdir -p coverage && DEBUG=true busted . && luacov",
     "test:coverage": "rm -rf luacov-html && yarn test:unit && luacov --reporter html && open luacov-html/index.html",
     "test:integration": "yarn build && node --test --experimental-wasm-memory64 **/*.test.mjs",
+    "patch:new": "node patch.mjs $1",
     "monitor:down": "docker compose -f tests/monitor/docker-compose.test.yml down",
     "monitor": "yarn monitor:down && node --test tests/monitor/monitor.test.mjs",
     "monitor:devnet": "yarn monitor:down && ARIO_NETWORK_PROCESS_ID=GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc node --test tests/monitor/monitor.test.mjs",
     "monitor:testnet": "yarn monitor:down && ARIO_NETWORK_PROCESS_ID=agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA node --test tests/monitor/monitor.test.mjs",
     "monitor:mainnet": "yarn monitor:down && ARIO_NETWORK_PROCESS_ID=qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE node --test tests/monitor/monitor.test.mjs",
+    "tick": "node tools/tick.mjs",
     "evolve": "yarn build && node tools/evolve.mjs",
     "prepare": "husky"
   },
   "devDependencies": {
-    "@ar.io/sdk": "3.5.1",
+    "@ar.io/sdk": "3.8.4",
     "@permaweb/ao-loader": "^0.0.36",
     "@permaweb/aoconnect": "^0.0.59",
     "arweave": "^1.15.1",
     "husky": "^9.1.6",
     "lint-staged": "^15.2.10",
+    "markdown-toc-gen": "^1.1.0",
     "p-limit": "^6.2.0",
     "prettier": "^3.3.2",
     "testcontainers": "^10.13.1",
@@ -33,6 +37,9 @@
   "lint-staged": {
     "*.lua": [
       "stylua"
+    ],
+    "*.md": [
+      "markdown-toc-gen insert"
     ],
     "*": [
       "prettier --write ."

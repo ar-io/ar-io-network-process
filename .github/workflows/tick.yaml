@@ -1,0 +1,53 @@
+name: Tick
+
+on:
+  schedule:
+    - cron: '0 12 * * *' # Run every day at 8AM ET (12:00 UTC)
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  tick:
+    strategy:
+      matrix:
+        network: [testnet, mainnet]
+      fail-fast: false
+    runs-on: ubuntu-latest
+    env:
+      NETWORK_MAP: |
+        {
+          "devnet": "GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc",
+          "testnet": "agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA",
+          "mainnet": "qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE"
+        }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'yarn'
+
+      - run: yarn --frozen-lockfile
+      - name: Run tick script
+        run: yarn tick
+        env:
+          WALLET: ${{ secrets.TICK_WALLET }}
+          ARIO_NETWORK_PROCESS_ID: ${{ fromJson(env.NETWORK_MAP)[matrix.network]}}
+          AO_CU_URL: ${{ vars.AO_CU_URL }}
+
+      - name: Notify Success
+        if: success() && vars.NOTIFY_SUCCESS == 'true'
+        uses: rtCamp/action-slack-notify@v2.3.0
+        env:
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: Successfully ticked ${{ matrix.network }} $ARIO Network Process (${{ fromJson(env.NETWORK_MAP)[matrix.network] }})
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_MESSAGE: 'Successfully ticked ${{ matrix.network }} $ARIO Network Process!'
+
+      - name: Notify Failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: danger
+          SLACK_TITLE: Failed to tick ${{ matrix.network }} $ARIO Network Process (${{ fromJson(env.NETWORK_MAP)[matrix.network] }})
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_MESSAGE: 'Failed to send tick to ${{ matrix.network }} $ARIO Network Process!'

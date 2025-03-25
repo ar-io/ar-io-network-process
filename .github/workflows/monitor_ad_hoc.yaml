@@ -1,4 +1,4 @@
-name: Ad-Hoc AR.IO Process Evaluation
+name: Ad-Hoc $ARIO Process Evaluation
 description: 'Evaluate a forked AR.IO process, looking for type issues and invariant state violations'
 
 on:

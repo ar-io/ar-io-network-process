@@ -1,4 +1,4 @@
-package.path = "spec/?.lua;spec/?/init.lua;" .. package.path
+package.path = "spec/?.lua;spec/?/init.lua;src/?.lua;" .. package.path
 
 _G.ao = {
 	send = function(val)
@@ -20,6 +20,11 @@ _G.Handlers = {
 		end,
 	},
 }
+
+-- stub print by default, if DEBUG is not set
+if not os.getenv("DEBUG") then
+	_G.print = function() end
+end
 
 -- stash it in package.loaded under the name ".crypto.init"
 -- so that any 'require(".crypto.init")' finds it:
