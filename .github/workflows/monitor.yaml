@@ -3,7 +3,7 @@ name: $ARIO Network Status
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *' # Run every hour
+    - cron: '15 * * * *' # Run every hour at the 15th minute (accounts for distributions happening at the 0th minute)
 
 jobs:
   monitor:
@@ -49,9 +49,7 @@ jobs:
         env:
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: $ARIO (${{ matrix.network }}) Process Observation Failed!
-          # SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
-          # SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
-          # SLACK_FILE_UPLOAD: logs/${{ matrix.network }}-${{ github.run_id }}.log
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_CUSTOM_PAYLOAD: |
             {
               "attachments": [
@@ -93,9 +91,7 @@ jobs:
         env:
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: $ARIO (${{ matrix.network }}) Process Observation Success!
-          # SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
-          # SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
-          # SLACK_FILE_UPLOAD: logs/${{ matrix.network }}-${{ github.run_id }}.log
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_CUSTOM_PAYLOAD: |
             {
               "attachments": [{
