@@ -31,7 +31,7 @@ Cons:
 - Dependency between faucet process and $ARIO process and ar-io-sdk
 - Dependency on $ARIO process to give balance to faucet process
 
-## Integrated feature flag and minting support
+## Integrated feature flag and minting support in existing $ARIO process
 
 Integrate a feature flag mechanism into the existing $ARIO process. All ArNS related actions are free if the global flag is enabled and an LRU cache to limit the number of ArNS records stored in state. Additionally, add a `mint` function to mint new balances for other interactions/use cases - but throttle the amount of tokens distributed at any given time.
 
@@ -49,11 +49,36 @@ Cons:
 - Match expectations of users?
 - Ensuring right controls with integration of new code to mainnet $ARIO process
 
+## Launch your own $ARIO process and gateway
+
+Users can spawn their own $ARIO process and manage it as they see fit, via a workflow. We provide the module, source code and APIs, and documents for the user to deploy their own $ARIO process and supporting gateway. Once the user has deployed their own $ARIO process, they can use it to interact with ArNS and mint $ARIO as they see fit.
+
+Wrap the ar-io gateway and process creation in a parameterized docker container that can be deployed with a single command and reused across projects.
+
+We could allow the process to be spawned locally or directly to AO. If spawned against AO - they would be able to use ao.link and other AO related services.
+
+Pros:
+
+- Users get total control over their own $ARIO process, no "minting" required
+- Minimal reliance on managed/centralized infrastructure (from $ARIO team's perspective)
+
+Cons:
+
+- Users would need to run their own gateway to leverage the $ARIO process
+- Token sprawl - creating multiple "lookalike" $ARIO processes (if not done locally)
+- Non-unified testnet experience - each user/team would have their own "testnet"
+
+## Outlying questions
+
+- Is it a real AO process?
+
 ## Decision Outcome
+
+We will implement the integrated feature flag and minting support in the existing $ARIO process (option #2). We can support option #3 as a future extension if we want to support more use cases for local interactions with $ARIO.
 
 - Add a global flag that can be used to enable/disable a global variable `ALLOW_FREE_ARNS_INTERACTIONS` or similar
   - all ArNS related interactions are free if the flag is enabled
-  - pruning will remove records > 30 days old when the flag is enabled
+  - pruning will remove records > 7 days old when the flag is enabled
   - can be toggled on/off by VAOT/contract owner without need for additional handler
 - Add a limit on the number of ArNS records at any given time (this could be like an LRU cache where we prune out the oldest records)
   - prevents abuse of the free ArNS interactions (via bloated state/unnecessary name resolution on ar-io.dev)
