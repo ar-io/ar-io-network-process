@@ -2512,7 +2512,6 @@ addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMa
 	local primaryNameResult = primaryNames.createPrimaryNameRequest(name, initiator, msg.Timestamp, msg.Id, fundFrom)
 
 	addPrimaryNameRequestData(msg.ioEvent, primaryNameResult)
-	-- update demand factor data
 
 	--- if the from is the new owner, then send an approved notice to the from
 	if primaryNameResult.newPrimaryName then
