@@ -5,6 +5,17 @@
 - Date: 2025-03-27
 - Authors: [Dylan]
 
+<!-- toc -->
+
+- [Table of Contents](#table-of-contents)
+- [Requirements](#requirements)
+- [Separate faucet process for getting $ARIO](#separate-faucet-process-for-getting-ario)
+- [Integrated feature flag and minting support in existing $ARIO process](#integrated-feature-flag-and-minting-support-in-existing-ario-process)
+- [Launch your own $ARIO process and gateway](#launch-your-own-ario-process-and-gateway)
+- [Decision Outcome](#decision-outcome)
+
+<!-- tocstop -->
+
 ## Requirements
 
 - Easy onboarding to users/projects looking to interact with ArNS
@@ -13,29 +24,31 @@
 - Ability to mint $ARIO for internal testing purposes
 - Decent enough protection against abuse
 
-## Separate process for interacting/managing $ARIO balances
+## Separate faucet process for getting $ARIO
 
-Create a separate process for interacting/managing $ARIO balances and pruning on a timed bases. It would be "allocated" $ARIO on an interval and store balances of testnet users locally. It would then be able to prune balances of users that haven't interacted with the testnet for a period of time.
+Create a separate process (or service/api) for interacting/managing $ARIO balances and pruning on a timed bases. It would be "allocated" $ARIO on an interval and transfer limited amounts to users. Ideally, it protects against abuse by limiting the amount of $ARIO that can be minted at any given time and sends alerts when the wallet balance is low.
 
-Pros:
+This could be a process, or a service and API that supported in the CLI.
 
-- Can be shared with community and used by other projects
+**Pros:**
+
 - Logic separated from main repo
 - Allows for more robust and flexible implementation if needed
+- Rate limits token distribution to prevent abuse
+- Minimal impact on the $ARIO process
+- If using a service - it can be deployed anywhere and doesn't need to be deployed to AO, allowing for more flexibility and alerting mechanisms
 
-Cons:
+**Cons:**
 
 - More overhead - repo/code to manage
-- Separate repo/ci pipeline for reviewing
-- Not useful for our own reusability
-- Dependency between faucet process and $ARIO process and ar-io-sdk
-- Dependency on $ARIO process to give balance to faucet process
+- If using a process - it would need to be deployed to AO and would need to be able to call the $ARIO process (i.e. depends on cranking)
+- If using a service - separate piece of infrastructure to manage
 
 ## Integrated feature flag and minting support in existing $ARIO process
 
 Integrate a feature flag mechanism into the existing $ARIO process. All ArNS related actions are free if the global flag is enabled and an LRU cache to limit the number of ArNS records stored in state. Additionally, add a `mint` function to mint new balances for other interactions/use cases - but throttle the amount of tokens distributed at any given time.
 
-Pros:
+**Pros:**
 
 - Tight integration with main repo
 - Integration with ArNS does not require any minting/extra work
@@ -43,7 +56,7 @@ Pros:
 - Lowest onboarding barrier for ArNS interactions (you don't need balance!)
 - A feature flag is easier to manage than a separate process
 
-Cons:
+**Cons:**
 
 - Intertwined logic with main repo
 - Match expectations of users?
@@ -57,39 +70,28 @@ Wrap the ar-io gateway and process creation in a parameterized docker container 
 
 We could allow the process to be spawned locally or directly to AO. If spawned against AO - they would be able to use ao.link and other AO related services.
 
-Pros:
+**Pros:**
 
 - Users get total control over their own $ARIO process, no "minting" required
 - Minimal reliance on managed/centralized infrastructure (from $ARIO team's perspective)
 
-Cons:
+**Cons:**
 
 - Users would need to run their own gateway to leverage the $ARIO process
 - Token sprawl - creating multiple "lookalike" $ARIO processes (if not done locally)
 - Non-unified testnet experience - each user/team would have their own "testnet"
-
-## Outlying questions
-
 - Is it a real AO process?
 
 ## Decision Outcome
 
-We will implement the integrated feature flag and minting support in the existing $ARIO process (option #2). We can support option #3 as a future extension if we want to support more use cases for local interactions with $ARIO.
+We will implement a faucet API for getting $ARIO (Option #1), deployed to our existing infrastructure and managed by the $ARIO team. It will be allocated it’s own balance of $ARIO and responsible for distributing $ARIO to users when requested. It will have necessary protections (i.e. rate-limiting) to prevent abuse, and proper alerting/observability around it’s use (i.e. the balance is low). Additional tools will be created to prune balances of users that haven’t interacted with the testnet for a period of time, and remove records via standard protected evals. This results in the least amount of changes to the $ARIO process code, and relies more on existing infrastructure expertise and tooling to administer tokens.
 
-- Add a global flag that can be used to enable/disable a global variable `ALLOW_FREE_ARNS_INTERACTIONS` or similar
-  - all ArNS related interactions are free if the flag is enabled
-  - pruning will remove records > 7 days old when the flag is enabled
-  - can be toggled on/off by VAOT/contract owner without need for additional handler
-- Add a limit on the number of ArNS records at any given time (this could be like an LRU cache where we prune out the oldest records)
-  - prevents abuse of the free ArNS interactions (via bloated state/unnecessary name resolution on ar-io.dev)
-  - ensures fair distribution of testnet resources
-  - can be adjusted based on usage patterns and community feedback
-- Add a global flag `ALLOW_MINTING` to the $ARIO process and a `mint` function to mint new balances for other interactions/use cases
-  - calling `mint` transfers balance from the `Owner` address to the recipient address
-  - `mint` is throttled by distribution limit over a period of time (e.g. 1M $ARIO per day)
-  - `mint` is restricted by amount of tokens given to a single address (e.g. 10k $ARIO per address)
-  - once the `Owner` address balance is below threshold, prune balances back to the `Owner` address (criteria here less certain, but similar to LRU cache eviction)
-  - expose `mint` API in SDK and CLI for projects to use
+Next steps:
+
+- create an API spec for requesting tokens
+- create a wallet, and transfer sufficient balance (50M $tARIO) to that wallet
+- add rate limiting and alerting and observability to the API
+- create separate testnet monitor tooling that can be used to trigger pruning of balances back to the faucet wallet address, and remove records from the testnet process
 
 [Ariel]: https://github.com/arielmelendez
 [Dylan]: https://github.com/dtfiedler
