@@ -8,20 +8,76 @@
 --
 
 local utils = require(".src.utils")
+local demand = require(".src.demand")
+local json = require(".src.json")
+local ARIOEvent = require(".src.ario_event")
 
--- Find reference to the handler for the distribute action in the Handlers table
-local distributeHandlerIndex = utils.findInArray(Handlers.list, function(handler)
-	return handler.name == "distribute"
-end)
+--[[
+	These changes update the handler defined in main.lua. All local functions are defined in this patch as they are not available in global scope.
 
-if not distributeHandlerIndex then
-	error("Distribute handler not found")
+	We also must use the `addEventingHandler` function to add the handler to the Handlers table and ensure we continue to get event data.
+]]
+--
+local function Send(msg, response)
+	if msg.reply then
+		--- Reference: https://github.com/permaweb/aos/blob/main/blueprints/patch-legacy-reply.lua
+		msg.reply(response)
+	else
+		ao.send(response)
+	end
 end
 
-local distributeHandler = Handlers.list[distributeHandlerIndex]
+local function eventingPcall(ioEvent, onError, fnToCall, ...)
+	local status, result = pcall(fnToCall, ...)
+	if not status then
+		onError(result)
+		ioEvent:addField("Error", result)
+		return status, result
+	end
+	return status, result
+end
+
+local function addEventingHandler(handlerName, pattern, handleFn, critical, printEvent)
+	critical = critical or false
+	printEvent = printEvent == nil and true or printEvent
+	Handlers.add(handlerName, pattern, function(msg)
+		-- add an ARIOEvent to the message if it doesn't exist
+		msg.ioEvent = msg.ioEvent or ARIOEvent(msg)
+		-- global handler for all eventing errors, so we can log them and send a notice to the sender for non critical errors and discard the memory on critical errors
+		local status, resultOrError = eventingPcall(msg.ioEvent, function(error)
+			--- non critical errors will send an invalid notice back to the caller with the error information, memory is not discarded
+			Send(msg, {
+				Target = msg.From,
+				Action = "Invalid-" .. utils.toTrainCase(handlerName) .. "-Notice",
+				Error = tostring(error),
+				Data = tostring(error),
+			})
+		end, handleFn, msg)
+		if not status and critical then
+			local errorEvent = ARIOEvent(msg)
+			-- For critical handlers we want to make sure the event data gets sent to the CU for processing, but that the memory is discarded on failures
+			-- These handlers (distribute, prune) severely modify global state, and partial updates are dangerous.
+			-- So we json encode the error and the event data and then throw, so the CU will discard the memory and still process the event data.
+			-- An alternative approach is to modify the implementation of ao.result - to also return the Output on error.
+			-- Reference: https://github.com/permaweb/ao/blob/76a618722b201430a372894b3e2753ac01e63d3d/dev-cli/src/starters/lua/ao.lua#L284-L287
+			local errorWithEvent = tostring(resultOrError) .. "\n" .. errorEvent:toJSON()
+			error(errorWithEvent, 0) -- 0 ensures not to include this line number in the error message
+		end
+
+		msg.ioEvent:addField("Handler-Memory-KiB-Used", collectgarbage("count"), false)
+		collectgarbage("collect")
+		msg.ioEvent:addField("Final-Memory-KiB-Used", collectgarbage("count"), false)
+
+		if printEvent then
+			msg.ioEvent:printEvent()
+		end
+	end)
+end
 
 -- Override the handle function for the distribute action
-distributeHandler.handle = function(msg)
+addEventingHandler("distribute", function(msg)
+	return msg.Action == "Tick" or msg.Action == "Distribute"
+end, function(msg)
 	local msgId = msg.Id
 	local blockHeight = tonumber(msg["Block-Height"])
 	local hashchain = msg["Hash-Chain"]
@@ -177,4 +233,4 @@ distributeHandler.handle = function(msg)
 			totalTickedRewardsDistributed = totalTickedRewardsDistributed,
 		}),
 	})
-end
+end, CRITICAL)
