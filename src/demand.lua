@@ -126,7 +126,8 @@ end
 
 --- Updates the demand factor and returns the updated demand factor to the current period. If multiple periods need to be updated, this function will call itself multiple times.
 --- @param currentTimestamp number The current timestamp
---- @return number | nil, table<number, number> # The demand factor, updated if necessary, nil if no update is necessary, and the updated demand factors
+--- @return number|nil demandFactor The demand factor, updated if necessary, nil if no update is necessary
+--- @return table<number, {period:number, demandFactor:number}> updatedDemandFactors The updated demand factors
 function demand.updateDemandFactor(currentTimestamp)
 	assert(currentTimestamp, "Timestamp must be provided")
 	local settings = demand.getSettings()
