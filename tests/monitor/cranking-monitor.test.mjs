@@ -1,12 +1,21 @@
 import { connect } from '@permaweb/aoconnect';
+import { DockerComposeEnvironment, Wait } from 'testcontainers';
+
+const projectRootPath = process.cwd();
 
 const arioProcessId =
   process.env.ARIO_NETWORK_PROCESS_ID ||
   'qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE';
+
+const compose = await new DockerComposeEnvironment(
+  projectRootPath,
+  'tests/monitor/docker-compose.test.yml',
+)
+  .withWaitStrategy('ao-cu', Wait.forHttp(`/state/${arioProcessId}`, 6363))
+  .up();
 const suRouter = process.env.SU_ROUTER || 'https://su-router.ao-testnet.xyz';
 const ao = connect({
-  CU_URL: process.env.CU_URL || 'https://cu.ardrive.io',
-  GRAPHQL_URL: process.env.GRAPHQL_URL || 'https://arweave.net/graphql',
+  CU_URL: process.env.CU_URL || 'http://localhost:6363',
 });
 
 // get all messages for a process by action from a given timestamp
@@ -173,9 +182,16 @@ async function main() {
           `Origin Message ID: ${originMessageId}, Ref: ${ref}`,
       ),
     );
-    process.exit('1');
   }
-  process.exit('0');
 }
 
-main();
+main()
+  .then(async () => {
+    await compose.down();
+    process.exit('0');
+  })
+  .catch(async (e) => {
+    console.error(e);
+    await compose.down();
+    process.exit('1');
+  });
