@@ -1,21 +1,22 @@
 import { connect } from '@permaweb/aoconnect';
-import { DockerComposeEnvironment, Wait } from 'testcontainers';
+//import { DockerComposeEnvironment, Wait } from 'testcontainers';
 
-const projectRootPath = process.cwd();
+// const projectRootPath = process.cwd();
 
 const arioProcessId =
   process.env.ARIO_NETWORK_PROCESS_ID ||
   'qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE';
 
-const compose = await new DockerComposeEnvironment(
-  projectRootPath,
-  'tests/monitor/docker-compose.test.yml',
-)
-  .withWaitStrategy('ao-cu', Wait.forHttp(`/state/${arioProcessId}`, 6363))
-  .up();
+// TODO: add back in when we have a local ao-cu that can be used for testing this - as is we need results cached
+// const compose = await new DockerComposeEnvironment(
+//   projectRootPath,
+//   'tests/monitor/docker-compose.test.yml',
+// )
+//   .withWaitStrategy('ao-cu', Wait.forHttp(`/state/${arioProcessId}`, 6363))
+//   .up();
 const suRouter = process.env.SU_ROUTER || 'https://su-router.ao-testnet.xyz';
 const ao = connect({
-  CU_URL: process.env.CU_URL || 'http://localhost:6363',
+  CU_URL: process.env.CU_URL || 'http://cu.ardrive.io',
 });
 
 // get all messages for a process by action from a given timestamp
@@ -101,7 +102,6 @@ async function validateCrankingChain({ originMessageId, fromTimestamp }) {
     message: originMessageId,
     process: arioProcessId,
   });
-
   const messages = results.Messages;
 
   const targetsToReferences = messages.reduce((acc, m) => {
@@ -187,11 +187,11 @@ async function main() {
 
 main()
   .then(async () => {
-    await compose.down();
+    // await compose.down();
     process.exit('0');
   })
   .catch(async (e) => {
     console.error(e);
-    await compose.down();
+    // await compose.down();
     process.exit('1');
   });
