@@ -7,7 +7,6 @@
 
 <!-- toc -->
 
-- [Table of Contents](#table-of-contents)
 - [Requirements](#requirements)
 - [Separate faucet process for getting $ARIO](#separate-faucet-process-for-getting-ario)
 - [Integrated feature flag and minting support in existing $ARIO process](#integrated-feature-flag-and-minting-support-in-existing-ario-process)
@@ -43,6 +42,7 @@ This could be a process, or a service and API that supported in the CLI.
 - More overhead - repo/code to manage
 - If using a process - it would need to be deployed to AO and would need to be able to call the $ARIO process (i.e. depends on cranking)
 - If using a service - separate piece of infrastructure to manage
+- Still requires some sybil resistance measures (i.e. rate limiting and CAPTCHA)
 
 ## Integrated feature flag and minting support in existing $ARIO process
 
@@ -91,6 +91,8 @@ Next steps:
 - create an API spec for requesting tokens
 - create a wallet, and transfer sufficient balance (50M $tARIO) to that wallet
 - add rate limiting and alerting and observability to the API
+  - use CAPTCHA based workflow from dedicated front-end service
+  - for programmatic requests, use a rate limit and CAPTCHA/link verification workflow to prevent abuse
 - create separate testnet monitor tooling that can be used to trigger pruning of balances back to the faucet wallet address, and remove records from the testnet process
 
 [Ariel]: https://github.com/arielmelendez
