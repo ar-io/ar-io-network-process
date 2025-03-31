@@ -3,7 +3,15 @@ name: Build / Test / Evolve
 on:
   workflow_dispatch:
   pull_request:
+    paths:
+      - 'src/**'
+      - 'spec/**'
+      - 'tests/**'
   push:
+    paths:
+      - 'src/**'
+      - 'spec/**'
+      - 'tests/**'
     branches:
       - develop
       - main
@@ -81,20 +89,6 @@ jobs:
         env:
           ARIO_NETWORK_PROCESS_ID: ${{ vars.ARIO_NETWORK_PROCESS_ID }}
           AO_CU_URL: ${{ vars.AO_CU_URL }}
-
-  monitor:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'yarn'
-
-      - run: yarn --frozen-lockfile
-      - run: yarn monitor
-        env:
-          ARIO_NETWORK_PROCESS_ID: ${{ vars.ARIO_NETWORK_PROCESS_ID }}
 
   evolve:
     runs-on: ubuntu-latest

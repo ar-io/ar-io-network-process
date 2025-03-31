@@ -96,7 +96,7 @@ describe('epochs', () => {
           arnsStats: {
             totalActiveNames: 1,
             totalGracePeriodNames: 0,
-            totalReservedNames: 0,
+            totalReservedNames: 1,
             totalReturnedNames: 0,
           },
           prescribedObservers: [],
@@ -310,7 +310,7 @@ describe('epochs', () => {
           arnsStats: {
             totalActiveNames: 1,
             totalGracePeriodNames: 0,
-            totalReservedNames: 0,
+            totalReservedNames: 1,
             totalReturnedNames: 0,
           },
           prescribedObservers: [],
