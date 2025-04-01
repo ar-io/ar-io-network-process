@@ -14,13 +14,14 @@
     "monitor": "yarn monitor:down && node --test tests/monitor/monitor.test.mjs",
     "monitor:devnet": "yarn monitor:down && ARIO_NETWORK_PROCESS_ID=GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc node --test tests/monitor/monitor.test.mjs",
     "monitor:testnet": "yarn monitor:down && ARIO_NETWORK_PROCESS_ID=agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA node --test tests/monitor/monitor.test.mjs",
-    "monitor:mainnet": "yarn monitor:down && ARIO_NETWORK_PROCESS_ID=qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE node --test tests/monitor/monitor.test.mjs",
+    "monitor:mainnet": "yarn monitor:down && ARIO_NETWORK_PROCESS_ID=qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE node --test tests/monitor/monitor.test.mjs && node --test tests/monitor/cranking-monitor.mjs",
+    "crank:mainnet": "ARIO_NETWORK_PROCESS_ID=qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE node --test tests/monitor/cranking-monitor.test.mjs",
     "tick": "node tools/tick.mjs",
     "evolve": "yarn build && node tools/evolve.mjs",
     "prepare": "husky"
   },
   "devDependencies": {
-    "@ar.io/sdk": "3.8.4",
+    "@ar.io/sdk": "3.9.1-alpha.2",
     "@permaweb/ao-loader": "^0.0.36",
     "@permaweb/aoconnect": "^0.0.59",
     "arweave": "^1.15.1",
