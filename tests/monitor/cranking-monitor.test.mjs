@@ -1,19 +1,10 @@
 import { connect } from '@permaweb/aoconnect';
-//import { DockerComposeEnvironment, Wait } from 'testcontainers';
-
-// const projectRootPath = process.cwd();
 
 const arioProcessId =
   process.env.ARIO_NETWORK_PROCESS_ID ||
   'qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE';
 
 // TODO: add back in when we have a local ao-cu that can be used for testing this - as is we need results cached
-// const compose = await new DockerComposeEnvironment(
-//   projectRootPath,
-//   'tests/monitor/docker-compose.test.yml',
-// )
-//   .withWaitStrategy('ao-cu', Wait.forHttp(`/state/${arioProcessId}`, 6363))
-//   .up();
 const suRouter = process.env.SU_ROUTER || 'https://su-router.ao-testnet.xyz';
 const ao = connect({
   CU_URL: process.env.CU_URL || 'http://cu.ardrive.io',
@@ -187,11 +178,9 @@ async function main() {
 
 main()
   .then(async () => {
-    // await compose.down();
     process.exit('0');
   })
   .catch(async (e) => {
     console.error(e);
-    // await compose.down();
     process.exit('1');
   });
