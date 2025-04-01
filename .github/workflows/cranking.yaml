@@ -1,0 +1,123 @@
+name: $ARIO Network Cranking Status
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *' # Run every hour
+
+jobs:
+  cranking:
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      matrix:
+        network: [mainnet]
+      fail-fast: false
+    runs-on: ubuntu-latest
+    env:
+      NETWORK_MAP: |
+        {
+          "devnet": "GaQrvEMKBpkjofgnBi_B3IgIDmY_XYelVLB6GcRGrHc",
+          "testnet": "agYcCFJtrMG6cqMuZfskIkFTGvUPddICmtQSBIoPdiA",
+          "mainnet": "qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE"
+        }
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'yarn'
+
+      - name: Setup
+        run: yarn
+
+      - name: Run Cranking Tests
+        run: |
+          mkdir -p logs
+          yarn crank:${{ matrix.network }} 2>&1 | tee logs/${{ matrix.network }}-${{ github.run_id }}-attempt-1.log
+          exit_code=${PIPESTATUS[0]}
+          if [ $exit_code -eq 0 ]; then
+              echo "Cranking tests passed"
+              exit 0
+          fi
+          exit 1
+        id: cranking
+        shell: bash
+      - name: Notify Failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2.3.2
+        env:
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: $ARIO (${{ matrix.network }}) Process Cranking Failed!
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CUSTOM_PAYLOAD: |
+            {
+              "attachments": [
+                {
+                  "fallback": "IO Process Cranking Failed",
+                  "color": "danger",
+                  "title": "Details",
+                  "text": "The $ARIO (${{ matrix.network }}) Process has failed at least one cranking test!",
+                  "fields": [
+                    {
+                      "title": "Network",
+                      "value": "${{ matrix.network }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Process ID",
+                      "value": "${{ fromJson(env.NETWORK_MAP)[matrix.network] }}",
+                      "short": true
+                    },
+                    {
+                      "title": "GitHub Action",
+                      "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                      "short": false
+                    },
+                    {
+                      "title": "Rerun",
+                      "value": "<${{ github.server_url }}/${{ github.repository }}/actions/jobs/${{ github.job }}/rerun|Click here to Rerun>",
+                      "short": false
+                    }
+                  ]
+                }
+              ]
+            }
+
+      # on success send a slack message
+      - name: Notify Success
+        if: success() && vars.NOTIFY_SUCCESS == 'true'
+        uses: rtCamp/action-slack-notify@v2.3.2
+        env:
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: $ARIO (${{ matrix.network }}) Process Cranking Success!
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CUSTOM_PAYLOAD: |
+            {
+              "attachments": [{
+                "fallback": "IO Process Cranking Success!",
+                "color": "good",
+                "title": "Test Results",
+                "text": 'The $ARIO (${{ matrix.network }}) Process has passed all cranking tests!',
+                "fields": [{
+                  "title": "Network",
+                  "value": "${{ matrix.network }}",
+                  "short": true
+                },
+                {
+                  "title": "Process ID",
+                  "value": "${{ fromJson(env.NETWORK_MAP)[matrix.network] }}",
+                  "short": true
+                },
+                {
+                  "title": "GitHub Action",
+                  "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                  "short": false
+                }
+                ]
+              }]
+            }
