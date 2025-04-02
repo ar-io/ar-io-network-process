@@ -173,6 +173,7 @@ async function main() {
           `Origin Message ID: ${originMessageId}, Ref: ${ref}`,
       ),
     );
+    throw new Error('Failed Crankings');
   }
 }
 
