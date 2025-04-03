@@ -54,6 +54,9 @@ async function getProcessMetadataFromGql({ processIds }) {
     try {
       const res = await fetch(graphqlUrl, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           query: `query {
       transactions(
@@ -83,6 +86,7 @@ async function getProcessMetadataFromGql({ processIds }) {
     }`,
         }),
       });
+
       const data = await res.json();
       checkedProcessIds.concat(
         data.data.transactions.edges.map((edge) => edge.node.id),
