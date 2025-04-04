@@ -1822,14 +1822,22 @@ end, function(msg)
 		-- Only print the prescribed observers of the newest epoch
 		local newestEpoch = epochs.getEpoch(math.max(table.unpack(newEpochIndexes)))
 		local prescribedObserverAddresses = newestEpoch
-			and utils.map(newestEpoch.prescribedObservers, function(_, observer)
-				return observer.gatewayAddress
+			and utils.map(newestEpoch.prescribedObservers, function(observerAddress, _)
+				return observerAddress
 			end)
 		msg.ioEvent:addField("Prescribed-Observers", prescribedObserverAddresses)
 	end
 	local updatedDemandFactorCount = utils.lengthOfTable(newDemandFactors)
 	if updatedDemandFactorCount > 0 then
-		msg.ioEvent:addField("Updated-Demand-Factors", newDemandFactors)
+		local updatedDemandFactorPeriods = {}
+		local updatedDemandFactorValues = {}
+		for _, df in ipairs(newDemandFactors) do
+			table.insert(updatedDemandFactorPeriods, df.period)
+			table.insert(updatedDemandFactorValues, df.demandFactor)
+		end
+		msg.ioEvent:addField("New-Demand-Factor-Periods", updatedDemandFactorPeriods)
+		msg.ioEvent:addField("New-Demand-Factor-Values", updatedDemandFactorValues)
+		msg.ioEvent:addField("New-Demand-Factor-Count", updatedDemandFactorCount)
 	end
 	if #newPruneGatewaysResults > 0 then
 		-- Reduce the prune gateways results and then track changes
