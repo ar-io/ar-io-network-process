@@ -491,7 +491,8 @@ describe('setup', () => {
               startTimestamp + 90 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000),
       );
       assert(
-        activeGatewayCountAtBeginningOfEpoch.length ===
+        // accounts for any gateways that leave during the epoch but are still eligible for rewards
+        activeGatewayCountAtBeginningOfEpoch.length <=
           distributions.totalEligibleGateways,
         `Active gateway count (${activeGatewayCountAtBeginningOfEpoch.length}) at the beginning of the epoch does not match total eligible gateways (${distributions.totalEligibleGateways}) for the current epoch`,
       );
