@@ -37,16 +37,14 @@ jobs:
 
       - name: Run Monitor Tests
         run: |
-          mkdir -p logs
           for i in {1..4}; do
             echo "Attempt $i of 4"
-            yarn monitor:${{ matrix.network }} 2>&1 | tee logs/${{ matrix.network }}-${{ github.run_id }}-attempt-$i.log
-            exit_code=${PIPESTATUS[0]}
-            if [ $exit_code -eq 0 ]; then
+            yarn monitor:${{ matrix.network }}
+            if [ $? -eq 0 ]; then
               echo "Monitor tests passed on attempt $i"
               exit 0
             else
-              echo "Attempt $i failed with exit code $exit_code"
+              echo "Attempt $i failed with exit code $?"
               if [ $i -lt 4 ]; then
                 echo "Retrying in 15 seconds..."
                 sleep 15
