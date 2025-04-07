@@ -3,7 +3,7 @@
 
 	Related PR: https://github.com/ar-io/ar-io-network-process/pull/406
 
-	Reviewers: Dylan, Ariel, Derek, Jonathon, Phil
+	Reviewers: Dylan, Ariel, Derek, Jonathan, Phil
 ]]
 --
 
