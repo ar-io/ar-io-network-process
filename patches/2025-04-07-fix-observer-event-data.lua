@@ -271,12 +271,15 @@ end, function(msg)
 		-- Only print the prescribed observers of the newest epoch
 		local newestEpoch = epochs.getEpoch(math.max(table.unpack(newEpochIndexes)))
 		local prescribedObserverAddresses = {}
+		local prescribedObserverGatewayAddresses = {}
 		if newestEpoch ~= nil and newestEpoch.prescribedObservers ~= nil then
-			for observerAddress, _ in pairs(newestEpoch.prescribedObservers) do
+			for observerAddress, gatewayAddress in pairs(newestEpoch.prescribedObservers) do
 				table.insert(prescribedObserverAddresses, observerAddress)
+				table.insert(prescribedObserverGatewayAddresses, gatewayAddress)
 			end
 		end
-		msg.ioEvent:addField("Prescribed-Observers", prescribedObserverAddresses)
+		msg.ioEvent:addField("Prescribed-Observer-Addresses", prescribedObserverAddresses)
+		msg.ioEvent:addField("Prescribed-Observer-Gateway-Addresses", prescribedObserverGatewayAddresses)
 	end
 	local updatedDemandFactorCount = utils.lengthOfTable(newDemandFactors)
 	if updatedDemandFactorCount > 0 then
