@@ -10,6 +10,10 @@
 local utils = require(".src.utils")
 local demand = require(".src.demand")
 local json = require(".src.json")
+local epochs = require(".src.epochs")
+local tick = require(".src.tick")
+local gar = require(".src.gar")
+local token = require(".src.token")
 local ARIOEvent = require(".src.ario_event")
 
 --[[
@@ -35,6 +39,117 @@ local function eventingPcall(ioEvent, onError, fnToCall, ...)
 		return status, result
 	end
 	return status, result
+end
+
+--- @class SupplyData
+--- @field circulatingSupply number|nil
+--- @field lockedSupply number|nil
+--- @field stakedSupply number|nil
+--- @field delegatedSupply number|nil
+--- @field withdrawSupply number|nil
+--- @field totalTokenSupply number|nil
+--- @field protocolBalance number|nil
+
+--- @param ioEvent ARIOEvent
+--- @param supplyData SupplyData|nil
+local function addSupplyData(ioEvent, supplyData)
+	supplyData = supplyData or {}
+	ioEvent:addField("Circulating-Supply", supplyData.circulatingSupply or LastKnownCirculatingSupply)
+	ioEvent:addField("Locked-Supply", supplyData.lockedSupply or LastKnownLockedSupply)
+	ioEvent:addField("Staked-Supply", supplyData.stakedSupply or LastKnownStakedSupply)
+	ioEvent:addField("Delegated-Supply", supplyData.delegatedSupply or LastKnownDelegatedSupply)
+	ioEvent:addField("Withdraw-Supply", supplyData.withdrawSupply or LastKnownWithdrawSupply)
+	ioEvent:addField("Total-Token-Supply", supplyData.totalTokenSupply or token.lastKnownTotalTokenSupply())
+	ioEvent:addField("Protocol-Balance", Balances[ao.id])
+end
+
+local function gatewayStats()
+	local numJoinedGateways = 0
+	local numLeavingGateways = 0
+	for _, gateway in pairs(GatewayRegistry) do
+		if gateway.status == "joined" then
+			numJoinedGateways = numJoinedGateways + 1
+		else
+			numLeavingGateways = numLeavingGateways + 1
+		end
+	end
+	return {
+		joined = numJoinedGateways,
+		leaving = numLeavingGateways,
+	}
+end
+
+--- @param ioEvent ARIOEvent
+--- @param talliesData StateObjectTallies|GatewayObjectTallies|nil
+local function addTalliesData(ioEvent, talliesData)
+	ioEvent:addFieldsIfExist(talliesData, {
+		"numAddressesVaulting",
+		"numBalanceVaults",
+		"numBalances",
+		"numDelegateVaults",
+		"numDelegatesVaulting",
+		"numDelegates",
+		"numDelegations",
+		"numExitingDelegations",
+		"numGatewayVaults",
+		"numGatewaysVaulting",
+		"numGateways",
+		"numExitingGateways",
+	})
+end
+
+--- @param ioEvent ARIOEvent
+--- @param pruneGatewaysResult PruneGatewaysResult
+local function addPruneGatewaysResult(ioEvent, pruneGatewaysResult)
+	LastKnownCirculatingSupply = LastKnownCirculatingSupply
+		+ (pruneGatewaysResult.delegateStakeReturned or 0)
+		+ (pruneGatewaysResult.gatewayStakeReturned or 0)
+
+	LastKnownWithdrawSupply = LastKnownWithdrawSupply
+		- (pruneGatewaysResult.delegateStakeReturned or 0)
+		- (pruneGatewaysResult.gatewayStakeReturned or 0)
+		+ (pruneGatewaysResult.delegateStakeWithdrawing or 0)
+		+ (pruneGatewaysResult.gatewayStakeWithdrawing or 0)
+
+	LastKnownDelegatedSupply = LastKnownDelegatedSupply - (pruneGatewaysResult.delegateStakeWithdrawing or 0)
+
+	local totalGwStakesSlashed = (pruneGatewaysResult.stakeSlashed or 0)
+	LastKnownStakedSupply = LastKnownStakedSupply
+		- totalGwStakesSlashed
+		- (pruneGatewaysResult.gatewayStakeWithdrawing or 0)
+
+	if totalGwStakesSlashed > 0 then
+		ioEvent:addField("Total-Gateways-Stake-Slashed", totalGwStakesSlashed)
+	end
+
+	local prunedGateways = pruneGatewaysResult.prunedGateways or {}
+	local prunedGatewaysCount = utils.lengthOfTable(prunedGateways)
+	if prunedGatewaysCount > 0 then
+		ioEvent:addField("Pruned-Gateways", prunedGateways)
+		ioEvent:addField("Pruned-Gateways-Count", prunedGatewaysCount)
+		local gwStats = gatewayStats()
+		ioEvent:addField("Joined-Gateways-Count", gwStats.joined)
+		ioEvent:addField("Leaving-Gateways-Count", gwStats.leaving)
+	end
+
+	local slashedGateways = pruneGatewaysResult.slashedGateways or {}
+	local slashedGatewaysCount = utils.lengthOfTable(slashedGateways or {})
+	if slashedGatewaysCount > 0 then
+		ioEvent:addField("Slashed-Gateway-Amounts", slashedGateways)
+		ioEvent:addField("Slashed-Gateways-Count", slashedGatewaysCount)
+		local invariantSlashedGateways = {}
+		for gwAddress, _ in pairs(slashedGateways) do
+			local unsafeGateway = gar.getGatewayUnsafe(gwAddress) or {}
+			if unsafeGateway and (unsafeGateway.totalDelegatedStake > 0) then
+				invariantSlashedGateways[gwAddress] = unsafeGateway.totalDelegatedStake
+			end
+		end
+		if utils.lengthOfTable(invariantSlashedGateways) > 0 then
+			ioEvent:addField("Invariant-Slashed-Gateways", invariantSlashedGateways)
+		end
+	end
+
+	addTalliesData(ioEvent, pruneGatewaysResult.gatewayObjectTallies)
 end
 
 local function addEventingHandler(handlerName, pattern, handleFn, critical, printEvent)
