@@ -60,7 +60,9 @@ local function AOEvent(initialData)
 		end
 		if not isValidType(value) then
 			print(
-				"ERROR: Invalid field value type: "
+				"ERROR: Invalid field value type for key ("
+					.. key
+					.. "): "
 					.. type(value)
 					.. ". Supported types are string, number, boolean, or nil."
 			)

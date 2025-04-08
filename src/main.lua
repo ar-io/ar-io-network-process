@@ -1821,15 +1821,28 @@ end, function(msg)
 		msg.ioEvent:addField("New-Epoch-Indexes", newEpochIndexes)
 		-- Only print the prescribed observers of the newest epoch
 		local newestEpoch = epochs.getEpoch(math.max(table.unpack(newEpochIndexes)))
-		local prescribedObserverAddresses = newestEpoch
-			and utils.map(newestEpoch.prescribedObservers, function(_, observer)
-				return observer.gatewayAddress
-			end)
-		msg.ioEvent:addField("Prescribed-Observers", prescribedObserverAddresses)
+		local prescribedObserverAddresses = {}
+		local prescribedObserverGatewayAddresses = {}
+		if newestEpoch ~= nil and newestEpoch.prescribedObservers ~= nil then
+			for observerAddress, gatewayAddress in pairs(newestEpoch.prescribedObservers) do
+				table.insert(prescribedObserverAddresses, observerAddress)
+				table.insert(prescribedObserverGatewayAddresses, gatewayAddress)
+			end
+		end
+		msg.ioEvent:addField("Prescribed-Observer-Addresses", prescribedObserverAddresses)
+		msg.ioEvent:addField("Prescribed-Observer-Gateway-Addresses", prescribedObserverGatewayAddresses)
 	end
 	local updatedDemandFactorCount = utils.lengthOfTable(newDemandFactors)
 	if updatedDemandFactorCount > 0 then
-		msg.ioEvent:addField("Updated-Demand-Factors", newDemandFactors)
+		local updatedDemandFactorPeriods = {}
+		local updatedDemandFactorValues = {}
+		for _, df in ipairs(newDemandFactors) do
+			table.insert(updatedDemandFactorPeriods, df.period)
+			table.insert(updatedDemandFactorValues, df.demandFactor)
+		end
+		msg.ioEvent:addField("New-Demand-Factor-Periods", updatedDemandFactorPeriods)
+		msg.ioEvent:addField("New-Demand-Factor-Values", updatedDemandFactorValues)
+		msg.ioEvent:addField("New-Demand-Factor-Count", updatedDemandFactorCount)
 	end
 	if #newPruneGatewaysResults > 0 then
 		-- Reduce the prune gateways results and then track changes
