@@ -23,6 +23,7 @@ local ActionMap = {
 	TotalSupply = "Total-Supply", -- for token.lua spec compatibility, gives just the total supply (circulating + locked + staked + delegated + withdraw)
 	TotalTokenSupply = "Total-Token-Supply", -- gives the total token supply and all components (protocol balance, locked supply, staked supply, delegated supply, and withdraw supply)
 	Transfer = "Transfer",
+	BatchTransfer = "Batch-Transfer",
 	Balance = "Balance",
 	Balances = "Balances",
 	DemandFactor = "Demand-Factor",
@@ -679,6 +680,133 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 		-- Send Debit-Notice and Credit-Notice
 		Send(msg, debitNotice)
 		Send(msg, creditNotice)
+	end
+end)
+
+addEventingHandler(ActionMap.BatchTransfer, utils.hasMatchingTag("Action", ActionMap.BatchTransfer), function(msg)
+	local allowUnsafeAddresses = msg.Tags["Allow-Unsafe-Addresses"] or false
+
+	-- Step 1: Parse CSV data and validate entries
+	local rawRecords = utils.parseCSV(msg.Data)
+	assert(rawRecords and #rawRecords > 0, "No transfer entries found in CSV")
+
+	-- Collect valid transfer entries and calculate total
+	local transferEntries = {}
+	local totalQuantity = 0
+
+	for i, record in ipairs(rawRecords) do
+		local recipient = record[1]
+		local quantity = tonumber(record[2]) -- convert to number since strings are not used in balances
+
+		assert(recipient and quantity, "Invalid entry at line " .. i .. ": recipient and quantity required")
+		assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
+		assert(quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
+		assert(recipient ~= msg.From, "Cannot transfer to self")
+
+		msg.ioEvent:addField("BatchRecipientFormatted", recipient)
+
+		table.insert(transferEntries, {
+			Recipient = recipient,
+			Quantity = quantity,
+		})
+
+		totalQuantity = totalQuantity + quantity
+	end
+
+	-- Step 2: Check if sender has enough balance
+	assert(balances.walletHasSufficientBalance(msg.From, totalQuantity), "Insufficient balance")
+
+	-- Step 3: Prepare the balance updates
+	local balanceIncreases = {}
+
+	-- Calculate all balance changes
+	for _, entry in ipairs(transferEntries) do
+		local recipient = entry.Recipient
+		local quantity = entry.Quantity
+
+		if not Balances[recipient] then
+			Balances[recipient] = 0
+		end
+
+		-- Aggregate multiple transfers to the same recipient
+		if not balanceIncreases[recipient] then
+			balanceIncreases[recipient] = Balances[recipient] + quantity
+		else
+			balanceIncreases[recipient] = quantity
+		end
+	end
+
+	-- Step 4: Apply the balance changes atomically
+	for recipient, balanceIncrease in pairs(balanceIncreases) do
+		local result = balances.transfer(recipient, msg.From, balanceIncrease, allowUnsafeAddresses)
+		if result ~= nil then
+			local senderNewBalance = result[msg.From]
+			local recipientNewBalance = result[recipient]
+			msg.ioEvent:addField("BatchSenderPreviousBalance", senderNewBalance + quantity)
+			msg.ioEvent:addField("BatchSenderNewBalance", senderNewBalance)
+			msg.ioEvent:addField("BatchRecipientPreviousBalance", recipientNewBalance - quantity)
+			msg.ioEvent:addField("BatchRecipientNewBalance", recipientNewBalance)
+		end
+	end
+
+	-- Step 5: Always send a batch debit notice to the sender
+	local batchDebitNotice = {
+		Action = "Batch-Debit-Notice",
+		Count = tostring(#transferEntries),
+		Total = tostring(totalQuantity),
+		["Allow-Unsafe-Addresses"] = tostring(allowUnsafeAddresses),
+		["Batch-Transfer-Init-Id"] = msg.Id,
+		Data = "You transferred a total of "
+			.. totalQuantity
+			.. " across "
+			.. tostring(#transferEntries)
+			.. " recipients",
+	}
+
+	-- Forward any X- tags to the debit notice
+	for tagName, tagValue in pairs(msg) do
+		if string.sub(tagName, 1, 2) == "X-" then
+			batchDebitNotice[tagName] = tagValue
+		end
+	end
+
+	-- Always send Batch-Debit-Notice to sender
+	msg.reply(batchDebitNotice)
+
+	-- Casting implies that the sender does not want a response - Reference: https://elixirforum.com/t/what-is-the-etymology-of-genserver-cast/33610/3
+	if not msg.Cast then
+		for _, entry in ipairs(transferEntries) do
+			local recipient = entry.Recipient
+			local quantity = entry.Quantity
+
+			-- Credit-Notice message template, sent to each recipient
+			local creditNotice = {
+				Target = recipient,
+				Action = "Credit-Notice",
+				Sender = msg.From,
+				Quantity = tostring(quantity),
+				["Allow-Unsafe-Addresses"] = tostring(allowUnsafeAddresses),
+				["Batch-Transfer-Init-Id"] = msg.Id,
+				Data = "You received " .. tostring(quantity) .. " from " .. msg.From,
+			}
+
+			-- Add forwarded tags to the credit and debit notice messages
+			local didForwardTags = false
+			for tagName, tagValue in pairs(msg) do
+				-- Tags beginning with "X-" are forwarded
+				if string.sub(tagName, 1, 2) == "X-" then
+					creditNotice[tagName] = tagValue
+					didForwardTags = true
+					msg.ioEvent:addField(tagName, tagValue)
+				end
+			end
+			if didForwardTags then
+				msg.ioEvent:addField("ForwardedTags", "true")
+			end
+
+			-- Send Credit-Notice to recipient
+			Send(creditNotice)
+		end
 	end
 end)
 

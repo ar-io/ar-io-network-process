@@ -59,6 +59,24 @@ function utils.slice(tbl, first, last, step)
 	return sliced
 end
 
+--- CSV Parser Implementation from token spec
+--- Simple CSV parser that splits input by newlines and commas to create a 2D table of values
+--- @param csvText string A csv string of newlines and commas
+--- @return table parsedTable The csv parsed into a table
+function utils.parseCSV(csvText)
+	local parsed = {}
+	-- Split by newlines and process each line
+	for line in csvText:gmatch("[^\r\n]+") do
+		local row = {}
+		-- Split line by commas and add each value to the row
+		for value in line:gmatch("[^,]+") do
+			table.insert(row, value)
+		end
+		table.insert(parsed, row)
+	end
+	return parsed
+end
+
 --- @class PaginationTags
 --- @field cursor string|nil The cursor to paginate from
 --- @field limit number The limit of results to return
