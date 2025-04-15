@@ -77,6 +77,39 @@ function utils.parseCSV(csvText)
 	return parsed
 end
 
+--- Parses and validates batch transfer CSV records
+--- @param rawRecords table CSV-parsed table of transfer entries
+--- @param sender string Sender's address (used for validation)
+--- @param allowUnsafeAddresses boolean Whether to allow unsafe addresses
+--- @return table transferEntries Validated list of transfer entries { Recipient, Quantity }
+--- @return number totalQuantity Total quantity summed from valid entries
+function utils.parseAndValidateBatchTransfers(rawRecords, sender, allowUnsafeAddresses)
+	assert(type(rawRecords) == "table" and #rawRecords > 0, "No transfer entries found")
+	assert(type(sender) == "string", "Sender must be a string")
+
+	local transferEntries = {}
+	local totalQuantity = 0
+
+	for i, record in ipairs(rawRecords) do
+		local recipient = record[1]
+		local quantity = tonumber(record[2])
+
+		assert(recipient and quantity, "Invalid entry at line " .. i .. ": recipient and quantity required")
+		assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
+		assert(quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
+		assert(recipient ~= sender, "Cannot transfer to self")
+
+		table.insert(transferEntries, {
+			Recipient = recipient,
+			Quantity = quantity,
+		})
+
+		totalQuantity = totalQuantity + quantity
+	end
+
+	return transferEntries, totalQuantity
+end
+
 --- @class PaginationTags
 --- @field cursor string|nil The cursor to paginate from
 --- @field limit number The limit of results to return

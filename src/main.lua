@@ -691,27 +691,10 @@ addEventingHandler(ActionMap.BatchTransfer, utils.hasMatchingTag("Action", Actio
 	assert(rawRecords and #rawRecords > 0, "No transfer entries found in CSV")
 
 	-- Collect valid transfer entries and calculate total
-	local transferEntries = {}
-	local totalQuantity = 0
+	local transferEntries, totalQuantity =
+		utils.parseAndValidateBatchTransfers(rawRecords, msg.From, allowUnsafeAddresses)
 
-	for i, record in ipairs(rawRecords) do
-		local recipient = record[1]
-		local quantity = tonumber(record[2]) -- convert to number since strings are not used in balances
-
-		assert(recipient and quantity, "Invalid entry at line " .. i .. ": recipient and quantity required")
-		assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
-		assert(quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
-		assert(recipient ~= msg.From, "Cannot transfer to self")
-
-		msg.ioEvent:addField("BatchRecipientFormatted", recipient)
-
-		table.insert(transferEntries, {
-			Recipient = recipient,
-			Quantity = quantity,
-		})
-
-		totalQuantity = totalQuantity + quantity
-	end
+	msg.ioEvent:addField("BatchRecipientsFormatted", tostring(#transferEntries))
 
 	-- Step 2: Check if sender has enough balance
 	assert(balances.walletHasSufficientBalance(msg.From, totalQuantity), "Insufficient balance")

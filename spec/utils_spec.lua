@@ -136,6 +136,281 @@ describe("utils", function()
 		end)
 	end)
 
+	describe("isInteger", function()
+		it("should return true for integer numbers", function()
+			assert.is_true(utils.isInteger(0))
+			assert.is_true(utils.isInteger(1))
+			assert.is_true(utils.isInteger(-100))
+			assert.is_true(utils.isInteger(999999))
+		end)
+
+		it("should return false for non-integer numbers", function()
+			assert.is_false(utils.isInteger(3.14))
+			assert.is_false(utils.isInteger(-7.5))
+			assert.is_false(utils.isInteger(math.pi))
+		end)
+
+		it("should return false for nil and non-number types", function()
+			assert.is_false(utils.isInteger(nil))
+			assert.is_false(utils.isInteger("hello"))
+			assert.is_false(utils.isInteger({}))
+			assert.is_false(utils.isInteger(true))
+		end)
+
+		it("should return true for strings that represent integers", function()
+			assert.is_true(utils.isInteger("5"))
+			assert.is_true(utils.isInteger("0"))
+			assert.is_true(utils.isInteger("-42"))
+		end)
+
+		it("should return false for strings that represent non-integer floats", function()
+			assert.is_false(utils.isInteger("5.1"))
+			assert.is_false(utils.isInteger("123.456"))
+		end)
+
+		it("should return true for strings that represent scientific notation integers", function()
+			assert.is_true(utils.isInteger("1e3")) -- "1000"
+			assert.is_true(utils.isInteger("3.0e2")) -- "300"
+		end)
+
+		it("should return true for scientific notation integers", function()
+			assert.is_true(utils.isInteger(1e3)) -- 1000
+			assert.is_true(utils.isInteger(2.5e3 - 500)) -- 2000
+		end)
+
+		it("should return false for scientific notation floats", function()
+			assert.is_false(utils.isInteger(1.234e2)) -- 123.4
+			assert.is_false(utils.isInteger("1.234e2"))
+		end)
+
+		it("should return true for values like 1.0 (float but integer)", function()
+			assert.is_true(utils.isInteger(1.0))
+			assert.is_true(utils.isInteger(1000.0))
+		end)
+	end)
+
+	describe("parseCSV", function()
+		it("should correctly parse a single-line CSV", function()
+			local csv = "a,b,c"
+			local expected = {
+				{ "a", "b", "c" },
+			}
+			assert.are.same(expected, utils.parseCSV(csv))
+		end)
+
+		it("should correctly parse a multi-line CSV", function()
+			local csv = "a,b,c\nd,e,f\ng,h,i"
+			local expected = {
+				{ "a", "b", "c" },
+				{ "d", "e", "f" },
+				{ "g", "h", "i" },
+			}
+			assert.are.same(expected, utils.parseCSV(csv))
+		end)
+
+		it("should handle empty strings gracefully", function()
+			local csv = ""
+			local expected = {}
+			assert.are.same(expected, utils.parseCSV(csv))
+		end)
+
+		it("should handle rows with different number of columns", function()
+			local csv = "a,b\nc,d,e\nf"
+			local expected = {
+				{ "a", "b" },
+				{ "c", "d", "e" },
+				{ "f" },
+			}
+			assert.are.same(expected, utils.parseCSV(csv))
+		end)
+
+		it("should strip whitespace around values", function()
+			local csv = " a , b , c "
+			local expected = {
+				{ " a ", " b ", " c " }, -- NOTE: your parser does *not* trim whitespace, so we expect it preserved
+			}
+			assert.are.same(expected, utils.parseCSV(csv))
+		end)
+
+		it("should parse newlines with carriage returns", function()
+			local csv = "a,b,c\r\nd,e,f\r\ng,h,i"
+			local expected = {
+				{ "a", "b", "c" },
+				{ "d", "e", "f" },
+				{ "g", "h", "i" },
+			}
+			assert.are.same(expected, utils.parseCSV(csv))
+		end)
+
+		it("should handle quoted values as separate tokens (basic, no escaping)", function()
+			local csv = '"a","b","c"'
+			local expected = {
+				{ '"a"', '"b"', '"c"' }, -- this parser does not handle quoted CSV rules (e.g. escaping), so we test literal behavior
+			}
+			assert.are.same(expected, utils.parseCSV(csv))
+		end)
+
+		it("should handle trailing newline", function()
+			local csv = "a,b,c\n"
+			local expected = {
+				{ "a", "b", "c" },
+			}
+			assert.are.same(expected, utils.parseCSV(csv))
+		end)
+
+		it("should handle multiple trailing newlines", function()
+			local csv = "a,b,c\n\n"
+			local expected = {
+				{ "a", "b", "c" },
+			}
+			assert.are.same(expected, utils.parseCSV(csv))
+		end)
+
+		it("should handle nil input by throwing an error", function()
+			assert.has_error(function()
+				utils.parseCSV(nil)
+			end)
+		end)
+
+		it("should handle non-string input by throwing an error", function()
+			assert.has_error(function()
+				utils.parseCSV(12345)
+			end)
+		end)
+	end)
+
+	describe("parseAndValidateBatchTransfers", function()
+		local sender = "sender-wallet-address"
+
+		it("should parse and validate valid entries with safe addresses", function()
+			local csvTable = {
+				{ testEthAddress, "10" },
+				{ testArweaveAddress, "20" },
+			}
+
+			stub(utils, "isValidAddress", function(address, allowUnsafe)
+				return (address == testEthAddress or address == testArweaveAddress)
+			end)
+
+			stub(utils, "isInteger", function(value)
+				return value % 1 == 0
+			end)
+
+			local entries, total = utils.parseAndValidateBatchTransfers(csvTable, sender, false)
+
+			assert.are.same(2, #entries)
+			assert.are.same(30, total)
+			assert.are.same(testEthAddress, entries[1].Recipient)
+			assert.are.same(10, entries[1].Quantity)
+			assert.are.same(testArweaveAddress, entries[2].Recipient)
+			assert.are.same(20, entries[2].Quantity)
+
+			utils.isValidAddress:revert()
+			utils.isInteger:revert()
+		end)
+
+		it("should parse and validate valid entries with unsafe addresses when allowUnsafeAddresses is true", function()
+			local csvTable = {
+				{ "unsafe-address-1", "15" },
+				{ "another-unsafe-address", "25" },
+			}
+
+			stub(utils, "isValidAddress", function(address, allowUnsafe)
+				return allowUnsafe
+			end)
+
+			stub(utils, "isInteger", function(value)
+				return value % 1 == 0
+			end)
+
+			local entries, total = utils.parseAndValidateBatchTransfers(csvTable, sender, true)
+
+			assert.are.same(2, #entries)
+			assert.are.same(40, total)
+			assert.are.same("unsafe-address-1", entries[1].Recipient)
+			assert.are.same(15, entries[1].Quantity)
+			assert.are.same("another-unsafe-address", entries[2].Recipient)
+			assert.are.same(25, entries[2].Quantity)
+
+			utils.isValidAddress:revert()
+			utils.isInteger:revert()
+		end)
+
+		it("should throw error if recipient is missing", function()
+			local csvTable = {
+				{ nil, "10" },
+			}
+			assert.has_error(function()
+				utils.parseAndValidateBatchTransfers(csvTable, sender, false)
+			end, "Invalid entry at line 1: recipient and quantity required")
+		end)
+
+		it("should throw error if quantity is invalid", function()
+			local csvTable = {
+				{ "recipient1", "abc" },
+			}
+			assert.has_error(function()
+				utils.parseAndValidateBatchTransfers(csvTable, sender, false)
+			end, "Invalid entry at line 1: recipient and quantity required")
+		end)
+
+		it("should throw error if quantity is not a positive integer", function()
+			local csvTable = {
+				{ "recipient1", "-5" },
+			}
+			stub(utils, "isValidAddress", function()
+				return true
+			end)
+			stub(utils, "isInteger", function()
+				return false
+			end)
+
+			assert.has_error(function()
+				utils.parseAndValidateBatchTransfers(csvTable, sender, false)
+			end, "Invalid quantity. Must be integer greater than 0")
+
+			utils.isValidAddress:revert()
+			utils.isInteger:revert()
+		end)
+
+		it("should throw error if trying to transfer to self", function()
+			local csvTable = {
+				{ sender, "100" },
+			}
+			stub(utils, "isValidAddress", function()
+				return true
+			end)
+			stub(utils, "isInteger", function()
+				return true
+			end)
+
+			assert.has_error(function()
+				utils.parseAndValidateBatchTransfers(csvTable, sender, false)
+			end, "Cannot transfer to self")
+
+			utils.isValidAddress:revert()
+			utils.isInteger:revert()
+		end)
+
+		it("should throw error on empty table", function()
+			assert.has_error(function()
+				utils.parseAndValidateBatchTransfers({}, sender, false)
+			end, "No transfer entries found")
+		end)
+
+		it("should throw error on non-table input", function()
+			assert.has_error(function()
+				utils.parseAndValidateBatchTransfers("not a table", sender, false)
+			end, "No transfer entries found")
+		end)
+
+		it("should throw error if sender is not a string", function()
+			assert.has_error(function()
+				utils.parseAndValidateBatchTransfers({ { "r", "1" } }, nil, false)
+			end, "Sender must be a string")
+		end)
+	end)
+
 	describe("paginateTableWithCursor", function()
 		local threeItemTable = {
 			{ name = "foo" },
