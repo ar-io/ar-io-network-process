@@ -14,17 +14,20 @@ const signer = createAoSigner(new ArweaveSigner(wallet));
 const networkProcess = new AOProcess({
   processId,
   ao: connect({
-    CU_URL: process.env.AO_CU_URL,
+    CU_URL: process.env.AO_CU_URL || 'https://cu.ardrive.io',
   }),
 });
 
 const protocolBalance =
   process.env.ARIO_PROTOCOL_BALANCE ||
-  new ARIOToken(65 * 10 ** 12).toAmount(65_000_000);
+  new ARIOToken(65 * 10 ** 12).toMARIO().value;
 const teamWalletBalance =
   process.env.ARIO_TEAM_WALLET_BALANCE ||
-  new ARIOToken(50 * 10 ** 12).toAmount(50_000_000);
-const teamWalletAddress = (process.env.ARIO_TEAM_WALLET_ADDRESS || '')
+  new ARIOToken(50 * 10 ** 12).toMARIO().value;
+const teamWalletAddress = (
+  process.env.ARIO_TEAM_WALLET_ADDRESS ||
+  'OZJjbPv98Qp8pJTZbKCmwlmhutGCW_zZ-18MjdBZQRY,DyQ3ZT4LSxSqx9CqFBb7O_28vE3bc7HsVA6jDvufpwc'
+)
   .trim()
   .split(',');
 const ownerBalance = 10 ** 15 - protocolBalance - teamWalletBalance;
@@ -33,7 +36,7 @@ const { id } = await networkProcess.send({
   data: ```
     PrimaryNames.owners={}
     PrimaryNames.names={}
-    GatewayRegistry = {}
+    GatewayRegistry={}
     NameRegistry.records={}
     NameRegistry.returned={}
     Epochs={}
@@ -45,4 +48,4 @@ const { id } = await networkProcess.send({
   ```,
   signer,
 });
-console.log(`Evolve result tx: ${id}`);
+console.log(`Testnet reset tx: ${id}`);
