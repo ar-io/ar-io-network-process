@@ -1,9 +1,7 @@
 --[[
 	Allow delegates to instantly withdraw their stake from leaving gateways.
 
-	TODO: ALLOW GATEWAY OPERATORS TO INSTANTLY WITHDRAW THEIR VAULTS, IF LEAVING, SO LONG AS THEY ARE NOT THE REQUIRED MINIMUM STAKE.
-
-	Related PR: https://github.com/ar-io/ar-io-network-process/pull/412
+	Related PR: https://github.com/ar-io/ar-io-network-process/pull/422
 
 	Reviewers: Dylan, Jonathon, Ariel, Phil
 ]]
