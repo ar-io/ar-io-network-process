@@ -1206,18 +1206,20 @@ function gar.instantGatewayWithdrawal(from, gatewayAddress, vaultId, currentTime
 	assert(gateway, "Gateway not found")
 
 	local isGatewayWithdrawal = from == gatewayAddress
-	assert(gateway.status ~= "leaving", "This gateway is leaving and this vault cannot be instantly withdrawn.")
 
 	local vault
 	local delegate
 	if isGatewayWithdrawal then
+		assert(gateway.vaults[vaultId], "Vault not found")
+		-- TODO: use the attribute on the vault to determine if it can be instantly withdrawn
+		assert(gateway.status ~= "leaving", "This gateway is leaving and this vault cannot be instantly withdrawn.")
 		vault = gateway.vaults[vaultId]
 	else
 		delegate = gateway.delegates[from]
 		assert(delegate, "Delegate not found")
+		assert(delegate.vaults[vaultId], "Vault not found")
 		vault = delegate.vaults[vaultId]
 	end
-	assert(vault, "Vault not found")
 
 	---@type number
 	local elapsedTime = currentTimestamp - vault.startTimestamp
@@ -2101,7 +2103,6 @@ function cancelGatewayDelegateVault(gateway, delegateAddress, vaultId)
 	local vault = delegate.vaults[vaultId]
 	assert(vault, "Vault not found")
 	assert(gar.delegateAllowedToStake(delegateAddress, gateway), "This Gateway does not allow this delegate to stake.")
-
 	gateway.delegates[delegateAddress].vaults[vaultId] = nil
 	increaseDelegateStakeAtGateway(delegate, gateway, vault.balance)
 end

@@ -1607,8 +1607,8 @@ describe("gar", function()
 					local vaultTimestamp = delegateStartTimestamp
 					local vaultBalance = 1000
 					local expectedPenaltyRate = 0.50
-					local expectedexpeditedWithdrawalFee = vaultBalance * expectedPenaltyRate
-					local expectedWithdrawalAmount = vaultBalance - expectedexpeditedWithdrawalFee
+					local expectedWithdrawalFee = vaultBalance * expectedPenaltyRate
+					local expectedWithdrawalAmount = vaultBalance - expectedWithdrawalFee
 
 					_G.Balances[ao.id] = 0
 
@@ -1652,7 +1652,7 @@ describe("gar", function()
 					-- assert the delegate has been removed from the gateway
 					assert.are.equal(nil, _G.GatewayRegistry[stubGatewayAddress].delegates[stubRandomAddress])
 					assert.are.equal(expectedWithdrawalAmount, _G.Balances[stubRandomAddress])
-					assert.are.equal(expectedexpeditedWithdrawalFee, _G.Balances[ao.id])
+					assert.are.equal(expectedWithdrawalFee, _G.Balances[ao.id])
 					assert.are.equal(0, _G.GatewayRegistry[stubGatewayAddress].totalDelegatedStake)
 				end
 			)
@@ -1822,6 +1822,53 @@ describe("gar", function()
 				assert.is_false(status)
 				assert.is_not_nil(err)
 				assert.matches("Vault not found", err)
+			end)
+
+			it("should allow delegate to instantly withdraw vaults when the gateway is leaving", function()
+				local gatewayAddress = "gateway_address"
+				local vaultId = "vault_id_1"
+				local currentTimestamp = 1000000
+
+				_G.GatewayRegistry[gatewayAddress] = {
+					operatorStake = 2000,
+					totalDelegatedStake = 0,
+					vaults = {},
+					startTimestamp = testGateway.startTimestamp,
+					stats = testGateway.stats,
+					services = testGateway.services,
+					settings = testGateway.settings,
+					status = "leaving",
+					observerAddress = testGateway.observerAddress,
+					weights = testGateway.weights,
+					delegates = {
+						[stubRandomAddress] = {
+							delegatedStake = 0,
+							startTimestamp = currentTimestamp,
+							vaults = {
+								[vaultId] = {
+									balance = 1000,
+									startTimestamp = currentTimestamp,
+									endTimestamp = currentTimestamp + operatorLeaveLengthMs,
+								},
+							},
+						},
+					},
+				}
+
+				local withdrawalResult =
+					gar.instantGatewayWithdrawal(stubRandomAddress, gatewayAddress, vaultId, currentTimestamp)
+
+				assert.are.same({
+					gateway = _G.GatewayRegistry[gatewayAddress],
+					elapsedTime = 0,
+					remainingTime = operatorLeaveLengthMs,
+					penaltyRate = 0.500,
+					expeditedWithdrawalFee = 500,
+					amountWithdrawn = 500,
+				}, withdrawalResult)
+				assert.are.same(nil, _G.GatewayRegistry[gatewayAddress].vaults[vaultId])
+				assert.are.equal(500, _G.Balances[stubRandomAddress])
+				assert.are.equal(500, _G.Balances[ao.id])
 			end)
 
 			it("should error if the Gateway not found", function()
