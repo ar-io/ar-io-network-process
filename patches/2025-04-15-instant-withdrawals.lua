@@ -49,7 +49,7 @@ function gar.instantGatewayWithdrawal(from, gatewayAddress, vaultId, currentTime
 	local delegate
 	if isGatewayWithdrawal then
 		assert(gateway.vaults[vaultId], "Vault not found")
-		assert(not isGatewayProtectedVault, "Gateway operator vault cannot be instantly withdrawn.")
+		assert(not isGatewayProtectedVault, "Gateway operator minimum stake vault cannot be instantly withdrawn.")
 		vault = gateway.vaults[vaultId]
 	else
 		delegate = gateway.delegates[from]

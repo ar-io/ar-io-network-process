@@ -1556,7 +1556,7 @@ describe("gar", function()
 					pcall(gar.instantGatewayWithdrawal, from, gatewayAddress, protectedVaultId, currentTimestamp)
 
 				assert.is_false(status)
-				assert.matches("Gateway operator vault cannot be instantly withdrawn.", result)
+				assert.matches("Gateway operator minimum stake vault cannot be instantly withdrawn.", result)
 			end)
 
 			it(
