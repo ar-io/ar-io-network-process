@@ -41,7 +41,10 @@ function gar.instantGatewayWithdrawal(from, gatewayAddress, vaultId, currentTime
 	assert(gateway, "Gateway not found")
 
 	local isGatewayWithdrawal = from == gatewayAddress
-	local isGatewayProtectedVault = vaultId == gatewayAddress -- when we create the minimum staked vault, we use the gateway address as the vault id - this vault cannot be instantly withdrawn
+
+	-- the protected operator vault is the vault that represents the gateway operators minimum stake and cannot be instantly withdrawn
+	local isGatewayProtectedVault = vaultId == gatewayAddress
+
 	local vault
 	local delegate
 	if isGatewayWithdrawal then
