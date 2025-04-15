@@ -1206,13 +1206,12 @@ function gar.instantGatewayWithdrawal(from, gatewayAddress, vaultId, currentTime
 	assert(gateway, "Gateway not found")
 
 	local isGatewayWithdrawal = from == gatewayAddress
-
+	local isGatewayProtectedVault = vaultId == gatewayAddress -- when we create the minimum staked vault, we use the gateway address as the vault id - this vault cannot be instantly withdrawn
 	local vault
 	local delegate
 	if isGatewayWithdrawal then
 		assert(gateway.vaults[vaultId], "Vault not found")
-		-- TODO: use the attribute on the vault to determine if it can be instantly withdrawn
-		assert(gateway.status ~= "leaving", "This gateway is leaving and this vault cannot be instantly withdrawn.")
+		assert(not isGatewayProtectedVault, "Gateway operator vault cannot be instantly withdrawn.")
 		vault = gateway.vaults[vaultId]
 	else
 		delegate = gateway.delegates[from]
@@ -2055,6 +2054,7 @@ end
 --- @param gatewayAddress WalletAddress
 function createGatewayExitVault(gateway, qty, currentTimestamp, gatewayAddress)
 	assert(not gateway.vaults[gatewayAddress], "Exit Vault already exists")
+	-- This vault is protected, and cannot be instantly withdrawn. It MUST use the gateway address as the vault id to prevent instant withdrawals.
 	gateway.vaults[gatewayAddress] = {
 		balance = qty,
 		startTimestamp = currentTimestamp,

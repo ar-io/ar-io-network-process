@@ -1526,11 +1526,10 @@ describe("gar", function()
 				assert.matches("Vault not found", result)
 			end)
 
-			-- Unhappy path test: Withdrawal from leaving gateway
-			it("should fail if trying to withdraw from a vault while gateway is leaving", function()
+			it("should fail if trying to withdraw the protected operator vault", function()
 				local from = "gateway_address"
 				local gatewayAddress = from
-				local vaultId = from -- Special vault ID representing the leaving status
+				local protectedVaultId = from -- protected operator vault is the vault that represents the gateway operators minimum stake
 				local currentTimestamp = 1000000
 
 				_G.GatewayRegistry[from] = {
@@ -1542,10 +1541,10 @@ describe("gar", function()
 					weights = testGateway.weights,
 					delegates = {},
 					totalDelegatedStake = 0,
-					operatorStake = 2000,
+					operatorStake = 0,
 					status = "leaving",
 					vaults = {
-						[vaultId] = {
+						[protectedVaultId] = {
 							balance = 1000,
 							startTimestamp = 1000000,
 							endTimestamp = 1000000 + operatorLeaveLengthMs,
@@ -1554,11 +1553,61 @@ describe("gar", function()
 				}
 
 				local status, result =
-					pcall(gar.instantGatewayWithdrawal, from, gatewayAddress, vaultId, currentTimestamp)
+					pcall(gar.instantGatewayWithdrawal, from, gatewayAddress, protectedVaultId, currentTimestamp)
 
 				assert.is_false(status)
-				assert.matches("This gateway is leaving and this vault cannot be instantly withdrawn.", result)
+				assert.matches("Gateway operator vault cannot be instantly withdrawn.", result)
 			end)
+
+			it(
+				"should allow gateway operator to instantly withdraw their vault when leaving, if it is not the protected operator vault",
+				function()
+					local from = "gateway_address"
+					local gatewayAddress = from
+					local nonProtectedVaultId = "some-other-vault-id"
+					local currentTimestamp = 1000000
+
+					_G.GatewayRegistry[from] = {
+						startTimestamp = testGateway.startTimestamp,
+						stats = testGateway.stats,
+						services = testGateway.services,
+						settings = testGateway.settings,
+						status = testGateway.status,
+						observerAddress = testGateway.observerAddress,
+						weights = testGateway.weights,
+						delegates = {},
+						totalDelegatedStake = 0,
+						operatorStake = 2000,
+						vaults = {
+							[gatewayAddress] = {
+								balance = 1000,
+								startTimestamp = 1000000,
+								endTimestamp = 1000000 + operatorLeaveLengthMs,
+							},
+							[nonProtectedVaultId] = {
+								balance = 1000,
+								startTimestamp = 1000000,
+								endTimestamp = 1000000 + operatorLeaveLengthMs,
+							},
+						},
+					}
+
+					local withdrawalResult =
+						gar.instantGatewayWithdrawal(from, gatewayAddress, nonProtectedVaultId, currentTimestamp)
+
+					assert.are.same({
+						gateway = _G.GatewayRegistry[gatewayAddress],
+						elapsedTime = 0,
+						remainingTime = operatorLeaveLengthMs,
+						penaltyRate = 0.500,
+						expeditedWithdrawalFee = 500,
+						amountWithdrawn = 500,
+					}, withdrawalResult)
+					assert.are.same(nil, withdrawalResult.gateway.vaults[nonProtectedVaultId]) -- non-protected vault should be removed after withdrawal
+					assert.are.equal(500, _G.Balances[from]) -- 50% of the vault balance
+					assert.are.equal(500, _G.Balances[ao.id]) -- 50% of the vault balance
+				end
+			)
 
 			-- Unhappy path test: Invalid elapsed time
 			it("should fail if elapsed time is negative", function()
