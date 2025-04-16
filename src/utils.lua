@@ -77,18 +77,20 @@ function utils.parseCSV(csvText)
 	return parsed
 end
 
---- Parses and validates batch transfer CSV records
+--- Parses, validates, and calculates batch transfer impacts.
 --- @param rawRecords table CSV-parsed table of transfer entries
 --- @param sender string Sender's address (used for validation)
 --- @param allowUnsafeAddresses boolean Whether to allow unsafe addresses
 --- @return table transferEntries Validated list of transfer entries { Recipient, Quantity }
 --- @return number totalQuantity Total quantity summed from valid entries
-function utils.parseAndValidateBatchTransfers(rawRecords, sender, allowUnsafeAddresses)
+--- @return table balanceIncreases Map of recipient → total quantity to receive after aggregation
+function utils.parseValidateAndCalculateBatchTransfers(rawRecords, sender, allowUnsafeAddresses)
 	assert(type(rawRecords) == "table" and #rawRecords > 0, "No transfer entries found")
 	assert(type(sender) == "string", "Sender must be a string")
 
 	local transferEntries = {}
 	local totalQuantity = 0
+	local balanceIncreases = {}
 
 	for i, record in ipairs(rawRecords) do
 		local recipient = record[1]
@@ -105,9 +107,15 @@ function utils.parseAndValidateBatchTransfers(rawRecords, sender, allowUnsafeAdd
 		})
 
 		totalQuantity = totalQuantity + quantity
+
+		if not balanceIncreases[recipient] then
+			balanceIncreases[recipient] = quantity
+		else
+			balanceIncreases[recipient] = balanceIncreases[recipient] + quantity
+		end
 	end
 
-	return transferEntries, totalQuantity
+	return transferEntries, totalQuantity, balanceIncreases
 end
 
 --- @class PaginationTags
@@ -115,7 +123,6 @@ end
 --- @field limit number The limit of results to return
 --- @field sortBy string|nil The field to sort by
 --- @field sortOrder string The order to sort by
-
 --- Parses the pagination tags from a message
 --- @param msg table The message provided to a handler (see ao docs for more info)
 --- @return PaginationTags paginationTags - the pagination tags

@@ -82,4 +82,88 @@ describe("balances", function()
 			}, returnedBalances)
 		end)
 	end)
+
+	describe("batchTransfer", function()
+		before_each(function()
+			-- Reset balances table before each test
+			_G.Balances = {}
+		end)
+
+		it("should transfer to multiple recipients correctly", function()
+			_G.Balances[testAddress1] = 100
+
+			local balanceIncreases = {
+				[testAddress2] = 30, -- Bob
+				[testAddressEth] = 20, -- Carol
+			}
+
+			local result = balances.batchTransfer(testAddress1, balanceIncreases, false)
+
+			assert.are.equal(50, _G.Balances[testAddress1])
+			assert.are.equal(30, _G.Balances[testAddress2])
+			assert.are.equal(20, _G.Balances[testAddressEth])
+
+			-- Validate that each recipient has the correct quantity,
+			-- and that the 'from' value is *either* 70 or 50 depending on order, since Lua has non-deterministic table ordering
+			local bob = result[testAddress2]
+			local carol = result[testAddressEth]
+
+			assert.are.equal(30, bob.recipient)
+			assert.is_true(bob.from == 80 or bob.from == 70 or bob.from == 50)
+
+			assert.are.equal(20, carol.recipient)
+			assert.is_true(carol.from == 80 or carol.from == 70 or carol.from == 50)
+
+			-- Validate that total sum still adds up correctly
+			assert.are.equal(30 + 20, 100 - _G.Balances[testAddress1])
+		end)
+
+		it("should throw if sender does not have sufficient balance", function()
+			_G.Balances[testAddress1] = 10
+
+			local balanceIncreases = {
+				[testAddress2] = 15,
+			}
+
+			local status, err = pcall(function()
+				balances.batchTransfer(testAddress1, balanceIncreases, false)
+			end)
+
+			assert.is_false(status)
+			assert.match("Insufficient balance", err)
+		end)
+
+		it("should throw if sender and recipient are the same", function()
+			_G.Balances[testAddress1] = 100
+
+			local balanceIncreases = {
+				[testAddress1] = 10,
+			}
+
+			local status, err = pcall(function()
+				balances.batchTransfer(testAddress1, balanceIncreases, false)
+			end)
+
+			assert.is_false(status)
+			assert.match("Cannot transfer to self", err)
+		end)
+
+		it("should throw if balanceIncreases is not a table", function()
+			local status, err = pcall(function()
+				balances.batchTransfer(testAddress1, "not-a-table", false)
+			end)
+
+			assert.is_false(status)
+			assert.match("balanceIncreases must be a table", err)
+		end)
+
+		it("should throw if sender is not a string", function()
+			local status, err = pcall(function()
+				balances.batchTransfer({}, {}, false)
+			end)
+
+			assert.is_false(status)
+			assert.match("Sender address must be a string", err)
+		end)
+	end)
 end)

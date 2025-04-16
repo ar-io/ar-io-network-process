@@ -28,6 +28,28 @@ function balances.transfer(recipient, from, qty, allowUnsafeAddresses)
 	}
 end
 
+--- Performs a batch transfer from one address to multiple recipients
+--- @param from string The sender's address
+--- @param balanceIncreases table<string, number> Map of recipient address → amount to transfer
+--- @param allowUnsafeAddresses boolean Whether to allow unsafe recipient addresses
+--- @return table<string, { from: number, recipient: number }> Map of recipient → { from, recipient } new balances
+function balances.batchTransfer(from, balanceIncreases, allowUnsafeAddresses)
+	assert(type(from) == "string", "Sender address must be a string")
+	assert(type(balanceIncreases) == "table", "balanceIncreases must be a table")
+
+	local result = {}
+
+	for recipient, amount in pairs(balanceIncreases) do
+		local transferResult = balances.transfer(recipient, from, amount, allowUnsafeAddresses)
+		result[recipient] = {
+			from = transferResult[from],
+			recipient = transferResult[recipient],
+		}
+	end
+
+	return result
+end
+
 --- Gets the balance for a specific address
 ---@param target WalletAddress The address to get balance for
 ---@return mARIO The balance amount (0 if address has no balance)

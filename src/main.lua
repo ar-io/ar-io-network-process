@@ -686,51 +686,19 @@ end)
 addEventingHandler(ActionMap.BatchTransfer, utils.hasMatchingTag("Action", ActionMap.BatchTransfer), function(msg)
 	local allowUnsafeAddresses = msg.Tags["Allow-Unsafe-Addresses"] or false
 
-	-- Step 1: Parse CSV data and validate entries
+	-- Step 1: Parse CSV data, validate entries and calculate total
 	local rawRecords = utils.parseCSV(msg.Data)
 	assert(rawRecords and #rawRecords > 0, "No transfer entries found in CSV")
 
-	-- Collect valid transfer entries and calculate total
-	local transferEntries, totalQuantity =
-		utils.parseAndValidateBatchTransfers(rawRecords, msg.From, allowUnsafeAddresses)
+	local transferEntries, totalQuantity, balanceIncreases =
+		utils.parseValidateAndCalculateBatchTransfers(rawRecords, msg.From, allowUnsafeAddresses)
 
 	msg.ioEvent:addField("BatchRecipientsFormatted", tostring(#transferEntries))
 
 	-- Step 2: Check if sender has enough balance
 	assert(balances.walletHasSufficientBalance(msg.From, totalQuantity), "Insufficient balance")
 
-	-- Step 3: Prepare the balance updates
-	local balanceIncreases = {}
-
-	-- Calculate all balance changes
-	for _, entry in ipairs(transferEntries) do
-		local recipient = entry.Recipient
-		local quantity = entry.Quantity
-
-		if not Balances[recipient] then
-			Balances[recipient] = 0
-		end
-
-		-- Aggregate multiple transfers to the same recipient
-		if not balanceIncreases[recipient] then
-			balanceIncreases[recipient] = Balances[recipient] + quantity
-		else
-			balanceIncreases[recipient] = quantity
-		end
-	end
-
-	-- Step 4: Apply the balance changes atomically
-	for recipient, balanceIncrease in pairs(balanceIncreases) do
-		local result = balances.transfer(recipient, msg.From, balanceIncrease, allowUnsafeAddresses)
-		if result ~= nil then
-			local senderNewBalance = result[msg.From]
-			local recipientNewBalance = result[recipient]
-			msg.ioEvent:addField("BatchSenderPreviousBalance", senderNewBalance + quantity)
-			msg.ioEvent:addField("BatchSenderNewBalance", senderNewBalance)
-			msg.ioEvent:addField("BatchRecipientPreviousBalance", recipientNewBalance - quantity)
-			msg.ioEvent:addField("BatchRecipientNewBalance", recipientNewBalance)
-		end
-	end
+	local result = balances.batchTransfer(msg.From, balanceIncreases, allowUnsafeAddresses)
 
 	-- Step 5: Always send a batch debit notice to the sender
 	local batchDebitNotice = {
@@ -756,6 +724,7 @@ addEventingHandler(ActionMap.BatchTransfer, utils.hasMatchingTag("Action", Actio
 	-- Always send Batch-Debit-Notice to sender
 	msg.reply(batchDebitNotice)
 
+	-- Step 6: Send Credit-Notices (if not Cast)
 	-- Casting implies that the sender does not want a response - Reference: https://elixirforum.com/t/what-is-the-etymology-of-genserver-cast/33610/3
 	if not msg.Cast then
 		for _, entry in ipairs(transferEntries) do

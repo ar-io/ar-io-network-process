@@ -189,6 +189,168 @@ describe("utils", function()
 		end)
 	end)
 
+	describe("parseValidateAndCalculateBatchTransfers", function()
+		local sender = "sender-wallet-address"
+
+		it("should parse and validate valid entries with safe addresses", function()
+			local Balances = {
+				[sender] = 1000,
+				[testEthAddress] = 50,
+				[testArweaveAddress] = 25,
+			}
+
+			local csvTable = {
+				{ testEthAddress, "10" },
+				{ testArweaveAddress, "20" },
+			}
+
+			stub(utils, "isValidAddress", function(address, allowUnsafe)
+				return (address == testEthAddress or address == testArweaveAddress)
+			end)
+
+			stub(utils, "isInteger", function(value)
+				return value % 1 == 0
+			end)
+
+			local entries, total, increases =
+				utils.parseValidateAndCalculateBatchTransfers(csvTable, sender, false, Balances)
+
+			assert.are.same(2, #entries)
+			assert.are.same(30, total)
+			assert.are.same(testEthAddress, entries[1].Recipient)
+			assert.are.same(10, entries[1].Quantity)
+			assert.are.same(testArweaveAddress, entries[2].Recipient)
+			assert.are.same(20, entries[2].Quantity)
+
+			assert.are.same(10, increases[testEthAddress])
+			assert.are.same(20, increases[testArweaveAddress])
+
+			utils.isValidAddress:revert()
+			utils.isInteger:revert()
+		end)
+
+		it("should parse and validate valid entries with unsafe addresses when allowUnsafeAddresses is true", function()
+			local csvTable = {
+				{ "unsafe-address-1", "15" },
+				{ "another-unsafe-address", "25" },
+			}
+
+			stub(utils, "isValidAddress", function(_, allowUnsafe)
+				return allowUnsafe
+			end)
+
+			stub(utils, "isInteger", function(value)
+				return value % 1 == 0
+			end)
+
+			local entries, total, increases = utils.parseValidateAndCalculateBatchTransfers(csvTable, sender, true)
+
+			assert.are.same(2, #entries)
+			assert.are.same(40, total)
+			assert.are.same(15, increases["unsafe-address-1"])
+			assert.are.same(25, increases["another-unsafe-address"])
+
+			utils.isValidAddress:revert()
+			utils.isInteger:revert()
+		end)
+
+		it("should aggregate multiple transfers to the same recipient", function()
+			local csvTable = {
+				{ "alice", "10" },
+				{ "alice", "20" },
+			}
+
+			stub(utils, "isValidAddress", function()
+				return true
+			end)
+			stub(utils, "isInteger", function()
+				return true
+			end)
+
+			local entries, total, increases = utils.parseValidateAndCalculateBatchTransfers(csvTable, sender, false)
+
+			assert.are.same(30, total)
+			assert.are.same(30, increases.alice)
+
+			utils.isValidAddress:revert()
+			utils.isInteger:revert()
+		end)
+
+		it("should throw error if recipient is missing", function()
+			local csvTable = {
+				{ nil, "10" },
+			}
+			assert.has_error(function()
+				utils.parseValidateAndCalculateBatchTransfers(csvTable, sender, false)
+			end, "Invalid entry at line 1: recipient and quantity required")
+		end)
+
+		it("should throw error if quantity is invalid", function()
+			local csvTable = {
+				{ "recipient1", "abc" },
+			}
+			assert.has_error(function()
+				utils.parseValidateAndCalculateBatchTransfers(csvTable, sender, false)
+			end, "Invalid entry at line 1: recipient and quantity required")
+		end)
+
+		it("should throw error if quantity is not a positive integer", function()
+			local csvTable = {
+				{ "recipient1", "-5" },
+			}
+			stub(utils, "isValidAddress", function()
+				return true
+			end)
+			stub(utils, "isInteger", function()
+				return false
+			end)
+
+			assert.has_error(function()
+				utils.parseValidateAndCalculateBatchTransfers(csvTable, sender, false)
+			end, "Invalid quantity. Must be integer greater than 0")
+
+			utils.isValidAddress:revert()
+			utils.isInteger:revert()
+		end)
+
+		it("should throw error if trying to transfer to self", function()
+			local csvTable = {
+				{ sender, "100" },
+			}
+			stub(utils, "isValidAddress", function()
+				return true
+			end)
+			stub(utils, "isInteger", function()
+				return true
+			end)
+
+			assert.has_error(function()
+				utils.parseValidateAndCalculateBatchTransfers(csvTable, sender, false)
+			end, "Cannot transfer to self")
+
+			utils.isValidAddress:revert()
+			utils.isInteger:revert()
+		end)
+
+		it("should throw error on empty table", function()
+			assert.has_error(function()
+				utils.parseValidateAndCalculateBatchTransfers({}, sender, false)
+			end, "No transfer entries found")
+		end)
+
+		it("should throw error on non-table input", function()
+			assert.has_error(function()
+				utils.parseValidateAndCalculateBatchTransfers("not a table", sender, false)
+			end, "No transfer entries found")
+		end)
+
+		it("should throw error if sender is not a string", function()
+			assert.has_error(function()
+				utils.parseValidateAndCalculateBatchTransfers({ { "r", "1" } }, nil, false)
+			end, "Sender must be a string")
+		end)
+	end)
+
 	describe("parseCSV", function()
 		it("should correctly parse a single-line CSV", function()
 			local csv = "a,b,c"
@@ -276,138 +438,6 @@ describe("utils", function()
 			assert.has_error(function()
 				utils.parseCSV(12345)
 			end)
-		end)
-	end)
-
-	describe("parseAndValidateBatchTransfers", function()
-		local sender = "sender-wallet-address"
-
-		it("should parse and validate valid entries with safe addresses", function()
-			local csvTable = {
-				{ testEthAddress, "10" },
-				{ testArweaveAddress, "20" },
-			}
-
-			stub(utils, "isValidAddress", function(address, allowUnsafe)
-				return (address == testEthAddress or address == testArweaveAddress)
-			end)
-
-			stub(utils, "isInteger", function(value)
-				return value % 1 == 0
-			end)
-
-			local entries, total = utils.parseAndValidateBatchTransfers(csvTable, sender, false)
-
-			assert.are.same(2, #entries)
-			assert.are.same(30, total)
-			assert.are.same(testEthAddress, entries[1].Recipient)
-			assert.are.same(10, entries[1].Quantity)
-			assert.are.same(testArweaveAddress, entries[2].Recipient)
-			assert.are.same(20, entries[2].Quantity)
-
-			utils.isValidAddress:revert()
-			utils.isInteger:revert()
-		end)
-
-		it("should parse and validate valid entries with unsafe addresses when allowUnsafeAddresses is true", function()
-			local csvTable = {
-				{ "unsafe-address-1", "15" },
-				{ "another-unsafe-address", "25" },
-			}
-
-			stub(utils, "isValidAddress", function(address, allowUnsafe)
-				return allowUnsafe
-			end)
-
-			stub(utils, "isInteger", function(value)
-				return value % 1 == 0
-			end)
-
-			local entries, total = utils.parseAndValidateBatchTransfers(csvTable, sender, true)
-
-			assert.are.same(2, #entries)
-			assert.are.same(40, total)
-			assert.are.same("unsafe-address-1", entries[1].Recipient)
-			assert.are.same(15, entries[1].Quantity)
-			assert.are.same("another-unsafe-address", entries[2].Recipient)
-			assert.are.same(25, entries[2].Quantity)
-
-			utils.isValidAddress:revert()
-			utils.isInteger:revert()
-		end)
-
-		it("should throw error if recipient is missing", function()
-			local csvTable = {
-				{ nil, "10" },
-			}
-			assert.has_error(function()
-				utils.parseAndValidateBatchTransfers(csvTable, sender, false)
-			end, "Invalid entry at line 1: recipient and quantity required")
-		end)
-
-		it("should throw error if quantity is invalid", function()
-			local csvTable = {
-				{ "recipient1", "abc" },
-			}
-			assert.has_error(function()
-				utils.parseAndValidateBatchTransfers(csvTable, sender, false)
-			end, "Invalid entry at line 1: recipient and quantity required")
-		end)
-
-		it("should throw error if quantity is not a positive integer", function()
-			local csvTable = {
-				{ "recipient1", "-5" },
-			}
-			stub(utils, "isValidAddress", function()
-				return true
-			end)
-			stub(utils, "isInteger", function()
-				return false
-			end)
-
-			assert.has_error(function()
-				utils.parseAndValidateBatchTransfers(csvTable, sender, false)
-			end, "Invalid quantity. Must be integer greater than 0")
-
-			utils.isValidAddress:revert()
-			utils.isInteger:revert()
-		end)
-
-		it("should throw error if trying to transfer to self", function()
-			local csvTable = {
-				{ sender, "100" },
-			}
-			stub(utils, "isValidAddress", function()
-				return true
-			end)
-			stub(utils, "isInteger", function()
-				return true
-			end)
-
-			assert.has_error(function()
-				utils.parseAndValidateBatchTransfers(csvTable, sender, false)
-			end, "Cannot transfer to self")
-
-			utils.isValidAddress:revert()
-			utils.isInteger:revert()
-		end)
-
-		it("should throw error on empty table", function()
-			assert.has_error(function()
-				utils.parseAndValidateBatchTransfers({}, sender, false)
-			end, "No transfer entries found")
-		end)
-
-		it("should throw error on non-table input", function()
-			assert.has_error(function()
-				utils.parseAndValidateBatchTransfers("not a table", sender, false)
-			end, "No transfer entries found")
-		end)
-
-		it("should throw error if sender is not a string", function()
-			assert.has_error(function()
-				utils.parseAndValidateBatchTransfers({ { "r", "1" } }, nil, false)
-			end, "Sender must be a string")
 		end)
 	end)
 
