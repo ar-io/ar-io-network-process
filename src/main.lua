@@ -722,7 +722,7 @@ addEventingHandler(ActionMap.BatchTransfer, utils.hasMatchingTag("Action", Actio
 	end
 
 	-- Always send Batch-Debit-Notice to sender
-	msg.reply(batchDebitNotice)
+	Send(msg, batchDebitNotice)
 
 	-- Step 6: Send Credit-Notices (if not Cast)
 	-- Casting implies that the sender does not want a response - Reference: https://elixirforum.com/t/what-is-the-etymology-of-genserver-cast/33610/3
@@ -757,7 +757,7 @@ addEventingHandler(ActionMap.BatchTransfer, utils.hasMatchingTag("Action", Actio
 			end
 
 			-- Send Credit-Notice to recipient
-			Send(creditNotice)
+			Send(msg, creditNotice)
 		end
 	end
 end)

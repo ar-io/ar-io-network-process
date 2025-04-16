@@ -8,6 +8,8 @@ import {
 } from '../tools/constants.mjs';
 import { assertNoInvariants } from './invariants.mjs';
 
+const makeCSV = (entries) => entries.map(([addr, qty]) => `${addr},${qty}`).join('\n');
+
 describe('Transfers', async () => {
   let endingMemory;
   afterEach(() => {
@@ -246,6 +248,173 @@ describe('Transfers', async () => {
     const balances = JSON.parse(result.Messages[0].Data);
     assert.equal(balances[recipient] || 0, 0);
     assert.equal(balances[sender], senderBalanceData);
+    endingMemory = result.Memory;
+  });
+});
+
+describe('Batch Transfers', async () => {
+  let endingMemory;
+  afterEach(() => {
+    assertNoInvariants({ memory: endingMemory, timestamp: STUB_TIMESTAMP });
+  });
+
+  it('should perform a batch transfer to multiple wallets', async () => {
+    let mem = startMemory;
+    const sender = ''.padEnd(43, 'a'); // Arweave-style
+    const recipients = [
+      [''.padEnd(43, 'b'), 100], // Arweave-style
+      ['0xB0bBbbbbBbBBBBbBbBbBBBBbbBBBbbbbBbBbBBBBb', 500], // Valid ETH address
+    ];
+
+    // Prefund the sender (must be From: PROCESS_OWNER or STUB_ADDRESS, not the sender itself)
+    const prefund = await handle({
+      options: {
+        Tags: [
+          { name: 'Action', value: 'Transfer' },
+          { name: 'Recipient', value: sender },
+          { name: 'Quantity', value: 2000 },
+        ],
+      },
+      memory: mem,
+    });
+
+    const balancesResponse1 = await handle({
+      options: { Tags: [{ name: 'Action', value: 'Balances' }] },
+      memory: prefund.Memory,
+    });
+    const balances1 = JSON.parse(balancesResponse1.Messages[0].Data);
+    console.log ("BALANCES!!!", balances1)
+    console.log ("RECIPIENTS!!", makeCSV(recipients))
+
+    // Step 2: Perform batch transfer
+    const batchTransfer = await handle({
+      options: {
+        From: sender,
+        Owner: sender,
+        Tags: [
+          { name: 'Action', value: 'Batch-Transfer' },
+        ],
+        Data: makeCSV(recipients),
+      },
+      memory: prefund.Memory,
+    });
+    console.log ("BATCH TRANSFER RESPONSE!!!", batchTransfer.Messages[0].Data)
+
+    const balancesResponse = await handle({
+      options: { Tags: [{ name: 'Action', value: 'Balances' }] },
+      memory: batchTransfer.Memory,
+    });
+    const balances = JSON.parse(balancesResponse.Messages[0].Data);
+    console.log ("UPDATED BALANCES!!!", balances)
+
+    assert.equal(balances[recipients[0][0]], recipients[0][1]);
+    assert.equal(balances[recipients[1][0]], recipients[1][1]);
+    assert.equal(balances[sender], 2000 - recipients[0][1] - recipients[1][1]);
+
+    endingMemory = balancesResponse.Memory;
+  });
+
+  it('should fail on invalid address if unsafe addresses not allowed', async () => {
+    const sender = PROCESS_OWNER;
+    const invalidRecipient = 'invalid-wallet-address';
+
+    const response = await handle({
+      options: {
+        From: sender,
+        Tags: [
+          { name: 'Action', value: 'Batch-Transfer' },
+          { name: 'Allow-Unsafe-Addresses', value: false },
+        ],
+        Data: makeCSV([[invalidRecipient, 100]]),
+      },
+      shouldAssertNoResultError: false,
+    });
+
+    const errorTag = response.Messages?.[0]?.Tags?.find(t => t.name === 'Error');
+    assert.ok(errorTag);
+    endingMemory = response.Memory;
+  });
+
+  it('should succeed with unsafe address if explicitly allowed', async () => {
+    const sender = PROCESS_OWNER;
+    const unsafeRecipient = 'unsafe-address';
+
+    const memory = await handle({
+      options: {
+        From: STUB_ADDRESS,
+        Tags: [
+          { name: 'Action', value: 'Transfer' },
+          { name: 'Recipient', value: sender },
+          { name: 'Quantity', value: 500000 },
+          { name: 'Cast', value: true },
+        ],
+      },
+    });    
+
+    const batchResult = await handle({
+      options: {
+        From: sender,
+        Tags: [
+          { name: 'Action', value: 'Batch-Transfer' },
+          { name: 'Allow-Unsafe-Addresses', value: true },
+        ],
+        Data: makeCSV([[unsafeRecipient, 500000]]),
+      },
+      memory: memory.Memory,
+    });
+
+    const balancesResponse = await handle({
+      options: { Tags: [{ name: 'Action', value: 'Balances' }] },
+      memory: batchResult.Memory,
+    });
+    const balances = JSON.parse(balancesResponse.Messages[0].Data);
+    assert.equal(balances[unsafeRecipient], 500000);
+    endingMemory = balancesResponse.Memory;
+  });
+
+  it('should fail if sender balance is insufficient', async () => {
+    const sender = PROCESS_OWNER;
+    const recipient = ''.padEnd(43, 'Z');
+  
+    // Get initial sender balance
+    const senderBalanceResp = await handle({
+      options: {
+        Tags: [
+          { name: 'Action', value: 'Balance' },
+          { name: 'Target', value: sender },
+        ],
+      },
+    });
+    const senderBalanceData = JSON.parse(senderBalanceResp.Messages[0].Data);
+  
+    // Attempt to transfer more than balance
+    const batch = await handle({
+      options: {
+        From: sender,
+        Tags: [{ name: 'Action', value: 'Batch-Transfer' }],
+        Data: makeCSV([[recipient, senderBalanceData + 1]]),
+      },
+      shouldAssertNoResultError: false,
+      memory: senderBalanceResp.Memory,
+    });
+  
+    // Confirm error
+    assert.ok(batch.Messages?.length, 'No messages returned from handler');
+    const errorTag = batch.Messages[0].Tags?.find(t => t.name === 'Error');
+    assert.ok(errorTag, 'Expected an Error tag on the response message');
+    assert.match(errorTag.value, /Insufficient balance/i);
+  
+    // Confirm balances unchanged
+    const result = await handle({
+      options: {
+        Tags: [{ name: 'Action', value: 'Balances' }],
+      },
+      memory: batch.Memory,
+    });
+    const balances = JSON.parse(result.Messages[0].Data);
+    assert.equal(balances[recipient] || 0, 0);
+    assert.equal(balances[sender], senderBalanceData);
+  
     endingMemory = result.Memory;
   });
 });
