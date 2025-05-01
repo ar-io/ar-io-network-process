@@ -35,7 +35,7 @@ jobs:
         env:
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: $ARIO (testnet) Process Reset - ${{ job.status }}!
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK: ${{ secrets.TESTNET_SLACK_WEBHOOK }}
           SLACK_MESSAGE: "Failed to reset the $ARIO (testnet) process! Please check the logs for more details.\n\nLink: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}}}"
 
       - name: Notify Slack
@@ -44,5 +44,5 @@ jobs:
         env:
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: $ARIO (testnet) Process Reset - ${{ job.status }}!
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK: ${{ secrets.TESTNET_SLACK_WEBHOOK }}
           SLACK_MESSAGE: 'Successfully reset the $ARIO (testnet) process! Records, primary names, and gateways have been reset. Team and faucet wallets have been funded with 50M tARIO.'
