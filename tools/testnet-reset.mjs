@@ -32,7 +32,8 @@ const teamWalletAddress = (
   .trim()
   .split(',');
 // the owner balance is the total supply minus the protocol balance and the team wallet balance
-const ownerBalance = totalSupply - protocolBalance - teamWalletBalance;
+const ownerBalance =
+  totalSupply - protocolBalance - teamWalletBalance * teamWalletAddress.length;
 const { id } = await networkProcess.send({
   tags: [{ name: 'Action', value: 'Eval' }],
   data: `
@@ -56,7 +57,6 @@ const { id } = await networkProcess.send({
       }
     }
     NameRegistry.returned={}
-    Epochs={}
     Balances={
       [Owner]=${ownerBalance},
       ${processId}=${protocolBalance},
