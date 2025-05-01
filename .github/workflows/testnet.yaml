@@ -27,7 +27,7 @@ jobs:
           ARIO_PROTOCOL_BALANCE: ${{ vars.ARIO_PROTOCOL_BALANCE }}
           ARIO_TEAM_WALLET_BALANCE: ${{ vars.ARIO_TEAM_WALLET_BALANCE }}
           ARIO_TEAM_WALLET_ADDRESS: ${{ vars.ARIO_TEAM_WALLET_ADDRESS }}
-        run: yarn tools/testnet-reset.mjs
+        run: node tools/testnet-reset.mjs
         id: reset
 
       - name: Notify Slack
