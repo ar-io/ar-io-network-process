@@ -67,7 +67,3 @@ const { id } = await networkProcess.send({
   signer,
 });
 console.log(`Testnet reset tx: ${id}`);
-
-/**
- *
- */
