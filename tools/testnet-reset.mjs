@@ -63,7 +63,7 @@ const { id } = await networkProcess.send({
     Balances={
       [Owner]=${ownerBalance},
       ${processId}=${protocolBalance},
-      ${teamWalletAddress.map((address) => `["${address}"]=${teamWalletBalance}`).join(',\n')}
+      ${teamWalletAddresses.map((address) => `["${address}"]=${teamWalletBalance}`).join(',\n')}
     }
   `,
   signer,
