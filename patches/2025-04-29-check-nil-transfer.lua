@@ -6,6 +6,7 @@
 --
 local utils = require(".src.utils")
 local token = require(".src.token")
+local balances = require(".src.balances")
 local ARIOEvent = require(".src.ario_event")
 
 local function Send(msg, response)
