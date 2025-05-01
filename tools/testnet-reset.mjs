@@ -39,6 +39,12 @@ const ownerBalance =
 const { id } = await networkProcess.send({
   tags: [{ name: 'Action', value: 'Eval' }],
   data: `
+    LastKnownMessageTimestamp = 0
+    LastKnownCirculatingSupply = 0
+    LastKnownLockedSupply = 0
+    LastKnownStakedSupply = 0
+    LastKnownDelegatedSupply = 0
+    LastKnownWithdrawSupply = 0
     PrimaryNames.owners={}
     PrimaryNames.names={}
     GatewayRegistry={}
