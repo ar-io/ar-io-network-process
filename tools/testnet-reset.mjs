@@ -40,6 +40,7 @@ const { id } = await networkProcess.send({
     PrimaryNames.owners={}
     PrimaryNames.names={}
     GatewayRegistry={}
+    DemandFactor.currentDemandFactor=1
     NameRegistry.records={
       ardrive={
         processId = "FAoLsl-FuRYap2WCTLE1xkMzoK3fuu2Pq-E5-F9Cy-A",
