@@ -18,34 +18,55 @@ const networkProcess = new AOProcess({
   }),
 });
 
-const protocolBalance =
-  process.env.ARIO_PROTOCOL_BALANCE ||
-  new ARIOToken(65 * 10 ** 12).toMARIO().value;
-const teamWalletBalance =
-  process.env.ARIO_TEAM_WALLET_BALANCE ||
-  new ARIOToken(50 * 10 ** 12).toMARIO().value;
+// 1B tARIO total supply
+const totalSupply = new ARIOToken(10 ** 9).toMARIO().valueOf();
+// 65M tARIO to the protocol
+const protocolBalance = new ARIOToken(65 * 10 ** 6).toMARIO().valueOf();
+// 50M tARIO to each of the team wallets
+const teamWalletBalance = new ARIOToken(50 * 10 ** 6).toMARIO().valueOf();
+// any team wallets needed for testing
 const teamWalletAddress = (
   process.env.ARIO_TEAM_WALLET_ADDRESS ||
   'OZJjbPv98Qp8pJTZbKCmwlmhutGCW_zZ-18MjdBZQRY,DyQ3ZT4LSxSqx9CqFBb7O_28vE3bc7HsVA6jDvufpwc'
 )
   .trim()
   .split(',');
-const ownerBalance = 10 ** 15 - protocolBalance - teamWalletBalance;
+// the owner balance is the total supply minus the protocol balance and the team wallet balance
+const ownerBalance = totalSupply - protocolBalance - teamWalletBalance;
 const { id } = await networkProcess.send({
   tags: [{ name: 'Action', value: 'Eval' }],
-  data: ```
+  data: `
     PrimaryNames.owners={}
     PrimaryNames.names={}
     GatewayRegistry={}
-    NameRegistry.records={}
+    NameRegistry.records={
+      ardrive={
+        processId = "FAoLsl-FuRYap2WCTLE1xkMzoK3fuu2Pq-E5-F9Cy-A",
+        purchasePrice = 0,
+        type = "permabuy",
+        startTimestamp = 1741799881987,
+        undernameLimit = 10
+      },
+      ["undername-limits"]={
+        processId = "YvtwbdthqwEjAvuPMckzBSWyeGFlcLoJzpbLdyFNY-w",
+        purchasePrice = 0,
+        type = "permabuy",
+        startTimestamp = 1741799881987,
+        undernameLimit = 10
+      }
+    }
     NameRegistry.returned={}
     Epochs={}
     Balances={
-        [Owner]=${ownerBalance},
-        ${processId}=${protocolBalance},
-        ${teamWalletAddress.map((address) => `${address}=${teamWalletBalance}`).join(',\n')}
+      [Owner]=${ownerBalance},
+      ${processId}=${protocolBalance},
+      ${teamWalletAddress.map((address) => `["${address}"]=${teamWalletBalance}`).join(',\n')}
     }
-  ```,
+  `,
   signer,
 });
 console.log(`Testnet reset tx: ${id}`);
+
+/**
+ *
+ */

@@ -3,7 +3,7 @@ name: AR.IO Testnet Reset
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 */30 * *' # Run every 30 days
+    - cron: '0 8 1 * *' # Run on the 1st of every month at 8AM ET
 
 jobs:
   reset-testnet:
@@ -27,7 +27,7 @@ jobs:
           ARIO_PROTOCOL_BALANCE: ${{ vars.ARIO_PROTOCOL_BALANCE }}
           ARIO_TEAM_WALLET_BALANCE: ${{ vars.ARIO_TEAM_WALLET_BALANCE }}
           ARIO_TEAM_WALLET_ADDRESS: ${{ vars.ARIO_TEAM_WALLET_ADDRESS }}
-        run: yarn node tools/testnet-reset.mjs
+        run: yarn tools/testnet-reset.mjs
         id: reset
 
       - name: Notify Slack
