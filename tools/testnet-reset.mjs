@@ -25,15 +25,17 @@ const protocolBalance = new ARIOToken(65 * 10 ** 6).toMARIO().valueOf();
 // 50M tARIO to each of the team wallets
 const teamWalletBalance = new ARIOToken(50 * 10 ** 6).toMARIO().valueOf();
 // any team wallets needed for testing
-const teamWalletAddress = (
-  process.env.ARIO_TEAM_WALLET_ADDRESS ||
+const teamWalletAddresses = (
+  process.env.ARIO_TEAM_WALLET_ADDRESSES ||
   'OZJjbPv98Qp8pJTZbKCmwlmhutGCW_zZ-18MjdBZQRY,DyQ3ZT4LSxSqx9CqFBb7O_28vE3bc7HsVA6jDvufpwc'
 )
   .trim()
   .split(',');
 // the owner balance is the total supply minus the protocol balance and the team wallet balance
 const ownerBalance =
-  totalSupply - protocolBalance - teamWalletBalance * teamWalletAddress.length;
+  totalSupply -
+  protocolBalance -
+  teamWalletBalance * teamWalletAddresses.length;
 const { id } = await networkProcess.send({
   tags: [{ name: 'Action', value: 'Eval' }],
   data: `

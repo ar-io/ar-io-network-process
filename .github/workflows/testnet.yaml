@@ -8,7 +8,7 @@ on:
 jobs:
   reset-testnet:
     runs-on: ubuntu-latest
-    environment: develop
+    environment: main
     steps:
       - uses: actions/checkout@v4
 
@@ -25,16 +25,24 @@ jobs:
           WALLET: ${{ secrets.WALLET }}
           ARIO_NETWORK_PROCESS_ID: ${{ vars.ARIO_NETWORK_PROCESS_ID }}
           AO_CU_URL: ${{ vars.AO_CU_URL }}
-          ARIO_PROTOCOL_BALANCE: ${{ vars.ARIO_PROTOCOL_BALANCE }}
-          ARIO_TEAM_WALLET_BALANCE: ${{ vars.ARIO_TEAM_WALLET_BALANCE }}
-          ARIO_TEAM_WALLET_ADDRESS: ${{ vars.ARIO_TEAM_WALLET_ADDRESS }}
+          ARIO_TEAM_WALLET_ADDRESSES: ${{ vars.ARIO_TEAM_WALLET_ADDRESSES }}
         run: node tools/testnet-reset.mjs
         id: reset
 
       - name: Notify Slack
+        if: failure()
         uses: rtCamp/action-slack-notify@v2.3.2
         env:
           SLACK_COLOR: ${{ job.status }}
           SLACK_TITLE: $ARIO (testnet) Process Reset - ${{ job.status }}!
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          MSG_MINIMAL: true
+          SLACK_MESSAGE: "Failed to reset the $ARIO (testnet) process! Please check the logs for more details.\n\nLink: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}}}"
+
+      - name: Notify Slack
+        if: success()
+        uses: rtCamp/action-slack-notify@v2.3.2
+        env:
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: $ARIO (testnet) Process Reset - ${{ job.status }}!
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_MESSAGE: 'Successfully reset the $ARIO (testnet) process! Records, primary names, and gateways have been reset. Team and faucet wallets have been funded with 50M tARIO.'
