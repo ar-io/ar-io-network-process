@@ -1,0 +1,39 @@
+name: AR.IO Testnet Reset
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 12 1 * *' # Run on the 1st of every month at 12:00 UTC
+
+jobs:
+  reset-testnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Reset Testnet
+        env:
+          WALLET: ${{ secrets.WALLET }}
+          ARIO_NETWORK_PROCESS_ID: ${{ vars.ARIO_NETWORK_PROCESS_ID }}
+          AO_CU_URL: ${{ vars.AO_CU_URL }}
+          ARIO_PROTOCOL_BALANCE: ${{ vars.ARIO_PROTOCOL_BALANCE }}
+          ARIO_TEAM_WALLET_BALANCE: ${{ vars.ARIO_TEAM_WALLET_BALANCE }}
+          ARIO_TEAM_WALLET_ADDRESS: ${{ vars.ARIO_TEAM_WALLET_ADDRESS }}
+        run: yarn tools/testnet-reset.mjs
+        id: reset
+
+      - name: Notify Slack
+        uses: rtCamp/action-slack-notify@v2.3.2
+        env:
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: $ARIO (testnet) Process Reset - ${{ job.status }}!
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          MSG_MINIMAL: true
