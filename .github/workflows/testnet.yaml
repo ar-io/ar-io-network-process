@@ -8,6 +8,7 @@ on:
 jobs:
   reset-testnet:
     runs-on: ubuntu-latest
+    environment: develop
     steps:
       - uses: actions/checkout@v4
 
