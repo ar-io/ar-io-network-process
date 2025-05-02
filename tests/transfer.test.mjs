@@ -248,4 +248,48 @@ describe('Transfers', async () => {
     assert.equal(balances[sender], senderBalanceData);
     endingMemory = result.Memory;
   });
+
+  it('should not transfer when the quantity is nil', async () => {
+    const recipient = STUB_ADDRESS;
+    const transferResult = await handle({
+      options: {
+        Tags: [
+          { name: 'Action', value: 'Transfer' },
+          { name: 'Recipient', value: recipient },
+          { name: 'Cast', value: true },
+        ],
+      },
+      shouldAssertNoResultError: false,
+    });
+
+    // confirm the error tag is present and includes the expected error message
+    const errorTag = transferResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.ok(errorTag, 'Error tag should be present');
+    assert.match(
+      errorTag.value,
+      /Invalid quantity. Must be integer greater than 0/,
+    );
+  });
+
+  it('should not transfer when the recipient is nil', async () => {
+    const transferResult = await handle({
+      options: {
+        Tags: [
+          { name: 'Action', value: 'Transfer' },
+          { name: 'Quantity', value: 100000000 },
+          { name: 'Cast', value: true },
+        ],
+      },
+      shouldAssertNoResultError: false,
+    });
+
+    // confirm the error tag is present and includes the expected error message
+    const errorTag = transferResult.Messages?.[0]?.Tags?.find(
+      (tag) => tag.name === 'Error',
+    );
+    assert.ok(errorTag, 'Error tag should be present');
+    assert.match(errorTag.value, /Invalid recipient/);
+  });
 });

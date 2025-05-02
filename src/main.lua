@@ -619,7 +619,7 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 	local quantity = msg.Tags.Quantity
 	local allowUnsafeAddresses = msg.Tags["Allow-Unsafe-Addresses"] or false
 	assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
-	assert(quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
+	assert(quantity and quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
 	assert(recipient ~= msg.From, "Cannot transfer to self")
 
 	msg.ioEvent:addField("RecipientFormatted", recipient)
