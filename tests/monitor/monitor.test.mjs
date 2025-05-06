@@ -39,7 +39,8 @@ describe('setup', () => {
       projectRootPath,
       'tests/monitor/docker-compose.test.yml',
     )
-      .withWaitStrategy('ao-cu', Wait.forHttp(`/state/${processId}`, 6363))
+      .withWaitStrategy('ao-cu-1', Wait.forHttp(`/state/${processId}`, 6363))
+      .withStartupTimeout(30 * 60 * 1000) // 30 minutes
       .up();
 
     // fetch all these at the beginning to avoid race conditions
