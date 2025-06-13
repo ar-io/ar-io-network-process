@@ -64,24 +64,27 @@ end
 --- @field limit number The limit of results to return
 --- @field sortBy string|nil The field to sort by
 --- @field sortOrder string The order to sort by
+--- @field filters table|nil Optional filters to apply
 
 --- Parses the pagination tags from a message
 --- @param msg table The message provided to a handler (see ao docs for more info)
 --- @return PaginationTags paginationTags - the pagination tags
 function utils.parsePaginationTags(msg)
-	local cursor = msg.Tags.Cursor
-	local limit = tonumber(msg.Tags["Limit"]) or 100
+        local cursor = msg.Tags.Cursor
+        local limit = tonumber(msg.Tags["Limit"]) or 100
 
 	assert(limit <= 1000, "Limit must be less than or equal to 1000")
 
-	local sortOrder = msg.Tags["Sort-Order"] and string.lower(msg.Tags["Sort-Order"]) or "desc"
-	local sortBy = msg.Tags["Sort-By"]
-	return {
-		cursor = cursor,
-		limit = limit,
-		sortBy = sortBy,
-		sortOrder = sortOrder,
-	}
+        local sortOrder = msg.Tags["Sort-Order"] and string.lower(msg.Tags["Sort-Order"]) or "desc"
+        local sortBy = msg.Tags["Sort-By"]
+        local filters = utils.safeDecodeJson(msg.Tags.Filters or msg.Tags.Filter)
+        return {
+                cursor = cursor,
+                limit = limit,
+                sortBy = sortBy,
+                sortOrder = sortOrder,
+                filters = filters,
+        }
 end
 
 --- Sorts a table by multiple fields with specified orders for each field.
@@ -204,16 +207,26 @@ end
 --- @param limit number The limit of items to return
 --- @param sortBy string|nil The field to sort by. Nil if sorting by the primitive items themselves.
 --- @param sortOrder string The order to sort by ("asc" or "desc")
+--- @param filters table|nil Optional filter table
 --- @return PaginatedTable paginatedTable - the paginated table result
-function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, sortBy, sortOrder)
-	-- Sort first by cursorField for a stable sort
-	if cursorField ~= nil then
-		table.sort(tableArray, function(a, b)
-			return a[cursorField] < b[cursorField]
-		end)
-	end
+function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
+        local filterFn = nil
+        if type(filters) == "table" then
+                filterFn = utils.createFilterFunction(filters)
+        end
 
-	local sortedArray = utils.sortTableByFields(tableArray, { { order = sortOrder, field = sortBy } })
+        local filteredArray = filterFn and utils.filterArray(tableArray, function(_, value)
+                return filterFn(value)
+        end) or tableArray
+
+        -- Sort first by cursorField for a stable sort
+        if cursorField ~= nil then
+                table.sort(filteredArray, function(a, b)
+                        return a[cursorField] < b[cursorField]
+                end)
+        end
+
+        local sortedArray = utils.sortTableByFields(filteredArray, { { order = sortOrder, field = sortBy } })
 
 	if not sortedArray or #sortedArray == 0 then
 		return {
@@ -625,13 +638,50 @@ function utils.filterArray(arr, predicate)
 end
 
 function utils.filterDictionary(tbl, predicate)
-	local filtered = {}
-	for key, value in pairs(tbl or {}) do
-		if predicate and predicate(key, value) then
-			filtered[key] = value
-		end
-	end
-	return filtered
+        local filtered = {}
+        for key, value in pairs(tbl or {}) do
+                if predicate and predicate(key, value) then
+                        filtered[key] = value
+                end
+        end
+        return filtered
+end
+
+--- Creates a predicate function from a table of filters.
+--- Each key/value pair in the filter table must be satisfied for an item to match.
+--- A filter value can be a table of acceptable values or a single value.
+--- @param filters table|nil The filters to convert
+--- @return function|nil predicate - the predicate function or nil if no filters
+function utils.createFilterFunction(filters)
+        if type(filters) ~= "table" then
+                return nil
+        end
+
+        -- Precompute lookup maps for array values so repeated checks are O(1)
+        local lookups = {}
+        for field, value in pairs(filters) do
+                if type(value) == "table" then
+                        lookups[field] = utils.createLookupTable(value)
+                else
+                        lookups[field] = value
+                end
+        end
+
+        return function(item)
+                for field, expected in pairs(lookups) do
+                        local itemValue = type(item) == "table" and item[field] or nil
+                        if type(expected) == "table" then
+                                if not expected[itemValue] then
+                                        return false
+                                end
+                        else
+                                if itemValue ~= expected then
+                                        return false
+                                end
+                        end
+                end
+                return true
+        end
 end
 
 --- Sanitizes inputs to ensure they are valid strings

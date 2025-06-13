@@ -2137,11 +2137,17 @@ end)
 -- Pagination handlers
 
 addEventingHandler("paginatedRecords", function(msg)
-	return msg.Action == "Paginated-Records" or msg.Action == ActionMap.Records
+        return msg.Action == "Paginated-Records" or msg.Action == ActionMap.Records
 end, function(msg)
-	local page = utils.parsePaginationTags(msg)
-	local result = arns.getPaginatedRecords(page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder)
-	Send(msg, { Target = msg.From, Action = "Records-Notice", Data = json.encode(result) })
+        local page = utils.parsePaginationTags(msg)
+        local result = arns.getPaginatedRecords(
+                page.cursor,
+                page.limit,
+                page.sortBy or "startTimestamp",
+                page.sortOrder,
+                page.filters
+        )
+        Send(msg, { Target = msg.From, Action = "Records-Notice", Data = json.encode(result) })
 end)
 
 addEventingHandler("paginatedGateways", function(msg)
