@@ -1409,6 +1409,47 @@ describe('ArNS', async () => {
       );
       sharedMemory = buyRecordsMemory;
     });
+
+    it('should filter records by process ids', async () => {
+      const namesAndIds = [
+        { name: 'filter-name-0', id: ''.padEnd(43, 'a') },
+        { name: 'filter-name-1', id: ''.padEnd(43, 'b') },
+        { name: 'filter-name-2', id: ''.padEnd(43, 'c') },
+      ];
+
+      let filterMemory = sharedMemory;
+      for (const { name, id } of namesAndIds) {
+        const { result } = await buyRecord({
+          name,
+          processId: id,
+          type: 'lease',
+          years: 1,
+          fundFrom: 'any',
+          memory: filterMemory,
+        });
+        filterMemory = result.Memory;
+      }
+
+      const wanted = [namesAndIds[0].id, namesAndIds[2].id];
+      const result = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Paginated-Records' },
+            { name: 'Limit', value: '10' },
+            { name: 'Filters', value: JSON.stringify({ processId: wanted }) },
+          ],
+          Timestamp: STUB_TIMESTAMP,
+        },
+        memory: filterMemory,
+      });
+
+      const data = JSON.parse(result.Messages[0].Data);
+      assert.equal(data.totalItems, 2);
+      const returnedIds = data.items.map((r) => r.processId).sort();
+      assert.deepEqual(returnedIds, [...wanted].sort());
+
+      sharedMemory = filterMemory;
+    });
   });
 
   describe('Cost-Details', () => {
