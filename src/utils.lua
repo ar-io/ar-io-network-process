@@ -219,14 +219,12 @@ function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, s
                 return filterFn(value)
         end) or tableArray
 
-        -- Sort first by cursorField for a stable sort
-        if cursorField ~= nil then
-                table.sort(filteredArray, function(a, b)
-                        return a[cursorField] < b[cursorField]
-                end)
+        local sortFields = { { order = sortOrder, field = sortBy } }
+        if cursorField ~= nil and cursorField ~= sortBy then
+                -- Tie-breaker to guarantee deterministic pagination
+                table.insert(sortFields, { order = "asc", field = cursorField })
         end
-
-        local sortedArray = utils.sortTableByFields(filteredArray, { { order = sortOrder, field = sortBy } })
+        local sortedArray = utils.sortTableByFields(filteredArray, sortFields)
 
 	if not sortedArray or #sortedArray == 0 then
 		return {
