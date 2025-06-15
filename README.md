@@ -207,6 +207,27 @@ dependencies = {
 }
 ```
 
+### Email Provider
+
+The `tools/email/ses.mjs` module exports `AWSEmailProvider`, a simple
+wrapper around Amazon SES.
+
+```javascript
+import AWSEmailProvider from './tools/email/ses.mjs';
+
+const ses = new AWSEmailProvider({
+  region: 'us-east-1',
+  credentials: { accessKeyId: 'AKIA...', secretAccessKey: 'SECRET' },
+});
+
+await ses.sendEmail({
+  from: 'noreply@example.com',
+  to: 'user@example.com',
+  subject: 'Hello',
+  text: 'Welcome to ar.io',
+});
+```
+
 [contract whitepaper]: https://whitepaper.ar.io
 [aoconnect]: https://github.com/permaweb/ao/tree/main/connect
 [ar-io/aos]: https://github.com/ar-io/aos

@@ -25,6 +25,7 @@
     "@permaweb/ao-loader": "^0.0.36",
     "@permaweb/aoconnect": "^0.0.59",
     "arweave": "^1.15.1",
+    "@aws-sdk/client-ses": "^3.602.0",
     "husky": "^9.1.6",
     "lint-staged": "^15.2.10",
     "markdown-toc-gen": "^1.1.0",
