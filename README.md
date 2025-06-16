@@ -15,6 +15,7 @@ The implementation of the ar.io network contract is written in lua and deployed 
 - [Tests](#tests)
   - [Unit Tests](#unit-tests)
   - [Integration Tests](#integration-tests)
+- [Pagination Filters](#pagination-filters)
 - [Developers](#developers)
   - [Requirements](#requirements)
   - [Lua Setup (MacOS)](#lua-setup-macos)
@@ -98,6 +99,25 @@ Integration tests are written using the [ao-loader](https://github.com/permaweb/
 ```sh
 yarn test:integration
 ```
+
+## Pagination Filters
+
+Handlers that return paginated results (`Paginated-*` actions) accept an optional
+`Filters` tag. The tag value must be a JSON object where each key corresponds to
+a field on the returned items. When provided, only items matching all fields are
+included in the result. Array values are treated as lists of acceptable values
+and are converted to lookup tables for efficient filtering.
+
+Example:
+
+```text
+Action: Paginated-Records
+Limit: 10
+Filters: {"processId":["id1","id2"],"type":"lease"}
+```
+
+The above request returns records whose `processId` is either `id1` or `id2` and
+whose `type` is `lease`.
 
 ## Developers
 

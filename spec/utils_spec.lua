@@ -312,11 +312,11 @@ describe("utils", function()
 			}, result)
 		end)
 
-		it("correctly handles a nil cursorField and sortBy on a table of non-table values", function()
-			local arr = { "1", "2", "3" }
-			local cursor = ""
-			local cursorField = nil
-			local limit = 1
+                it("correctly handles a nil cursorField and sortBy on a table of non-table values", function()
+                        local arr = { "1", "2", "3" }
+                        local cursor = ""
+                        local cursorField = nil
+                        local limit = 1
 			local sortOrder = "asc"
 			local sortBy = nil
 			local result = utils.paginateTableWithCursor(arr, cursor, cursorField, limit, sortBy, sortOrder)
@@ -331,18 +331,61 @@ describe("utils", function()
 				hasMore = true,
 			}, result)
 			local result2 = utils.paginateTableWithCursor(arr, result.nextCursor, cursorField, limit, sortBy, sortOrder)
-			assert.are.same({
-				items = {
-					[1] = "2",
-				},
-				limit = 1,
-				totalItems = 3,
-				sortOrder = "asc",
-				nextCursor = "2",
-				hasMore = true,
-			}, result2)
-		end)
-	end)
+                        assert.are.same({
+                                items = {
+                                        [1] = "2",
+                                },
+                                limit = 1,
+                                totalItems = 3,
+                                sortOrder = "asc",
+                                nextCursor = "2",
+                                hasMore = true,
+                        }, result2)
+                end)
+
+                it("applies table filters when paginating", function()
+                        local list = {
+                                { name = "alpha", type = "lease" },
+                                { name = "beta", type = "permabuy" },
+                                { name = "gamma", type = "lease" },
+                        }
+                        local result = utils.paginateTableWithCursor(list, nil, "name", 10, "name", "asc", { type = "lease" })
+                        assert.are.same({
+                                items = {
+                                        { name = "alpha", type = "lease" },
+                                        { name = "gamma", type = "lease" },
+                                },
+                                limit = 10,
+                                totalItems = 2,
+                                sortBy = "name",
+                                sortOrder = "asc",
+                                nextCursor = nil,
+                                hasMore = false,
+                        }, result)
+                end)
+
+               it("applies array filters when paginating", function()
+                        local list = {
+                                { name = "alpha", type = "lease" },
+                                { name = "beta", type = "permabuy" },
+                                { name = "gamma", type = "renewal" },
+                        }
+                        local result = utils.paginateTableWithCursor(list, nil, "name", 10, "name", "asc", { type = { "lease", "renewal" } })
+                        assert.are.same({
+                                items = {
+                                        { name = "alpha", type = "lease" },
+                                        { name = "gamma", type = "renewal" },
+                                },
+                                limit = 10,
+                                totalItems = 2,
+                                sortBy = "name",
+                                sortOrder = "asc",
+                                nextCursor = nil,
+                                hasMore = false,
+                        }, result)
+                end)
+
+        end)
 
 	describe("splitAndTrimString", function()
 		it("should split a comma-separated list and trim whitespace", function()
@@ -710,21 +753,33 @@ describe("utils", function()
 		end)
 	end)
 
-	describe("parsePaginationTags", function()
-		it("should parse pagination tags", function()
-			local tags = {
-				Tags = { Cursor = "1", Limit = "10", ["Sort-By"] = "name", ["Sort-Order"] = "asc" },
-			}
-			local result = utils.parsePaginationTags(tags)
-			assert.are.same({ cursor = "1", limit = 10, sortBy = "name", sortOrder = "asc" }, result)
-		end)
+        describe("parsePaginationTags", function()
+                it("should parse pagination tags", function()
+                        local tags = {
+                                Tags = {
+                                        Cursor = "1",
+                                        Limit = "10",
+                                        ["Sort-By"] = "name",
+                                        ["Sort-Order"] = "asc",
+                                        Filters = '{"type":"lease"}',
+                                },
+                        }
+                        local result = utils.parsePaginationTags(tags)
+                        assert.are.same({
+                                cursor = "1",
+                                limit = 10,
+                                sortBy = "name",
+                                sortOrder = "asc",
+                                filters = { type = "lease" },
+                        }, result)
+                end)
 
 		it("should handle missing tags gracefully", function()
 			local tags = { Tags = {} }
-			local result = utils.parsePaginationTags(tags)
-			assert.are.same({ cursor = nil, limit = 100, sortBy = nil, sortOrder = "desc" }, result)
-		end)
-	end)
+                        local result = utils.parsePaginationTags(tags)
+                        assert.are.same({ cursor = nil, limit = 100, sortBy = nil, sortOrder = "desc", filters = nil }, result)
+                end)
+        end)
 
 	describe("slice", function()
 		it("should slice a table from a given index to a given index by a given step", function()
