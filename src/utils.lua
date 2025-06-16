@@ -221,6 +221,7 @@ function utils.paginateTableWithCursor(tableArray, cursor, cursorField, limit, s
 			end)
 		or tableArray
 
+	assert(sortOrder == "asc" or sortOrder == "desc", "Invalid sortOrder: expected 'asc' or 'desc'")
 	local sortFields = { { order = sortOrder, field = sortBy } }
 	if cursorField ~= nil and cursorField ~= sortBy then
 		-- Tie-breaker to guarantee deterministic pagination
