@@ -188,7 +188,7 @@ function arns.getPaginatedRecords(cursor, limit, sortBy, sortOrder, filters)
 		table.insert(recordsArray, recordCopy)
 	end
 
-        return utils.paginateTableWithCursor(recordsArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
+	return utils.paginateTableWithCursor(recordsArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
 end
 
 --- Get paginated reserved names
