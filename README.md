@@ -15,7 +15,7 @@ The implementation of the ar.io network contract is written in lua and deployed 
 - [Tests](#tests)
   - [Unit Tests](#unit-tests)
   - [Integration Tests](#integration-tests)
-  - [Pagination Filters](#pagination-filters)
+- [Pagination Filters](#pagination-filters)
 - [Developers](#developers)
   - [Requirements](#requirements)
   - [Lua Setup (MacOS)](#lua-setup-macos)
