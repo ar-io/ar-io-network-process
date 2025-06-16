@@ -76,6 +76,7 @@ function utils.parsePaginationTags(msg)
 	assert(limit <= 1000, "Limit must be less than or equal to 1000")
 
         local sortOrder = msg.Tags["Sort-Order"] and string.lower(msg.Tags["Sort-Order"]) or "desc"
+        assert(sortOrder == "asc" or sortOrder == "desc", "Invalid sortOrder: expected 'asc' or 'desc'")
         local sortBy = msg.Tags["Sort-By"]
         local filters = utils.safeDecodeJson(msg.Tags.Filters or msg.Tags.Filter)
         return {
