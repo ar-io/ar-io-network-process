@@ -175,8 +175,9 @@ end
 --- @param limit number The limit of records to return
 --- @param sortBy string The field to sort by
 --- @param sortOrder string The order to sort by
+--- @param filters table|nil Optional filter criteria
 --- @return PaginatedTable<Record> The paginated records
-function arns.getPaginatedRecords(cursor, limit, sortBy, sortOrder)
+function arns.getPaginatedRecords(cursor, limit, sortBy, sortOrder, filters)
 	--- @type Record[]
 	local recordsArray = {}
 	local cursorField = "name" -- the cursor will be the name
@@ -187,7 +188,7 @@ function arns.getPaginatedRecords(cursor, limit, sortBy, sortOrder)
 		table.insert(recordsArray, recordCopy)
 	end
 
-	return utils.paginateTableWithCursor(recordsArray, cursor, cursorField, limit, sortBy, sortOrder)
+	return utils.paginateTableWithCursor(recordsArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
 end
 
 --- Get paginated reserved names

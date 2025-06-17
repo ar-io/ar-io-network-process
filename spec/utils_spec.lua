@@ -342,6 +342,69 @@ describe("utils", function()
 				hasMore = true,
 			}, result2)
 		end)
+
+		it("applies table filters when paginating", function()
+			local list = {
+				{ name = "alpha", type = "lease" },
+				{ name = "beta", type = "permabuy" },
+				{ name = "gamma", type = "lease" },
+			}
+			local result = utils.paginateTableWithCursor(list, nil, "name", 10, "name", "asc", { type = "lease" })
+			assert.are.same({
+				items = {
+					{ name = "alpha", type = "lease" },
+					{ name = "gamma", type = "lease" },
+				},
+				limit = 10,
+				totalItems = 2,
+				sortBy = "name",
+				sortOrder = "asc",
+				nextCursor = nil,
+				hasMore = false,
+			}, result)
+		end)
+
+		it("applies array filters when paginating", function()
+			local list = {
+				{ name = "alpha", type = "lease" },
+				{ name = "beta", type = "permabuy" },
+				{ name = "gamma", type = "renewal" },
+			}
+			local result =
+				utils.paginateTableWithCursor(list, nil, "name", 10, "name", "asc", { type = { "lease", "renewal" } })
+			assert.are.same({
+				items = {
+					{ name = "alpha", type = "lease" },
+					{ name = "gamma", type = "renewal" },
+				},
+				limit = 10,
+				totalItems = 2,
+				sortBy = "name",
+				sortOrder = "asc",
+				nextCursor = nil,
+				hasMore = false,
+			}, result)
+		end)
+
+		it("applies filters when filter values are numbers", function()
+			local list = {
+				{ name = "alpha", type = 1 },
+				{ name = "beta", type = 2 },
+				{ name = "gamma", type = 3 },
+			}
+			local result = utils.paginateTableWithCursor(list, nil, "name", 10, "name", "asc", { type = 1 })
+			assert.are.same({
+				items = {
+					{ name = "alpha", type = 1 },
+				},
+				limit = 10,
+				totalItems = 1,
+				sortBy = "name",
+				sortOrder = "asc",
+				nextCursor = nil,
+				hasMore = false,
+			}, result)
+		end)
 	end)
 
 	describe("splitAndTrimString", function()
@@ -713,16 +776,28 @@ describe("utils", function()
 	describe("parsePaginationTags", function()
 		it("should parse pagination tags", function()
 			local tags = {
-				Tags = { Cursor = "1", Limit = "10", ["Sort-By"] = "name", ["Sort-Order"] = "asc" },
+				Tags = {
+					Cursor = "1",
+					Limit = "10",
+					["Sort-By"] = "name",
+					["Sort-Order"] = "asc",
+					Filters = '{"type":"lease"}',
+				},
 			}
 			local result = utils.parsePaginationTags(tags)
-			assert.are.same({ cursor = "1", limit = 10, sortBy = "name", sortOrder = "asc" }, result)
+			assert.are.same({
+				cursor = "1",
+				limit = 10,
+				sortBy = "name",
+				sortOrder = "asc",
+				filters = { type = "lease" },
+			}, result)
 		end)
 
 		it("should handle missing tags gracefully", function()
 			local tags = { Tags = {} }
 			local result = utils.parsePaginationTags(tags)
-			assert.are.same({ cursor = nil, limit = 100, sortBy = nil, sortOrder = "desc" }, result)
+			assert.are.same({ cursor = nil, limit = 100, sortBy = nil, sortOrder = "desc", filters = nil }, result)
 		end)
 	end)
 

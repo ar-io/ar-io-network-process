@@ -1,6 +1,6 @@
 services:
   ao-cu:
-    image: ghcr.io/permaweb/ao-cu:250dbd241864ca2b81e8df7a9ff80e91788b99ac
+    image: ghcr.io/permaweb/ao-cu:latest
     volumes:
       - ${CU_WALLET_FILE:-./test-wallet.json}:/usr/app/test-wallet.json
     ports:
@@ -10,8 +10,7 @@ services:
       WALLET_FILE: ${CU_WALLET_FILE:-./test-wallet.json}
       NODE_CONFIG_ENV: ${NODE_CONFIG_ENV:-development}
       NODE_HEAPDUMP_OPTIONS: ${NODE_HEAPDUMP_OPTIONS:-nosignal}
-      PROCESS_CHECKPOINT_TRUSTED_OWNERS: ${PROCESS_CHECKPOINT_TRUSTED_OWNERS:-fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY}
+      PROCESS_CHECKPOINT_TRUSTED_OWNERS: ${PROCESS_CHECKPOINT_TRUSTED_OWNERS:-fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY,WjnS-s03HWsDSdMnyTdzB1eHZB2QheUWP_FVRVYxkXk,-HFe6PleLxj1EdFMYMSetT2NIJioDsZIktn-Y0AwP54}
       GRAPHQL_URL: ${GRAPHQL_URL:-https://arweave.net/graphql}
       CHECKPOINT_GRAPHQL_URL: ${CHECKPOINT_GRAPHQL_URL:-https://arweave.net/graphql}
-      DISABLE_PROCESS_CHECKPOINT_CREATION: ${DISABLE_PROCESS_CHECKPOINT_CREATION:-true}
       PROCESS_WASM_MEMORY_MAX_LIMIT: ${PROCESS_WASM_MEMORY_MAX_LIMIT:-17179869184}

@@ -3,7 +3,7 @@ name: $ARIO Network Status
 on:
   workflow_dispatch:
   schedule:
-    - cron: '15 1-6,8-23 * * *' # Run every hour at the 15th minute, except 2AM ET (6AM UTC)
+    - cron: '15 0-5,8-23 * * *' # Run every hour at the 15th minute, except 2 and 3AM ET (6AM and 7AM UTC)
 
 jobs:
   monitor:
