@@ -1450,6 +1450,136 @@ describe('ArNS', async () => {
 
       sharedMemory = filterMemory;
     });
+
+    it('should paginate through all records with a filter', async () => {
+      // create records with different processIds and types
+      const recordData = [
+        {
+          name: 'pagination-filter-1',
+          processId: ''.padEnd(43, 'f'),
+          type: 'lease',
+        },
+        {
+          name: 'pagination-filter-2',
+          processId: ''.padEnd(43, 'g'),
+          type: 'permabuy',
+        },
+        {
+          name: 'pagination-filter-3',
+          processId: ''.padEnd(43, 'h'),
+          type: 'lease',
+        },
+        {
+          name: 'pagination-filter-4',
+          processId: ''.padEnd(43, 'i'),
+          type: 'permabuy',
+        },
+        {
+          name: 'pagination-filter-5',
+          processId: ''.padEnd(43, 'j'),
+          type: 'lease',
+        },
+      ];
+
+      // Buy records with specified data
+      let timestamp = STUB_TIMESTAMP;
+      let filterMemory = sharedMemory;
+
+      for (const record of recordData) {
+        const { result } = await buyRecord({
+          name: record.name,
+          processId: record.processId,
+          type: record.type,
+          years: 1,
+          timestamp: (timestamp += 1000),
+          memory: filterMemory,
+        });
+        filterMemory = result.Memory;
+      }
+
+      // filter by type 'lease'
+      const leaseTypeFilter = JSON.stringify({ type: 'lease' });
+
+      // paginate through all lease records with a page size of 1
+      let allLeaseRecords = [];
+      let cursor = undefined;
+      let hasMore = true;
+
+      while (hasMore) {
+        const result = await handle({
+          options: {
+            Tags: [
+              { name: 'Action', value: 'Paginated-Records' },
+              { name: 'Cursor', value: cursor },
+              { name: 'Limit', value: 1 },
+              { name: 'Filters', value: leaseTypeFilter },
+            ],
+            Timestamp: timestamp,
+          },
+          memory: filterMemory,
+        });
+
+        const responseData = JSON.parse(result.Messages?.[0]?.Data);
+        const {
+          items,
+          nextCursor,
+          hasMore: moreRecords,
+          totalItems,
+        } = responseData;
+
+        allLeaseRecords.push(...items);
+        cursor = nextCursor;
+        hasMore = moreRecords;
+
+        // Verify that the total items count is correct (3 lease records)
+        assert.equal(totalItems, 3);
+      }
+
+      // verify we've got all lease records
+      assert.equal(allLeaseRecords.length, 3);
+
+      // verify that all retrieved records are of type 'lease'
+      allLeaseRecords.forEach((record) => {
+        assert.equal(record.type, 'lease');
+      });
+
+      // filter by multiple criteria: type = 'permabuy' AND specific process ID
+      const multipleFilterCriteria = JSON.stringify({
+        type: 'permabuy',
+        processId: recordData[1].processId, // Second record has permabuy type
+      });
+
+      const multipleFilterResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Paginated-Records' },
+            { name: 'Limit', value: 10 },
+            { name: 'Filters', value: multipleFilterCriteria },
+          ],
+          Timestamp: timestamp,
+        },
+        memory: filterMemory,
+      });
+
+      const multipleFilterResponseData = JSON.parse(
+        multipleFilterResult.Messages?.[0]?.Data,
+      );
+      const {
+        items: multipleFilterItems,
+        totalItems: multipleFilterTotalItems,
+      } = multipleFilterResponseData;
+
+      // verify that we've got exactly one record that matches both criteria
+      assert.equal(multipleFilterTotalItems, 1);
+      assert.equal(multipleFilterItems.length, 1);
+
+      // verify the returned record matches both filter criteria
+      assert.equal(multipleFilterItems[0].type, 'permabuy');
+      assert.equal(multipleFilterItems[0].processId, recordData[1].processId);
+      assert.equal(multipleFilterItems[0].name, recordData[1].name);
+
+      sharedMemory = filterMemory;
+    });
   });
 
   describe('Cost-Details', () => {
