@@ -1527,6 +1527,9 @@ describe('ArNS', async () => {
           totalItems,
         } = responseData;
 
+        // assert the returned items count is 1
+        assert.equal(items.length, 1);
+
         allLeaseRecords.push(...items);
         cursor = nextCursor;
         hasMore = moreRecords;
