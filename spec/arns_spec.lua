@@ -1815,51 +1815,51 @@ describe("arns", function()
 					},
 				},
 			}, paginatedRecords3)
-                        local paginatedRecords4 = arns.getPaginatedRecords(paginatedRecords3.nextCursor, 1, "endTimestamp", "asc")
-                        assert.are.same({
-                                limit = 1,
-                                sortBy = "endTimestamp",
-                                sortOrder = "asc",
-                                hasMore = false,
-                                totalItems = 4,
-                                nextCursor = nil,
-                                items = {
-                                        {
-                                                name = "permabuy-record",
-                                                endTimestamp = nil,
-                                                processId = "permabuy-process-id",
-                                                purchasePrice = basePriceForNineLetterName,
-                                                startTimestamp = 0,
-                                                type = "permabuy",
-                                                undernameLimit = 10,
-                                        },
-                                },
-                        }, paginatedRecords4)
-                end)
+			local paginatedRecords4 = arns.getPaginatedRecords(paginatedRecords3.nextCursor, 1, "endTimestamp", "asc")
+			assert.are.same({
+				limit = 1,
+				sortBy = "endTimestamp",
+				sortOrder = "asc",
+				hasMore = false,
+				totalItems = 4,
+				nextCursor = nil,
+				items = {
+					{
+						name = "permabuy-record",
+						endTimestamp = nil,
+						processId = "permabuy-process-id",
+						purchasePrice = basePriceForNineLetterName,
+						startTimestamp = 0,
+						type = "permabuy",
+						undernameLimit = 10,
+					},
+				},
+			}, paginatedRecords4)
+		end)
 
-                it("filters records when filters are provided", function()
-                        local result = arns.getPaginatedRecords(nil, 10, "name", "asc", { type = { "permabuy" } })
-                        assert.are.same({
-                                limit = 10,
-                                sortBy = "name",
-                                sortOrder = "asc",
-                                hasMore = false,
-                                totalItems = 1,
-                                nextCursor = nil,
-                                items = {
-                                        {
-                                                name = "permabuy-record",
-                                                endTimestamp = nil,
-                                                processId = "permabuy-process-id",
-                                                purchasePrice = basePriceForNineLetterName,
-                                                startTimestamp = 0,
-                                                type = "permabuy",
-                                                undernameLimit = 10,
-                                        },
-                                },
-                        }, result)
-                end)
-        end)
+		it("filters records when filters are provided", function()
+			local result = arns.getPaginatedRecords(nil, 10, "name", "asc", { type = { "permabuy" } })
+			assert.are.same({
+				limit = 10,
+				sortBy = "name",
+				sortOrder = "asc",
+				hasMore = false,
+				totalItems = 1,
+				nextCursor = nil,
+				items = {
+					{
+						name = "permabuy-record",
+						endTimestamp = nil,
+						processId = "permabuy-process-id",
+						purchasePrice = basePriceForNineLetterName,
+						startTimestamp = 0,
+						type = "permabuy",
+						undernameLimit = 10,
+					},
+				},
+			}, result)
+		end)
+	end)
 
 	describe("getPaginatedReservedNames", function()
 		before_each(function()

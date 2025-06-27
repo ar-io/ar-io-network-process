@@ -1124,12 +1124,13 @@ end
 --- @param currentTimestamp number The current timestamp
 --- @param newProcessId string The new process id
 --- @param allowUnsafeProcessId boolean|nil Whether to allow unsafe processIds. Default false.
---- @return StoredRecord|nil updatedRecord - the updated record
+--- @return StoredRecord updatedRecord - the updated record, or nil if the name is not registered
 function arns.reassignName(name, from, currentTimestamp, newProcessId, allowUnsafeProcessId)
 	allowUnsafeProcessId = allowUnsafeProcessId or false
 	local record = arns.getRecord(name)
 	arns.assertValidReassignName(record, currentTimestamp, from, newProcessId, allowUnsafeProcessId)
 	local updatedRecord = arns.modifyProcessId(name, newProcessId)
+	assert(updatedRecord, "Failed to reassign name")
 	return updatedRecord
 end
 

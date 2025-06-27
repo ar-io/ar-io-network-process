@@ -13,6 +13,7 @@ local prune = require(".src.prune")
 local tick = require(".src.tick")
 local primaryNames = require(".src.primary_names")
 local ARIOEvent = require(".src.ario_event")
+local patch = require(".src.patches")
 
 -- handlers that are critical should discard the memory on error (see prune for an example)
 local CRITICAL = true
@@ -546,6 +547,8 @@ end, function(msg)
 			local prunedRecordNames = {}
 			for name, _ in pairs(prunedStateResult.prunedRecords) do
 				table.insert(prunedRecordNames, name)
+				-- send a patch message for the pruned records
+				patch.sendRecordPatch(name, arns.getRecord(name))
 			end
 			msg.ioEvent:addField("Pruned-Records", prunedRecordNames)
 			msg.ioEvent:addField("Pruned-Records-Count", prunedRecordsCount)
@@ -946,6 +949,9 @@ addEventingHandler(ActionMap.BuyName, utils.hasMatchingTag("Action", ActionMap.B
 			}),
 		})
 	end
+
+	-- update the patch space for the record
+	patch.sendRecordPatch(record.name, arns.getRecord(record.name))
 end)
 
 addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.UpgradeName), function(msg)
@@ -976,6 +982,9 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 			type = record.type,
 		}),
 	})
+
+	-- update the patch space for the record
+	patch.sendRecordPatch(record.name, arns.getRecord(record.name))
 end)
 
 addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.ExtendLease), function(msg)
@@ -1001,6 +1010,8 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 		Tags = { Action = ActionMap.ExtendLease .. "-Notice", Name = name },
 		Data = json.encode(fundFrom and result or recordResult),
 	})
+
+	patch.sendRecordPatch(recordResult.name, arns.getRecord(recordResult.name))
 end)
 
 addEventingHandler(
@@ -1034,6 +1045,8 @@ addEventingHandler(
 			},
 			Data = json.encode(fundFrom and result or recordResult),
 		})
+
+		patch.sendRecordPatch(recordResult.name, arns.getRecord(recordResult.name))
 	end
 )
 
@@ -1619,7 +1632,9 @@ addEventingHandler(ActionMap.ReassignName, utils.hasMatchingTag("Action", Action
 			Data = json.encode(reassignment),
 		})
 	end
-	return
+
+	-- update the patch space for the record
+	patch.sendRecordPatch(name, arns.getRecord(name))
 end)
 
 addEventingHandler(ActionMap.SaveObservations, utils.hasMatchingTag("Action", ActionMap.SaveObservations), function(msg)
@@ -2137,17 +2152,12 @@ end)
 -- Pagination handlers
 
 addEventingHandler("paginatedRecords", function(msg)
-        return msg.Action == "Paginated-Records" or msg.Action == ActionMap.Records
+	return msg.Action == "Paginated-Records" or msg.Action == ActionMap.Records
 end, function(msg)
-        local page = utils.parsePaginationTags(msg)
-        local result = arns.getPaginatedRecords(
-                page.cursor,
-                page.limit,
-                page.sortBy or "startTimestamp",
-                page.sortOrder,
-                page.filters
-        )
-        Send(msg, { Target = msg.From, Action = "Records-Notice", Data = json.encode(result) })
+	local page = utils.parsePaginationTags(msg)
+	local result =
+		arns.getPaginatedRecords(page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder, page.filters)
+	Send(msg, { Target = msg.From, Action = "Records-Notice", Data = json.encode(result) })
 end)
 
 addEventingHandler("paginatedGateways", function(msg)
@@ -2260,6 +2270,9 @@ addEventingHandler("releaseName", utils.hasMatchingTag("Action", ActionMap.Relea
 		Name = name,
 		Data = json.encode(releaseNameData),
 	})
+
+	-- send a patch message to the patch device to remove the record from the cache
+	patch.sendRecordPatch(name, nil)
 end)
 
 addEventingHandler(ActionMap.ReturnedNames, utils.hasMatchingTag("Action", ActionMap.ReturnedNames), function(msg)
