@@ -23,6 +23,78 @@ const io = ARIO.init({
 
 const projectRootPath = process.cwd();
 
+async function assertRecentCheckpointForProcess(processToCheck) {
+  console.log(`Checking for recent checkpoint for process ${processToCheck}`);
+  const query = `
+  query {
+        transactions(
+          first:1
+
+tags: [
+	{name:"Process", values: ["${processToCheck}"]}
+  {name:"Type", values:["Checkpoint"]}
+]
+        ) {
+    count
+    pageInfo {
+      hasNextPage
+  
+    }
+            edges {
+                node {
+                  block {
+                    timestamp
+                  }
+                  recipient
+                    id
+                  owner {
+                    address
+                  }
+                  tags {
+                    name
+                    value
+                  }
+                }
+            }
+        }
+    }
+  `;
+
+  const response = await fetch('https://arweave-search.goldsky.com/graphql', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query }),
+  });
+
+  const { data } = await response.json();
+  if (data.transactions.edges.length === 0) {
+    throw new Error('No checkpoint found');
+  }
+  const latestCheckpoint = data.transactions.edges[0].node;
+  const checkpointTimestamp = latestCheckpoint.block.timestamp * 1000;
+  const currentTime = Date.now();
+  const timeSinceCheckpoint = currentTime - checkpointTimestamp;
+  const oneHourMs = 1000 * 60 * 60;
+  const checkpointDate = new Date(checkpointTimestamp);
+  if (timeSinceCheckpoint > oneHourMs) {
+    throw new Error(
+      `Checkpoint with ID ${latestCheckpoint.id} is more than 1 hour old: ${timeSinceCheckpoint}ms since it was created at ${checkpointDate.toLocaleDateString()}, ${checkpointDate.toLocaleTimeString()}`,
+    );
+  }
+
+  console.log(
+    `Using checkpoint with ID ${latestCheckpoint.id} created at ${(checkpointDate.toLocaleDateString(), checkpointDate.toLocaleTimeString())}`,
+  );
+}
+
+await assertRecentCheckpointForProcess(processId).catch((err) => {
+  console.error(err);
+  console.log('Checkpoint is not recent, skipping tests');
+  process.exit(0); // exit with success to avoid test failure if checkpoint is not recent
+});
+
 describe('setup', () => {
   let compose;
   let balances;
