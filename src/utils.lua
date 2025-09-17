@@ -783,7 +783,9 @@ function utils.undernameForName(name)
 	end
 
 	local baseName = utils.baseNameForName(name)
-	return string.gsub(name:reverse(), baseName:reverse() .. "_", "", 1):reverse()
+	-- Escape the pattern to treat it as literal text, not a pattern
+	local pattern = string.gsub(baseName:reverse() .. "_", "([%-%.%+%[%]%(%)%$%^%%%?%*])", "%%%1")
+	return string.gsub(name:reverse(), pattern, "", 1):reverse()
 end
 
 return utils
