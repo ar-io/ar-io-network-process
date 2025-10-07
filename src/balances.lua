@@ -2,7 +2,7 @@ local utils = require(".src.utils")
 local balances = {}
 
 --- @alias mARIO number
-
+--- @
 --- Transfers tokens from one address to another
 ---@param recipient string The address to receive tokens
 ---@param from string The address sending tokens
@@ -86,49 +86,6 @@ function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder)
 	end
 
 	return utils.paginateTableWithCursor(balancesArray, cursor, cursorField, limit, sortBy, sortOrder)
-end
-
---- Checks if a wallet has a sufficient balance
---- @param wallet string The address of the wallet
---- @param quantity number The amount to check against the balance
---- @return boolean True if the wallet has a sufficient balance, false otherwise
-function balances.walletHasSufficientBalance(wallet, quantity)
-	return Balances[wallet] ~= nil and Balances[wallet] >= quantity
-end
-
----@param oldBalances table<string, number> A table of addresses and their balances
----@param newBalances table<string, number> A table of addresses and their balances
----@return table<string, boolean> affectedBalancesAddresses table of addresses that have had balance changes
-function balances.patchBalances(oldBalances, newBalances)
-	assert(type(oldBalances) == "table", "Old balances must be a table")
-	assert(type(newBalances) == "table", "New balances must be a table")
-	local affectedBalancesAddresses = {}
-	for address, _ in pairs(oldBalances) do
-		if Balances[address] ~= oldBalances[address] then
-			affectedBalancesAddresses[address] = true
-		end
-	end
-	for address, _ in pairs(newBalances) do
-		if oldBalances[address] ~= newBalances[address] then
-			affectedBalancesAddresses[address] = true
-		end
-	end
-
-	--- For simplicity we always include the protocol balance in the patch message
-	--- this also prevents us from sending an empty patch message and deleting the entire hyperbeam balances table
-	local patchMessage = { device = "patch@1.0", balances = { [ao.id] = Balances[ao.id] or 0 } }
-	for address, _ in pairs(affectedBalancesAddresses) do
-		patchMessage.balances[address] = Balances[address] or 0
-	end
-
-	-- only send the patch message if there are affected balances, otherwise we'll end up deleting the entire hyperbeam balances table
-	if next(patchMessage.balances) == nil then
-		return {}
-	else
-		ao.send(patchMessage)
-	end
-
-	return affectedBalancesAddresses
 end
 
 return balances

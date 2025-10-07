@@ -4,6 +4,7 @@ local token = require(".src.token")
 local utils = require(".src.utils")
 local json = require(".src.json")
 local balances = require(".src.balances")
+local hb = require(".src.hb")
 local arns = require(".src.arns")
 local gar = require(".src.gar")
 local demand = require(".src.demand")
@@ -499,7 +500,7 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 		end
 
 		-- Send patch message to HB
-		balances.patchBalances(oldBalances, Balances)
+		hb.patchBalances(oldBalances, Balances)
 
 		msg.ioEvent:addField("Handler-Memory-KiB-Used", collectgarbage("count"), false)
 		collectgarbage("collect")
