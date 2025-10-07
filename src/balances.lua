@@ -96,4 +96,17 @@ function balances.walletHasSufficientBalance(wallet, quantity)
 	return Balances[wallet] ~= nil and Balances[wallet] >= quantity
 end
 
+---@param addresses table<string> A table of addresses and their balances
+function balances.patchBalances(addresses)
+	assert(type(addresses) == "table", "Addresses must be a table")
+	--- For simplicity we always include the protocol balance in the patch message
+	local patchMessage = { device = "patch@1.0", balances = { [ao.id] = Balances[ao.id] or 0 } }
+	for _, address in pairs(addresses) do
+		assert(type(address) == "string", "Address must be a string")
+		patchMessage.balances[address] = Balances[address] or 0
+	end
+
+	ao.send(patchMessage)
+end
+
 return balances

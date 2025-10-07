@@ -233,6 +233,8 @@ end
 --- @param currentTimestamp number The current timestamp
 --- @return Vault[] The pruned vaults
 function vaults.pruneVaults(currentTimestamp)
+	local affectedAddresses = {}
+
 	if not NextBalanceVaultsPruneTimestamp or currentTimestamp < NextBalanceVaultsPruneTimestamp then
 		-- No known pruning work to do
 		return {}
@@ -248,12 +250,14 @@ function vaults.pruneVaults(currentTimestamp)
 		for id, nestedVault in pairs(ownersVaults) do
 			if currentTimestamp >= nestedVault.endTimestamp then
 				balances.increaseBalance(owner, nestedVault.balance)
+				table.insert(affectedAddresses, owner)
 				prunedVaults[id] = vaults.removeVault(owner, id)
 			else
 				vaults.scheduleNextVaultsPruning(nestedVault.endTimestamp)
 			end
 		end
 	end
+	balances.patchBalances(affectedAddresses)
 	return prunedVaults
 end
 
