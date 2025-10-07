@@ -1067,10 +1067,6 @@ function gar.pruneGateways(currentTimestamp, msgId)
 
 	result.gatewayObjectTallies = gatewayObjectTallies
 
-	for _, gateway in pairs(result.prunedGateways) do
-		AffectedBalancesAddresses[gateway] = true
-	end
-
 	return result
 end
 

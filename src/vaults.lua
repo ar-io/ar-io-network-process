@@ -248,14 +248,12 @@ function vaults.pruneVaults(currentTimestamp)
 		for id, nestedVault in pairs(ownersVaults) do
 			if currentTimestamp >= nestedVault.endTimestamp then
 				balances.increaseBalance(owner, nestedVault.balance)
-				AffectedBalancesAddresses[owner] = true
 				prunedVaults[id] = vaults.removeVault(owner, id)
 			else
 				vaults.scheduleNextVaultsPruning(nestedVault.endTimestamp)
 			end
 		end
 	end
-
 	return prunedVaults
 end
 
