@@ -17,3 +17,4 @@ coverage
 
 mainnet/**/outputs/*
 mainnet/outputs/*
+._*
