@@ -494,6 +494,13 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 			error(errorWithEvent, 0) -- 0 ensures not to include this line number in the error message
 		end
 
+		-- Add affected balances addresses to the event before cleaning up
+		msg.ioEvent:addField("Affected-Balances-Addresses", utils.getTableKeys(AffectedBalancesAddresses))
+		-- Send patch message to HB
+		balances.patchBalances(utils.getTableKeys(AffectedBalancesAddresses))
+		-- Clean up the affected balances addresses before collecting garbage
+		AffectedBalancesAddresses = {}
+
 		msg.ioEvent:addField("Handler-Memory-KiB-Used", collectgarbage("count"), false)
 		collectgarbage("collect")
 		msg.ioEvent:addField("Final-Memory-KiB-Used", collectgarbage("count"), false)
@@ -681,7 +688,8 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 		Send(msg, debitNotice)
 		Send(msg, creditNotice)
 	end
-	balances.patchBalances({ msg.From, recipient })
+	AffectedBalancesAddresses[msg.From] = true
+	AffectedBalancesAddresses[recipient] = true
 end)
 
 addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.CreateVault), function(msg)
@@ -717,7 +725,7 @@ addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionM
 		},
 		Data = json.encode(vault),
 	})
-	balances.patchBalances({ msg.From })
+	AffectedBalancesAddresses[msg.From] = true
 end)
 
 addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap.VaultedTransfer), function(msg)
@@ -786,7 +794,8 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 		Data = json.encode(vault),
 	})
 	-- might not need recipient here
-	balances.patchBalances({ msg.From, recipient })
+	AffectedBalancesAddresses[msg.From] = true
+	AffectedBalancesAddresses[recipient] = true
 end)
 
 addEventingHandler(ActionMap.RevokeVault, utils.hasMatchingTag("Action", ActionMap.RevokeVault), function(msg)
@@ -825,7 +834,8 @@ addEventingHandler(ActionMap.RevokeVault, utils.hasMatchingTag("Action", ActionM
 		Tags = { Action = ActionMap.RevokeVault .. "-Notice", ["Vault-Id"] = vaultId },
 		Data = json.encode(vault),
 	})
-	balances.patchBalances({ msg.From, recipient })
+	AffectedBalancesAddresses[msg.From] = true
+	AffectedBalancesAddresses[recipient] = true
 end)
 
 addEventingHandler(ActionMap.ExtendVault, utils.hasMatchingTag("Action", ActionMap.ExtendVault), function(msg)
@@ -879,7 +889,7 @@ addEventingHandler(ActionMap.IncreaseVault, utils.hasMatchingTag("Action", Actio
 		Tags = { Action = ActionMap.IncreaseVault .. "-Notice" },
 		Data = json.encode(vault),
 	})
-	balances.patchBalances({ msg.From })
+	AffectedBalancesAddresses[msg.From] = true
 end)
 
 addEventingHandler(ActionMap.BuyName, utils.hasMatchingTag("Action", ActionMap.BuyName), function(msg)
@@ -953,7 +963,7 @@ addEventingHandler(ActionMap.BuyName, utils.hasMatchingTag("Action", ActionMap.B
 			}),
 		})
 	end
-	balances.patchBalances({ msg.From })
+	AffectedBalancesAddresses[msg.From] = true
 end)
 
 addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.UpgradeName), function(msg)
@@ -984,7 +994,7 @@ addEventingHandler("upgradeName", utils.hasMatchingTag("Action", ActionMap.Upgra
 			type = record.type,
 		}),
 	})
-	balances.patchBalances({ msg.From })
+	AffectedBalancesAddresses[msg.From] = true
 end)
 
 addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionMap.ExtendLease), function(msg)
@@ -1010,7 +1020,7 @@ addEventingHandler(ActionMap.ExtendLease, utils.hasMatchingTag("Action", ActionM
 		Tags = { Action = ActionMap.ExtendLease .. "-Notice", Name = name },
 		Data = json.encode(fundFrom and result or recordResult),
 	})
-	balances.patchBalances({ msg.From })
+	AffectedBalancesAddresses[msg.From] = true
 end)
 
 addEventingHandler(
@@ -1045,7 +1055,7 @@ addEventingHandler(
 			Data = json.encode(fundFrom and result or recordResult),
 		})
 		-- TODO patch other ARIO locations based on FUND
-		balances.patchBalances({ msg.From })
+		AffectedBalancesAddresses[msg.From] = true
 	end
 )
 
@@ -1197,7 +1207,7 @@ addEventingHandler(ActionMap.JoinNetwork, utils.hasMatchingTag("Action", ActionM
 		Tags = { Action = ActionMap.JoinNetwork .. "-Notice" },
 		Data = json.encode(gateway),
 	})
-	balances.patchBalances({ msg.From })
+	AffectedBalancesAddresses[msg.From] = true
 end)
 
 addEventingHandler(ActionMap.LeaveNetwork, utils.hasMatchingTag("Action", ActionMap.LeaveNetwork), function(msg)
@@ -1285,7 +1295,7 @@ addEventingHandler(
 			Tags = { Action = ActionMap.IncreaseOperatorStake .. "-Notice" },
 			Data = json.encode(gateway),
 		})
-		balances.patchBalances({ msg.From })
+		AffectedBalancesAddresses[msg.From] = true
 	end
 )
 
@@ -1357,7 +1367,7 @@ addEventingHandler(
 			},
 			Data = json.encode(decreaseOperatorStakeResult.gateway),
 		})
-		balances.patchBalances({ msg.From })
+		AffectedBalancesAddresses[msg.From] = true
 	end
 )
 
@@ -1391,7 +1401,7 @@ addEventingHandler(ActionMap.DelegateStake, utils.hasMatchingTag("Action", Actio
 		Tags = { Action = ActionMap.DelegateStake .. "-Notice", Gateway = gatewayTarget },
 		Data = json.encode(delegateResult),
 	})
-	balances.patchBalances({ msg.From })
+	AffectedBalancesAddresses[msg.From] = true
 end)
 
 addEventingHandler(ActionMap.CancelWithdrawal, utils.hasMatchingTag("Action", ActionMap.CancelWithdrawal), function(msg)
@@ -1471,7 +1481,7 @@ addEventingHandler(
 				Data = json.encode(result),
 			})
 		end
-		balances.patchBalances({ msg.From })
+		AffectedBalancesAddresses[msg.From] = true
 	end
 )
 
@@ -1543,7 +1553,7 @@ addEventingHandler(
 			},
 			Data = json.encode(result and result.updatedDelegate or {}),
 		})
-		balances.patchBalances({ msg.From })
+		AffectedBalancesAddresses[msg.From] = true
 	end
 )
 
@@ -2469,7 +2479,7 @@ addEventingHandler(ActionMap.RedelegateStake, utils.hasMatchingTag("Action", Act
 		Data = json.encode(redelegationResult),
 	})
 
-	balances.patchBalances({ ao.id })
+	AffectedBalancesAddresses[ao.id] = true
 end)
 
 addEventingHandler(ActionMap.RedelegationFee, utils.hasMatchingTag("Action", ActionMap.RedelegationFee), function(msg)
@@ -2537,7 +2547,7 @@ addEventingHandler("requestPrimaryName", utils.hasMatchingTag("Action", ActionMa
 	assertValidFundFrom(fundFrom)
 
 	local primaryNameResult = primaryNames.createPrimaryNameRequest(name, initiator, msg.Timestamp, msg.Id, fundFrom)
-	balances.patchBalances({ msg.From })
+	AffectedBalancesAddresses[msg.From] = true
 	addPrimaryNameRequestData(msg.ioEvent, primaryNameResult)
 
 	--- if the from is the new owner, then send an approved notice to the from

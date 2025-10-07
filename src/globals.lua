@@ -19,6 +19,14 @@ Balances[ao.id] = Balances[ao.id] or constants.DEFAULT_PROTOCOL_BALANCE
 Balances[Owner] = Balances[Owner] or (constants.TOTAL_TOKEN_SUPPLY - constants.DEFAULT_PROTOCOL_BALANCE)
 
 --[[
+    The addresses that have had their balances affected over the course of a message that need HB patch state updated.
+
+    AffectedBalancesAddresses
+    @type table<string, boolean>
+]]
+AffectedBalancesAddresses = AffectedBalancesAddresses or {}
+
+--[[
     Token Supply
 ]]
 --- @type number

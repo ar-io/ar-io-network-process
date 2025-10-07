@@ -934,8 +934,6 @@ end
 --- @param msgId string The message ID
 --- @return PruneGatewaysResult # The result containing the pruned gateways, slashed gateways, and other stats
 function gar.pruneGateways(currentTimestamp, msgId)
-	local affectedAddresses = {}
-
 	--- @type PruneGatewaysResult
 	local result = {
 		prunedGateways = {},
@@ -1070,9 +1068,8 @@ function gar.pruneGateways(currentTimestamp, msgId)
 	result.gatewayObjectTallies = gatewayObjectTallies
 
 	for _, gateway in pairs(result.prunedGateways) do
-		table.insert(affectedAddresses, gateway)
+		AffectedBalancesAddresses[gateway] = true
 	end
-	balances.patchBalances(affectedAddresses)
 
 	return result
 end
