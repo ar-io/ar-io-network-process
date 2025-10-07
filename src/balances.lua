@@ -122,7 +122,7 @@ function balances.patchBalances(oldBalances, newBalances)
 	end
 
 	-- only send the patch message if there are affected balances, otherwise we'll end up deleting the entire hyperbeam balances table
-	if patchMessage.balances == {} then
+	if next(patchMessage.balances) == nil then
 		return {}
 	else
 		ao.send(patchMessage)

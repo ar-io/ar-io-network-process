@@ -632,7 +632,6 @@ addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.
 	msg.ioEvent:addField("RecipientFormatted", recipient)
 
 	local result = balances.transfer(recipient, msg.From, quantity, allowUnsafeAddresses)
-
 	if result ~= nil then
 		local senderNewBalance = result[msg.From]
 		local recipientNewBalance = result[recipient]
@@ -1042,7 +1041,6 @@ addEventingHandler(
 			},
 			Data = json.encode(fundFrom and result or recordResult),
 		})
-		-- TODO patch other ARIO locations based on FUND
 	end
 )
 
@@ -1791,7 +1789,6 @@ end, function(msg)
 	]]
 	--
 	print("Ticking from " .. lastCreatedEpochIndex .. " to " .. targetCurrentEpochIndex)
-
 	for epochIndexToTick = lastCreatedEpochIndex, targetCurrentEpochIndex do
 		local tickResult = tick.tickEpoch(msg.Timestamp, blockHeight, hashchain, msgId, epochIndexToTick)
 		if tickResult.pruneGatewaysResult ~= nil then
