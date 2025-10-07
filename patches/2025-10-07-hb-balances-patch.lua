@@ -14,7 +14,6 @@
 local function _loaded_mod_src_hb()
 	-- hb.lua needs to be in its own file and not in balances.lua to avoid circular dependencies
 	local hb = {}
-	local token = require(".src.token")
 
 	---@param oldBalances table<string, number> A table of addresses and their balances
 	---@param newBalances table<string, number> A table of addresses and their balances
@@ -36,13 +35,10 @@ local function _loaded_mod_src_hb()
 
 		--- For simplicity we always include the protocol balance in the patch message
 		--- this also prevents us from sending an empty patch message and deleting the entire hyperbeam balances table\
-		local supplyStats = token.calculateTotalSupply()
+
 		local patchMessage = {
 			device = "patch@1.0",
 			balances = { [ao.id] = Balances[ao.id] or 0 },
-			info = {
-				supply = tostring(supplyStats.totalSupply),
-			},
 		}
 		for address, _ in pairs(affectedBalancesAddresses) do
 			patchMessage.balances[address] = Balances[address] or 0
@@ -552,7 +548,11 @@ local function _loaded_mod_src_main()
 		printEvent = printEvent == nil and true or printEvent
 		Handlers.add(handlerName, pattern, function(msg)
 			-- Store the old balances to compare after the handler has run for patching state
-			local oldBalances = utils.deepCopy(Balances)
+			-- Only do this for the last handler to avoid unnecessary copying
+			local oldBalances = nil
+			if pattern(msg) ~= "continue" then
+				oldBalances = utils.deepCopy(Balances)
+			end
 			-- add an ARIOEvent to the message if it doesn't exist
 			msg.ioEvent = msg.ioEvent or ARIOEvent(msg)
 			-- global handler for all eventing errors, so we can log them and send a notice to the sender for non critical errors and discard the memory on critical errors
@@ -577,7 +577,9 @@ local function _loaded_mod_src_main()
 			end
 
 			-- Send patch message to HB
-			hb.patchBalances(oldBalances, Balances)
+			if oldBalances then
+				hb.patchBalances(oldBalances, Balances)
+			end
 
 			msg.ioEvent:addField("Handler-Memory-KiB-Used", collectgarbage("count"), false)
 			collectgarbage("collect")

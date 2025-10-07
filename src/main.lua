@@ -475,7 +475,11 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 	printEvent = printEvent == nil and true or printEvent
 	Handlers.add(handlerName, pattern, function(msg)
 		-- Store the old balances to compare after the handler has run for patching state
-		local oldBalances = utils.deepCopy(Balances)
+		-- Only do this for the last handler to avoid unnecessary copying
+		local oldBalances = nil
+		if pattern(msg) ~= "continue" then
+			oldBalances = utils.deepCopy(Balances)
+		end
 		-- add an ARIOEvent to the message if it doesn't exist
 		msg.ioEvent = msg.ioEvent or ARIOEvent(msg)
 		-- global handler for all eventing errors, so we can log them and send a notice to the sender for non critical errors and discard the memory on critical errors
@@ -500,7 +504,9 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 		end
 
 		-- Send patch message to HB
-		hb.patchBalances(oldBalances, Balances)
+		if oldBalances then
+			hb.patchBalances(oldBalances, Balances)
+		end
 
 		msg.ioEvent:addField("Handler-Memory-KiB-Used", collectgarbage("count"), false)
 		collectgarbage("collect")

@@ -1,6 +1,5 @@
 -- hb.lua needs to be in its own file and not in balances.lua to avoid circular dependencies
 local hb = {}
-local token = require(".src.token")
 
 ---@param oldBalances table<string, number> A table of addresses and their balances
 ---@param newBalances table<string, number> A table of addresses and their balances
@@ -22,13 +21,10 @@ function hb.patchBalances(oldBalances, newBalances)
 
 	--- For simplicity we always include the protocol balance in the patch message
 	--- this also prevents us from sending an empty patch message and deleting the entire hyperbeam balances table\
-	local supplyStats = token.calculateTotalSupply()
+
 	local patchMessage = {
 		device = "patch@1.0",
 		balances = { [ao.id] = Balances[ao.id] or 0 },
-		info = {
-			supply = tostring(supplyStats.totalSupply),
-		},
 	}
 	for address, _ in pairs(affectedBalancesAddresses) do
 		patchMessage.balances[address] = Balances[address] or 0
