@@ -499,9 +499,7 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 		end
 
 		-- Send patch message to HB
-		local affectedBalances = balances.patchBalances(oldBalances, Balances)
-		-- Add affected balances addresses to the event before cleaning up
-		msg.ioEvent:addField("Affected-Balances-Addresses", utils.getTableKeys(affectedBalances))
+		balances.patchBalances(oldBalances, Balances)
 
 		msg.ioEvent:addField("Handler-Memory-KiB-Used", collectgarbage("count"), false)
 		collectgarbage("collect")
