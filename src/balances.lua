@@ -91,13 +91,14 @@ end
 --- Checks if a wallet has a sufficient balance
 --- @param wallet string The address of the wallet
 --- @param quantity number The amount to check against the balance
---- @return table<string, boolean> A table of addresses and whether they have a sufficient balance
+--- @return boolean True if the wallet has a sufficient balance, false otherwise
 function balances.walletHasSufficientBalance(wallet, quantity)
 	return Balances[wallet] ~= nil and Balances[wallet] >= quantity
 end
 
 ---@param oldBalances table<string, number> A table of addresses and their balances
 ---@param newBalances table<string, number> A table of addresses and their balances
+---@return table<string, boolean> affectedBalancesAddresses table of addresses that have had balance changes
 function balances.patchBalances(oldBalances, newBalances)
 	assert(type(oldBalances) == "table", "Old balances must be a table")
 	assert(type(newBalances) == "table", "New balances must be a table")
