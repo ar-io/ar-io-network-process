@@ -90,6 +90,8 @@ local ActionMap = {
 	ApprovePrimaryNameRequest = "Approve-Primary-Name-Request",
 	PrimaryNames = "Primary-Names",
 	PrimaryName = "Primary-Name",
+	-- Hyperbeam Patch Balances
+	PatchHyperbeamBalances = "Patch-Hyperbeam-Balances",
 }
 
 --- @param msg ParsedMessage
@@ -2695,5 +2697,19 @@ addEventingHandler("allPaginatedGatewayVaults", utils.hasMatchingTag("Action", "
 	local result = gar.getPaginatedVaultsFromAllGateways(page.cursor, page.limit, page.sortBy, page.sortOrder)
 	Send(msg, { Target = msg.From, Action = "All-Gateway-Vaults-Notice", Data = json.encode(result) })
 end)
+
+addEventingHandler(
+	ActionMap.PatchHyperbeamBalances,
+	utils.hasMatchingTag("Action", ActionMap.PatchHyperbeamBalances),
+	function(msg)
+		assert(msg.From == Owner, "Only the owner can trigger " .. ActionMap.PatchHyperbeamBalances)
+		local patchMessage = { device = "patch@1.0", balances = utils.deepCopy(Balances) }
+		ao.send(patchMessage)
+		return Send(msg, {
+			Target = msg.From,
+			Action = ActionMap.PatchHyperbeamBalances .. "-Notice",
+		})
+	end
+)
 
 return main

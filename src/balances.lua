@@ -114,12 +114,19 @@ function balances.patchBalances(oldBalances, newBalances)
 	end
 
 	--- For simplicity we always include the protocol balance in the patch message
+	--- this also prevents us from sending an empty patch message and deleting the entire hyperbeam balances table
 	local patchMessage = { device = "patch@1.0", balances = { [ao.id] = Balances[ao.id] or 0 } }
 	for address, _ in pairs(affectedBalancesAddresses) do
 		patchMessage.balances[address] = Balances[address] or 0
 	end
 
-	ao.send(patchMessage)
+	-- only send the patch message if there are affected balances, otherwise we'll end up deleting the entire hyperbeam balances table
+	if patchMessage.balances == {} then
+		return {}
+	else
+		ao.send(patchMessage)
+	end
+
 	return affectedBalancesAddresses
 end
 
