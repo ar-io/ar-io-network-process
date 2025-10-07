@@ -88,4 +88,12 @@ function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder)
 	return utils.paginateTableWithCursor(balancesArray, cursor, cursorField, limit, sortBy, sortOrder)
 end
 
+--- Checks if a wallet has a sufficient balance
+--- @param wallet string The address of the wallet
+--- @param quantity number The amount to check against the balance
+--- @return boolean True if the wallet has a sufficient balance, false otherwise
+function balances.walletHasSufficientBalance(wallet, quantity)
+	return Balances[wallet] ~= nil and Balances[wallet] >= quantity
+end
+
 return balances
