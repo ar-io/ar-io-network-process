@@ -23,7 +23,12 @@ export const AO_LOADER_HANDLER_ENV = {
   Process: {
     Id: PROCESS_ID,
     Owner: PROCESS_OWNER,
-    Tags: [{ name: 'Authority', value: 'XXXXXX' }],
+    Tags: [
+      {
+        name: 'Authority',
+        value: 'XXXXXX',
+      },
+    ],
   },
   Module: {
     Id: PROCESS_ID,

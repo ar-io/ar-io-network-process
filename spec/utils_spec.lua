@@ -1027,13 +1027,55 @@ describe("utils", function()
 			local name = undername .. "_" .. basename
 
 			local undernameFromName = utils.undernameForName(name)
-			assert.are.same(undernameFromName, undername)
+			assert.are.same(undername, undernameFromName)
 		end)
 
 		it("should return nil for a name with no undername", function()
 			local basename = "basename"
 			local undernameFromName = utils.undernameForName(basename)
-			assert.are.same(undernameFromName, nil)
+			assert.are.same(nil, undernameFromName)
+		end)
+
+		it("should get the undername name for a name with an undername and base name with dashes", function()
+			local undername = "test"
+			local basename = "base-name-with-dashes"
+			local name = undername .. "_" .. basename
+
+			local undernameFromName = utils.undernameForName(name)
+			assert.are.same(undername, undernameFromName)
+		end)
+
+		it("should return nil for a base name with dashes but no undername", function()
+			local basename = "base-name-with-dashes"
+			local undernameFromName = utils.undernameForName(basename)
+			assert.are.same(nil, undernameFromName)
+		end)
+
+		it("should handle complex undername with base name containing dashes", function()
+			local undername = "my-complex-undername"
+			local basename = "test-base-name-with-dashes"
+			local name = undername .. "_" .. basename
+
+			local undernameFromName = utils.undernameForName(name)
+			assert.are.same(undername, undernameFromName)
+		end)
+
+		it("should handle case where undername and base name are identical", function()
+			local undername = "samename"
+			local basename = "samename"
+			local name = undername .. "_" .. basename
+
+			local undernameFromName = utils.undernameForName(name)
+			assert.are.same(undername, undernameFromName)
+		end)
+
+		it("should handle case where undername and base name are identical with dashes", function()
+			local undername = "same-name-with-dashes"
+			local basename = "same-name-with-dashes"
+			local name = undername .. "_" .. basename
+
+			local undernameFromName = utils.undernameForName(name)
+			assert.are.same(undername, undernameFromName)
 		end)
 	end)
 end)

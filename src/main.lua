@@ -4,6 +4,7 @@ local token = require(".src.token")
 local utils = require(".src.utils")
 local json = require(".src.json")
 local balances = require(".src.balances")
+local hb = require(".src.hb")
 local arns = require(".src.arns")
 local gar = require(".src.gar")
 local demand = require(".src.demand")
@@ -90,6 +91,8 @@ local ActionMap = {
 	ApprovePrimaryNameRequest = "Approve-Primary-Name-Request",
 	PrimaryNames = "Primary-Names",
 	PrimaryName = "Primary-Name",
+	-- Hyperbeam Patch Balances
+	PatchHyperbeamBalances = "Patch-Hyperbeam-Balances",
 }
 
 --- @param msg ParsedMessage
@@ -471,6 +474,12 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 	critical = critical or false
 	printEvent = printEvent == nil and true or printEvent
 	Handlers.add(handlerName, pattern, function(msg)
+		-- Store the old balances to compare after the handler has run for patching state
+		-- Only do this for the last handler to avoid unnecessary copying
+		local oldBalances = nil
+		if pattern(msg) ~= "continue" then
+			oldBalances = utils.deepCopy(Balances)
+		end
 		-- add an ARIOEvent to the message if it doesn't exist
 		msg.ioEvent = msg.ioEvent or ARIOEvent(msg)
 		-- global handler for all eventing errors, so we can log them and send a notice to the sender for non critical errors and discard the memory on critical errors
@@ -492,6 +501,11 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 			-- Reference: https://github.com/permaweb/ao/blob/76a618722b201430a372894b3e2753ac01e63d3d/dev-cli/src/starters/lua/ao.lua#L284-L287
 			local errorWithEvent = tostring(resultOrError) .. "\n" .. errorEvent:toJSON()
 			error(errorWithEvent, 0) -- 0 ensures not to include this line number in the error message
+		end
+
+		-- Send patch message to HB
+		if oldBalances then
+			hb.patchBalances(oldBalances)
 		end
 
 		msg.ioEvent:addField("Handler-Memory-KiB-Used", collectgarbage("count"), false)
@@ -2137,17 +2151,12 @@ end)
 -- Pagination handlers
 
 addEventingHandler("paginatedRecords", function(msg)
-        return msg.Action == "Paginated-Records" or msg.Action == ActionMap.Records
+	return msg.Action == "Paginated-Records" or msg.Action == ActionMap.Records
 end, function(msg)
-        local page = utils.parsePaginationTags(msg)
-        local result = arns.getPaginatedRecords(
-                page.cursor,
-                page.limit,
-                page.sortBy or "startTimestamp",
-                page.sortOrder,
-                page.filters
-        )
-        Send(msg, { Target = msg.From, Action = "Records-Notice", Data = json.encode(result) })
+	local page = utils.parsePaginationTags(msg)
+	local result =
+		arns.getPaginatedRecords(page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder, page.filters)
+	Send(msg, { Target = msg.From, Action = "Records-Notice", Data = json.encode(result) })
 end)
 
 addEventingHandler("paginatedGateways", function(msg)
@@ -2689,6 +2698,28 @@ addEventingHandler("allPaginatedGatewayVaults", utils.hasMatchingTag("Action", "
 	local page = utils.parsePaginationTags(msg)
 	local result = gar.getPaginatedVaultsFromAllGateways(page.cursor, page.limit, page.sortBy, page.sortOrder)
 	Send(msg, { Target = msg.From, Action = "All-Gateway-Vaults-Notice", Data = json.encode(result) })
+end)
+
+addEventingHandler(ActionMap.PatchHyperbeamBalances, function(msg)
+	if msg.Tags.Action == ActionMap.PatchHyperbeamBalances then
+		return "continue"
+	end
+	return false
+end, function(msg)
+	assert(msg.From == Owner, "Only the owner can trigger " .. ActionMap.PatchHyperbeamBalances)
+
+	local patchBalances = {}
+	for address, balance in pairs(Balances) do
+		patchBalances[address] = tostring(balance)
+	end
+
+	local patchMessage = { device = "patch@1.0", balances = patchBalances }
+	ao.send(patchMessage)
+
+	return Send(msg, {
+		Target = msg.From,
+		Action = ActionMap.PatchHyperbeamBalances .. "-Notice",
+	})
 end)
 
 return main
