@@ -16,7 +16,6 @@ local function _loaded_mod_src_hb()
 	local hb = {}
 
 	---@param oldBalances table<string, number> A table of addresses and their balances
-	---@param newBalances table<string, number> A table of addresses and their balances
 	---@return table<string, boolean> affectedBalancesAddresses table of addresses that have had balance changes
 	function hb.patchBalances(oldBalances)
 		assert(type(oldBalances) == "table", "Old balances must be a table")
@@ -2857,12 +2856,5 @@ _G.package.loaded[".src.main"] = _loaded_mod_src_main()
 -- Initialize the HB balances state
 ao.send({
 	device = "patch@1.0",
-	balances = { device = "trie@1.0" },
-	["token-info"] = {
-		name = Name,
-		ticker = Ticker,
-		logo = Logo,
-		denomination = tostring(Denomination),
-		supply = TotalSupply,
-	},
+	balances = Balances,
 })

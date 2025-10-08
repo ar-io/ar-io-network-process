@@ -2,7 +2,6 @@
 local hb = {}
 
 ---@param oldBalances table<string, number> A table of addresses and their balances
----@param newBalances table<string, number> A table of addresses and their balances
 ---@return table<string, boolean> affectedBalancesAddresses table of addresses that have had balance changes
 function hb.patchBalances(oldBalances)
 	assert(type(oldBalances) == "table", "Old balances must be a table")

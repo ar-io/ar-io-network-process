@@ -26,7 +26,7 @@ export const AO_LOADER_HANDLER_ENV = {
     Tags: [
       {
         name: 'Authority',
-        value: 'fcoN_xJeisVsPXA-trzVAuIiqO3ydLQxM-L4XbrQKzY',
+        value: 'XXXXXX',
       },
     ],
   },
