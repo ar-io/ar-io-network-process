@@ -40,6 +40,7 @@ const { handle: originalHandle, memory } = await createAosLoader({
   wasm,
   lua: mainnetLuaFile,
 });
+// We are using new helpers here because our other integration tests are using a different module id.
 const startMemory = memory;
 
 /**
