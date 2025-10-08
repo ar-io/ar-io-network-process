@@ -505,7 +505,7 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 
 		-- Send patch message to HB
 		if oldBalances then
-			hb.patchBalances(oldBalances, Balances)
+			hb.patchBalances(oldBalances)
 		end
 
 		msg.ioEvent:addField("Handler-Memory-KiB-Used", collectgarbage("count"), false)

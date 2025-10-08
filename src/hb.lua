@@ -4,17 +4,16 @@ local hb = {}
 ---@param oldBalances table<string, number> A table of addresses and their balances
 ---@param newBalances table<string, number> A table of addresses and their balances
 ---@return table<string, boolean> affectedBalancesAddresses table of addresses that have had balance changes
-function hb.patchBalances(oldBalances, newBalances)
+function hb.patchBalances(oldBalances)
 	assert(type(oldBalances) == "table", "Old balances must be a table")
-	assert(type(newBalances) == "table", "New balances must be a table")
 	local affectedBalancesAddresses = {}
 	for address, _ in pairs(oldBalances) do
 		if Balances[address] ~= oldBalances[address] then
 			affectedBalancesAddresses[address] = true
 		end
 	end
-	for address, _ in pairs(newBalances) do
-		if oldBalances[address] ~= newBalances[address] then
+	for address, _ in pairs(Balances) do
+		if oldBalances[address] ~= Balances[address] then
 			affectedBalancesAddresses[address] = true
 		end
 	end
