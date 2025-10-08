@@ -17,3 +17,5 @@ coverage
 
 mainnet/**/outputs/*
 mainnet/outputs/*
+._*
+*-wasm-memory

@@ -964,7 +964,7 @@ describe('GatewayRegistry', async () => {
       });
 
       if (instant) {
-        assert.equal(decreaseDelegateStakeResult.Messages.length, 1);
+        assert.equal(decreaseDelegateStakeResult.Messages.length, 2);
         decreaseDelegateStakeResult.Messages[0].Tags.sort((a, b) =>
           a.name.localeCompare(b.name),
         );
@@ -980,7 +980,7 @@ describe('GatewayRegistry', async () => {
         delete decreaseDelegateStakeResult.Messages[0].Data;
         assert.deepStrictEqual(decreaseDelegateStakeResult.Messages[0], {
           Target: delegatorAddress,
-          Anchor: '00000000000000000000000000000008',
+          Anchor: '00000000000000000000000000000013',
           Tags: [
             {
               name: 'Action',
@@ -1020,7 +1020,7 @@ describe('GatewayRegistry', async () => {
             },
             {
               name: 'Ref_',
-              value: '8',
+              value: '13',
             },
             {
               name: 'Type',
@@ -1754,7 +1754,7 @@ describe('GatewayRegistry', async () => {
         memory: gatewayMemory,
       });
 
-      assert.equal(result.Messages.length, 1);
+      assert.equal(result.Messages.length, 2);
       assert.equal(result.Messages[0].Target, observerAddress);
       assert.deepEqual(JSON.parse(result.Messages[0].Data), {
         reports: {
@@ -1776,7 +1776,7 @@ describe('GatewayRegistry', async () => {
         shouldAssertNoResultError: false,
       });
 
-      assert.equal(result.Messages.length, 1);
+      assert.equal(result.Messages.length, 2);
       assert.equal(result.Messages[0].Target, invalidObserver);
       assert.ok(
         result.Messages[0].Data.includes(
@@ -1795,7 +1795,7 @@ describe('GatewayRegistry', async () => {
         memory: gatewayMemory,
         shouldAssertNoResultError: false,
       });
-      assert.equal(result.Messages.length, 1);
+      assert.equal(result.Messages.length, 2);
       assert.ok(
         result.Messages[0].Data.includes(
           'Invalid report tx id. Must be a valid Arweave address.',
@@ -1814,7 +1814,7 @@ describe('GatewayRegistry', async () => {
         shouldAssertNoResultError: false,
       });
 
-      assert.equal(result.Messages?.length, 1);
+      assert.equal(result.Messages?.length, 2);
       assert.ok(
         result.Messages[0].Data.includes('Invalid failed gateway address:'),
       );
@@ -1831,7 +1831,7 @@ describe('GatewayRegistry', async () => {
         shouldAssertNoResultError: false,
       });
 
-      assert.equal(result.Messages.length, 1);
+      assert.equal(result.Messages.length, 2);
       assert.ok(
         result.Messages[0].Data.includes(
           `Observations for epoch 0 must be submitted after ${epochSettings.epochZeroStartTimestamp}`,
@@ -1851,7 +1851,7 @@ describe('GatewayRegistry', async () => {
         shouldAssertNoResultError: false,
       });
 
-      assert.equal(result.Messages.length, 1);
+      assert.equal(result.Messages.length, 2);
       assert.ok(
         result.Messages[0].Data.includes(
           `Observations for epoch 0 must be submitted before ${epochSettings.epochZeroStartTimestamp + epochSettings.durationMs}`,

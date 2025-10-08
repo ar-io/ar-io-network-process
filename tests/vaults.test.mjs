@@ -334,7 +334,7 @@ describe('Vaults', async () => {
         });
 
       // it should create two messages, one for sender and other for recipient
-      assert.deepEqual(createVaultedTransferResult.Messages.length, 2);
+      assert.deepEqual(createVaultedTransferResult.Messages.length, 3);
 
       const senderMessage = createVaultedTransferResult.Messages.find((msg) =>
         msg.Tags.find(
@@ -431,7 +431,7 @@ describe('Vaults', async () => {
         memory: createVaultedTransferResult.Memory,
       });
 
-      assert.deepEqual(result.Messages.length, 2);
+      assert.deepEqual(result.Messages.length, 3);
       const recipientMessageAfterRevoke = result.Messages.find((msg) =>
         msg.Tags.find(
           (tag) => tag.name === 'Action' && tag.value === 'Revoke-Vault-Notice',
