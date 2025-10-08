@@ -177,6 +177,7 @@ describe('hyperbeam patch balances', async () => {
         Owner: STUB_ADDRESS,
         Tags: [{ name: 'Action', value: 'Patch-Hyperbeam-Balances' }],
       },
+      shouldAssertNoResultError: false,
     });
     const error = result.Messages.at(-1).Tags.find(
       (tag) => tag.name === 'Error',

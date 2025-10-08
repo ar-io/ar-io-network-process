@@ -15,6 +15,11 @@ import {
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
+const mainnetLuaFile = fs.readFileSync(
+  path.join(__dirname, 'main-aos-bundled.lua'),
+  { encoding: 'utf-8' },
+);
+
 const patchFile = fs.readFileSync(
   path.join(__dirname, '../../../patches/2025-10-07-hb-balances-patch.lua'),
   { encoding: 'utf-8' },
@@ -33,7 +38,7 @@ const wasm = fs.readFileSync(
 
 const { handle: originalHandle, memory } = await createAosLoader({
   wasm,
-  //  lua: patchFile,
+  lua: mainnetLuaFile,
 });
 const startMemory = memory;
 
@@ -152,7 +157,7 @@ describe('2025-10-07-hb-balances-patch', () => {
       memory: wasmMemory,
     });
 
-    console.log(evalPatchMemory);
+    console.dir(rest, { depth: null });
 
     const balances = await handle({
       options: {
@@ -160,7 +165,7 @@ describe('2025-10-07-hb-balances-patch', () => {
         Owner: processOwner,
         Tags: [{ name: 'Action', value: 'Balances' }],
       },
-      memory: undefined,
+      memory: evalPatchMemory,
     });
 
     console.dir(balances, { depth: null });
