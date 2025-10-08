@@ -18,17 +18,16 @@ local function _loaded_mod_src_hb()
 	---@param oldBalances table<string, number> A table of addresses and their balances
 	---@param newBalances table<string, number> A table of addresses and their balances
 	---@return table<string, boolean> affectedBalancesAddresses table of addresses that have had balance changes
-	function hb.patchBalances(oldBalances, newBalances)
+	function hb.patchBalances(oldBalances)
 		assert(type(oldBalances) == "table", "Old balances must be a table")
-		assert(type(newBalances) == "table", "New balances must be a table")
 		local affectedBalancesAddresses = {}
 		for address, _ in pairs(oldBalances) do
 			if Balances[address] ~= oldBalances[address] then
 				affectedBalancesAddresses[address] = true
 			end
 		end
-		for address, _ in pairs(newBalances) do
-			if oldBalances[address] ~= newBalances[address] then
+		for address, _ in pairs(Balances) do
+			if oldBalances[address] ~= Balances[address] then
 				affectedBalancesAddresses[address] = true
 			end
 		end
@@ -578,7 +577,7 @@ local function _loaded_mod_src_main()
 
 			-- Send patch message to HB
 			if oldBalances then
-				hb.patchBalances(oldBalances, Balances)
+				hb.patchBalances(oldBalances)
 			end
 
 			msg.ioEvent:addField("Handler-Memory-KiB-Used", collectgarbage("count"), false)
@@ -2836,19 +2835,20 @@ local function _loaded_mod_src_main()
 		Send(msg, { Target = msg.From, Action = "All-Gateway-Vaults-Notice", Data = json.encode(result) })
 	end)
 
-	addEventingHandler(
-		ActionMap.PatchHyperbeamBalances,
-		Handlers.utils.continue(utils.hasMatchingTag("Action", ActionMap.PatchHyperbeamBalances)),
-		function(msg)
-			assert(msg.From == Owner, "Only the owner can trigger " .. ActionMap.PatchHyperbeamBalances)
-			local patchMessage = { device = "patch@1.0", balances = utils.deepCopy(Balances) }
-			ao.send(patchMessage)
-			return Send(msg, {
-				Target = msg.From,
-				Action = ActionMap.PatchHyperbeamBalances .. "-Notice",
-			})
+	addEventingHandler(ActionMap.PatchHyperbeamBalances, function(msg)
+		if msg.Tags.Action == ActionMap.PatchHyperbeamBalances then
+			return "continue"
 		end
-	)
+		return false
+	end, function(msg)
+		assert(msg.From == Owner, "Only the owner can trigger " .. ActionMap.PatchHyperbeamBalances)
+		local patchMessage = { device = "patch@1.0", balances = utils.deepCopy(Balances) }
+		ao.send(patchMessage)
+		return Send(msg, {
+			Target = msg.From,
+			Action = ActionMap.PatchHyperbeamBalances .. "-Notice",
+		})
+	end)
 
 	return main
 end
