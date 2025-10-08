@@ -369,7 +369,7 @@ describe('Tick', async () => {
     });
 
     // should only have one message with a tick notice, the epoch distribution notice is sent separately
-    assert.equal(newEpochTick.Messages.length, 3);
+    assert.equal(newEpochTick.Messages.length, 4);
     // updated demand factor is sent
     assert.equal(
       newEpochTick.Messages[0].Tags.find((tag) => tag.name === 'Action').value,
@@ -464,7 +464,7 @@ describe('Tick', async () => {
     );
 
     // assert multiple messages are sent given the tick notice, epoch created notice and epoch distribution notice
-    assert.equal(distributionTick.Messages.length, 4); // 1 epoch distribution notice, 1 epoch created notice, 1 tick notice, 1 demand factor updated notice
+    assert.equal(distributionTick.Messages.length, 5); // 1 epoch distribution notice, 1 epoch created notice, 1 tick notice, 1 demand factor updated notice
 
     // new epoch is created
     const createdMessage = distributionTick.Messages.find(

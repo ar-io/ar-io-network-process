@@ -21,7 +21,7 @@ export const STUB_HASH_CHAIN = 'NGU1fq_ssL9m6kRbRU1bqiIDBht79ckvAwRMGElkSOg';
 /* ao READ-ONLY Env Variables */
 export const AO_LOADER_HANDLER_ENV = {
   Process: {
-    Id: 'qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE',
+    Id: PROCESS_ID,
     Owner: PROCESS_OWNER,
     Tags: [
       {
@@ -31,7 +31,7 @@ export const AO_LOADER_HANDLER_ENV = {
     ],
   },
   Module: {
-    Id: 'CWxzoe4IoNpFHiykadZWphZtLWybDF8ocNi7gmK6zCg',
+    Id: PROCESS_ID,
     Tags: [{ name: 'Authority', value: 'YYYYYY' }],
   },
 };

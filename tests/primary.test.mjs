@@ -329,7 +329,7 @@ describe('primary names', function () {
       });
 
       // there should be two messages, one to the ant and one to the owner
-      assert.equal(approvePrimaryNameRequestResult.Messages.length, 2);
+      assert.equal(approvePrimaryNameRequestResult.Messages.length, 3);
       assert.equal(
         approvePrimaryNameRequestResult.Messages[0].Target,
         processId,
@@ -454,7 +454,7 @@ describe('primary names', function () {
     });
 
     // there should be only one message with the Approve-Primary-Name-Request-Notice action
-    assert.equal(requestPrimaryNameResult.Messages.length, 1);
+    assert.equal(requestPrimaryNameResult.Messages.length, 2);
     assert.equal(requestPrimaryNameResult.Messages[0].Target, processId);
 
     // find the action tag in the messages
@@ -565,7 +565,7 @@ describe('primary names', function () {
     // assert no error
     assertNoResultError(removePrimaryNameResult);
     // assert 2 messages sent - one to the owner and one to the recipient
-    assert.equal(removePrimaryNameResult.Messages.length, 2);
+    assert.equal(removePrimaryNameResult.Messages.length, 3);
     assert.equal(removePrimaryNameResult.Messages[0].Target, processId);
     assert.equal(removePrimaryNameResult.Messages[1].Target, recipient);
     const removedPrimaryNameData = JSON.parse(

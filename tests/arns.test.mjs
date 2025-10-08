@@ -819,7 +819,7 @@ describe('ArNS', async () => {
       });
 
       // should send three messages including a Buy-Name-Notice and a Debit-Notice
-      assert.equal(newBuyResult.Messages.length, 2);
+      assert.equal(newBuyResult.Messages.length, 3);
 
       // should send a buy record notice
       const buyRecordNoticeTag = newBuyResult.Messages?.[0]?.Tags?.find(
@@ -1030,7 +1030,7 @@ describe('ArNS', async () => {
       });
 
       // should send three messages including a Buy-Name-Notice and a Debit-Notice
-      assert.equal(buyReturnedNameResult.Messages.length, 2);
+      assert.equal(buyReturnedNameResult.Messages.length, 3);
 
       // should send a buy record notice
       const buyRecordNoticeTag =

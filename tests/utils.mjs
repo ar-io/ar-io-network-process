@@ -15,7 +15,7 @@ import assert from 'node:assert';
 export async function createAosLoader({
   wasm = AOS_WASM,
   lua = BUNDLED_SOURCE_CODE,
-}) {
+} = {}) {
   const handle = await AoLoader(wasm, AO_LOADER_OPTIONS);
   const evalRes = await handle(
     null,
@@ -27,13 +27,8 @@ export async function createAosLoader({
       ],
       Data: lua,
     },
-    {
-      ...AO_LOADER_HANDLER_ENV,
-      Process: {
-        ...AO_LOADER_HANDLER_ENV.Process,
-        Id: 'qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE',
-      },
-    },
+
+    AO_LOADER_HANDLER_ENV,
   );
   return {
     handle,
