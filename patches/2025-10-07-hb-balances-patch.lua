@@ -2838,7 +2838,7 @@ local function _loaded_mod_src_main()
 
 	addEventingHandler(
 		ActionMap.PatchHyperbeamBalances,
-		utils.hasMatchingTag("Action", ActionMap.PatchHyperbeamBalances),
+		Handlers.continue(utils.hasMatchingTag("Action", ActionMap.PatchHyperbeamBalances)),
 		function(msg)
 			assert(msg.From == Owner, "Only the owner can trigger " .. ActionMap.PatchHyperbeamBalances)
 			local patchMessage = { device = "patch@1.0", balances = utils.deepCopy(Balances) }

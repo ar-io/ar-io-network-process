@@ -160,7 +160,7 @@ describe('2025-10-07-hb-balances-patch', () => {
         Owner: processOwner,
         Tags: [{ name: 'Action', value: 'Balances' }],
       },
-      memory: null,
+      memory: undefined,
     });
 
     console.dir(balances, { depth: null });

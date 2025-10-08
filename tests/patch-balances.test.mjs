@@ -167,4 +167,6 @@ describe('hyperbeam patch balances', async () => {
     ).value;
     assert.equal(patchData3[sender], 0);
   });
+
+  it('should only send one patch message ')
 });
