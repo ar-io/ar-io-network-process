@@ -36,10 +36,10 @@ local function _loaded_mod_src_hb()
 
 		local patchMessage = {
 			device = "patch@1.0",
-			balances = { [ao.id] = Balances[ao.id] or 0 },
+			balances = { [ao.id] = tostring(Balances[ao.id] or 0) },
 		}
 		for address, _ in pairs(affectedBalancesAddresses) do
-			patchMessage.balances[address] = Balances[address] or 0
+			patchMessage.balances[address] = tostring(Balances[address] or 0)
 		end
 
 		-- only send the patch message if there are affected balances, otherwise we'll end up deleting the entire hyperbeam balances table
@@ -2841,8 +2841,15 @@ local function _loaded_mod_src_main()
 		return false
 	end, function(msg)
 		assert(msg.From == Owner, "Only the owner can trigger " .. ActionMap.PatchHyperbeamBalances)
-		local patchMessage = { device = "patch@1.0", balances = utils.deepCopy(Balances) }
+
+		local patchBalances = {}
+		for address, balance in pairs(Balances) do
+			patchBalances[address] = tostring(balance)
+		end
+
+		local patchMessage = { device = "patch@1.0", balances = patchBalances }
 		ao.send(patchMessage)
+
 		return Send(msg, {
 			Target = msg.From,
 			Action = ActionMap.PatchHyperbeamBalances .. "-Notice",
@@ -2853,8 +2860,14 @@ local function _loaded_mod_src_main()
 end
 
 _G.package.loaded[".src.main"] = _loaded_mod_src_main()
+
 -- Initialize the HB balances state
+
+local patchBalances = {}
+for address, balance in pairs(Balances) do
+	patchBalances[address] = tostring(balance)
+end
 ao.send({
 	device = "patch@1.0",
-	balances = Balances,
+	balances = patchBalances,
 })

@@ -22,10 +22,10 @@ function hb.patchBalances(oldBalances)
 
 	local patchMessage = {
 		device = "patch@1.0",
-		balances = { [ao.id] = Balances[ao.id] or 0 },
+		balances = { [ao.id] = tostring(Balances[ao.id] or 0) },
 	}
 	for address, _ in pairs(affectedBalancesAddresses) do
-		patchMessage.balances[address] = Balances[address] or 0
+		patchMessage.balances[address] = tostring(Balances[address] or 0)
 	end
 
 	-- only send the patch message if there are affected balances, otherwise we'll end up deleting the entire hyperbeam balances table

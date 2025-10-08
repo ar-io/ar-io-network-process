@@ -2707,8 +2707,15 @@ addEventingHandler(ActionMap.PatchHyperbeamBalances, function(msg)
 	return false
 end, function(msg)
 	assert(msg.From == Owner, "Only the owner can trigger " .. ActionMap.PatchHyperbeamBalances)
-	local patchMessage = { device = "patch@1.0", balances = utils.deepCopy(Balances) }
+
+	local patchBalances = {}
+	for address, balance in pairs(Balances) do
+		patchBalances[address] = tostring(balance)
+	end
+
+	local patchMessage = { device = "patch@1.0", balances = patchBalances }
 	ao.send(patchMessage)
+
 	return Send(msg, {
 		Target = msg.From,
 		Action = ActionMap.PatchHyperbeamBalances .. "-Notice",
