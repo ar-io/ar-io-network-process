@@ -12,8 +12,11 @@ import assert from 'node:assert';
  * Loads the aos wasm binary and returns the handle function with program memory
  * @returns {Promise<{handle: Function, memory: WebAssembly.Memory}>}
  */
-export async function createAosLoader() {
-  const handle = await AoLoader(AOS_WASM, AO_LOADER_OPTIONS);
+export async function createAosLoader({
+  wasm = AOS_WASM,
+  lua = BUNDLED_SOURCE_CODE,
+}) {
+  const handle = await AoLoader(wasm, AO_LOADER_OPTIONS);
   const evalRes = await handle(
     null,
     {
@@ -22,7 +25,7 @@ export async function createAosLoader() {
         { name: 'Action', value: 'Eval' },
         { name: 'Module', value: ''.padEnd(43, '1') },
       ],
-      Data: BUNDLED_SOURCE_CODE,
+      Data: lua,
     },
     AO_LOADER_HANDLER_ENV,
   );
