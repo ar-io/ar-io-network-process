@@ -4,7 +4,7 @@
  *   After that, do a computeTotalSupply call to ensure that hb patches the empty (nil) address afterwards as 0
  */
 
-import { getBalances, handle, transfer } from './helpers.mjs';
+import { handle, transfer } from './helpers.mjs';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { STUB_ADDRESS, STUB_TIMESTAMP } from '../tools/constants.mjs';
@@ -47,9 +47,7 @@ describe('hyperbeam patch balances', async () => {
       recipient: sender,
       quantity,
     });
-    const balancesAfterTransfer = await getBalances({
-      memory: transferToSenderAddressMemory,
-    });
+
     const transferToRecipientAddress = await handle({
       options: {
         From: sender,
@@ -63,9 +61,7 @@ describe('hyperbeam patch balances', async () => {
       },
       memory: transferToSenderAddressMemory,
     });
-    const balancesAfterTransferToRecipient = await getBalances({
-      memory: transferToRecipientAddress.Memory,
-    });
+
     const patchMessage = transferToRecipientAddress.Messages.at(-1);
     const patchData = patchMessage.Tags.find(
       (tag) => tag.name === 'balances',
@@ -85,9 +81,6 @@ describe('hyperbeam patch balances', async () => {
         Timestamp: STUB_TIMESTAMP,
       },
       memory: transferToRecipientAddress.Memory,
-    });
-    const balancesAfterDrain = await getBalances({
-      memory: transferToDrainerAddress.Memory,
     });
 
     const patchMessage2 = transferToDrainerAddress.Messages.at(-1);
@@ -147,18 +140,11 @@ describe('hyperbeam patch balances', async () => {
     assert.equal(patchData2[sender], 0);
     assert.equal(patchData2[recipient], quantity);
 
-    const balancesBeforeCleanup = await getBalances({
-      memory: transferToDrainerAddress.Memory,
-    });
-
     const tokenSupplyRes = await handle({
       options: {
         Tags: [{ name: 'Action', value: 'Total-Supply' }],
       },
       memory: transferToDrainerAddress.Memory,
-    });
-    const balancesAfterCleanup = await getBalances({
-      memory: tokenSupplyRes.Memory,
     });
 
     const patchMessage3 = tokenSupplyRes.Messages.at(-1);
