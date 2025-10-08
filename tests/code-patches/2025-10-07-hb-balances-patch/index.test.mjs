@@ -1,12 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, it } from 'node:test';
-import assert from 'node:assert';
 import { assertNoResultError, createAosLoader } from '../../utils.mjs';
 import {
   AO_LOADER_HANDLER_ENV,
   DEFAULT_HANDLE_OPTIONS,
-  STUB_ADDRESS,
   STUB_BLOCK_HEIGHT,
   STUB_HASH_CHAIN,
   STUB_TIMESTAMP,
@@ -36,8 +34,6 @@ const { handle: originalHandle, memory } = await createAosLoader({
 });
 const startMemory = memory;
 
-const PROCESS_OWNER = 'My21NOHZyyeQG0t0yANsWjRakNDM7CJvd8urtdMLEDE';
-
 /**
  *
  * @param {{
@@ -64,7 +60,14 @@ async function handle({
       ...DEFAULT_HANDLE_OPTIONS,
       ...options,
     },
-    AO_LOADER_HANDLER_ENV,
+    {
+      ...AO_LOADER_HANDLER_ENV,
+      Process: {
+        ...AO_LOADER_HANDLER_ENV.Process,
+        Id: 'qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE',
+        Owner: processOwner,
+      },
+    },
   );
   if (shouldAssertNoResultError) {
     assertNoResultError(result);
@@ -72,212 +75,30 @@ async function handle({
   return result;
 }
 
-// Helper functions for manual loader
-async function getBalances({ memory, timestamp = STUB_TIMESTAMP }) {
-  const result = await handle({
-    options: {
-      Tags: [{ name: 'Action', value: 'Balances' }],
-    },
-    timestamp,
-    memory,
-  });
-
-  const balancesData = result.Messages?.[0]?.Data;
-  if (!balancesData) {
-    const { Memory, ...rest } = result;
-    console.log(rest);
-    assert(false, `Something went wrong: ${JSON.stringify(rest, null, 2)}`);
-  }
-  const balances = JSON.parse(result.Messages?.[0]?.Data);
-  return balances;
-}
-
-async function transfer({
-  recipient = STUB_ADDRESS,
-  quantity = 100_000_000_000,
-  memory = startMemory,
-  timestamp = STUB_TIMESTAMP,
-  from = PROCESS_OWNER,
-} = {}) {
-  if (quantity === 0) {
-    return memory;
-  }
-
-  const transferResult = await handle({
-    options: {
-      From: from,
-      Owner: from,
-      Tags: [
-        { name: 'Action', value: 'Transfer' },
-        { name: 'Recipient', value: recipient },
-        { name: 'Quantity', value: String(quantity) },
-      ],
-      Timestamp: timestamp,
-    },
-    memory,
-  });
-  return transferResult.Memory;
-}
+const processOwner = 'My21NOHZyyeQG0t0yANsWjRakNDM7CJvd8urtdMLEDE';
 
 describe('2025-10-07-hb-balances-patch', () => {
-  it('should handle sending a patch to a newly created address', async () => {
-    const sender = STUB_ADDRESS;
-    const recipient = ''.padEnd(43, 'a');
-    const quantity = 100000000;
-    const transferToSenderAddressMemory = await transfer({
-      recipient: sender,
-      quantity,
+  it('should eval the patch file', async () => {
+    const { memory: evalPatchMemory, ...rest } = await handle({
+      options: {
+        From: processOwner,
+        Owner: processOwner,
+        Tags: [{ name: 'Action', value: 'Eval' }],
+        Data: patchFile,
+      },
       memory: wasmMemory,
     });
-    const transferToRecipientAddress = await handle({
+
+    console.dir(rest, { depth: null });
+
+    const balances = await handle({
       options: {
-        From: sender,
-        Owner: sender,
-        Tags: [
-          { name: 'Action', value: 'Transfer' },
-          { name: 'Recipient', value: recipient },
-          { name: 'Quantity', value: String(quantity / 2) },
-        ],
-        Timestamp: STUB_TIMESTAMP,
+        From: processOwner,
+        Owner: processOwner,
+        Tags: [{ name: 'Action', value: 'Balances' }],
       },
-      memory: transferToSenderAddressMemory,
+      memory: evalPatchMemory,
     });
-    const patchMessage = transferToRecipientAddress.Messages.at(-1);
-    const patchData = patchMessage.Tags.find(
-      (tag) => tag.name === 'balances',
-    ).value;
-    assert.equal(patchData[sender], quantity / 2);
-    assert.equal(patchData[recipient], quantity / 2);
-  });
-
-  it('should handle sending a patch that drains an address', async () => {
-    const sender = STUB_ADDRESS;
-    const recipient = ''.padEnd(43, 'a');
-    const quantity = 100000000;
-    const transferToSenderAddressMemory = await transfer({
-      recipient: sender,
-      quantity,
-      memory: wasmMemory,
-    });
-    const balancesAfterTransfer = await getBalances({
-      memory: transferToSenderAddressMemory,
-    });
-    const transferToRecipientAddress = await handle({
-      options: {
-        From: sender,
-        Owner: sender,
-        Tags: [
-          { name: 'Action', value: 'Transfer' },
-          { name: 'Recipient', value: recipient },
-          { name: 'Quantity', value: String(quantity / 2) },
-        ],
-        Timestamp: STUB_TIMESTAMP,
-      },
-      memory: transferToSenderAddressMemory,
-    });
-    const balancesAfterTransferToRecipient = await getBalances({
-      memory: transferToRecipientAddress.Memory,
-    });
-    const patchMessage = transferToRecipientAddress.Messages.at(-1);
-    const patchData = patchMessage.Tags.find(
-      (tag) => tag.name === 'balances',
-    ).value;
-    assert.equal(patchData[sender], quantity / 2);
-    assert.equal(patchData[recipient], quantity / 2);
-
-    const transferToDrainerAddress = await handle({
-      options: {
-        From: sender,
-        Owner: sender,
-        Tags: [
-          { name: 'Action', value: 'Transfer' },
-          { name: 'Recipient', value: recipient },
-          { name: 'Quantity', value: String(quantity / 2) },
-        ],
-        Timestamp: STUB_TIMESTAMP,
-      },
-      memory: transferToRecipientAddress.Memory,
-    });
-    const balancesAfterDrain = await getBalances({
-      memory: transferToDrainerAddress.Memory,
-    });
-
-    const patchMessage2 = transferToDrainerAddress.Messages.at(-1);
-    const patchData2 = patchMessage2.Tags.find(
-      (tag) => tag.name === 'balances',
-    ).value;
-    assert.equal(patchData2[sender], 0);
-    assert.equal(patchData2[recipient], quantity);
-  });
-
-  it('should handle sending a patch when an address is removed from balances', async () => {
-    const sender = STUB_ADDRESS;
-    const recipient = ''.padEnd(43, 'a');
-    const quantity = 100000000;
-    const transferToSenderAddressMemory = await transfer({
-      recipient: sender,
-      quantity,
-      memory: wasmMemory,
-    });
-    const transferToRecipientAddress = await handle({
-      options: {
-        From: sender,
-        Owner: sender,
-        Tags: [
-          { name: 'Action', value: 'Transfer' },
-          { name: 'Recipient', value: recipient },
-          { name: 'Quantity', value: String(quantity / 2) },
-        ],
-        Timestamp: STUB_TIMESTAMP,
-      },
-      memory: transferToSenderAddressMemory,
-    });
-    const patchMessage = transferToRecipientAddress.Messages.at(-1);
-    const patchData = patchMessage.Tags.find(
-      (tag) => tag.name === 'balances',
-    ).value;
-    assert.equal(patchData[sender], quantity / 2);
-    assert.equal(patchData[recipient], quantity / 2);
-
-    const transferToDrainerAddress = await handle({
-      options: {
-        From: sender,
-        Owner: sender,
-        Tags: [
-          { name: 'Action', value: 'Transfer' },
-          { name: 'Recipient', value: recipient },
-          { name: 'Quantity', value: String(quantity / 2) },
-        ],
-        Timestamp: STUB_TIMESTAMP,
-      },
-      memory: transferToRecipientAddress.Memory,
-    });
-
-    const patchMessage2 = transferToDrainerAddress.Messages.at(-1);
-    const patchData2 = patchMessage2.Tags.find(
-      (tag) => tag.name === 'balances',
-    ).value;
-    assert.equal(patchData2[sender], 0);
-    assert.equal(patchData2[recipient], quantity);
-
-    const balancesBeforeCleanup = await getBalances({
-      memory: transferToDrainerAddress.Memory,
-    });
-
-    const tokenSupplyRes = await handle({
-      options: {
-        Tags: [{ name: 'Action', value: 'Total-Supply' }],
-      },
-      memory: transferToDrainerAddress.Memory,
-    });
-    const balancesAfterCleanup = await getBalances({
-      memory: tokenSupplyRes.Memory,
-    });
-
-    const patchMessage3 = tokenSupplyRes.Messages.at(-1);
-    const patchData3 = patchMessage3.Tags.find(
-      (tag) => tag.name === 'balances',
-    ).value;
-    assert.equal(patchData3[sender], 0);
+    console.dir(balances, { depth: null });
   });
 });

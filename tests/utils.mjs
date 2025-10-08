@@ -27,7 +27,13 @@ export async function createAosLoader({
       ],
       Data: lua,
     },
-    AO_LOADER_HANDLER_ENV,
+    {
+      ...AO_LOADER_HANDLER_ENV,
+      Process: {
+        ...AO_LOADER_HANDLER_ENV.Process,
+        Id: 'qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE',
+      },
+    },
   );
   return {
     handle,
