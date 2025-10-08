@@ -2700,18 +2700,19 @@ addEventingHandler("allPaginatedGatewayVaults", utils.hasMatchingTag("Action", "
 	Send(msg, { Target = msg.From, Action = "All-Gateway-Vaults-Notice", Data = json.encode(result) })
 end)
 
-addEventingHandler(
-	ActionMap.PatchHyperbeamBalances,
-	Handlers.utils.continue(utils.hasMatchingTag("Action", ActionMap.PatchHyperbeamBalances)),
-	function(msg)
-		assert(msg.From == Owner, "Only the owner can trigger " .. ActionMap.PatchHyperbeamBalances)
-		local patchMessage = { device = "patch@1.0", balances = utils.deepCopy(Balances) }
-		ao.send(patchMessage)
-		return Send(msg, {
-			Target = msg.From,
-			Action = ActionMap.PatchHyperbeamBalances .. "-Notice",
-		})
+addEventingHandler(ActionMap.PatchHyperbeamBalances, function(msg)
+	if msg.Tags.Action == ActionMap.PatchHyperbeamBalances then
+		return "continue"
 	end
-)
+	return false
+end, function(msg)
+	assert(msg.From == Owner, "Only the owner can trigger " .. ActionMap.PatchHyperbeamBalances)
+	local patchMessage = { device = "patch@1.0", balances = utils.deepCopy(Balances) }
+	ao.send(patchMessage)
+	return Send(msg, {
+		Target = msg.From,
+		Action = ActionMap.PatchHyperbeamBalances .. "-Notice",
+	})
+end)
 
 return main

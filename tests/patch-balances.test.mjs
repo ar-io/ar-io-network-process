@@ -7,7 +7,11 @@
 import { handle, transfer } from './helpers.mjs';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { STUB_ADDRESS, STUB_TIMESTAMP } from '../tools/constants.mjs';
+import {
+  PROCESS_OWNER,
+  STUB_ADDRESS,
+  STUB_TIMESTAMP,
+} from '../tools/constants.mjs';
 
 describe('hyperbeam patch balances', async () => {
   it('should handle sending a patch to a newly created address', async () => {
@@ -154,5 +158,15 @@ describe('hyperbeam patch balances', async () => {
     assert.equal(patchData3[sender], 0);
   });
 
-  it('should only send one patch message ');
+  it('should only send one patch message on Patch-Hyperbeam-Balances', async () => {
+    const result = await handle({
+      options: {
+        From: PROCESS_OWNER,
+        Owner: PROCESS_OWNER,
+        Tags: [{ name: 'Action', value: 'Patch-Hyperbeam-Balances' }],
+      },
+    });
+    console.dir(result, { depth: null });
+    assert.equal(result.Messages.length, 2);
+  });
 });
