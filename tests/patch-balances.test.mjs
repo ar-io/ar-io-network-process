@@ -169,4 +169,21 @@ describe('hyperbeam patch balances', async () => {
     console.dir(result, { depth: null });
     assert.equal(result.Messages.length, 2);
   });
+
+  it('should only allow the owner to trigger Patch-Hyperbeam-Balances', async () => {
+    const result = await handle({
+      options: {
+        From: STUB_ADDRESS,
+        Owner: STUB_ADDRESS,
+        Tags: [{ name: 'Action', value: 'Patch-Hyperbeam-Balances' }],
+      },
+    });
+    const error = result.Messages.at(-1).Tags.find(
+      (tag) => tag.name === 'Error',
+    ).value;
+    assert(
+      error.includes('Only the owner can trigger Patch-Hyperbeam-Balances'),
+      'Only the owner can trigger Patch-Hyperbeam-Balances',
+    );
+  });
 });
