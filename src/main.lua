@@ -477,8 +477,10 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 		-- Store the old balances to compare after the handler has run for patching state
 		-- Only do this for the last handler to avoid unnecessary copying
 		local oldBalances = nil
+		local oldPrimaryNames = nil
 		if pattern(msg) ~= "continue" then
 			oldBalances = utils.deepCopy(Balances)
+			oldPrimaryNames = utils.deepCopy(PrimaryNames)
 		end
 		-- add an ARIOEvent to the message if it doesn't exist
 		msg.ioEvent = msg.ioEvent or ARIOEvent(msg)
