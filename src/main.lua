@@ -509,6 +509,9 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 		if oldBalances then
 			hb.patchBalances(oldBalances)
 		end
+		if oldPrimaryNames then
+			hb.patchPrimaryNames(oldPrimaryNames)
+		end
 
 		msg.ioEvent:addField("Handler-Memory-KiB-Used", collectgarbage("count"), false)
 		collectgarbage("collect")
