@@ -477,10 +477,10 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 		-- Store the old balances to compare after the handler has run for patching state
 		-- Only do this for the last handler to avoid unnecessary copying
 		local oldBalances = nil
-		local oldPrimaryNames = nil
+		local shouldPatchHbState = false
 		if pattern(msg) ~= "continue" then
 			oldBalances = utils.deepCopy(Balances)
-			oldPrimaryNames = utils.deepCopy(PrimaryNames)
+			shouldPatchHbState = true
 		end
 		-- add an ARIOEvent to the message if it doesn't exist
 		msg.ioEvent = msg.ioEvent or ARIOEvent(msg)
@@ -509,8 +509,9 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 		if oldBalances then
 			hb.patchBalances(oldBalances)
 		end
-		if oldPrimaryNames then
-			hb.patchPrimaryNames(oldPrimaryNames)
+
+		if shouldPatchHbState then
+			hb.patchHbState()
 		end
 
 		msg.ioEvent:addField("Handler-Memory-KiB-Used", collectgarbage("count"), false)

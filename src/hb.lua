@@ -1,52 +1,26 @@
 -- hb.lua needs to be in its own file and not in balances.lua to avoid circular dependencies
 local hb = {}
 
-function hb.deepEqual(val1, val2)
-	-- If types are different, they're not equal
-	if type(val1) ~= type(val2) then
-		return false
-	end
-
-	-- If not tables, use simple equality
-	if type(val1) ~= "table" then
-		return val1 == val2
-	end
-
-	-- Both are tables, compare recursively
-	-- Check if all keys in val1 have equal values in val2
-	for key, value in pairs(val1) do
-		if not hb.deepEqual(value, val2[key]) then
-			return false
-		end
-	end
-
-	-- Check if val2 has any keys that val1 doesn't have
-	for key, _ in pairs(val2) do
-		if val1[key] == nil then
-			return false
-		end
-	end
-
-	return true
-end
-
----@param accumulator table<string, any>
----@param oldTable table<string, any>
----@param newTable table<string, any>
----@return table<string, any>
-function hb.getTableChanges(accumulator, oldTable, newTable)
-	for key, value in pairs(oldTable) do
-		if not hb.deepEqual(newTable[key], value) then
-			accumulator[key] = newTable[key]
-		end
-	end
-	for key, value in pairs(newTable) do
-		if not hb.deepEqual(oldTable[key], value) then
-			accumulator[key] = value
-		end
-	end
-	return accumulator
-end
+--[[
+	HyperbeamSync is a table that is used to track changes to our lua state that need to be synced to the Hyperbeam.
+	the principal of using it is to set the key:value pairs that need to be synced, then
+		the patch function will pull that from the global state to build the patch message.
+		
+	After, the HyperbeamSync table is cleared and the next message run will start fresh.
+]]
+HyperbeamSync = HyperbeamSync
+	or {
+		---@type table<string, boolean> addresses that have had balance changes
+		balances = {},
+		primaryNames = {
+			---@type table<string, boolean> addresses that have had name changes
+			names = {},
+			---@type table<string, boolean> addresses that have had owner changes
+			owners = {},
+			---@type table<string, boolean> addresses that have had request changes
+			requests = {},
+		},
+	}
 
 ---@param oldBalances table<string, number> A table of addresses and their balances
 ---@return table<string, boolean> affectedBalancesAddresses table of addresses that have had balance changes
@@ -85,33 +59,100 @@ function hb.patchBalances(oldBalances)
 	return affectedBalancesAddresses
 end
 
----@param oldPrimaryNames PrimaryNames
----@return PrimaryNames affectedPrimaryNamesAddresses
-function hb.patchPrimaryNames(oldPrimaryNames)
-	assert(type(oldPrimaryNames) == "table", "Old primary names must be a table")
+---@return PrimaryNames|nil affectedPrimaryNamesAddresses
+function hb.createPrimaryNamesPatch()
 	---@type PrimaryNames
 	local affectedPrimaryNamesAddresses = {
-		names = hb.getTableChanges({}, oldPrimaryNames.names, PrimaryNames.names),
-		owners = hb.getTableChanges({}, oldPrimaryNames.owners, PrimaryNames.owners),
-		requests = hb.getTableChanges({}, oldPrimaryNames.requests, PrimaryNames.requests),
+		names = {},
+		owners = {},
+		requests = {},
 	}
 
-	local patchMessage = {
-		device = "patch@1.0",
-		["primary-names"] = affectedPrimaryNamesAddresses,
-	}
+	-- if no changes, return early. This will allow downstream code to not send the patch state for this key ('primary-names')
+	if
+		next(HyperbeamSync.primaryNames.names) == nil
+		and next(HyperbeamSync.primaryNames.owners) == nil
+		and next(HyperbeamSync.primaryNames.requests) == nil
+	then
+		return nil
+	end
 
-	if next(patchMessage["primary-names"]) == nil then
-		return {
-			names = {},
-			owners = {},
-			requests = {},
-		}
+	-- build the affected primary names addresses table for the patch message
+	for name, _ in pairs(HyperbeamSync.primaryNames.names) do
+		-- we need to send an empty string to remove the name
+		affectedPrimaryNamesAddresses.names[name] = PrimaryNames.names[name] or ""
+	end
+	for owner, _ in pairs(HyperbeamSync.primaryNames.owners) do
+		-- we need to send an empty table to remove the owner primary name data
+		affectedPrimaryNamesAddresses.owners[owner] = PrimaryNames.owners[owner] or {}
+	end
+	for address, _ in pairs(HyperbeamSync.primaryNames.requests) do
+		-- we need to send an empty table to remove the request
+		affectedPrimaryNamesAddresses.requests[address] = PrimaryNames.requests[address] or {}
+	end
+
+	local shouldSendEmptyNames = next(PrimaryNames.names) == nil
+	local shouldSendEmptyOwners = next(PrimaryNames.owners) == nil
+	local shouldSendEmptyRequests = next(PrimaryNames.requests) == nil
+
+	-- if we're not sending any data, we need to remove the table from the patch message to not delete the entire primary names table
+	--- with this ifelse pattern we are saying that if the global state for that key is empty, we can remove the data from the hyperbeam state
+	--- by sending the empty table.
+	---
+	--- unlikely case for names and owners, but possible for requests
+	if not shouldSendEmptyNames then
+		affectedPrimaryNamesAddresses.names = nil
 	else
-		ao.send(patchMessage)
+		affectedPrimaryNamesAddresses.names = {}
+	end
+	if not shouldSendEmptyOwners then
+		affectedPrimaryNamesAddresses.owners = nil
+	else
+		affectedPrimaryNamesAddresses.owners = {}
+	end
+
+	if not shouldSendEmptyRequests then
+		affectedPrimaryNamesAddresses.requests = nil
+	else
+		affectedPrimaryNamesAddresses.requests = {}
+	end
+
+	-- if we're not sending any data, return nil which will allow downstream code to not send the patch message
+	if next(affectedPrimaryNamesAddresses) == nil then
+		return nil
 	end
 
 	return affectedPrimaryNamesAddresses
+end
+
+function hb.resetHyperbeamSync()
+	HyperbeamSync = {
+		balances = {},
+		primaryNames = {
+			names = {},
+			owners = {},
+			requests = {},
+		},
+	}
+end
+
+--[[
+	1. Create the data patches
+	2. Send the patch message if there are any data patches
+	3. Reset the hyperbeam sync
+]]
+function hb.patchHyperbeamState()
+	local patchMessageFields = {
+		["primary-names"] = hb.createPrimaryNamesPatch(),
+	}
+
+	--- just seperating out the device field to make it easier to predicate on
+	if next(patchMessageFields) ~= nil then
+		patchMessageFields.device = "patch@1.0"
+		ao.send(patchMessageFields)
+	end
+
+	hb.resetHyperbeamSync()
 end
 
 return hb
