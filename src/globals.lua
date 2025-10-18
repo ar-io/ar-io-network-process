@@ -65,6 +65,57 @@ PrimaryNames = PrimaryNames or {
 	owners = {},
 }
 
+-- Wrap PrimaryNames sub-tables with metatables that automatically track changes in HyperbeamSync
+-- When you write: PrimaryNames.names[key] = value
+-- It stores the value AND sets HyperbeamSync.primaryNames.names[key] = true
+if not getmetatable(PrimaryNames.names) then
+	local function wrapWithTracking(targetTable, syncTable)
+		return setmetatable({}, {
+			__index = targetTable,
+			__newindex = function(t, key, value)
+				-- Set the actual value
+				rawset(targetTable, key, value)
+				-- Track the change (key = true, not the value)
+				syncTable[key] = true
+			end,
+			__pairs = function()
+				return pairs(targetTable)
+			end,
+			__len = function()
+				return #targetTable
+			end,
+		})
+	end
+
+	-- Store references to the original tables
+	local originalNames = PrimaryNames.names
+	local originalOwners = PrimaryNames.owners
+	local originalRequests = PrimaryNames.requests
+
+	-- Create wrapped versions
+	local wrappedNames = wrapWithTracking(originalNames, HyperbeamSync.primaryNames.names)
+	local wrappedOwners = wrapWithTracking(originalOwners, HyperbeamSync.primaryNames.owners)
+	local wrappedRequests = wrapWithTracking(originalRequests, HyperbeamSync.primaryNames.requests)
+
+	-- Replace the PrimaryNames table itself with a metatable that returns the wrapped tables
+	local originalPrimaryNames = PrimaryNames
+	PrimaryNames = setmetatable({}, {
+		__index = function(t, key)
+			if key == "names" then
+				return wrappedNames
+			elseif key == "owners" then
+				return wrappedOwners
+			elseif key == "requests" then
+				return wrappedRequests
+			end
+			return rawget(originalPrimaryNames, key)
+		end,
+		__newindex = function(t, key, value)
+			rawset(originalPrimaryNames, key, value)
+		end,
+	})
+end
+
 --[[
     DemandFactor
 ]]

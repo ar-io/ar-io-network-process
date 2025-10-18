@@ -7,6 +7,11 @@ local hb = {}
 		the patch function will pull that from the global state to build the patch message.
 		
 	After, the HyperbeamSync table is cleared and the next message run will start fresh.
+	
+	NOTE: PrimaryNames changes are tracked AUTOMATICALLY via metatables (see globals.lua).
+	When you write: PrimaryNames.names[key] = value
+	The metatable automatically sets: HyperbeamSync.primaryNames.names[key] = true
+	Same for owners and requests. No manual tracking needed in primary_names.lua!
 ]]
 HyperbeamSync = HyperbeamSync
 	or {
