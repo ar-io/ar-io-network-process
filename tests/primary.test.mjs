@@ -683,4 +683,322 @@ describe('primary names', function () {
       endingMemory = getPaginatedPrimaryNameRequestsResult.Memory;
     });
   });
+
+  describe('hyperbeam patch', function () {
+    it('should send patch message on primary name request', async function () {
+      const processId = ''.padEnd(43, 'a');
+      const recipient = ''.padEnd(43, 'b');
+      const requestTimestamp = 1234567890;
+
+      // First buy a record
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-name',
+        processId,
+        timestamp: requestTimestamp,
+        memory: sharedMemory,
+        type: 'permabuy',
+      });
+
+      // Request primary name - this should trigger a patch message
+      const { result: requestPrimaryNameResult } = await requestPrimaryName({
+        name: 'test-name',
+        caller: recipient,
+        timestamp: requestTimestamp,
+        memory: buyRecordResult.Memory,
+      });
+
+      assertNoResultError(requestPrimaryNameResult);
+
+      // Find the patch message - it should be the last message
+      const patchMessage = requestPrimaryNameResult.Messages.at(-1);
+
+      // Verify it has device tag
+      const deviceTag = patchMessage.Tags.find((tag) => tag.name === 'device');
+      assert.ok(deviceTag, 'Expected to find device tag');
+      assert.equal(
+        deviceTag.value,
+        'patch@1.0',
+        'Expected device tag to be patch@1.0',
+      );
+
+      // Verify the patch message has primary-names field with the request
+      const patchData = patchMessage.Tags.find(
+        (tag) => tag.name === 'primary-names',
+      )?.value;
+
+      assert.ok(patchData, 'Expected primary-names tag in patch');
+      assert.ok(
+        patchData.requests,
+        'Expected requests field in primary-names patch',
+      );
+      assert.ok(
+        patchData.requests[recipient],
+        'Expected request for recipient in patch',
+      );
+      assert.equal(
+        patchData.requests[recipient].name,
+        'test-name',
+        'Expected correct name in patch request',
+      );
+
+      endingMemory = requestPrimaryNameResult.Memory;
+    });
+
+    it('should send patch message on primary name approval', async function () {
+      const processId = ''.padEnd(43, 'a');
+      const recipient = ''.padEnd(43, 'b');
+      const requestTimestamp = 1234567890;
+
+      // Buy record and create request
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-name',
+        processId,
+        timestamp: requestTimestamp,
+        memory: sharedMemory,
+        type: 'permabuy',
+      });
+
+      const { result: requestPrimaryNameResult } = await requestPrimaryName({
+        name: 'test-name',
+        caller: recipient,
+        timestamp: requestTimestamp,
+        memory: buyRecordResult.Memory,
+      });
+
+      const approvalTimestamp = 1234567899;
+
+      // Approve primary name - this should trigger a patch message
+      const { result: approvePrimaryNameRequestResult } =
+        await approvePrimaryNameRequest({
+          name: 'test-name',
+          caller: processId,
+          recipient: recipient,
+          timestamp: approvalTimestamp,
+          memory: requestPrimaryNameResult.Memory,
+        });
+
+      assertNoResultError(approvePrimaryNameRequestResult);
+
+      // Find the patch message - it should be the last message
+      const patchMessage = approvePrimaryNameRequestResult.Messages.at(-1);
+
+      // Verify it has device tag
+      const deviceTag = patchMessage.Tags.find((tag) => tag.name === 'device');
+      assert.ok(deviceTag, 'Expected to find device tag');
+      assert.equal(
+        deviceTag.value,
+        'patch@1.0',
+        'Expected device tag to be patch@1.0',
+      );
+
+      // Verify the patch message contains the updated primary name data
+      const patchData = patchMessage.Tags.find(
+        (tag) => tag.name === 'primary-names',
+      )?.value;
+
+      assert.ok(patchData, 'Expected primary-names tag in patch');
+
+      // Should have the new owner entry
+      assert.ok(
+        patchData.owners,
+        'Expected owners field in primary-names patch',
+      );
+      assert.ok(
+        patchData.owners[recipient],
+        'Expected owner entry for recipient in patch',
+      );
+      assert.equal(
+        patchData.owners[recipient].name,
+        'test-name',
+        'Expected correct name in patch owner',
+      );
+
+      // Should have the new name entry
+      assert.ok(patchData.names, 'Expected names field in primary-names patch');
+      assert.equal(
+        patchData.names['test-name'],
+        recipient,
+        'Expected correct owner for name in patch',
+      );
+
+      // Should remove the request (set to nil/null)
+      assert.ok(
+        patchData.requests,
+        'Expected requests field in primary-names patch',
+      );
+      // In Lua, nil becomes null in JSON, or the key exists with null value
+      // or the key exists because it changed from something to nil
+      const requestExists = recipient in patchData.requests;
+      if (requestExists) {
+        assert.equal(
+          patchData.requests[recipient],
+          null,
+          'Expected request to be removed (null) in patch',
+        );
+      }
+
+      endingMemory = approvePrimaryNameRequestResult.Memory;
+    });
+
+    it('should send patch message on primary name removal', async function () {
+      const processId = ''.padEnd(43, 'a');
+      const recipient = ''.padEnd(43, 'b');
+      const requestTimestamp = 1234567890;
+
+      // Buy record, create request, and approve
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-name',
+        processId,
+        timestamp: requestTimestamp,
+        memory: sharedMemory,
+        type: 'permabuy',
+      });
+
+      const { result: requestPrimaryNameResult } = await requestPrimaryName({
+        name: 'test-name',
+        caller: recipient,
+        timestamp: requestTimestamp,
+        memory: buyRecordResult.Memory,
+      });
+
+      const { result: approvePrimaryNameRequestResult } =
+        await approvePrimaryNameRequest({
+          name: 'test-name',
+          caller: processId,
+          recipient: recipient,
+          timestamp: requestTimestamp,
+          memory: requestPrimaryNameResult.Memory,
+        });
+
+      // Remove primary name - this should trigger a patch message
+      const { result: removePrimaryNameResult } = await removePrimaryNames({
+        names: ['test-name'],
+        caller: processId,
+        memory: approvePrimaryNameRequestResult.Memory,
+        timestamp: requestTimestamp,
+        notifyOwners: true,
+      });
+
+      assertNoResultError(removePrimaryNameResult);
+
+      // Find the patch message - it should be the last message
+      const patchMessage = removePrimaryNameResult.Messages.at(-1);
+
+      // Verify it has device tag
+      const deviceTag = patchMessage.Tags.find((tag) => tag.name === 'device');
+      assert.ok(deviceTag, 'Expected to find device tag');
+      assert.equal(
+        deviceTag.value,
+        'patch@1.0',
+        'Expected device tag to be patch@1.0',
+      );
+
+      // Verify the patch message contains the removed primary name data
+      const patchData = patchMessage.Tags.find(
+        (tag) => tag.name === 'primary-names',
+      )?.value;
+
+      assert.ok(patchData, 'Expected primary-names tag in patch');
+
+      // Should remove the owner entry (set to nil/null)
+      assert.ok(
+        patchData.owners,
+        'Expected owners field in primary-names patch',
+      );
+      const ownerExists = recipient in patchData.owners;
+      if (ownerExists) {
+        assert.equal(
+          patchData.owners[recipient],
+          null,
+          'Expected owner to be removed (null) in patch',
+        );
+      }
+
+      // Should remove the name entry (set to nil/null)
+      assert.ok(patchData.names, 'Expected names field in primary-names patch');
+      const nameExists = 'test-name' in patchData.names;
+      if (nameExists) {
+        assert.equal(
+          patchData.names['test-name'],
+          null,
+          'Expected name to be removed (null) in patch',
+        );
+      }
+
+      endingMemory = removePrimaryNameResult.Memory;
+    });
+
+    it('should send patch message when owner immediately approves their own request', async function () {
+      const processId = ''.padEnd(43, 'a');
+      const requestTimestamp = 1234567890;
+
+      // Buy record
+      const { result: buyRecordResult } = await buyRecord({
+        name: 'test-name',
+        processId,
+        timestamp: requestTimestamp,
+        memory: sharedMemory,
+        type: 'permabuy',
+      });
+
+      // Request as the owner - should immediately approve
+      const { result: requestPrimaryNameResult } = await requestPrimaryName({
+        name: 'test-name',
+        caller: processId,
+        timestamp: requestTimestamp,
+        memory: buyRecordResult.Memory,
+      });
+
+      assertNoResultError(requestPrimaryNameResult);
+
+      // Find the patch message - it should be the last message
+      const patchMessage = requestPrimaryNameResult.Messages.at(-1);
+
+      // Verify it has device tag
+      const deviceTag = patchMessage.Tags.find((tag) => tag.name === 'device');
+      assert.ok(deviceTag, 'Expected to find device tag');
+      assert.equal(
+        deviceTag.value,
+        'patch@1.0',
+        'Expected device tag to be patch@1.0',
+      );
+
+      // Verify the patch message contains the immediate primary name assignment
+      const patchData = patchMessage.Tags.find(
+        (tag) => tag.name === 'primary-names',
+      )?.value;
+
+      assert.ok(patchData, 'Expected primary-names tag in patch');
+
+      // Should have the new owner entry
+      assert.ok(
+        patchData.owners,
+        'Expected owners field in primary-names patch',
+      );
+      assert.ok(
+        patchData.owners[processId],
+        'Expected owner entry for processId in patch',
+      );
+
+      // Should have the new name entry
+      assert.ok(patchData.names, 'Expected names field in primary-names patch');
+      assert.equal(
+        patchData.names['test-name'],
+        processId,
+        'Expected correct owner for name in patch',
+      );
+
+      // Should NOT have a pending request since it was immediately approved
+      // The requests field should be empty or not contain this processId
+      if (patchData.requests) {
+        assert.ok(
+          !(processId in patchData.requests) ||
+            patchData.requests[processId] === null,
+          'Expected no pending request for processId in patch',
+        );
+      }
+
+      endingMemory = requestPrimaryNameResult.Memory;
+    });
+  });
 });
