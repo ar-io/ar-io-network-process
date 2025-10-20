@@ -1,6 +1,33 @@
 local constants = require(".src.constants")
 local utils = require(".src.utils")
+local listen = require(".src.listen")
 local globals = {}
+
+--[[
+	HyperbeamSync is a table that is used to track changes to our lua state that need to be synced to the Hyperbeam.
+	the principal of using it is to set the key:value pairs that need to be synced, then
+		the patch function will pull that from the global state to build the patch message.
+		
+	After, the HyperbeamSync table is cleared and the next message run will start fresh.
+	
+	NOTE: PrimaryNames changes are tracked AUTOMATICALLY via metatables (see globals.lua).
+	When you write: PrimaryNames.names[key] = value
+	The metatable automatically sets: HyperbeamSync.primaryNames.names[key] = true
+	Same for owners and requests. No manual tracking needed in primary_names.lua!
+]]
+HyperbeamSync = HyperbeamSync
+	or {
+		---@type table<string, boolean> addresses that have had balance changes
+		balances = {},
+		primaryNames = {
+			---@type table<string, boolean> addresses that have had name changes
+			names = {},
+			---@type table<string, boolean> addresses that have had owner changes
+			owners = {},
+			---@type table<string, boolean> addresses that have had request changes
+			requests = {},
+		},
+	}
 
 --[[
     Constants
@@ -65,55 +92,21 @@ PrimaryNames = PrimaryNames or {
 	owners = {},
 }
 
--- Wrap PrimaryNames sub-tables with metatables that automatically track changes in HyperbeamSync
+-- Wrap PrimaryNames sub-tables with listeners that automatically track changes in HyperbeamSync
 -- When you write: PrimaryNames.names[key] = value
 -- It stores the value AND sets HyperbeamSync.primaryNames.names[key] = true
 if not getmetatable(PrimaryNames.names) then
-	local function wrapWithTracking(targetTable, syncTable)
-		return setmetatable({}, {
-			__index = targetTable,
-			__newindex = function(t, key, value)
-				-- Set the actual value
-				rawset(targetTable, key, value)
-				-- Track the change (key = true, not the value)
-				syncTable[key] = true
-			end,
-			__pairs = function()
-				return pairs(targetTable)
-			end,
-			__len = function()
-				return #targetTable
-			end,
-		})
-	end
+	PrimaryNames.names = listen.addListener(PrimaryNames.names, function(ctx)
+		HyperbeamSync.primaryNames.names[ctx.key] = true
+	end)
 
-	-- Store references to the original tables
-	local originalNames = PrimaryNames.names
-	local originalOwners = PrimaryNames.owners
-	local originalRequests = PrimaryNames.requests
+	PrimaryNames.owners = listen.addListener(PrimaryNames.owners, function(ctx)
+		HyperbeamSync.primaryNames.owners[ctx.key] = true
+	end)
 
-	-- Create wrapped versions
-	local wrappedNames = wrapWithTracking(originalNames, HyperbeamSync.primaryNames.names)
-	local wrappedOwners = wrapWithTracking(originalOwners, HyperbeamSync.primaryNames.owners)
-	local wrappedRequests = wrapWithTracking(originalRequests, HyperbeamSync.primaryNames.requests)
-
-	-- Replace the PrimaryNames table itself with a metatable that returns the wrapped tables
-	local originalPrimaryNames = PrimaryNames
-	PrimaryNames = setmetatable({}, {
-		__index = function(t, key)
-			if key == "names" then
-				return wrappedNames
-			elseif key == "owners" then
-				return wrappedOwners
-			elseif key == "requests" then
-				return wrappedRequests
-			end
-			return rawget(originalPrimaryNames, key)
-		end,
-		__newindex = function(t, key, value)
-			rawset(originalPrimaryNames, key, value)
-		end,
-	})
+	PrimaryNames.requests = listen.addListener(PrimaryNames.requests, function(ctx)
+		HyperbeamSync.primaryNames.requests[ctx.key] = true
+	end)
 end
 
 --[[

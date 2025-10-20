@@ -2,30 +2,11 @@
 local hb = {}
 
 --[[
-	HyperbeamSync is a table that is used to track changes to our lua state that need to be synced to the Hyperbeam.
-	the principal of using it is to set the key:value pairs that need to be synced, then
-		the patch function will pull that from the global state to build the patch message.
-		
-	After, the HyperbeamSync table is cleared and the next message run will start fresh.
-	
-	NOTE: PrimaryNames changes are tracked AUTOMATICALLY via metatables (see globals.lua).
+	PrimaryNames changes are tracked AUTOMATICALLY via the listen module (see globals.lua).
 	When you write: PrimaryNames.names[key] = value
-	The metatable automatically sets: HyperbeamSync.primaryNames.names[key] = true
+	A listener automatically sets: HyperbeamSync.primaryNames.names[key] = true
 	Same for owners and requests. No manual tracking needed in primary_names.lua!
 ]]
-HyperbeamSync = HyperbeamSync
-	or {
-		---@type table<string, boolean> addresses that have had balance changes
-		balances = {},
-		primaryNames = {
-			---@type table<string, boolean> addresses that have had name changes
-			names = {},
-			---@type table<string, boolean> addresses that have had owner changes
-			owners = {},
-			---@type table<string, boolean> addresses that have had request changes
-			requests = {},
-		},
-	}
 
 ---@param oldBalances table<string, number> A table of addresses and their balances
 ---@return table<string, boolean> affectedBalancesAddresses table of addresses that have had balance changes
@@ -73,6 +54,8 @@ function hb.createPrimaryNamesPatch()
 		requests = {},
 	}
 
+	print(HyperbeamSync)
+
 	-- if no changes, return early. This will allow downstream code to not send the patch state for this key ('primary-names')
 	if
 		next(HyperbeamSync.primaryNames.names) == nil
@@ -81,6 +64,8 @@ function hb.createPrimaryNamesPatch()
 	then
 		return nil
 	end
+
+	print(PrimaryNames)
 
 	-- build the affected primary names addresses table for the patch message
 	for name, _ in pairs(HyperbeamSync.primaryNames.names) do
@@ -107,18 +92,18 @@ function hb.createPrimaryNamesPatch()
 	--- unlikely case for names and owners, but possible for requests
 	if not shouldSendEmptyNames then
 		affectedPrimaryNamesAddresses.names = nil
-	else
+	elseif next(affectedPrimaryNamesAddresses.names) == nil then
 		affectedPrimaryNamesAddresses.names = {}
 	end
 	if not shouldSendEmptyOwners then
 		affectedPrimaryNamesAddresses.owners = nil
-	else
+	elseif next(affectedPrimaryNamesAddresses.owners) == nil then
 		affectedPrimaryNamesAddresses.owners = {}
 	end
 
 	if not shouldSendEmptyRequests then
 		affectedPrimaryNamesAddresses.requests = nil
-	else
+	elseif next(affectedPrimaryNamesAddresses.requests) == nil then
 		affectedPrimaryNamesAddresses.requests = {}
 	end
 
