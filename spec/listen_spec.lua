@@ -84,7 +84,7 @@ describe("listen", function()
 			assert.is.equal("bar", contextTable.foo)
 		end)
 
-		it("should support multiple listeners on the same table", function()
+		it("should replace the listener when adding a second one", function()
 			local tracker1 = {}
 			local tracker2 = {}
 			local testTable = {}
@@ -99,7 +99,8 @@ describe("listen", function()
 
 			testTable.foo = "bar"
 
-			assert.is.equal("bar", tracker1.foo)
+			-- Only the second listener should fire
+			assert.is_nil(tracker1.foo)
 			assert.is.equal("bar", tracker2.foo)
 		end)
 
@@ -174,17 +175,12 @@ describe("listen", function()
 
 		it("should handle listener that throws error", function()
 			local testTable = {}
-			local secondListenerCalled = false
 
 			testTable = listen.addListener(testTable, function(ctx)
 				error("intentional error")
 			end)
 
-			listen.addListener(testTable, function(ctx)
-				secondListenerCalled = true
-			end)
-
-			-- First listener throws, but shouldn't prevent the value from being set
+			-- Listener throws, but value should still be set
 			assert.has_error(function()
 				testTable.foo = "bar"
 			end)
@@ -194,8 +190,8 @@ describe("listen", function()
 		end)
 	end)
 
-	describe("removeAllListeners", function()
-		it("should stop tracking after listeners are removed", function()
+	describe("removeListener", function()
+		it("should stop tracking after listener is removed", function()
 			local tracked = {}
 			local testTable = {}
 
@@ -206,19 +202,65 @@ describe("listen", function()
 			testTable.before = "remove"
 			assert.is.equal("remove", tracked.before)
 
-			listen.removeAllListeners(testTable)
+			local unwrapped = listen.removeListener(testTable)
 
-			testTable.after = "remove"
+			unwrapped.after = "remove"
 			assert.is_nil(tracked.after)
+		end)
+
+		it("should return unwrapped table with actual data", function()
+			local testTable = { existing = "value" }
+
+			testTable = listen.addListener(testTable, function(ctx) end)
+			testTable.new = "data"
+
+			local unwrapped = listen.removeListener(testTable)
+
+			assert.is.equal("value", unwrapped.existing)
+			assert.is.equal("data", unwrapped.new)
+		end)
+
+		it("should restore original metatable if it existed", function()
+			local originalCalled = false
+			local testTable = setmetatable({}, {
+				__index = function(t, key)
+					originalCalled = true
+					return "original-" .. key
+				end,
+			})
+
+			testTable = listen.addListener(testTable, function(ctx) end)
+			testTable.foo = "bar"
+
+			local unwrapped = listen.removeListener(testTable)
+
+			-- Original __index should work again
+			originalCalled = false
+			local value = unwrapped.missing
+			assert.is_true(originalCalled)
+			assert.is.equal("original-missing", value)
+		end)
+
+		it("should remove metatable if there was none originally", function()
+			local testTable = {}
+
+			testTable = listen.addListener(testTable, function(ctx) end)
+
+			local unwrapped = listen.removeListener(testTable)
+
+			assert.is_nil(getmetatable(unwrapped))
 		end)
 
 		it("should handle removing listeners from unwrapped table", function()
 			local testTable = {}
 
-			-- Should not error
+			-- Should not error and return the table
+			local result = nil
 			assert.has_no.errors(function()
-				listen.removeAllListeners(testTable)
+				result = listen.removeListener(testTable)
 			end)
+
+			assert.is.equal(testTable, result)
 		end)
 	end)
 

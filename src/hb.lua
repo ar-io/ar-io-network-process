@@ -1,12 +1,29 @@
 -- hb.lua needs to be in its own file and not in balances.lua to avoid circular dependencies
 local hb = {}
+local listen = require(".src.listen")
 
 --[[
-	PrimaryNames changes are tracked AUTOMATICALLY via the listen module (see globals.lua).
-	When you write: PrimaryNames.names[key] = value
-	A listener automatically sets: HyperbeamSync.primaryNames.names[key] = true
-	Same for owners and requests. No manual tracking needed in primary_names.lua!
+	Setup listeners to state changes here.
 ]]
+
+-- Wrap PrimaryNames sub-tables with listeners that automatically track changes in HyperbeamSync
+-- When you write: PrimaryNames.names[key] = value
+-- It stores the value AND sets HyperbeamSync.primaryNames.names[key] = true
+if not getmetatable(PrimaryNames.names) then
+	PrimaryNames.names = listen.addListener(PrimaryNames.names, function(ctx)
+		HyperbeamSync.primaryNames.names[ctx.key] = true
+	end)
+end
+if not getmetatable(PrimaryNames.owners) then
+	PrimaryNames.owners = listen.addListener(PrimaryNames.owners, function(ctx)
+		HyperbeamSync.primaryNames.owners[ctx.key] = true
+	end)
+end
+if not getmetatable(PrimaryNames.requests) then
+	PrimaryNames.requests = listen.addListener(PrimaryNames.requests, function(ctx)
+		HyperbeamSync.primaryNames.requests[ctx.key] = true
+	end)
+end
 
 ---@param oldBalances table<string, number> A table of addresses and their balances
 ---@return table<string, boolean> affectedBalancesAddresses table of addresses that have had balance changes
@@ -54,8 +71,6 @@ function hb.createPrimaryNamesPatch()
 		requests = {},
 	}
 
-	print(HyperbeamSync)
-
 	-- if no changes, return early. This will allow downstream code to not send the patch state for this key ('primary-names')
 	if
 		next(HyperbeamSync.primaryNames.names) == nil
@@ -64,8 +79,6 @@ function hb.createPrimaryNamesPatch()
 	then
 		return nil
 	end
-
-	print(PrimaryNames)
 
 	-- build the affected primary names addresses table for the patch message
 	for name, _ in pairs(HyperbeamSync.primaryNames.names) do
@@ -81,30 +94,24 @@ function hb.createPrimaryNamesPatch()
 		affectedPrimaryNamesAddresses.requests[address] = PrimaryNames.requests[address] or {}
 	end
 
-	local shouldSendEmptyNames = next(PrimaryNames.names) == nil
-	local shouldSendEmptyOwners = next(PrimaryNames.owners) == nil
-	local shouldSendEmptyRequests = next(PrimaryNames.requests) == nil
-
-	-- if we're not sending any data, we need to remove the table from the patch message to not delete the entire primary names table
-	--- with this ifelse pattern we are saying that if the global state for that key is empty, we can remove the data from the hyperbeam state
-	--- by sending the empty table.
-	---
-	--- unlikely case for names and owners, but possible for requests
-	if not shouldSendEmptyNames then
-		affectedPrimaryNamesAddresses.names = nil
-	elseif next(affectedPrimaryNamesAddresses.names) == nil then
+	-- If PrimaryNames.<thing> is empty, send an empty table to clear hyperbeam state
+	-- Otherwise, only include fields that have changes
+	if next(PrimaryNames.names) == nil then
 		affectedPrimaryNamesAddresses.names = {}
-	end
-	if not shouldSendEmptyOwners then
-		affectedPrimaryNamesAddresses.owners = nil
-	elseif next(affectedPrimaryNamesAddresses.owners) == nil then
-		affectedPrimaryNamesAddresses.owners = {}
+	elseif next(affectedPrimaryNamesAddresses.names) == nil then
+		affectedPrimaryNamesAddresses.names = nil
 	end
 
-	if not shouldSendEmptyRequests then
-		affectedPrimaryNamesAddresses.requests = nil
-	elseif next(affectedPrimaryNamesAddresses.requests) == nil then
+	if next(PrimaryNames.owners) == nil then
+		affectedPrimaryNamesAddresses.owners = {}
+	elseif next(affectedPrimaryNamesAddresses.owners) == nil then
+		affectedPrimaryNamesAddresses.owners = nil
+	end
+
+	if next(PrimaryNames.requests) == nil then
 		affectedPrimaryNamesAddresses.requests = {}
+	elseif next(affectedPrimaryNamesAddresses.requests) == nil then
+		affectedPrimaryNamesAddresses.requests = nil
 	end
 
 	-- if we're not sending any data, return nil which will allow downstream code to not send the patch message

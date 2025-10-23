@@ -11,10 +11,11 @@ local listen = {}
 --- @param callback fun(ctx: ListenerContext) Function called on each change
 --- @return table The wrapped table (use this instead of original)
 function listen.addListener(targetTable, callback)
-	-- If the table already has a metatable with listeners, add to existing
+	-- If the table already has a listener, replace it
 	local existingMeta = getmetatable(targetTable)
-	if existingMeta and existingMeta.__listeners then
-		table.insert(existingMeta.__listeners, callback)
+	if existingMeta and existingMeta.__listener then
+		-- Already has a listener metatable, just replace the callback
+		existingMeta.__listener = callback
 		return targetTable
 	end
 
@@ -35,10 +36,13 @@ function listen.addListener(targetTable, callback)
 		actualData[k] = v
 	end
 
-	-- Create new metatable with listener support
-	local listeners = { callback }
+	-- Store original metamethods if they exist
+	local originalIndex = existingMeta and existingMeta.__index
+	local originalNewIndex = existingMeta and existingMeta.__newindex
+	local originalPairs = existingMeta and existingMeta.__pairs
+	local originalLen = existingMeta and existingMeta.__len
 
-	local proxy = setmetatable({}, {
+	local meta = {
 		__index = function(t, key)
 			return actualData[key]
 		end,
@@ -46,9 +50,9 @@ function listen.addListener(targetTable, callback)
 			local oldValue = actualData[key]
 			-- Set the new value
 			actualData[key] = value
-
-			-- Call all listeners
-			for _, listener in ipairs(listeners) do
+			-- Call the listener from the metatable (not the closure)
+			local listener = getmetatable(t).__listener
+			if listener then
 				listener({
 					key = key,
 					value = value,
@@ -63,23 +67,62 @@ function listen.addListener(targetTable, callback)
 		__len = function(t)
 			return #actualData
 		end,
-		__listeners = listeners,
+		-- Store metadata for later access
+		__listener = callback,
 		__actualData = actualData,
-	})
+		__originalMeta = {
+			__index = originalIndex,
+			__newindex = originalNewIndex,
+			__pairs = originalPairs,
+			__len = originalLen,
+		},
+	}
+
+	local proxy = setmetatable({}, meta)
 
 	return proxy
 end
 
---- Remove all listeners from a table
+--- Remove the listener from a table and restore original metamethods
 --- @param wrappedTable table The wrapped table
-function listen.removeAllListeners(wrappedTable)
+--- @return table The unwrapped table with original data and metamethods
+function listen.removeListener(wrappedTable)
 	local meta = getmetatable(wrappedTable)
-	if meta and meta.__listeners then
-		-- Clear the table instead of replacing it (preserves closure references)
-		for k in pairs(meta.__listeners) do
-			meta.__listeners[k] = nil
-		end
+	if not meta or not meta.__actualData then
+		-- Not a wrapped table, return as-is
+		return wrappedTable
 	end
+
+	-- Get the actual data
+	local actualData = meta.__actualData
+	local originalMeta = meta.__originalMeta
+
+	-- Restore original metatable if it existed
+	if
+		originalMeta and (originalMeta.__index or originalMeta.__newindex or originalMeta.__pairs or originalMeta.__len)
+	then
+		-- Build a new metatable with original metamethods
+		local restoredMeta = {}
+		if originalMeta.__index then
+			restoredMeta.__index = originalMeta.__index
+		end
+		if originalMeta.__newindex then
+			restoredMeta.__newindex = originalMeta.__newindex
+		end
+		if originalMeta.__pairs then
+			restoredMeta.__pairs = originalMeta.__pairs
+		end
+		if originalMeta.__len then
+			restoredMeta.__len = originalMeta.__len
+		end
+
+		setmetatable(actualData, restoredMeta)
+	else
+		-- No original metatable, clear it
+		setmetatable(actualData, nil)
+	end
+
+	return actualData
 end
 
 --- Get the actual data from a wrapped table (bypassing the proxy)

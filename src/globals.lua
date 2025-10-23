@@ -1,6 +1,5 @@
 local constants = require(".src.constants")
 local utils = require(".src.utils")
-local listen = require(".src.listen")
 local globals = {}
 
 --[[
@@ -91,23 +90,6 @@ PrimaryNames = PrimaryNames or {
 	names = {},
 	owners = {},
 }
-
--- Wrap PrimaryNames sub-tables with listeners that automatically track changes in HyperbeamSync
--- When you write: PrimaryNames.names[key] = value
--- It stores the value AND sets HyperbeamSync.primaryNames.names[key] = true
-if not getmetatable(PrimaryNames.names) then
-	PrimaryNames.names = listen.addListener(PrimaryNames.names, function(ctx)
-		HyperbeamSync.primaryNames.names[ctx.key] = true
-	end)
-
-	PrimaryNames.owners = listen.addListener(PrimaryNames.owners, function(ctx)
-		HyperbeamSync.primaryNames.owners[ctx.key] = true
-	end)
-
-	PrimaryNames.requests = listen.addListener(PrimaryNames.requests, function(ctx)
-		HyperbeamSync.primaryNames.requests[ctx.key] = true
-	end)
-end
 
 --[[
     DemandFactor
