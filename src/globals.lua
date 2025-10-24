@@ -6,9 +6,7 @@ local globals = {}
 	HyperbeamSync is a table that is used to track changes to our lua state that need to be synced to the Hyperbeam.
 	the principal of using it is to set the key:value pairs that need to be synced, then
 		the patch function will pull that from the global state to build the patch message.
-		
 	After, the HyperbeamSync table is cleared and the next message run will start fresh.
-	
 	NOTE: PrimaryNames changes are tracked AUTOMATICALLY via metatables (see globals.lua).
 	When you write: PrimaryNames.names[key] = value
 	The metatable automatically sets: HyperbeamSync.primaryNames.names[key] = true

@@ -112,7 +112,7 @@ describe("listen", function()
 				tbl = { nested = "value" },
 			}
 
-			testTable = listen.addListener(testTable, function(ctx) end)
+			testTable = listen.addListener(testTable, function(_) end)
 
 			assert.is.equal("hello", testTable.str)
 			assert.is.equal(42, testTable.num)
@@ -123,11 +123,11 @@ describe("listen", function()
 		it("should work with pairs iteration", function()
 			local testTable = { a = 1, b = 2, c = 3 }
 
-			testTable = listen.addListener(testTable, function(ctx) end)
+			testTable = listen.addListener(testTable, function(_) end)
 
 			local count = 0
 			local sum = 0
-			for k, v in pairs(testTable) do
+			for _, v in pairs(testTable) do
 				count = count + 1
 				sum = sum + v
 			end
@@ -176,7 +176,7 @@ describe("listen", function()
 		it("should handle listener that throws error", function()
 			local testTable = {}
 
-			testTable = listen.addListener(testTable, function(ctx)
+			testTable = listen.addListener(testTable, function(_)
 				error("intentional error")
 			end)
 
@@ -211,7 +211,7 @@ describe("listen", function()
 		it("should return unwrapped table with actual data", function()
 			local testTable = { existing = "value" }
 
-			testTable = listen.addListener(testTable, function(ctx) end)
+			testTable = listen.addListener(testTable, function(_) end)
 			testTable.new = "data"
 
 			local unwrapped = listen.removeListener(testTable)
@@ -223,19 +223,18 @@ describe("listen", function()
 		it("should restore original metatable if it existed", function()
 			local originalCalled = false
 			local testTable = setmetatable({}, {
-				__index = function(t, key)
+				__index = function(_, key)
 					originalCalled = true
 					return "original-" .. key
 				end,
 			})
 
-			testTable = listen.addListener(testTable, function(ctx) end)
+			testTable = listen.addListener(testTable, function(_) end)
 			testTable.foo = "bar"
 
 			local unwrapped = listen.removeListener(testTable)
 
 			-- Original __index should work again
-			originalCalled = false
 			local value = unwrapped.missing
 			assert.is_true(originalCalled)
 			assert.is.equal("original-missing", value)
@@ -244,7 +243,7 @@ describe("listen", function()
 		it("should remove metatable if there was none originally", function()
 			local testTable = {}
 
-			testTable = listen.addListener(testTable, function(ctx) end)
+			testTable = listen.addListener(testTable, function(_) end)
 
 			local unwrapped = listen.removeListener(testTable)
 
@@ -268,7 +267,7 @@ describe("listen", function()
 		it("should return the actual data table", function()
 			local testTable = { foo = "bar" }
 
-			testTable = listen.addListener(testTable, function(ctx) end)
+			testTable = listen.addListener(testTable, function(_) end)
 
 			local actualData = listen.getActualData(testTable)
 
@@ -286,7 +285,7 @@ describe("listen", function()
 		it("should show changes made to wrapped table", function()
 			local testTable = { foo = "bar" }
 
-			testTable = listen.addListener(testTable, function(ctx) end)
+			testTable = listen.addListener(testTable, function(_) end)
 
 			testTable.baz = "qux"
 
@@ -337,7 +336,7 @@ describe("listen", function()
 			local changeCount = 0
 			local testTable = {}
 
-			testTable = listen.addListener(testTable, function(ctx)
+			testTable = listen.addListener(testTable, function(_)
 				changeCount = changeCount + 1
 			end)
 
@@ -352,7 +351,7 @@ describe("listen", function()
 			local changeCount = 0
 			local testTable = {}
 
-			testTable = listen.addListener(testTable, function(ctx)
+			testTable = listen.addListener(testTable, function(_)
 				changeCount = changeCount + 1
 			end)
 

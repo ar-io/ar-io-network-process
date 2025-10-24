@@ -21,13 +21,11 @@ function listen.addListener(targetTable, callback)
 
 	--[[
 		Store the actual data separately to ensure __newindex always fires.
-		
 		WHY USE A PROXY?
 		In Lua, __newindex is ONLY called when the key doesn't exist in the table.
 		This means:
 		- Updating existing keys wouldn't trigger __newindex
 		- Deletions (setting to nil) wouldn't trigger __newindex for existing keys
-		
 		By keeping the proxy empty and storing data separately, __newindex fires
 		for ALL writes (creates, updates, and deletions), giving complete tracking.
 	]]
@@ -43,7 +41,7 @@ function listen.addListener(targetTable, callback)
 	local originalLen = existingMeta and existingMeta.__len
 
 	local meta = {
-		__index = function(t, key)
+		__index = function(_, key)
 			return actualData[key]
 		end,
 		__newindex = function(t, key, value)
@@ -61,10 +59,10 @@ function listen.addListener(targetTable, callback)
 				})
 			end
 		end,
-		__pairs = function(t)
+		__pairs = function(_)
 			return pairs(actualData)
 		end,
-		__len = function(t)
+		__len = function(_)
 			return #actualData
 		end,
 		-- Store metadata for later access
