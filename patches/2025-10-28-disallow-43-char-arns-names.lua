@@ -30,9 +30,9 @@ _G.package.loaded[".src.arns"].assertValidArNSName = function(name)
 			.. " characters."
 	)
 	assert(
-		#name ~= constants.CONFLICTING_NAME_LENGTH,
+		#name ~= constants.ARWEAVE_ADDRESS_LENGTH,
 		"Name cannot be "
-			.. constants.CONFLICTING_NAME_LENGTH
+			.. constants.ARWEAVE_ADDRESS_LENGTH
 			.. " characters as it conflicts with Arweave address length used in sandboxed subdomains."
 	)
 	if #name == 1 then
