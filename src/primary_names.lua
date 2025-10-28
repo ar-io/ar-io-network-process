@@ -258,7 +258,7 @@ function primaryNames.removePrimaryNames(names, from)
 		local removedPrimaryNameAndOwner = primaryNames.removePrimaryName(name, from)
 		-- track the changes in the hyperbeam sync
 		HyperbeamSync.primaryNames.names[name] = true
-		HyperbeamSync.primaryNames.owners[from] = true
+		HyperbeamSync.primaryNames.owners[removedPrimaryNameAndOwner.owner] = true
 
 		table.insert(removedPrimaryNamesAndOwners, removedPrimaryNameAndOwner)
 	end
