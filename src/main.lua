@@ -511,7 +511,7 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 		end
 
 		if shouldPatchHbState then
-			hb.patchHbState()
+			hb.patchHyperbeamState()
 		end
 
 		msg.ioEvent:addField("Handler-Memory-KiB-Used", collectgarbage("count"), false)

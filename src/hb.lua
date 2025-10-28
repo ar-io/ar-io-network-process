@@ -1,27 +1,6 @@
 -- hb.lua needs to be in its own file and not in balances.lua to avoid circular dependencies
 local hb = {}
 
---[[
-	HyperbeamSync is a table that is used to track changes to our lua state that need to be synced to the Hyperbeam.
-	the principal of using it is to set the key:value pairs that need to be synced, then
-		the patch function will pull that from the global state to build the patch message.
-		
-	After, the HyperbeamSync table is cleared and the next message run will start fresh.
-]]
-HyperbeamSync = HyperbeamSync
-	or {
-		---@type table<string, boolean> addresses that have had balance changes
-		balances = {},
-		primaryNames = {
-			---@type table<string, boolean> addresses that have had name changes
-			names = {},
-			---@type table<string, boolean> addresses that have had owner changes
-			owners = {},
-			---@type table<string, boolean> addresses that have had request changes
-			requests = {},
-		},
-	}
-
 ---@param oldBalances table<string, number> A table of addresses and their balances
 ---@return table<string, boolean> affectedBalancesAddresses table of addresses that have had balance changes
 function hb.patchBalances(oldBalances)
@@ -70,51 +49,43 @@ function hb.createPrimaryNamesPatch()
 
 	-- if no changes, return early. This will allow downstream code to not send the patch state for this key ('primary-names')
 	if
-		next(HyperbeamSync.primaryNames.names) == nil
-		and next(HyperbeamSync.primaryNames.owners) == nil
-		and next(HyperbeamSync.primaryNames.requests) == nil
+		next(_G.HyperbeamSync.primaryNames.names) == nil
+		and next(_G.HyperbeamSync.primaryNames.owners) == nil
+		and next(_G.HyperbeamSync.primaryNames.requests) == nil
 	then
 		return nil
 	end
 
 	-- build the affected primary names addresses table for the patch message
-	for name, _ in pairs(HyperbeamSync.primaryNames.names) do
+	for name, _ in pairs(_G.HyperbeamSync.primaryNames.names) do
 		-- we need to send an empty string to remove the name
 		affectedPrimaryNamesAddresses.names[name] = PrimaryNames.names[name] or ""
 	end
-	for owner, _ in pairs(HyperbeamSync.primaryNames.owners) do
+	for owner, _ in pairs(_G.HyperbeamSync.primaryNames.owners) do
 		-- we need to send an empty table to remove the owner primary name data
 		affectedPrimaryNamesAddresses.owners[owner] = PrimaryNames.owners[owner] or {}
 	end
-	for address, _ in pairs(HyperbeamSync.primaryNames.requests) do
+	for address, _ in pairs(_G.HyperbeamSync.primaryNames.requests) do
 		-- we need to send an empty table to remove the request
 		affectedPrimaryNamesAddresses.requests[address] = PrimaryNames.requests[address] or {}
 	end
 
-	local shouldSendEmptyNames = next(PrimaryNames.names) == nil
-	local shouldSendEmptyOwners = next(PrimaryNames.owners) == nil
-	local shouldSendEmptyRequests = next(PrimaryNames.requests) == nil
-
-	-- if we're not sending any data, we need to remove the table from the patch message to not delete the entire primary names table
-	--- with this ifelse pattern we are saying that if the global state for that key is empty, we can remove the data from the hyperbeam state
-	--- by sending the empty table.
-	---
-	--- unlikely case for names and owners, but possible for requests
-	if not shouldSendEmptyNames then
-		affectedPrimaryNamesAddresses.names = nil
-	else
+	if next(PrimaryNames.names) == nil then
 		affectedPrimaryNamesAddresses.names = {}
-	end
-	if not shouldSendEmptyOwners then
-		affectedPrimaryNamesAddresses.owners = nil
-	else
-		affectedPrimaryNamesAddresses.owners = {}
+	elseif next(affectedPrimaryNamesAddresses.names) == nil then
+		affectedPrimaryNamesAddresses.names = nil
 	end
 
-	if not shouldSendEmptyRequests then
-		affectedPrimaryNamesAddresses.requests = nil
-	else
+	if next(PrimaryNames.owners) == nil then
+		affectedPrimaryNamesAddresses.owners = {}
+	elseif next(affectedPrimaryNamesAddresses.owners) == nil then
+		affectedPrimaryNamesAddresses.owners = nil
+	end
+
+	if next(PrimaryNames.requests) == nil then
 		affectedPrimaryNamesAddresses.requests = {}
+	elseif next(affectedPrimaryNamesAddresses.requests) == nil then
+		affectedPrimaryNamesAddresses.requests = nil
 	end
 
 	-- if we're not sending any data, return nil which will allow downstream code to not send the patch message
@@ -142,11 +113,15 @@ end
 	3. Reset the hyperbeam sync
 ]]
 function hb.patchHyperbeamState()
-	local patchMessageFields = {
-		["primary-names"] = hb.createPrimaryNamesPatch(),
-	}
+	local patchMessageFields = {}
 
-	--- just seperating out the device field to make it easier to predicate on
+	-- Only add patches that have data
+	local primaryNamesPatch = hb.createPrimaryNamesPatch()
+	if primaryNamesPatch then
+		patchMessageFields["primary-names"] = primaryNamesPatch
+	end
+
+	--- Send patch message if there are any patches
 	if next(patchMessageFields) ~= nil then
 		patchMessageFields.device = "patch@1.0"
 		ao.send(patchMessageFields)
