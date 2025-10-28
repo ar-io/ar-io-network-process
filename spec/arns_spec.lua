@@ -153,6 +153,68 @@ describe("arns", function()
 				assert.is_nil(err)
 			end
 		end)
+
+		describe("43-character name restriction", function()
+			it("should reject 43-character names due to Arweave address conflict", function()
+				local name43 = string.rep("a", 43)
+				local status, err = pcall(arns.assertValidArNSName, name43)
+				assert.is_false(status, "Expected 43-character name to be rejected")
+				assert.not_nil(err)
+				assert.matches("43 characters", err)
+				assert.matches("conflicts with Arweave address", err)
+			end)
+
+			it("should accept 42-character names (boundary test)", function()
+				local name42 = string.rep("a", 42)
+				local status, err = pcall(arns.assertValidArNSName, name42)
+				assert.is_true(status, "Expected 42-character name to be valid")
+				assert.is_nil(err)
+			end)
+
+			it("should accept 44-character names (boundary test)", function()
+				local name44 = string.rep("a", 44)
+				local status, err = pcall(arns.assertValidArNSName, name44)
+				assert.is_true(status, "Expected 44-character name to be valid")
+				assert.is_nil(err)
+			end)
+
+			it("should reject 43-character names with hyphens", function()
+				local name43 = "a" .. string.rep("-", 41) .. "a" -- 43 chars with pattern a-...-a
+				local status, err = pcall(arns.assertValidArNSName, name43)
+				assert.is_false(status, "Expected 43-character name with hyphens to be rejected")
+				assert.not_nil(err)
+				assert.matches("43 characters", err)
+			end)
+
+			it("should reject 43-character names with mixed alphanumeric", function()
+				local name43 = "test123" .. string.rep("x", 36) -- 43 chars total
+				local status, err = pcall(arns.assertValidArNSName, name43)
+				assert.is_false(status, "Expected 43-character mixed name to be rejected")
+				assert.not_nil(err)
+			end)
+
+			it("should reject 43-character names that resemble Arweave addresses", function()
+				local name43 = "337tbu7stkmspaw25nul5pyc6smj67xha26yukbz7ln" -- 43 chars, similar to txId format
+				local status, err = pcall(arns.assertValidArNSName, name43)
+				assert.is_false(status, "Expected 43-character Arweave-like address to be rejected")
+				assert.not_nil(err)
+				assert.matches("conflicts with Arweave address", err)
+			end)
+
+			it("should reject 43-character alphanumeric names", function()
+				local name43 = string.rep("0", 21) .. string.rep("1", 22) -- 43 numeric chars
+				local status, err = pcall(arns.assertValidArNSName, name43)
+				assert.is_false(status, "Expected 43-character numeric name to be rejected")
+				assert.not_nil(err)
+			end)
+
+			it("should reject 43-character uppercase names", function()
+				local name43 = string.rep("A", 43)
+				local status, err = pcall(arns.assertValidArNSName, name43)
+				assert.is_false(status, "Expected 43-character uppercase name to be rejected")
+				assert.not_nil(err)
+			end)
+		end)
 	end)
 
 	for addressType, testAddress in pairs(testAddresses) do

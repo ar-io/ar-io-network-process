@@ -119,6 +119,8 @@ constants.MAX_BASE_NAME_LENGTH = 51 -- gateways utilize sandbox subdomains of 52
 constants.MAX_PRIMARY_NAME_LENGTH = 63 -- The max length of a domain label (any part separated by dots)
 constants.MAX_UNDERNAME_LENGTH = 61 -- MAX_PRIMARY_NAME_LENGTH - 1 (for underscore) - 1 (minimum base name length)
 constants.MIN_NAME_LENGTH = 1
+constants.ARWEAVE_ADDRESS_LENGTH = 43 -- Arweave addresses (ProcessIds) are exactly 43 characters
+constants.CONFLICTING_NAME_LENGTH = constants.ARWEAVE_ADDRESS_LENGTH -- Disallow ARNS names of this length to prevent conflicts with Arweave addresses in sandboxed subdomains
 -- Regex pattern to validate ARNS names:
 -- - Starts with an alphanumeric character (%w)
 -- - Can contain alphanumeric characters and hyphens (%w-)
