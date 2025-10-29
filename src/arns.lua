@@ -566,10 +566,10 @@ function arns.assertValidArNSName(name)
 			.. " characters."
 	)
 	assert(
-		#name ~= constants.CONFLICTING_NAME_LENGTH,
+		#name ~= constants.ARWEAVE_ADDRESS_LENGTH,
 		"Name cannot be "
-			.. constants.CONFLICTING_NAME_LENGTH
-			.. " characters as it conflicts with Arweave address length used in sandboxed subdomains."
+			.. constants.ARWEAVE_ADDRESS_LENGTH
+			.. " characters as it conflicts with Arweave address length."
 	)
 	if #name == 1 then
 		assert(

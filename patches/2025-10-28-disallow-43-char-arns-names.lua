@@ -6,16 +6,17 @@
 	This creates ambiguity in the gateway sandbox system.
 
 	Changes:
-	- Add ARWEAVE_ADDRESS_LENGTH and CONFLICTING_NAME_LENGTH constants
+	- Add ARWEAVE_ADDRESS_LENGTH constants
 	- Update arns.assertValidArNSName() to reject 43-character names
 	- Valid name lengths remain: 1-42 and 44-51 characters
 
-	Reviewers: [PLACEHOLDER FOR REVIEWERS]
-]]--
+	Reviewers: Dylan, Ariel, Phil
+]]
+--
 
 local constants = require(".src.constants")
 
--- Add new constants for Arweave address length and conflicting name length
+-- Add new constants for Arweave address length
 constants.ARWEAVE_ADDRESS_LENGTH = 43 -- Arweave addresses (ProcessIds) are exactly 43 characters
 
 -- Override the assertValidArNSName function to include the 43-character restriction
@@ -33,7 +34,7 @@ _G.package.loaded[".src.arns"].assertValidArNSName = function(name)
 		#name ~= constants.ARWEAVE_ADDRESS_LENGTH,
 		"Name cannot be "
 			.. constants.ARWEAVE_ADDRESS_LENGTH
-			.. " characters as it conflicts with Arweave address length used in sandboxed subdomains."
+			.. " characters as it conflicts with Arweave address length."
 	)
 	if #name == 1 then
 		assert(
