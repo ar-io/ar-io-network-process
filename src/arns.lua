@@ -565,6 +565,12 @@ function arns.assertValidArNSName(name)
 			.. constants.MAX_BASE_NAME_LENGTH
 			.. " characters."
 	)
+	assert(
+		#name ~= constants.ARWEAVE_ADDRESS_LENGTH,
+		"Name cannot be "
+			.. constants.ARWEAVE_ADDRESS_LENGTH
+			.. " characters as it conflicts with Arweave address length."
+	)
 	if #name == 1 then
 		assert(
 			name:match(constants.ARNS_NAME_SINGLE_CHAR_REGEX),
