@@ -4,8 +4,8 @@ local globals = {}
 
 --[[
 	HyperbeamSync is a table that is used to track changes to our lua state that need to be synced to the Hyperbeam.
-	the principal of using it is to set the key:value pairs that need to be synced, then
-		the patch function will pull that from the global state to build the patch message.
+	the principle of using it is to set the key:value pairs that need to be synced, then
+	the patch function will pull that from the global state to build the patch message.
 	After, the HyperbeamSync table is cleared and the next message run will start fresh.
 ]]
 HyperbeamSync = HyperbeamSync
