@@ -70,8 +70,12 @@ function hb.createPrimaryNamesPatch()
 		affectedPrimaryNamesAddresses.requests[address] = PrimaryNames.requests[address] or {}
 	end
 
+	-- Setting the property to {} will nuke the entire table from patch device state
+	-- We do this because we want to remove the entire table from patch device state if it's empty
 	if next(PrimaryNames.names) == nil then
 		affectedPrimaryNamesAddresses.names = {}
+	-- setting the property to nil will remove it from the patch message entirely to avoid sending an empty table and nuking patch device state
+	-- We do this to AVOID sending an empty table and nuking patch device state if our lua state is not empty.
 	elseif next(affectedPrimaryNamesAddresses.names) == nil then
 		affectedPrimaryNamesAddresses.names = nil
 	end
@@ -89,6 +93,7 @@ function hb.createPrimaryNamesPatch()
 	end
 
 	-- if we're not sending any data, return nil which will allow downstream code to not send the patch message
+	-- We do this to AVOID sending an empty table and nuking patch device state if our lua state is not empty.
 	if next(affectedPrimaryNamesAddresses) == nil then
 		return nil
 	end
