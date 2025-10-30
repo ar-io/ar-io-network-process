@@ -476,10 +476,9 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 	Handlers.add(handlerName, pattern, function(msg)
 		-- Store the old balances to compare after the handler has run for patching state
 		-- Only do this for the last handler to avoid unnecessary copying
-		local oldBalances = nil
+
 		local shouldPatchHbState = false
 		if pattern(msg) ~= "continue" then
-			oldBalances = utils.deepCopy(Balances)
 			shouldPatchHbState = true
 		end
 		-- add an ARIOEvent to the message if it doesn't exist
@@ -503,11 +502,6 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 			-- Reference: https://github.com/permaweb/ao/blob/76a618722b201430a372894b3e2753ac01e63d3d/dev-cli/src/starters/lua/ao.lua#L284-L287
 			local errorWithEvent = tostring(resultOrError) .. "\n" .. errorEvent:toJSON()
 			error(errorWithEvent, 0) -- 0 ensures not to include this line number in the error message
-		end
-
-		-- Send patch message to HB
-		if oldBalances then
-			hb.patchBalances(oldBalances)
 		end
 
 		if shouldPatchHbState then
@@ -535,6 +529,8 @@ end, CRITICAL, false)
 addEventingHandler("prune", function()
 	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
 end, function(msg)
+	HyperbeamSync.balances = utils.deepCopy(Balances)
+
 	local epochIndex = epochs.getEpochIndexForTimestamp(msg.Timestamp)
 	msg.ioEvent:addField("Epoch-Index", epochIndex)
 

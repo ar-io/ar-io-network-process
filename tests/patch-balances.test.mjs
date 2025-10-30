@@ -36,9 +36,10 @@ describe('hyperbeam patch balances', async () => {
       memory: transferToSenderAddressMemory,
     });
     const patchMessage = transferToRecipientAddress.Messages.at(-1);
-    const patchData = patchMessage.Tags.find(
+    const balancesTag = patchMessage.Tags.find(
       (tag) => tag.name === 'balances',
-    ).value;
+    );
+    const patchData = balancesTag.value;
     assert.equal(patchData[sender], quantity / 2);
     assert.equal(patchData[recipient], quantity / 2);
   });
@@ -67,9 +68,10 @@ describe('hyperbeam patch balances', async () => {
     });
 
     const patchMessage = transferToRecipientAddress.Messages.at(-1);
-    const patchData = patchMessage.Tags.find(
+    const balancesTag = patchMessage.Tags.find(
       (tag) => tag.name === 'balances',
-    ).value;
+    );
+    const patchData = balancesTag.value;
     assert.equal(patchData[sender], quantity / 2);
     assert.equal(patchData[recipient], quantity / 2);
 
@@ -88,9 +90,10 @@ describe('hyperbeam patch balances', async () => {
     });
 
     const patchMessage2 = transferToDrainerAddress.Messages.at(-1);
-    const patchData2 = patchMessage2.Tags.find(
+    const balancesTag2 = patchMessage2.Tags.find(
       (tag) => tag.name === 'balances',
-    ).value;
+    );
+    const patchData2 = balancesTag2.value;
     assert.equal(patchData2[sender], 0);
     assert.equal(patchData2[recipient], quantity);
   });
@@ -117,9 +120,10 @@ describe('hyperbeam patch balances', async () => {
       memory: transferToSenderAddressMemory,
     });
     const patchMessage = transferToRecipientAddress.Messages.at(-1);
-    const patchData = patchMessage.Tags.find(
+    const balancesTag = patchMessage.Tags.find(
       (tag) => tag.name === 'balances',
-    ).value;
+    );
+    const patchData = balancesTag.value;
     assert.equal(patchData[sender], quantity / 2);
     assert.equal(patchData[recipient], quantity / 2);
 
@@ -138,9 +142,10 @@ describe('hyperbeam patch balances', async () => {
     });
 
     const patchMessage2 = transferToDrainerAddress.Messages.at(-1);
-    const patchData2 = patchMessage2.Tags.find(
+    const balancesTag2 = patchMessage2.Tags.find(
       (tag) => tag.name === 'balances',
-    ).value;
+    );
+    const patchData2 = balancesTag2.value;
     assert.equal(patchData2[sender], 0);
     assert.equal(patchData2[recipient], quantity);
 
@@ -152,9 +157,10 @@ describe('hyperbeam patch balances', async () => {
     });
 
     const patchMessage3 = tokenSupplyRes.Messages.at(-1);
-    const patchData3 = patchMessage3.Tags.find(
+    const balancesTag3 = patchMessage3.Tags.find(
       (tag) => tag.name === 'balances',
-    ).value;
+    );
+    const patchData3 = balancesTag3.value;
     assert.equal(patchData3[sender], 0);
   });
 
