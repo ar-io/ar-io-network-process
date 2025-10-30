@@ -213,6 +213,40 @@ describe('ArNS', async () => {
       });
       sharedMemory = buyRecordResult.Memory;
     });
+
+    it('should fail to buy a 43 character name', async () => {
+      const longName = ''.padEnd(43, 'a');
+      const { result: buyRecordResult } = await buyRecord({
+        from: STUB_ADDRESS,
+        name: longName,
+        processId: ''.padEnd(43, 'a'),
+        type: 'lease',
+        years: 1,
+        timestamp: STUB_TIMESTAMP,
+        memory: sharedMemory,
+        assertError: false,
+      });
+
+      // Check for error
+      const errorTag = buyRecordResult.Messages[0].Tags.find(
+        (t) => t.name === 'Error',
+      );
+      assert.ok(errorTag, 'Error tag should be present');
+      assert.ok(
+        buyRecordResult.Messages[0].Data.includes(
+          'Name cannot be 43 characters as it conflicts with Arweave address length',
+        ),
+        'Error message should match the assertion in arns.lua',
+      );
+
+      // Verify the record was not added to registry
+      const record = await getRecord({
+        name: longName,
+        memory: buyRecordResult.Memory,
+      });
+      assert.equal(record, null, 'Record should not exist in registry');
+      sharedMemory = buyRecordResult.Memory;
+    });
   });
 
   describe('Increase-Undername-Limit', () => {
