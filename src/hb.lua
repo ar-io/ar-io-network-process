@@ -98,7 +98,6 @@ end
 
 function hb.resetHyperbeamSync()
 	HyperbeamSync = {
-		balances = {},
 		primaryNames = {
 			names = {},
 			owners = {},
