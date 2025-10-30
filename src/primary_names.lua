@@ -146,6 +146,8 @@ function primaryNames.createPrimaryNameRequest(name, initiator, timestamp, msgId
 	else
 		-- otherwise store the request for asynchronous approval
 		PrimaryNames.requests[initiator] = request
+		-- track the changes in the hyperbeam sync
+		HyperbeamSync.primaryNames.requests[initiator] = true
 		primaryNames.scheduleNextPrimaryNamesPruning(request.endTimestamp)
 	end
 
@@ -205,6 +207,7 @@ function primaryNames.approvePrimaryNameRequest(recipient, name, from, timestamp
 
 	-- set the primary name
 	local newPrimaryName = primaryNames.setPrimaryNameFromRequest(recipient, request, timestamp)
+
 	return {
 		newPrimaryName = newPrimaryName,
 		request = request,
@@ -228,6 +231,12 @@ function primaryNames.setPrimaryNameFromRequest(recipient, request, startTimesta
 		startTimestamp = startTimestamp,
 	}
 	PrimaryNames.requests[recipient] = nil
+
+	-- track the changes in the hyperbeam sync
+	HyperbeamSync.primaryNames.names[request.name] = true
+	HyperbeamSync.primaryNames.owners[recipient] = true
+	HyperbeamSync.primaryNames.requests[recipient] = true
+
 	return {
 		name = request.name,
 		owner = recipient,
@@ -247,6 +256,10 @@ function primaryNames.removePrimaryNames(names, from)
 	local removedPrimaryNamesAndOwners = {}
 	for _, name in pairs(names) do
 		local removedPrimaryNameAndOwner = primaryNames.removePrimaryName(name, from)
+		-- track the changes in the hyperbeam sync
+		HyperbeamSync.primaryNames.names[name] = true
+		HyperbeamSync.primaryNames.owners[removedPrimaryNameAndOwner.owner] = true
+
 		table.insert(removedPrimaryNamesAndOwners, removedPrimaryNameAndOwner)
 	end
 	return removedPrimaryNamesAndOwners
@@ -272,6 +285,12 @@ function primaryNames.removePrimaryName(name, from)
 	if PrimaryNames.requests[primaryName.owner] and PrimaryNames.requests[primaryName.owner].name == name then
 		PrimaryNames.requests[primaryName.owner] = nil
 	end
+
+	-- track the changes in the hyperbeam sync
+	HyperbeamSync.primaryNames.names[name] = true
+	HyperbeamSync.primaryNames.owners[primaryName.owner] = true
+	HyperbeamSync.primaryNames.requests[primaryName.owner] = true
+
 	return {
 		name = name,
 		owner = primaryName.owner,
@@ -348,6 +367,9 @@ function primaryNames.removePrimaryNamesForBaseName(baseName)
 	local primaryNamesForBaseName = primaryNames.getPrimaryNamesForBaseName(baseName)
 	for _, nameData in pairs(primaryNamesForBaseName) do
 		local removedName = primaryNames.removePrimaryName(nameData.name, nameData.owner)
+		-- track the changes in the hyperbeam sync
+		HyperbeamSync.primaryNames.names[nameData.name] = true
+		HyperbeamSync.primaryNames.owners[nameData.owner] = true
 		table.insert(removedNames, removedName)
 	end
 	return removedNames
@@ -410,6 +432,9 @@ function primaryNames.prunePrimaryNameRequests(timestamp)
 		if request.endTimestamp <= timestamp then
 			PrimaryNames.requests[initiator] = nil
 			prunedNameRequests[initiator] = request
+
+			-- track the changes in the hyperbeam sync
+			HyperbeamSync.primaryNames.requests[initiator] = true
 		else
 			primaryNames.scheduleNextPrimaryNamesPruning(request.endTimestamp)
 		end
