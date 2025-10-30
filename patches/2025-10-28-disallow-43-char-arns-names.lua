@@ -15,12 +15,13 @@
 --
 
 local constants = require(".src.constants")
+local arns = require(".src.arns")
 
 -- Add new constants for Arweave address length
 constants.ARWEAVE_ADDRESS_LENGTH = 43 -- Arweave addresses (ProcessIds) are exactly 43 characters
 
 -- Override the assertValidArNSName function to include the 43-character restriction
-_G.package.loaded[".src.arns"].assertValidArNSName = function(name)
+arns.assertValidArNSName = function(name)
 	assert(name and type(name) == "string", "Name is required and must be a string.")
 	assert(
 		#name >= constants.MIN_NAME_LENGTH and #name <= constants.MAX_BASE_NAME_LENGTH,
