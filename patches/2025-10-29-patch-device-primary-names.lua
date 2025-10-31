@@ -6,6 +6,7 @@
 ]]
 HyperbeamSync = HyperbeamSync
 	or {
+		balances = {},
 		primaryNames = {
 			---@type table<string, boolean> addresses that have had name changes
 			names = {},
@@ -21,41 +22,36 @@ local function _loaded_mod_src_hb()
 	-- hb.lua needs to be in its own file and not in balances.lua to avoid circular dependencies
 	local hb = {}
 
-	---@param oldBalances table<string, number> A table of addresses and their balances
-	---@return table<string, boolean> affectedBalancesAddresses table of addresses that have had balance changes
-	function hb.patchBalances(oldBalances)
-		assert(type(oldBalances) == "table", "Old balances must be a table")
+	---@return table<string, string>|nil affectedBalancesAddresses table of addresses and their balance values as strings
+	function hb.createBalancesPatch()
 		local affectedBalancesAddresses = {}
-		for address, _ in pairs(oldBalances) do
-			if Balances[address] ~= oldBalances[address] then
+		for address, _ in pairs(Balances) do
+			if HyperbeamSync.balances[address] ~= Balances[address] then
 				affectedBalancesAddresses[address] = true
 			end
 		end
-		for address, _ in pairs(Balances) do
-			if oldBalances[address] ~= Balances[address] then
+
+		for address, _ in pairs(HyperbeamSync.balances) do
+			if Balances[address] ~= HyperbeamSync.balances[address] then
 				affectedBalancesAddresses[address] = true
 			end
 		end
 
 		--- For simplicity we always include the protocol balance in the patch message
-		--- this also prevents us from sending an empty patch message and deleting the entire hyperbeam balances table\
+		--- this also prevents us from sending an empty patch message and deleting the entire hyperbeam balances table
+		affectedBalancesAddresses[ao.id] = true
 
-		local patchMessage = {
-			device = "patch@1.0",
-			balances = { [ao.id] = tostring(Balances[ao.id] or 0) },
-		}
+		-- Convert all affected addresses from boolean flags to actual balance values
+		local balancesPatch = {}
 		for address, _ in pairs(affectedBalancesAddresses) do
-			patchMessage.balances[address] = tostring(Balances[address] or 0)
+			balancesPatch[address] = tostring(Balances[address] or 0)
 		end
 
-		-- only send the patch message if there are affected balances, otherwise we'll end up deleting the entire hyperbeam balances table
-		if next(patchMessage.balances) == nil then
-			return {}
-		else
-			ao.send(patchMessage)
+		if next(balancesPatch) == nil then
+			return nil
 		end
 
-		return affectedBalancesAddresses
+		return balancesPatch
 	end
 
 	---@return PrimaryNames|nil affectedPrimaryNamesAddresses
@@ -90,8 +86,12 @@ local function _loaded_mod_src_hb()
 			affectedPrimaryNamesAddresses.requests[address] = PrimaryNames.requests[address] or {}
 		end
 
+		-- Setting the property to {} will nuke the entire table from patch device state
+		-- We do this because we want to remove the entire table from patch device state if it's empty
 		if next(PrimaryNames.names) == nil then
 			affectedPrimaryNamesAddresses.names = {}
+		-- setting the property to nil will remove it from the patch message entirely to avoid sending an empty table and nuking patch device state
+		-- We do this to AVOID sending an empty table and nuking patch device state if our lua state is not empty.
 		elseif next(affectedPrimaryNamesAddresses.names) == nil then
 			affectedPrimaryNamesAddresses.names = nil
 		end
@@ -109,6 +109,7 @@ local function _loaded_mod_src_hb()
 		end
 
 		-- if we're not sending any data, return nil which will allow downstream code to not send the patch message
+		-- We do this to AVOID sending an empty table and nuking patch device state if our lua state is not empty.
 		if next(affectedPrimaryNamesAddresses) == nil then
 			return nil
 		end
@@ -139,6 +140,11 @@ local function _loaded_mod_src_hb()
 		local primaryNamesPatch = hb.createPrimaryNamesPatch()
 		if primaryNamesPatch then
 			patchMessageFields["primary-names"] = primaryNamesPatch
+		end
+
+		local balancesPatch = hb.createBalancesPatch()
+		if balancesPatch then
+			patchMessageFields["balances"] = balancesPatch
 		end
 
 		--- Send patch message if there are any patches
@@ -1104,10 +1110,9 @@ local function _loaded_mod_src_main()
 		Handlers.add(handlerName, pattern, function(msg)
 			-- Store the old balances to compare after the handler has run for patching state
 			-- Only do this for the last handler to avoid unnecessary copying
-			local oldBalances = nil
+
 			local shouldPatchHbState = false
 			if pattern(msg) ~= "continue" then
-				oldBalances = utils.deepCopy(Balances)
 				shouldPatchHbState = true
 			end
 			-- add an ARIOEvent to the message if it doesn't exist
@@ -1131,11 +1136,6 @@ local function _loaded_mod_src_main()
 				-- Reference: https://github.com/permaweb/ao/blob/76a618722b201430a372894b3e2753ac01e63d3d/dev-cli/src/starters/lua/ao.lua#L284-L287
 				local errorWithEvent = tostring(resultOrError) .. "\n" .. errorEvent:toJSON()
 				error(errorWithEvent, 0) -- 0 ensures not to include this line number in the error message
-			end
-
-			-- Send patch message to HB
-			if oldBalances then
-				hb.patchBalances(oldBalances)
 			end
 
 			if shouldPatchHbState then
@@ -1163,6 +1163,8 @@ local function _loaded_mod_src_main()
 	addEventingHandler("prune", function()
 		return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
 	end, function(msg)
+		HyperbeamSync.balances = utils.deepCopy(Balances)
+
 		local epochIndex = epochs.getEpochIndexForTimestamp(msg.Timestamp)
 		msg.ioEvent:addField("Epoch-Index", epochIndex)
 
