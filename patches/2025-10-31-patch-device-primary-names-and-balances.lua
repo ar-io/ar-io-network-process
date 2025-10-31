@@ -1,4 +1,14 @@
 --[[
+	1. Set up HyperbeamSync table
+	2. copy balances in the prune handler and store in the HyperbeamSync table
+	3. Record primary names changes in primary names module and send patch message for them
+	4. Sends one single patch message instead of multiple
+
+	Reviewers: Dylan, Ariel, Atticus
+]]
+--
+
+--[[
 	HyperbeamSync is a table that is used to track changes to our lua state that need to be synced to the Hyperbeam.
 	the principle of using it is to set the key:value pairs that need to be synced, then
 	the patch function will pull that from the global state to build the patch message.
@@ -3425,3 +3435,21 @@ local function _loaded_mod_src_main()
 end
 
 _G.package.loaded[".src.main"] = _loaded_mod_src_main()
+
+--------------------------------
+-------- HYPERBEAM SYNC --------
+--- Sends a sync patch to hyperbeam with the current balances and primary names state
+--------------------------------
+
+-- For balances we need to send the balance as a string due to trie device requirements
+local patchBalances = {}
+for address, balance in pairs(Balances) do
+	patchBalances[address] = tostring(balance)
+end
+
+ao.send({
+	device = "patch@1.0",
+	balances = patchBalances,
+	-- primary names don't need to be sent as a string
+	["primary-names"] = PrimaryNames,
+})
