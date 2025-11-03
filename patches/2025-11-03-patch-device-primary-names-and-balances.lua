@@ -47,10 +47,6 @@ local function _loaded_mod_src_hb()
 			end
 		end
 
-		--- For simplicity we always include the protocol balance in the patch message
-		--- this also prevents us from sending an empty patch message and deleting the entire hyperbeam balances table
-		affectedBalancesAddresses[ao.id] = true
-
 		-- Convert all affected addresses from boolean flags to actual balance values
 		local balancesPatch = {}
 		for address, _ in pairs(affectedBalancesAddresses) do
@@ -144,23 +140,15 @@ local function _loaded_mod_src_hb()
 	3. Reset the hyperbeam sync
 ]]
 	function hb.patchHyperbeamState()
-		local patchMessageFields = {}
-
 		-- Only add patches that have data
 		local primaryNamesPatch = hb.createPrimaryNamesPatch()
 		if primaryNamesPatch then
-			patchMessageFields["primary-names"] = primaryNamesPatch
+			ao.send({ device = "patch@1.0", ["primary-names"] = primaryNamesPatch })
 		end
 
 		local balancesPatch = hb.createBalancesPatch()
 		if balancesPatch then
-			patchMessageFields["balances"] = balancesPatch
-		end
-
-		--- Send patch message if there are any patches
-		if next(patchMessageFields) ~= nil then
-			patchMessageFields.device = "patch@1.0"
-			ao.send(patchMessageFields)
+			ao.send({ device = "patch@1.0", balances = balancesPatch })
 		end
 
 		hb.resetHyperbeamSync()
@@ -1173,6 +1161,7 @@ local function _loaded_mod_src_main()
 	addEventingHandler("prune", function()
 		return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
 	end, function(msg)
+		-- We copy the balances here and put them in HyperbeamSync so that in subsequent handlers we can compare the previous and new balances and send a patch message if there are any changes
 		HyperbeamSync.balances = utils.deepCopy(Balances)
 
 		local epochIndex = epochs.getEpochIndexForTimestamp(msg.Timestamp)
@@ -3450,6 +3439,10 @@ end
 ao.send({
 	device = "patch@1.0",
 	balances = patchBalances,
-	-- primary names don't need to be sent as a string
+})
+
+ao.send({
+	device = "patch@1.0",
+	-- primary names does not need to be sent as a string
 	["primary-names"] = PrimaryNames,
 })
