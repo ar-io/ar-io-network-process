@@ -109,23 +109,15 @@ end
 	3. Reset the hyperbeam sync
 ]]
 function hb.patchHyperbeamState()
-	local patchMessageFields = {}
-
 	-- Only add patches that have data
 	local primaryNamesPatch = hb.createPrimaryNamesPatch()
 	if primaryNamesPatch then
-		patchMessageFields["primary-names"] = primaryNamesPatch
+		ao.send({ device = "patch@1.0", ["primary-names"] = primaryNamesPatch })
 	end
 
 	local balancesPatch = hb.createBalancesPatch()
 	if balancesPatch then
-		patchMessageFields["balances"] = balancesPatch
-	end
-
-	--- Send patch message if there are any patches
-	if next(patchMessageFields) ~= nil then
-		patchMessageFields.device = "patch@1.0"
-		ao.send(patchMessageFields)
+		ao.send({ device = "patch@1.0", balances = balancesPatch })
 	end
 
 	hb.resetHyperbeamSync()

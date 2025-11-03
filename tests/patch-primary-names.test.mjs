@@ -69,19 +69,16 @@ describe('Primary Names Hyperbeam Patching', function () {
 
     assertNoResultError(requestResult);
 
-    // Find the patch message with device: "patch@1.0"
-    const messages = requestResult.Messages || [];
-    let patchMessage = null;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const tags = messages[i].Tags || [];
-      const deviceTag = tags.find((t) => t.name === 'device');
-      if (deviceTag && deviceTag.value === 'patch@1.0') {
-        patchMessage = messages[i];
-        break;
-      }
-    }
-
-    assert(patchMessage, 'Should send a patch message');
+    // Find the primary-names patch message (sent as individual message now)
+    const patchMessage = requestResult.Messages.find((msg) =>
+      msg.Tags.some(
+        (tag) =>
+          tag.name === 'device' &&
+          tag.value === 'patch@1.0' &&
+          msg.Tags.some((t) => t.name === 'primary-names'),
+      ),
+    );
+    assert(patchMessage, 'Should send a primary-names patch message');
 
     // Get the primary-names tag
     const primaryNamesTag = patchMessage.Tags.find(
@@ -177,10 +174,13 @@ describe('Primary Names Hyperbeam Patching', function () {
     // Verify patch message was sent with pruned request
     const patchMessage = tickResult.Messages.find((msg) =>
       msg.Tags.some(
-        (tag) => tag.name === 'device' && tag.value === 'patch@1.0',
+        (tag) =>
+          tag.name === 'device' &&
+          tag.value === 'patch@1.0' &&
+          msg.Tags.some((t) => t.name === 'primary-names'),
       ),
     );
-    assert(patchMessage, 'Should send a patch message');
+    assert(patchMessage, 'Should send a primary-names patch message');
 
     const primaryNamesTag = patchMessage.Tags.find(
       (tag) => tag.name === 'primary-names',
@@ -296,10 +296,13 @@ describe('Primary Names Hyperbeam Patching', function () {
     // Verify patch message was sent
     const patchMessage = tickResult.Messages.find((msg) =>
       msg.Tags.some(
-        (tag) => tag.name === 'device' && tag.value === 'patch@1.0',
+        (tag) =>
+          tag.name === 'device' &&
+          tag.value === 'patch@1.0' &&
+          msg.Tags.some((t) => t.name === 'primary-names'),
       ),
     );
-    assert(patchMessage, 'Should send a patch message');
+    assert(patchMessage, 'Should send a primary-names patch message');
 
     const primaryNamesTag = patchMessage.Tags.find(
       (tag) => tag.name === 'primary-names',

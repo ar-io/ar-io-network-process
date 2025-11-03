@@ -453,8 +453,8 @@ describe('primary names', function () {
       'DF-Revenue-This-Period': 2001000000, // buy name + request primary name
     });
 
-    // there should be one message with the Approve-Primary-Name-Request-Notice action and one patch message
-    assert.equal(requestPrimaryNameResult.Messages.length, 2);
+    // there should be one notice message and two patch messages (primary-names and balances)
+    assert.equal(requestPrimaryNameResult.Messages.length, 3);
     assert.equal(requestPrimaryNameResult.Messages[0].Target, processId);
 
     // find the action tag in the messages
@@ -709,17 +709,16 @@ describe('primary names', function () {
 
       assertNoResultError(requestPrimaryNameResult);
 
-      // Find the patch message - it should be the last message
-      const patchMessage = requestPrimaryNameResult.Messages.at(-1);
-
-      // Verify it has device tag
-      const deviceTag = patchMessage.Tags.find((tag) => tag.name === 'device');
-      assert.ok(deviceTag, 'Expected to find device tag');
-      assert.equal(
-        deviceTag.value,
-        'patch@1.0',
-        'Expected device tag to be patch@1.0',
+      // Find the primary-names patch message (sent as individual message now)
+      const patchMessage = requestPrimaryNameResult.Messages.find((msg) =>
+        msg.Tags.some(
+          (tag) =>
+            tag.name === 'device' &&
+            tag.value === 'patch@1.0' &&
+            msg.Tags.some((t) => t.name === 'primary-names'),
+        ),
       );
+      assert.ok(patchMessage, 'Expected to find primary-names patch message');
 
       // Verify the patch message has primary-names field with the request
       const patchData = patchMessage.Tags.find(
@@ -779,17 +778,17 @@ describe('primary names', function () {
 
       assertNoResultError(approvePrimaryNameRequestResult);
 
-      // Find the patch message - it should be the last message
-      const patchMessage = approvePrimaryNameRequestResult.Messages.at(-1);
-
-      // Verify it has device tag
-      const deviceTag = patchMessage.Tags.find((tag) => tag.name === 'device');
-      assert.ok(deviceTag, 'Expected to find device tag');
-      assert.equal(
-        deviceTag.value,
-        'patch@1.0',
-        'Expected device tag to be patch@1.0',
+      // Find the primary-names patch message (sent as individual message now)
+      const patchMessage = approvePrimaryNameRequestResult.Messages.find(
+        (msg) =>
+          msg.Tags.some(
+            (tag) =>
+              tag.name === 'device' &&
+              tag.value === 'patch@1.0' &&
+              msg.Tags.some((t) => t.name === 'primary-names'),
+          ),
       );
+      assert.ok(patchMessage, 'Expected to find primary-names patch message');
 
       // Verify the patch message contains the updated primary name data
       const patchData = patchMessage.Tags.find(
@@ -951,17 +950,16 @@ describe('primary names', function () {
 
       assertNoResultError(requestPrimaryNameResult);
 
-      // Find the patch message - it should be the last message
-      const patchMessage = requestPrimaryNameResult.Messages.at(-1);
-
-      // Verify it has device tag
-      const deviceTag = patchMessage.Tags.find((tag) => tag.name === 'device');
-      assert.ok(deviceTag, 'Expected to find device tag');
-      assert.equal(
-        deviceTag.value,
-        'patch@1.0',
-        'Expected device tag to be patch@1.0',
+      // Find the primary-names patch message (sent as individual message now)
+      const patchMessage = requestPrimaryNameResult.Messages.find((msg) =>
+        msg.Tags.some(
+          (tag) =>
+            tag.name === 'device' &&
+            tag.value === 'patch@1.0' &&
+            msg.Tags.some((t) => t.name === 'primary-names'),
+        ),
       );
+      assert.ok(patchMessage, 'Expected to find primary-names patch message');
 
       // Verify the patch message contains the immediate primary name assignment
       const patchData = patchMessage.Tags.find(

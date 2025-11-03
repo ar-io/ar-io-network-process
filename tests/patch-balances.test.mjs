@@ -56,7 +56,16 @@ describe('hyperbeam patch balances', async () => {
       },
       memory: transferToSenderAddressMemory,
     });
-    const patchMessage = transferToRecipientAddress.Messages.at(-1);
+    // Find the balance patch message (sent as individual message now)
+    const patchMessage = transferToRecipientAddress.Messages.find((msg) =>
+      msg.Tags.some(
+        (tag) =>
+          tag.name === 'device' &&
+          tag.value === 'patch@1.0' &&
+          msg.Tags.some((t) => t.name === 'balances'),
+      ),
+    );
+    assert(patchMessage, 'Should send a balance patch message');
     const balancesTag = patchMessage.Tags.find(
       (tag) => tag.name === 'balances',
     );
@@ -88,7 +97,16 @@ describe('hyperbeam patch balances', async () => {
       memory: transferToSenderAddressMemory,
     });
 
-    const patchMessage = transferToRecipientAddress.Messages.at(-1);
+    // Find the balance patch message (sent as individual message now)
+    const patchMessage = transferToRecipientAddress.Messages.find((msg) =>
+      msg.Tags.some(
+        (tag) =>
+          tag.name === 'device' &&
+          tag.value === 'patch@1.0' &&
+          msg.Tags.some((t) => t.name === 'balances'),
+      ),
+    );
+    assert(patchMessage, 'Should send a balance patch message');
     const balancesTag = patchMessage.Tags.find(
       (tag) => tag.name === 'balances',
     );
@@ -110,7 +128,16 @@ describe('hyperbeam patch balances', async () => {
       memory: transferToRecipientAddress.Memory,
     });
 
-    const patchMessage2 = transferToDrainerAddress.Messages.at(-1);
+    // Find the balance patch message (sent as individual message now)
+    const patchMessage2 = transferToDrainerAddress.Messages.find((msg) =>
+      msg.Tags.some(
+        (tag) =>
+          tag.name === 'device' &&
+          tag.value === 'patch@1.0' &&
+          msg.Tags.some((t) => t.name === 'balances'),
+      ),
+    );
+    assert(patchMessage2, 'Should send a balance patch message');
     const balancesTag2 = patchMessage2.Tags.find(
       (tag) => tag.name === 'balances',
     );
@@ -140,7 +167,16 @@ describe('hyperbeam patch balances', async () => {
       },
       memory: transferToSenderAddressMemory,
     });
-    const patchMessage = transferToRecipientAddress.Messages.at(-1);
+    // Find the balance patch message (sent as individual message now)
+    const patchMessage = transferToRecipientAddress.Messages.find((msg) =>
+      msg.Tags.some(
+        (tag) =>
+          tag.name === 'device' &&
+          tag.value === 'patch@1.0' &&
+          msg.Tags.some((t) => t.name === 'balances'),
+      ),
+    );
+    assert(patchMessage, 'Should send a balance patch message');
     const balancesTag = patchMessage.Tags.find(
       (tag) => tag.name === 'balances',
     );
@@ -162,7 +198,16 @@ describe('hyperbeam patch balances', async () => {
       memory: transferToRecipientAddress.Memory,
     });
 
-    const patchMessage2 = transferToDrainerAddress.Messages.at(-1);
+    // Find the balance patch message (sent as individual message now)
+    const patchMessage2 = transferToDrainerAddress.Messages.find((msg) =>
+      msg.Tags.some(
+        (tag) =>
+          tag.name === 'device' &&
+          tag.value === 'patch@1.0' &&
+          msg.Tags.some((t) => t.name === 'balances'),
+      ),
+    );
+    assert(patchMessage2, 'Should send a balance patch message');
     const balancesTag2 = patchMessage2.Tags.find(
       (tag) => tag.name === 'balances',
     );
@@ -177,7 +222,16 @@ describe('hyperbeam patch balances', async () => {
       memory: transferToDrainerAddress.Memory,
     });
 
-    const patchMessage3 = tokenSupplyRes.Messages.at(-1);
+    // Find the balance patch message (sent as individual message now)
+    const patchMessage3 = tokenSupplyRes.Messages.find((msg) =>
+      msg.Tags.some(
+        (tag) =>
+          tag.name === 'device' &&
+          tag.value === 'patch@1.0' &&
+          msg.Tags.some((t) => t.name === 'balances'),
+      ),
+    );
+    assert(patchMessage3, 'Should send a balance patch message');
     const balancesTag3 = patchMessage3.Tags.find(
       (tag) => tag.name === 'balances',
     );
