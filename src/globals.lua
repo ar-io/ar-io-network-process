@@ -10,7 +10,7 @@ local globals = {}
 ]]
 HyperbeamSync = HyperbeamSync
 	or {
-		---@type table<string, boolean> addresses that have had balance changes
+		---@type table<string, number> addresses that have had balance changes
 		balances = {},
 		primaryNames = {
 			---@type table<string, boolean> addresses that have had name changes
