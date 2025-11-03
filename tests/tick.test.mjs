@@ -369,7 +369,8 @@ describe('Tick', async () => {
     });
 
     // should only have one message with a tick notice, the epoch distribution notice is sent separately
-    assert.equal(newEpochTick.Messages.length, 4);
+    // Note: Balance patch is no longer sent if only protocol balance changes
+    assert.equal(newEpochTick.Messages.length, 3);
     // updated demand factor is sent
     assert.equal(
       newEpochTick.Messages[0].Tags.find((tag) => tag.name === 'Action').value,
