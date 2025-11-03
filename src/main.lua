@@ -529,6 +529,7 @@ end, CRITICAL, false)
 addEventingHandler("prune", function()
 	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
 end, function(msg)
+	-- We copy the balances here and put them in HyperbeamSync so that in subsequent handlers we can compare the previous and new balances and send a patch message if there are any changes
 	HyperbeamSync.balances = utils.deepCopy(Balances)
 
 	local epochIndex = epochs.getEpochIndexForTimestamp(msg.Timestamp)
