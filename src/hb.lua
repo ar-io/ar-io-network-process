@@ -16,10 +16,6 @@ function hb.createBalancesPatch()
 		end
 	end
 
-	--- For simplicity we always include the protocol balance in the patch message
-	--- this also prevents us from sending an empty patch message and deleting the entire hyperbeam balances table
-	affectedBalancesAddresses[ao.id] = true
-
 	-- Convert all affected addresses from boolean flags to actual balance values
 	local balancesPatch = {}
 	for address, _ in pairs(affectedBalancesAddresses) do
