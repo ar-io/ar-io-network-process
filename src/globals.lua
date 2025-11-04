@@ -3,6 +3,26 @@ local utils = require(".src.utils")
 local globals = {}
 
 --[[
+	HyperbeamSync is a table that is used to track changes to our lua state that need to be synced to the Hyperbeam.
+	the principle of using it is to set the key:value pairs that need to be synced, then
+	the patch function will pull that from the global state to build the patch message.
+	After, the HyperbeamSync table is cleared and the next message run will start fresh.
+]]
+HyperbeamSync = HyperbeamSync
+	or {
+		---@type table<string, number> addresses that have had balance changes
+		balances = {},
+		primaryNames = {
+			---@type table<string, boolean> addresses that have had name changes
+			names = {},
+			---@type table<string, boolean> addresses that have had owner changes
+			owners = {},
+			---@type table<string, boolean> addresses that have had request changes
+			requests = {},
+		},
+	}
+
+--[[
     Constants
 ]]
 Name = Name or constants.NAME
