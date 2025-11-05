@@ -476,9 +476,10 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 	Handlers.add(handlerName, pattern, function(msg)
 		-- Store the old balances to compare after the handler has run for patching state
 		-- Only do this for the last handler to avoid unnecessary copying
-		local oldBalances = nil
+
+		local shouldPatchHbState = false
 		if pattern(msg) ~= "continue" then
-			oldBalances = utils.deepCopy(Balances)
+			shouldPatchHbState = true
 		end
 		-- add an ARIOEvent to the message if it doesn't exist
 		msg.ioEvent = msg.ioEvent or ARIOEvent(msg)
@@ -503,9 +504,8 @@ local function addEventingHandler(handlerName, pattern, handleFn, critical, prin
 			error(errorWithEvent, 0) -- 0 ensures not to include this line number in the error message
 		end
 
-		-- Send patch message to HB
-		if oldBalances then
-			hb.patchBalances(oldBalances)
+		if shouldPatchHbState then
+			hb.patchHyperbeamState()
 		end
 
 		msg.ioEvent:addField("Handler-Memory-KiB-Used", collectgarbage("count"), false)
@@ -529,6 +529,9 @@ end, CRITICAL, false)
 addEventingHandler("prune", function()
 	return "continue" -- continue is a pattern that matches every message and continues to the next handler that matches the tags
 end, function(msg)
+	-- We copy the balances here and put them in HyperbeamSync so that in subsequent handlers we can compare the previous and new balances and send a patch message if there are any changes
+	HyperbeamSync.balances = utils.deepCopy(Balances)
+
 	local epochIndex = epochs.getEpochIndexForTimestamp(msg.Timestamp)
 	msg.ioEvent:addField("Epoch-Index", epochIndex)
 
