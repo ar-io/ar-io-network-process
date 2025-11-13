@@ -26,7 +26,11 @@ const balancesLua = fs.readFileSync(
   path.join(__dirname, 'balances.lua'),
   'utf8',
 );
-const processLua = `
+const balances2Lua = fs.readFileSync(
+  path.join(__dirname, 'balances_2.lua'),
+  'utf8',
+);
+const patchHbLua = `
   ${balancesLua}\n
  --- Pads a number with leading zeros to 32 digits.
 -- @lfunction padZero32
@@ -163,7 +167,7 @@ ao.send({ device = "patch@1.0", balances = { device = "trie@1.0" } })
 
 `;
 
-fs.writeFileSync(path.join(__dirname, 'test-process.lua'), processLua);
+fs.writeFileSync(path.join(__dirname, 'test-process.lua'), patchHbLua);
 
 const processId = await ao.spawn({
   module: moduleId,
@@ -187,12 +191,26 @@ const loadArioId = await ao.message({
 
 const loadCodeId = await ao.message({
   process: processId,
-  data: processLua,
+  data: patchHbLua,
   tags: [{ name: 'Action', value: 'Eval' }],
   signer,
 });
 
 const patchBalancesId = await ao.message({
+  process: processId,
+  data: ' ',
+  tags: [{ name: 'Action', value: 'Patch-Hyperbeam-Balances' }],
+  signer,
+});
+
+const initBalances2Id = await ao.message({
+  process: processId,
+  data: balances2Lua,
+  tags: [{ name: 'Action', value: 'Eval' }],
+  signer,
+});
+
+const patchBalances2Id = await ao.message({
   process: processId,
   data: ' ',
   tags: [{ name: 'Action', value: 'Patch-Hyperbeam-Balances' }],

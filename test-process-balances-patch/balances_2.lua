@@ -1,5 +1,4 @@
-
-  Balances["kbea8UD9251dqJRTtGMS0NXsMmCeNLMl4X6oUVGW7X8"] = "4562250000"
+Balances["kbea8UD9251dqJRTtGMS0NXsMmCeNLMl4X6oUVGW7X8"] = "4562250000"
 Balances["TS8x0i9iRDVTDpi9C_c5uYOqFWU5SvIcnW22C6XNtrw"] = "128301894"
 Balances["vSLMAAZgsHIwgDv64aipJAcCYFpvq39cZYQ6U5fYuAE"] = "0"
 Balances["-N2nFwkbzi-70V8eD8TJ0_dVErVKbTV7yQ0SOuyJ5Ek"] = "916488097"
@@ -795,6 +794,7 @@ Balances["TZOqJqdbzZSERNUrQ9U7thDOXYS0n6fTe2hVeCfaw1Y"] = "0"
 Balances["IsgDheMWdNg5DL3yCf4IDhvw64EoOsY1AlNpKspIIWc"] = "348000000"
 Balances["nAvqHc2ifG6-O8U51Ht5fvx1BTNGQ-L1ue6jVwlHUY0"] = "0"
 Balances["L2Q205fFsiRUZ860vsfhqxQ5NX6I29eb-uiIaR-rJxQ"] = "13999822"
+Balances["fENTqXDm0oZT3eJwa3Ld9dymWa06pYp2QpmDxKaEeNQ"] = "1533989557"
 Balances["Sn8HvGy5bWFlevj_9yM0KebIXEGJpBtyFzZhXkEZTg4"] = "315285205"
 Balances["5Hg5_M5X5F47OD7qMvPEfUiipbVkyR5x9z-bPKIdY4o"] = "4248685021"
 Balances["pSqKMWN24AfeRlWRh6RrWAgfv8bSPEit5VGNda1e02A"] = "1738000000"
@@ -6314,138 +6314,3 @@ Balances["gMNc6S9ryiZ7EtAPwjEOeYYVGUw9BLH7NN2YSrAKkwQ"] = "10767847"
 Balances["CyqCJ-dSuuSLmqALa0mY7V96KTvVwSx963Oi7OKO3S0"] = "48654849"
 Balances["_JLMx-yVAq5oAF9fcjAOGnMXM8HuSgFK3XMawEiaTTo"] = "14999790"
 Balances["srjd5j3HPPK1lb1yzEC6l7a7tHNeE4vC4wDiBWoTAWQ"] = "14000496"
-
-
- --- Pads a number with leading zeros to 32 digits.
--- @lfunction padZero32
--- @tparam {number} num The number to pad
--- @treturn {string} The padded number as a string
-local function padZero32(num)
-	return string.format("%032d", num)
-end
-
---- Checks if a key exists in a list.
--- @lfunction _includes
--- @tparam {table} list The list to check against
--- @treturn {function} A function that takes a key and returns true if the key exists in the list
-local function _includes(list)
-	return function(key)
-		local exists = false
-		for _, listKey in ipairs(list) do
-			if key == listKey then
-				exists = true
-				break
-			end
-		end
-		if not exists then
-			return false
-		end
-		return true
-	end
-end
-
---- Checks if a table is an array.
--- @lfunction isArray
--- @tparam {table} table The table to check
--- @treturn {boolean} True if the table is an array, false otherwise
-local function isArray(table)
-	if type(table) == "table" then
-		local maxIndex = 0
-		for k, v in pairs(table) do
-			if type(k) ~= "number" or k < 1 or math.floor(k) ~= k then
-				return false -- If there's a non-integer key, it's not an array
-			end
-			maxIndex = math.max(maxIndex, k)
-		end
-		-- If the highest numeric index is equal to the number of elements, it's an array
-		return maxIndex == #table
-	end
-	return false
-end
-
-if not ao.reference then
-	ao.reference = 0
-end
-
---- Sends a message.
--- @function send
--- @tparam {table} msg The message to send
-ao.send = function(msg)
-	assert(type(msg) == "table", "msg should be a table")
-	ao.reference = ao.reference + 1
-	local referenceString = tostring(ao.reference)
-
-	local message = {
-		Target = msg.Target,
-		Data = msg.Data,
-		Anchor = padZero32(ao.reference),
-		Tags = {
-			{ name = "Data-Protocol", value = "ao" },
-			{ name = "Variant", value = "ao.TN.1" },
-			{ name = "Type", value = "Message" },
-			{ name = "Reference", value = referenceString },
-		},
-	}
-
-	-- if custom tags in root move them to tags
-	for k, v in pairs(msg) do
-		if not _includes({ "Target", "Data", "Anchor", "Tags", "From" })(k) then
-			table.insert(message.Tags, { name = k, value = v })
-		end
-	end
-
-	if msg.Tags then
-		if isArray(msg.Tags) then
-			for _, o in ipairs(msg.Tags) do
-				table.insert(message.Tags, o)
-			end
-		else
-			for k, v in pairs(msg.Tags) do
-				table.insert(message.Tags, { name = k, value = v })
-			end
-		end
-	end
-
-	-- If running in an environment without the AOS Handlers module, do not add
-	-- the onReply and receive functions to the message.
-	if not Handlers then
-		return message
-	end
-
-	-- clone message info and add to outbox
-	local extMessage = {}
-	for k, v in pairs(message) do
-		extMessage[k] = v
-	end
-
-	-- add message to outbox
-	table.insert(ao.outbox.Messages, extMessage)
-
-	-- add callback for onReply handler(s)
-	message.onReply = function(...) -- Takes either (AddressThatWillReply, handler(s)) or (handler(s))
-		local from, resolver
-		if select("#", ...) == 2 then
-			from = select(1, ...)
-			resolver = select(2, ...)
-		else
-			from = message.Target
-			resolver = select(1, ...)
-		end
-
-		-- Add a one-time callback that runs the user's (matching) resolver on reply
-		Handlers.once({ From = from, ["X-Reference"] = referenceString }, resolver)
-	end
-
-	message.receive = function(...)
-		local from = message.Target
-		if select("#", ...) == 1 then
-			from = select(1, ...)
-		end
-		return Handlers.receive({ From = from, ["X-Reference"] = referenceString })
-	end
-
-	return message
-end
-
-ao.send({ device = "patch@1.0", balances = { device = "trie@1.0" } })
-
