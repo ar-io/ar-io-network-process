@@ -779,7 +779,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 	Send(msg, {
 		Target = msg.From,
 		Recipient = recipient,
-		Quantity = quantity,
+		Quantity = tostring(quantity),
 		Tags = {
 			Action = "Debit-Notice",
 			["Vault-Id"] = msgId,
@@ -790,7 +790,7 @@ addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", Act
 	-- to the receiver, they get a vault notice
 	Send(msg, {
 		Target = recipient,
-		Quantity = quantity,
+		Quantity = tostring(quantity),
 		Sender = msg.From,
 		Tags = {
 			Action = ActionMap.CreateVault .. "-Notice",
@@ -824,7 +824,7 @@ addEventingHandler(ActionMap.RevokeVault, utils.hasMatchingTag("Action", ActionM
 	Send(msg, {
 		Target = msg.From,
 		Recipient = recipient,
-		Quantity = vault.balance,
+		Quantity = tostring(vault.balance),
 		Tags = { Action = "Credit-Notice", ["Vault-Id"] = vaultId },
 		Data = json.encode(vault),
 	})
@@ -832,7 +832,7 @@ addEventingHandler(ActionMap.RevokeVault, utils.hasMatchingTag("Action", ActionM
 	-- to the receiver, they get a revoke vault notice
 	Send(msg, {
 		Target = recipient,
-		Quantity = vault.balance,
+		Quantity = tostring(vault.balance),
 		Sender = msg.From,
 		Tags = { Action = ActionMap.RevokeVault .. "-Notice", ["Vault-Id"] = vaultId },
 		Data = json.encode(vault),
@@ -1536,7 +1536,7 @@ addEventingHandler(
 			Tags = {
 				Action = ActionMap.DecreaseDelegateStake .. "-Notice",
 				Address = target,
-				Quantity = quantity,
+				Quantity = tostring(quantity),
 				["Penalty-Rate"] = tostring(decreaseDelegateStakeResult.penaltyRate),
 				["Expedited-Withdrawal-Fee"] = tostring(decreaseDelegateStakeResult.expeditedWithdrawalFee),
 				["Amount-Withdrawn"] = tostring(decreaseDelegateStakeResult.amountWithdrawn),
