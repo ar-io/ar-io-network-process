@@ -531,7 +531,7 @@ local function _loaded_mod_src_main()
 	--- @field Action string
 	--- @field From string
 	--- @field Timestamp Timestamp
-	--- @field Tags table<string, any>
+	--- @field Tags table<string, string>
 	--- @field ioEvent ARIOEvent
 	--- @field Cast boolean?
 	--- @field reply? fun(response: any)

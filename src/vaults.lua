@@ -3,14 +3,6 @@ local utils = require(".src.utils")
 local constants = require(".src.constants")
 local vaults = {}
 
---- @alias Vaults table<WalletAddress, table<VaultId, Vault>> -- A table of vaults indexed by owner address, then by vault id
-
---- @class Vault
---- @field balance mARIO The balance of the vault
---- @field controller WalletAddress | nil The controller of a revokable vault. Nil if not revokable (default: nil)
---- @field startTimestamp Timestamp The start timestamp of the vault
---- @field endTimestamp Timestamp The end timestamp of the vault
-
 --- Creates a vault
 --- @param from string The address of the owner
 --- @param qty number The quantity of tokens to vault

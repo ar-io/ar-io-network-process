@@ -96,7 +96,7 @@ local ActionMap = {
 }
 
 --- @param msg ParsedMessage
---- @param response any
+--- @param response SendResponse
 local function Send(msg, response)
 	if msg.reply then
 		--- Reference: https://github.com/permaweb/aos/blob/main/blueprints/patch-legacy-reply.lua
@@ -427,6 +427,11 @@ local function assertValueBytesLowerThan(value, remainingBytes, tablesSeen)
 end
 
 -- Sanitize inputs before every interaction
+--- Validates and sanitizes raw message inputs
+--- Converts raw Tags (string:string|number|boolean) to typed MessageTags
+--- Formats addresses and converts known tags to proper types
+--- @param msg RawMessage The raw message before sanitization
+--- @return nil Modifies msg in place
 local function assertAndSanitizeInputs(msg)
 	if msg.Tags.Action ~= "Eval" and msg.Data then
 		assertValueBytesLowerThan(msg.Data, 100)
@@ -448,6 +453,9 @@ local function assertAndSanitizeInputs(msg)
 	msg.Timestamp = msg.Timestamp and tonumber(msg.Timestamp) -- Timestamp should always be provided by the CU
 end
 
+--- Updates the last known message timestamp and ID
+--- @param msg ParsedMessage The sanitized message
+--- @return nil
 local function updateLastKnownMessage(msg)
 	if msg.Timestamp >= LastKnownMessageTimestamp then
 		LastKnownMessageTimestamp = msg.Timestamp
@@ -455,24 +463,17 @@ local function updateLastKnownMessage(msg)
 	end
 end
 
---- @class ParsedMessage
---- @field Id string
---- @field Action string
---- @field From string
---- @field Timestamp Timestamp
---- @field Tags table<string, any>
---- @field ioEvent ARIOEvent
---- @field Cast boolean?
---- @field reply? fun(response: any)
-
---- @param handlerName string
---- @param pattern fun(msg: ParsedMessage):'continue'|boolean
---- @param handleFn fun(msg: ParsedMessage)
---- @param critical boolean?
---- @param printEvent boolean?
+--- Adds an event handler with automatic event tracking and error handling
+--- Handlers receive ParsedMessage with sanitized, typed tags (see MessageTags)
+--- @param handlerName string The name of the handler
+--- @param pattern fun(msg: ParsedMessage):'continue'|boolean Pattern matcher function
+--- @param handleFn fun(msg: ParsedMessage) Handler function that receives sanitized message
+--- @param critical boolean? If true, discards memory on error (for state-modifying handlers)
+--- @param printEvent boolean? If true, prints event data (default: true)
 local function addEventingHandler(handlerName, pattern, handleFn, critical, printEvent)
 	critical = critical or false
 	printEvent = printEvent == nil and true or printEvent
+	--- @param msg ParsedMessage
 	Handlers.add(handlerName, pattern, function(msg)
 		-- Store the old balances to compare after the handler has run for patching state
 		-- Only do this for the last handler to avoid unnecessary copying
@@ -630,112 +631,127 @@ end, function(msg)
 end, CRITICAL, false)
 
 -- Write handlers
-addEventingHandler(ActionMap.Transfer, utils.hasMatchingTag("Action", ActionMap.Transfer), function(msg)
-	-- assert recipient is a valid arweave address
-	local recipient = msg.Tags.Recipient
-	local quantity = msg.Tags.Quantity
-	local allowUnsafeAddresses = msg.Tags["Allow-Unsafe-Addresses"] or false
-	assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
-	assert(quantity and quantity > 0 and utils.isInteger(quantity), "Invalid quantity. Must be integer greater than 0")
-	assert(recipient ~= msg.From, "Cannot transfer to self")
+-- Note: Add ---@param msg ParsedMessage before each handler function for proper type inference
+addEventingHandler(
+	ActionMap.Transfer,
+	utils.hasMatchingTag("Action", ActionMap.Transfer),
+	---@param msg ParsedMessage
+	function(msg)
+		-- assert recipient is a valid arweave address
+		local recipient = msg.Tags.Recipient
+		local quantity = msg.Tags.Quantity
+		local allowUnsafeAddresses = msg.Tags["Allow-Unsafe-Addresses"] or false
+		assert(utils.isValidAddress(recipient, allowUnsafeAddresses), "Invalid recipient")
+		assert(
+			quantity and quantity > 0 and utils.isInteger(quantity),
+			"Invalid quantity. Must be integer greater than 0"
+		)
+		assert(recipient ~= msg.From, "Cannot transfer to self")
 
-	msg.ioEvent:addField("RecipientFormatted", recipient)
+		msg.ioEvent:addField("RecipientFormatted", recipient)
 
-	local result = balances.transfer(recipient, msg.From, quantity, allowUnsafeAddresses)
-	if result ~= nil then
-		local senderNewBalance = result[msg.From]
-		local recipientNewBalance = result[recipient]
-		msg.ioEvent:addField("SenderPreviousBalance", senderNewBalance + quantity)
-		msg.ioEvent:addField("SenderNewBalance", senderNewBalance)
-		msg.ioEvent:addField("RecipientPreviousBalance", recipientNewBalance - quantity)
-		msg.ioEvent:addField("RecipientNewBalance", recipientNewBalance)
-	end
+		local result = balances.transfer(recipient, msg.From, quantity, allowUnsafeAddresses)
+		if result ~= nil then
+			local senderNewBalance = result[msg.From]
+			local recipientNewBalance = result[recipient]
+			msg.ioEvent:addField("SenderPreviousBalance", senderNewBalance + quantity)
+			msg.ioEvent:addField("SenderNewBalance", senderNewBalance)
+			msg.ioEvent:addField("RecipientPreviousBalance", recipientNewBalance - quantity)
+			msg.ioEvent:addField("RecipientNewBalance", recipientNewBalance)
+		end
 
-	-- if the sender is the protocol, then we need to update the circulating supply as tokens are now in circulation
-	if msg.From == ao.id then
-		LastKnownCirculatingSupply = LastKnownCirculatingSupply + quantity
-		addSupplyData(msg.ioEvent)
-	end
+		-- if the sender is the protocol, then we need to update the circulating supply as tokens are now in circulation
+		if msg.From == ao.id then
+			LastKnownCirculatingSupply = LastKnownCirculatingSupply + quantity
+			addSupplyData(msg.ioEvent)
+		end
 
-	-- Casting implies that the sender does not want a response - Reference: https://elixirforum.com/t/what-is-the-etymology-of-genserver-cast/33610/3
-	if not msg.Cast then
-		-- Debit-Notice message template, that is sent to the Sender of the transfer
-		local debitNotice = {
-			Target = msg.From,
-			Action = "Debit-Notice",
-			Recipient = recipient,
-			Quantity = tostring(quantity),
-			["Allow-Unsafe-Addresses"] = tostring(allowUnsafeAddresses),
-			Data = "You transferred " .. msg.Tags.Quantity .. " to " .. recipient,
-		}
-		-- Credit-Notice message template, that is sent to the Recipient of the transfer
-		local creditNotice = {
-			Target = recipient,
-			Action = "Credit-Notice",
-			Sender = msg.From,
-			Quantity = tostring(quantity),
-			["Allow-Unsafe-Addresses"] = tostring(allowUnsafeAddresses),
-			Data = "You received " .. msg.Tags.Quantity .. " from " .. msg.From,
-		}
+		-- Casting implies that the sender does not want a response - Reference: https://elixirforum.com/t/what-is-the-etymology-of-genserver-cast/33610/3
+		if not msg.Cast then
+			-- Debit-Notice message template, that is sent to the Sender of the transfer
+			local debitNotice = {
+				Target = msg.From,
+				Action = "Debit-Notice",
+				Recipient = recipient,
+				Quantity = tostring(quantity),
+				["Allow-Unsafe-Addresses"] = tostring(allowUnsafeAddresses),
+				Data = "You transferred " .. msg.Tags.Quantity .. " to " .. recipient,
+			}
+			-- Credit-Notice message template, that is sent to the Recipient of the transfer
+			local creditNotice = {
+				Target = recipient,
+				Action = "Credit-Notice",
+				Sender = msg.From,
+				Quantity = tostring(quantity),
+				["Allow-Unsafe-Addresses"] = tostring(allowUnsafeAddresses),
+				Data = "You received " .. msg.Tags.Quantity .. " from " .. msg.From,
+			}
 
-		-- Add forwarded tags to the credit and debit notice messages
-		local didForwardTags = false
-		for tagName, tagValue in pairs(msg) do
-			-- Tags beginning with "X-" are forwarded
-			if string.sub(tagName, 1, 2) == "X-" then
-				debitNotice[tagName] = tagValue
-				creditNotice[tagName] = tagValue
-				didForwardTags = true
-				msg.ioEvent:addField(tagName, tagValue)
+			-- Add forwarded tags to the credit and debit notice messages
+			local didForwardTags = false
+			for tagName, tagValue in pairs(msg) do
+				-- Tags beginning with "X-" are forwarded
+				if string.sub(tagName, 1, 2) == "X-" then
+					debitNotice[tagName] = tagValue
+					creditNotice[tagName] = tagValue
+					didForwardTags = true
+					msg.ioEvent:addField(tagName, tagValue)
+				end
 			end
+			if didForwardTags then
+				msg.ioEvent:addField("ForwardedTags", "true")
+			end
+
+			-- Send Debit-Notice and Credit-Notice
+			Send(msg, debitNotice)
+			Send(msg, creditNotice)
 		end
-		if didForwardTags then
-			msg.ioEvent:addField("ForwardedTags", "true")
+	end
+)
+
+addEventingHandler(
+	ActionMap.CreateVault,
+	utils.hasMatchingTag("Action", ActionMap.CreateVault),
+	---@param msg ParsedMessage
+	function(msg)
+		local quantity = msg.Tags.Quantity
+		local lockLengthMs = msg.Tags["Lock-Length"]
+		local msgId = msg.Id
+		assert(
+			lockLengthMs and lockLengthMs > 0 and utils.isInteger(lockLengthMs),
+			"Invalid lock length. Must be integer greater than 0"
+		)
+		assert(
+			quantity and utils.isInteger(quantity) and quantity >= constants.MIN_VAULT_SIZE,
+			"Invalid quantity. Must be integer greater than or equal to " .. constants.MIN_VAULT_SIZE .. " mARIO"
+		)
+		local vault = vaults.createVault(msg.From, quantity, lockLengthMs, msg.Timestamp, msgId)
+
+		if vault ~= nil then
+			msg.ioEvent:addField("Vault-Id", msgId)
+			msg.ioEvent:addField("Vault-Balance", vault.balance)
+			msg.ioEvent:addField("Vault-Start-Timestamp", vault.startTimestamp)
+			msg.ioEvent:addField("Vault-End-Timestamp", vault.endTimestamp)
 		end
 
-		-- Send Debit-Notice and Credit-Notice
-		Send(msg, debitNotice)
-		Send(msg, creditNotice)
+		LastKnownLockedSupply = LastKnownLockedSupply + quantity
+		LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
+		addSupplyData(msg.ioEvent)
+
+		Send(msg, {
+			Target = msg.From,
+			Tags = {
+				Action = ActionMap.CreateVault .. "-Notice",
+				["Vault-Id"] = msgId,
+			},
+			Data = json.encode(vault),
+		})
 	end
-end)
-
-addEventingHandler(ActionMap.CreateVault, utils.hasMatchingTag("Action", ActionMap.CreateVault), function(msg)
-	local quantity = msg.Tags.Quantity
-	local lockLengthMs = msg.Tags["Lock-Length"]
-	local msgId = msg.Id
-	assert(
-		lockLengthMs and lockLengthMs > 0 and utils.isInteger(lockLengthMs),
-		"Invalid lock length. Must be integer greater than 0"
-	)
-	assert(
-		quantity and utils.isInteger(quantity) and quantity >= constants.MIN_VAULT_SIZE,
-		"Invalid quantity. Must be integer greater than or equal to " .. constants.MIN_VAULT_SIZE .. " mARIO"
-	)
-	local vault = vaults.createVault(msg.From, quantity, lockLengthMs, msg.Timestamp, msgId)
-
-	if vault ~= nil then
-		msg.ioEvent:addField("Vault-Id", msgId)
-		msg.ioEvent:addField("Vault-Balance", vault.balance)
-		msg.ioEvent:addField("Vault-Start-Timestamp", vault.startTimestamp)
-		msg.ioEvent:addField("Vault-End-Timestamp", vault.endTimestamp)
-	end
-
-	LastKnownLockedSupply = LastKnownLockedSupply + quantity
-	LastKnownCirculatingSupply = LastKnownCirculatingSupply - quantity
-	addSupplyData(msg.ioEvent)
-
-	Send(msg, {
-		Target = msg.From,
-		Tags = {
-			Action = ActionMap.CreateVault .. "-Notice",
-			["Vault-Id"] = msgId,
-		},
-		Data = json.encode(vault),
-	})
-end)
+)
 
 addEventingHandler(ActionMap.VaultedTransfer, utils.hasMatchingTag("Action", ActionMap.VaultedTransfer), function(msg)
 	local recipient = msg.Tags.Recipient
+
 	local quantity = msg.Tags.Quantity
 	local lockLengthMs = msg.Tags["Lock-Length"]
 	local msgId = msg.Id

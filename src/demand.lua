@@ -1,27 +1,6 @@
 local utils = require(".src.utils")
 local demand = {}
 
---- @class DemandFactor
---- @field currentPeriod number The current period
---- @field trailingPeriodPurchases number[] The trailing period purchases
---- @field trailingPeriodRevenues number[] The trailing period revenues
---- @field purchasesThisPeriod number The current period purchases
---- @field revenueThisPeriod number The current period revenue
---- @field currentDemandFactor number The current demand factor
---- @field consecutivePeriodsWithMinDemandFactor number The number of consecutive periods with the minimum demand factor
---- @field fees table<number, number> The fees for each name length
-
---- @class DemandFactorSettings
---- @field periodZeroStartTimestamp number The timestamp of the start of period zero
---- @field movingAvgPeriodCount number The number of periods to use for the moving average
---- @field periodLengthMs number The length of a period in milliseconds
---- @field demandFactorBaseValue number The base demand factor value that is what the demand factor is reset to when fees are reset
---- @field demandFactorMin number The minimum demand factor value
---- @field demandFactorUpAdjustmentRate number The adjustment to the demand factor when it is increasing
---- @field demandFactorDownAdjustmentRate number The adjustment to the demand factor when it is decreasing
---- @field maxPeriodsAtMinDemandFactor number The threshold for the number of consecutive periods with the minimum demand factor before adjusting the demand factor
---- @field criteria 'revenue' | 'purchases' The criteria to use for determining if the demand is increasing
-
 --- Tally a name purchase
 --- @param qty number The quantity of the purchase
 function demand.tallyNamePurchase(qty)

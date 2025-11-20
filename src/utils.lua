@@ -688,6 +688,13 @@ end
 --- Sanitizes inputs to ensure they are valid strings
 --- @param table table The table to sanitize
 --- @return table sanitizedTable - the sanitized table
+--- Validates and sanitizes input tags
+--- Converts raw tag values to proper types based on known tag patterns
+--- - Known address tags: formatted as WalletAddress
+--- - Known number tags: converted to number
+--- - Known boolean tags: converted to boolean
+--- @param table table<string, string|number|boolean> Raw tags table
+--- @return MessageTags Sanitized tags with proper types
 function utils.validateAndSanitizeInputs(table)
 	assert(type(table) == "table", "Table must be a table")
 	local sanitizedTable = {}

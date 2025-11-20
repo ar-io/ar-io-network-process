@@ -10,11 +10,70 @@
         "spec",
         "${addons}/busted/module/library",
         "${3rd}/luassert/library"
-      ]
+      ],
+      "ignoreDir": [
+        "patches",
+        "tests/code-patches"
+      ],
+      "ignoreSubmodules": true
     },
     "diagnostics": {
       "enable": true,
-      "globals": []
+      "globals": [
+        "describe",
+        "it",
+        "before_each",
+        "after_each",
+        "setup",
+        "teardown",
+        "before",
+        "after",
+        "assert",
+        "spy",
+        "stub",
+        "mock",
+        "finally",
+        "pending",
+        "insulate",
+        "expose",
+        "randomize",
+        "Owner",
+        "Name",
+        "Handlers",
+        "ao",
+        "OrderIndex",
+        "Orderbook",
+        "EnglishAuctionBids",
+        "Intents",
+        "ARIO_TOKEN_PROCESS_ID"
+      ],
+      "disable": [
+        "lowercase-global",
+        "duplicate-set-field",
+        "redundant-parameter"
+      ],
+      "neededFileStatus": {
+        "unused-local": "Any",
+        "unused-function": "Any",
+        "unused-vararg": "Any"
+      },
+      "severity": {
+        "missing-fields": "Error!",
+        "need-check-nil": "Error!",
+        "undefined-field": "Error!",
+        "assign-type-mismatch": "Error!",
+        "no-unknown": "Error!"
+      }
+    },
+    "type": {
+      "castNumberToInteger": true,
+      "weakUnionCheck": true
+    },
+    "hint": {
+      "enable": true,
+      "paramName": "All",
+      "paramType": true,
+      "setType": true
     }
   },
   "workspace.checkThirdParty": false

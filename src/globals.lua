@@ -47,7 +47,6 @@ TotalSupply = TotalSupply or constants.TOTAL_TOKEN_SUPPLY
 --[[
     Gateway Registry
 ]]
---- @alias Gateways table<WalletAddress, Gateway>
 --- @type Gateways
 GatewayRegistry = GatewayRegistry or {}
 --- @type GatewayRegistrySettings
@@ -56,7 +55,6 @@ GatewayRegistrySettings = GatewayRegistrySettings or utils.deepCopy(constants.DE
 --[[
     Epochs
 ]]
---- @alias Epochs table<number, PrescribedEpoch>
 --- @type Epochs
 Epochs = Epochs or {}
 --- @type EpochSettings

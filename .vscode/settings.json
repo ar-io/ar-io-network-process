@@ -22,6 +22,7 @@
   },
   "Lua.codeLens.enable": true,
   "Lua.workspace.library": ["${workspaceFolderBasename}/**"],
+  "Lua.workspace.ignoreDir": ["patches", "tests/code-patches"],
   "Lua.completion.callSnippet": "Both",
   "Lua.signatureHelp.enable": true,
   "Lua.workspace.checkThirdParty": true,
@@ -37,6 +38,23 @@
     "editor.formatOnPaste": true,
     "editor.formatOnSaveMode": "file"
   },
+  "Lua.diagnostics.severity": {
+    // Type checking - missing required fields
+    "missing-fields": "Error!",
+    // Nil safety checks
+    "need-check-nil": "Error!",
+    "undefined-field": "Error!",
+    // Type mismatch
+    "assign-type-mismatch": "Error!",
+    // No unknown/any types allowed
+    "no-unknown": "Error!"
+  },
+  "Lua.type.castNumberToInteger": true,
+  "Lua.type.weakUnionCheck": true,
+  "Lua.hint.enable": true,
+  "Lua.hint.paramName": "All",
+  "Lua.hint.paramType": true,
+  "Lua.hint.setType": true,
   "cSpell.words": [
     "ARIO",
     "hashchain",

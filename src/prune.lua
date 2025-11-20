@@ -4,17 +4,6 @@ local vaults = require(".src.vaults")
 local primaryNames = require(".src.primary_names")
 local prune = {}
 
----@class PruneStateResult
----@field prunedRecords table<string, Record>
----@field newGracePeriodRecords table<string, Record>
----@field prunedReturnedNames table<string, ReturnedName>
----@field prunedReserved table<string, ReservedName>
----@field prunedVaults table<string, Vault>
----@field pruneGatewaysResult table<string, table>
----@field prunedPrimaryNamesAndOwners table<string, RemovedPrimaryName[]>
----@field prunedPrimaryNameRequests table<WalletAddress, PrimaryNameRequest>
----@field delegatorsWithFeeReset WalletAddress[]
-
 --- Prunes the state
 --- @param timestamp number The timestamp
 --- @param msgId string The message ID
