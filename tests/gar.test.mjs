@@ -1016,7 +1016,7 @@ describe('GatewayRegistry', async () => {
             },
             {
               name: 'Quantity',
-              value: decreaseQty,
+              value: `${decreaseQty}`,
             },
             {
               name: 'Ref_',
