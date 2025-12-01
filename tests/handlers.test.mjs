@@ -87,8 +87,8 @@ describe('handlers', async () => {
           'total supply should be 1 billion ARIO but was ' + supplyData.total,
         );
         assert.ok(
-          supplyData.circulating === ARIOToMARIO(1000000000) - 65000000000000,
-          'circulating supply should be 0.95 billion ARIO but was ' +
+          supplyData.circulating === ARIOToMARIO(1000000000),
+          'circulating supply should be 1 billion ARIO (total - locked) but was ' +
             supplyData.circulating,
         );
         assert.ok(

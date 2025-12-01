@@ -113,7 +113,7 @@ LastCreatedEpochIndex = LastCreatedEpochIndex or -1
 --- @type number
 LastDistributedEpochIndex = LastDistributedEpochIndex or 0
 --- @type number
-LastKnownCirculatingSupply = LastKnownCirculatingSupply or 0 -- total circulating supply (e.g. balances - protocol balance)
+LastKnownCirculatingSupply = LastKnownCirculatingSupply or 0 -- total circulating supply (e.g. balances - vaults)
 --- @type number
 LastKnownLockedSupply = LastKnownLockedSupply or 0 -- total vault balance across all vaults
 --- @type number
@@ -122,7 +122,8 @@ LastKnownStakedSupply = LastKnownStakedSupply or 0 -- total operator stake acros
 LastKnownDelegatedSupply = LastKnownDelegatedSupply or 0 -- total delegated stake across all gateways
 --- @type number
 LastKnownWithdrawSupply = LastKnownWithdrawSupply or 0 -- total withdraw supply across all gateways (gateways and delegates)
-
+--- @type number
+LastKnownLiquidSupply = LastKnownLiquidSupply or 0 -- total liquid supply across all user balances
 --[[
     Pruning Timestamps
 ]]

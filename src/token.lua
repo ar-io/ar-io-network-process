@@ -34,6 +34,7 @@ end
 --- @class TotalSupplyDetails
 --- @field totalSupply number
 --- @field circulatingSupply number
+--- @field liquidSupply number
 --- @field lockedSupply number
 --- @field stakedSupply number
 --- @field delegatedSupply number
@@ -46,7 +47,7 @@ end
 function token.computeTotalSupply()
 	-- add all the balances
 	local totalSupply = 0
-	local circulatingSupply = 0
+	local liquidSupply = 0
 	local lockedSupply = 0
 	local stakedSupply = 0
 	local delegatedSupply = 0
@@ -69,18 +70,19 @@ function token.computeTotalSupply()
 		numExitingGateways = 0,
 	}
 
-	-- tally circulating supply
+	-- tally circulating supply in user balances
 	for walletAddress, balance in pairs(userBalances) do
 		-- clean up 0 balances opportunistically
-		if balance > 0 then
-			circulatingSupply = circulatingSupply + balance
+		if walletAddress == ao.id then
+			-- skip protocol account balance here, it's handled separately
+		elseif balance > 0 then
+			liquidSupply = liquidSupply + balance
 			stateObjectTallies.numBalances = stateObjectTallies.numBalances + 1
 		else
 			Balances[walletAddress] = nil
 		end
 	end
-	circulatingSupply = circulatingSupply - protocolBalance
-	totalSupply = totalSupply + protocolBalance + circulatingSupply
+	totalSupply = totalSupply + protocolBalance + liquidSupply
 
 	-- tally supply stashed in gateways and delegates
 	local uniqueDelegates = {}
@@ -139,7 +141,12 @@ function token.computeTotalSupply()
 		end
 	end
 
-	LastKnownCirculatingSupply = circulatingSupply
+	-- compute circulating supply which is total supply minus anything vaulted
+	local circulatingSupply = totalSupply - lockedSupply
+
+	-- Note: LastKnownCirculatingSupply tracks liquid user balances (excluding protocol) for incremental updates in main.lua
+	LastKnownCirculatingSupply = liquidSupply
+	LastKnownLiquidSupply = liquidSupply
 	LastKnownLockedSupply = lockedSupply
 	LastKnownStakedSupply = stakedSupply
 	LastKnownDelegatedSupply = delegatedSupply
@@ -148,11 +155,12 @@ function token.computeTotalSupply()
 	return {
 		totalSupply = totalSupply,
 		circulatingSupply = circulatingSupply,
-		lockedSupply = lockedSupply,
-		stakedSupply = stakedSupply,
-		delegatedSupply = delegatedSupply,
-		withdrawSupply = withdrawSupply,
-		protocolBalance = protocolBalance,
+		liquidSupply = liquidSupply, -- all liquid tokens not vaulted
+		lockedSupply = lockedSupply, -- all tokens in user vaults
+		stakedSupply = stakedSupply, -- all operator stakes in gateways
+		delegatedSupply = delegatedSupply, -- all delegated stakes in gateways
+		withdrawSupply = withdrawSupply, -- all tokens in delegate and gateway vaults
+		protocolBalance = protocolBalance, -- balance of the protocol account
 		stateObjectTallies = stateObjectTallies,
 	}
 end
