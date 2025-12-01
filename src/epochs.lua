@@ -286,8 +286,17 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	-- get our prescribed observers, using the hashchain as entropy
 	local hash = epochHash
 	while utils.lengthOfTable(prescribedObserversLookup) < epochs.getSettings().maxObservers do
+		-- calculate total remaining weight of unprescribed observers
+		local totalRemainingWeight = 0
+		for _, observer in ipairs(filteredObservers) do
+			if not prescribedObserversLookup[observer.observerAddress] then
+				totalRemainingWeight = totalRemainingWeight + observer.normalizedCompositeWeight
+			end
+		end
+
 		local hashString = crypto.utils.array.toString(hash)
-		local random = crypto.random(nil, nil, hashString) / 0xffffffff
+		-- scale random value to the remaining weight range for proper weighted selection
+		local random = (crypto.random(nil, nil, hashString) / 0xffffffff) * totalRemainingWeight
 		local cumulativeNormalizedCompositeWeight = 0
 		for _, observer in ipairs(filteredObservers) do
 			local alreadyPrescribed = prescribedObserversLookup[observer.observerAddress]
