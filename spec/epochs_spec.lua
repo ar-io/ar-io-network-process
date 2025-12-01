@@ -1009,6 +1009,177 @@ describe("epochs", function()
 		end)
 	end)
 
+	describe("computePrescribedObserversForEpoch weighted selection", function()
+		it("should select observers proportionally to their normalized weights across full [0,1] range", function()
+			-- Setup: Create 10 gateways with varying weights to test the full distribution
+			-- Gateway 1-5 have low cumulative weights (0-0.5 range)
+			-- Gateway 6-10 have high cumulative weights (0.5-1.0 range)
+			-- With the bug (0xffffffff), only gateways in the 0-0.5 range would be selected
+			-- With the fix (0x7fffffff), all gateways should be selectable
+
+			_G.EpochSettings = {
+				maxObservers = 3, -- select 3 observers
+				epochZeroStartTimestamp = startTimestamp,
+				durationMs = 60 * 1000 * 60 * 24, -- 24 hours
+			}
+
+			-- Create 10 gateways with equal weights (each 0.1 normalized weight)
+			for i = 1, 10 do
+				local gateway = {
+					operatorStake = gar.getSettings().operators.minStake,
+					totalDelegatedStake = 0,
+					vaults = {},
+					delegates = {},
+					startTimestamp = startTimestamp,
+					stats = {
+						prescribedEpochCount = 0,
+						observedEpochCount = 0,
+						totalEpochCount = 0,
+						passedEpochCount = 0,
+						failedEpochCount = 0,
+						failedConsecutiveEpochs = 0,
+						passedConsecutiveEpochs = 0,
+					},
+					settings = testSettings,
+					status = "joined",
+					observerAddress = "observer-address-" .. i,
+					weights = {
+						normalizedCompositeWeight = 0.1, -- each gateway has 10% weight
+						stakeWeight = 1,
+						tenureWeight = 1,
+						gatewayPerformanceRatio = 1,
+						observerPerformanceRatio = 1,
+						compositeWeight = 1,
+					},
+				}
+				_G.GatewayRegistry["gateway-address-" .. i] = gateway
+			end
+
+			-- Run multiple epochs with different hashchains to get statistical distribution
+			local selectionCounts = {}
+			for i = 1, 10 do
+				selectionCounts["observer-address-" .. i] = 0
+			end
+
+			-- Use different hashchains to simulate multiple epochs
+			local testHashchains = {
+				"YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=", -- base64 strings
+				"MTIzNDU2Nzg5MGFiY2RlZmdoaWprbG1ub3BxcnN0dXY=",
+				"cXdlcnR5dWlvcGFzZGZnaGprbHp4Y3Zibm0xMjM0NTY=",
+				"YXNkZmdoamtsenhjdmJubTEyMzQ1Njc4OTBxd2VydHk=",
+				"enhjdmJubTEyMzQ1Njc4OTBhc2RmZ2hqa2xxd2VydHl1",
+				"cG9pdXl0cmV3cWFzZGZnaGprbHp4Y3Zibm0xMjM0NTY=",
+				"bW5iY3h6bGtqaGdmZHNhcG9pdXl0cmV3cTEyMzQ1Njc=",
+				"OTg3NjU0MzIxMHF3ZXJ0eXVpb3Bhc2RmZ2hqa2x6eGM=",
+				"dGVzdGluZzEyMzQ1Njc4OTBhYmNkZWZnaGlqa2xtbm9w",
+				"Zmluam1zZGlvYXNkZmhzdWRmaHNkaWZoc2lkZmhzZGY=",
+			}
+
+			for _, testHashchain in ipairs(testHashchains) do
+				local prescribedObserverMap = epochs.computePrescribedObserversForEpoch(1, testHashchain)
+				for observerAddr, _ in pairs(prescribedObserverMap) do
+					selectionCounts[observerAddr] = selectionCounts[observerAddr] + 1
+				end
+			end
+
+			-- With 10 hashchains selecting 3 observers each = 30 total selections
+			-- With equal 10% weights, each gateway should be selected ~3 times on average
+			-- The key test: gateways in the upper half of the distribution (6-10) should also be selected
+			local upperHalfSelections = 0
+			for i = 6, 10 do
+				upperHalfSelections = upperHalfSelections + selectionCounts["observer-address-" .. i]
+			end
+
+			-- With the bug (random max ~0.5), upperHalfSelections would be 0 or very low
+			-- With the fix, upperHalfSelections should be roughly 15 (half of 30)
+			-- We use a loose bound to account for randomness: at least 5 selections in upper half
+			assert(
+				upperHalfSelections >= 5,
+				"Expected at least 5 selections from upper half of weight distribution, got "
+					.. upperHalfSelections
+					.. ". This suggests random values are not reaching the full [0,1] range."
+			)
+		end)
+
+		it("should select high-weight gateways more frequently than low-weight gateways", function()
+			_G.EpochSettings = {
+				maxObservers = 2, -- select 2 observers
+				epochZeroStartTimestamp = startTimestamp,
+				durationMs = 60 * 1000 * 60 * 24, -- 24 hours
+			}
+
+			-- Create 3 gateways with different weights:
+			-- Gateway 1: 60% weight (should be selected most often)
+			-- Gateway 2: 30% weight
+			-- Gateway 3: 10% weight (should be selected least often)
+			local weights = { 0.6, 0.3, 0.1 }
+			for i = 1, 3 do
+				local gateway = {
+					operatorStake = gar.getSettings().operators.minStake,
+					totalDelegatedStake = 0,
+					vaults = {},
+					delegates = {},
+					startTimestamp = startTimestamp,
+					stats = {
+						prescribedEpochCount = 0,
+						observedEpochCount = 0,
+						totalEpochCount = 0,
+						passedEpochCount = 0,
+						failedEpochCount = 0,
+						failedConsecutiveEpochs = 0,
+						passedConsecutiveEpochs = 0,
+					},
+					settings = testSettings,
+					status = "joined",
+					observerAddress = "observer-" .. i,
+					weights = {
+						normalizedCompositeWeight = weights[i],
+						stakeWeight = 1,
+						tenureWeight = 1,
+						gatewayPerformanceRatio = 1,
+						observerPerformanceRatio = 1,
+						compositeWeight = 1,
+					},
+				}
+				_G.GatewayRegistry["gateway-" .. i] = gateway
+			end
+
+			local selectionCounts = { 0, 0, 0 }
+
+			-- Use different hashchains to simulate multiple epochs
+			local testHashchains = {
+				"dGVzdDEyMzQ1Njc4OTBhYmNkZWZnaGlqa2xtbm9wcXI=",
+				"YWJjZGVmMTIzNDU2Nzg5MGdoaWprbG1ub3BxcnN0dXY=",
+				"MTIzYWJjNDU2ZGVmNzg5MGdoaWprbG1ub3BxcnN0dXY=",
+				"cXdlcnR5MTIzNDU2Nzg5MGFzZGZnaGprbHp4Y3Zibm0=",
+				"enhjdmJubTk4NzY1NDMyMTBhc2RmZ2hqa2xxd2VydHk=",
+				"bW5idmN4ejEyMzQ1Njc4OTBhc2RmZ2hqa2xxd2VydHl1",
+				"cG9pdXl0cmV3cTEyMzQ1Njc4OTBhc2RmZ2hqa2x6eGM=",
+				"YXNkZjEyMzRnaGprNTY3OGxrenhjOTB2Ym5tcXdlcnR5",
+				"dGVzdGhhc2gxMjM0NTY3ODkwYWJjZGVmZ2hpamtsbW5v",
+				"ZmluYWxoYXNoMTIzNDU2Nzg5MGFiY2RlZmdoaWprbG0=",
+			}
+
+			for _, testHashchain in ipairs(testHashchains) do
+				local prescribedObserverMap = epochs.computePrescribedObserversForEpoch(1, testHashchain)
+				for observerAddr, _ in pairs(prescribedObserverMap) do
+					local idx = tonumber(observerAddr:match("observer%-(%d+)"))
+					selectionCounts[idx] = selectionCounts[idx] + 1
+				end
+			end
+
+			-- Gateway 1 (60% weight) should be selected more than Gateway 3 (10% weight)
+			assert(
+				selectionCounts[1] > selectionCounts[3],
+				"Expected gateway with 60% weight to be selected more often than gateway with 10% weight. "
+					.. "Gateway 1: "
+					.. selectionCounts[1]
+					.. ", Gateway 3: "
+					.. selectionCounts[3]
+			)
+		end)
+	end)
+
 	describe("getEligibleRewardsForEpoch", function()
 		it("should return paginated eligible rewards for the current epoch", function()
 			_G.Epochs[0] = {
