@@ -153,7 +153,7 @@ describe("epochs", function()
 					status = "joined",
 					observerAddress = "observer-address-" .. i,
 					weights = {
-						normalizedCompositeWeight = 0.33, -- all equal weights	
+						normalizedCompositeWeight = 0.33, -- all equal weights
 						stakeWeight = 1,
 						tenureWeight = 1,
 						gatewayPerformanceRatio = 1,
