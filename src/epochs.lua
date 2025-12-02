@@ -287,7 +287,8 @@ function epochs.computePrescribedObserversForEpoch(epochIndex, hashchain)
 	local hash = epochHash
 	while utils.lengthOfTable(prescribedObserversLookup) < epochs.getSettings().maxObservers do
 		local hashString = crypto.utils.array.toString(hash)
-		local random = crypto.random(nil, nil, hashString) / 0x7fffffff
+		-- crypto.random returns values in [0, 2^31-1], so divide by max to get [0, 1]
+		local random = crypto.random(nil, nil, hashString) / (2 ^ 31 - 1)
 		local cumulativeNormalizedCompositeWeight = 0
 		for _, observer in ipairs(filteredObservers) do
 			local alreadyPrescribed = prescribedObserversLookup[observer.observerAddress]
