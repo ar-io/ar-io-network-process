@@ -153,7 +153,7 @@ describe("epochs", function()
 					status = "joined",
 					observerAddress = "observer-address-" .. i,
 					weights = {
-						normalizedCompositeWeight = 1,
+						normalizedCompositeWeight = 0.33, -- all equal weights	
 						stakeWeight = 1,
 						tenureWeight = 1,
 						gatewayPerformanceRatio = 1,
@@ -165,13 +165,13 @@ describe("epochs", function()
 				_G.GatewayRegistry["observer" .. i] = gateway
 			end
 
+			-- only 2 observers should be prescribed and they should always be the same given the same hashchain
+			local expectation = {
+				["observer-address-2"] = "observer2",
+				["observer-address-3"] = "observer3",
+			}
 			local prescribedObserverMap = epochs.computePrescribedObserversForEpoch(1, testHashchain)
-			-- Should select exactly maxObservers (2) from the 3 available gateways
-			local count = 0
-			for _ in pairs(prescribedObserverMap) do
-				count = count + 1
-			end
-			assert.are.equal(2, count)
+			assert.are.same(expectation, prescribedObserverMap)
 		end)
 	end)
 
