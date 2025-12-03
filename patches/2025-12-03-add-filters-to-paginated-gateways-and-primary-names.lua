@@ -4,7 +4,7 @@
 	This extends the pagination filters feature (added in 2025-06-16-pagination-filters.lua)
 	to also support filtering on gateways, primary names, and vaults endpoints.
 
-	Reviewers: [PLACEHOLDER FOR REVIEWERS]
+	Reviewers: Dylan, Ariel, Atticus
 ]]
 --
 local gar = require(".src.gar")
@@ -66,7 +66,15 @@ function vaults.getPaginatedVaults(cursor, limit, sortOrder, sortBy, filters)
 		return acc
 	end, {})
 
-	return utils.paginateTableWithCursor(vaultsArray, cursor, cursorField, limit, sortBy or "address", sortOrder, filters)
+	return utils.paginateTableWithCursor(
+		vaultsArray,
+		cursor,
+		cursorField,
+		limit,
+		sortBy or "address",
+		sortOrder,
+		filters
+	)
 end
 
 -- main.lua - update handlers to pass filters
