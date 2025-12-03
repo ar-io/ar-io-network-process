@@ -92,6 +92,14 @@ To run the tests with debugging (includes print statements), set the `DEBUG` env
 DEBUG=true busted . or yarn test:unit:debug
 ```
 
+#### Running Unit Tests via Docker
+
+If you don't have Lua installed locally, you can run unit tests using Docker:
+
+```sh
+docker build -t ario-test -f Dockerfile.test . && docker run --rm ario-test
+```
+
 ### Integration Tests
 
 Integration tests are written using the [ao-loader](https://github.com/permaweb/ao/tree/main/loader). To run the tests, execute the following command:

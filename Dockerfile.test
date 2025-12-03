@@ -1,0 +1,27 @@
+FROM ubuntu:22.04
+
+# Install Lua 5.3 and dependencies
+RUN apt-get update && apt-get install -y \
+    lua5.3 \
+    liblua5.3-dev \
+    luarocks \
+    git \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Lua 5.3 as default (use set instead of install since lua-interpreter already manages it)
+RUN update-alternatives --set lua-interpreter /usr/bin/lua5.3 \
+    && update-alternatives --set lua-compiler /usr/bin/luac5.3
+
+# Install busted and luacov via luarocks
+RUN luarocks install busted \
+    && luarocks install luacov
+
+# Set working directory
+WORKDIR /app
+
+# Copy the project files
+COPY . .
+
+# Default command runs the unit tests
+CMD ["busted", "."]
