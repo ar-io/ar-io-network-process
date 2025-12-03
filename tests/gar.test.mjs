@@ -2590,4 +2590,110 @@ describe('GatewayRegistry', async () => {
       lastTimestamp = STUB_TIMESTAMP + 1;
     });
   });
+
+  describe('Gateways-Filters', () => {
+    it('should filter gateways by status', async () => {
+      const gateway1 = STUB_ADDRESS_6;
+      const gateway2 = STUB_ADDRESS_7;
+
+      // Join two gateways
+      const { memory: joinMemory1 } = await joinNetwork({
+        address: gateway1,
+        memory: sharedMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+
+      const { memory: joinMemory2 } = await joinNetwork({
+        address: gateway2,
+        memory: joinMemory1,
+        timestamp: STUB_TIMESTAMP,
+      });
+
+      // Get all gateways without filter
+      const allGatewaysResult = await handle({
+        options: {
+          Tags: [{ name: 'Action', value: 'Gateways' }],
+        },
+        memory: joinMemory2,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const allGateways = JSON.parse(allGatewaysResult.Messages[0].Data);
+      assert.ok(allGateways.items.length >= 2);
+
+      // Filter by status = 'joined'
+      const filteredResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Gateways' },
+            { name: 'Filters', value: JSON.stringify({ status: 'joined' }) },
+          ],
+        },
+        memory: joinMemory2,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const filteredGateways = JSON.parse(filteredResult.Messages[0].Data);
+      assert.ok(filteredGateways.items.length >= 2);
+      assert.ok(
+        filteredGateways.items.every((g) => g.status === 'joined'),
+        'All filtered gateways should have status "joined"',
+      );
+
+      // Filter by non-existent status should return empty
+      const emptyResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Gateways' },
+            { name: 'Filters', value: JSON.stringify({ status: 'leaving' }) },
+          ],
+        },
+        memory: joinMemory2,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const emptyGateways = JSON.parse(emptyResult.Messages[0].Data);
+      assert.strictEqual(emptyGateways.items.length, 0);
+
+      sharedMemory = joinMemory2;
+    });
+
+    it('should filter gateways by gatewayAddress using array filter', async () => {
+      const gateway1 = STUB_ADDRESS_6;
+      const gateway2 = STUB_ADDRESS_7;
+      const gateway3 = STUB_ADDRESS_8;
+
+      // Join three gateways
+      let memory = sharedMemory;
+      for (const addr of [gateway1, gateway2, gateway3]) {
+        const { memory: joinMemory } = await joinNetwork({
+          address: addr,
+          memory,
+          timestamp: STUB_TIMESTAMP,
+        });
+        memory = joinMemory;
+      }
+
+      // Filter to only get gateway1 and gateway3
+      const filteredResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Gateways' },
+            {
+              name: 'Filters',
+              value: JSON.stringify({ gatewayAddress: [gateway1, gateway3] }),
+            },
+          ],
+        },
+        memory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const filteredGateways = JSON.parse(filteredResult.Messages[0].Data);
+      assert.strictEqual(filteredGateways.items.length, 2);
+
+      const addresses = filteredGateways.items.map((g) => g.gatewayAddress);
+      assert.ok(addresses.includes(gateway1));
+      assert.ok(addresses.includes(gateway3));
+      assert.ok(!addresses.includes(gateway2));
+
+      sharedMemory = memory;
+    });
+  });
 });

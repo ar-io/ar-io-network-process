@@ -1090,8 +1090,9 @@ end
 ---@param limit number # The max number of gateways to fetch
 ---@param sortBy string # The gateway field to sort by. Default is "gatewayAddress" (which is added each time)
 ---@param sortOrder string # The order to sort by, either "asc" or "desc"
+---@param filters table|nil # Optional filter criteria
 ---@return table # A table containing the paginated gateways and pagination metadata
-function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
+function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder, filters)
 	local gateways = gar.getGateways()
 	local gatewaysArray = {}
 	local cursorField = "gatewayAddress" -- the cursor will be the gateway address
@@ -1104,7 +1105,7 @@ function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
 		table.insert(gatewaysArray, gateway)
 	end
 
-	return utils.paginateTableWithCursor(gatewaysArray, cursor, cursorField, limit, sortBy, sortOrder)
+	return utils.paginateTableWithCursor(gatewaysArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
 end
 
 ---@param address string # The address of the gateway

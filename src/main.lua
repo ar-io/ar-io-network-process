@@ -2166,8 +2166,13 @@ addEventingHandler("paginatedGateways", function(msg)
 	return msg.Action == "Paginated-Gateways" or msg.Action == ActionMap.Gateways
 end, function(msg)
 	local page = utils.parsePaginationTags(msg)
-	local result =
-		gar.getPaginatedGateways(page.cursor, page.limit, page.sortBy or "startTimestamp", page.sortOrder or "desc")
+	local result = gar.getPaginatedGateways(
+		page.cursor,
+		page.limit,
+		page.sortBy or "startTimestamp",
+		page.sortOrder or "desc",
+		page.filters
+	)
 	Send(msg, { Target = msg.From, Action = "Gateways-Notice", Data = json.encode(result) })
 end)
 
@@ -2182,7 +2187,7 @@ addEventingHandler("paginatedVaults", function(msg)
 	return msg.Action == "Paginated-Vaults" or msg.Action == ActionMap.Vaults
 end, function(msg)
 	local page = utils.parsePaginationTags(msg)
-	local pageVaults = vaults.getPaginatedVaults(page.cursor, page.limit, page.sortOrder, page.sortBy)
+	local pageVaults = vaults.getPaginatedVaults(page.cursor, page.limit, page.sortOrder, page.sortBy, page.filters)
 	Send(msg, { Target = msg.From, Action = "Vaults-Notice", Data = json.encode(pageVaults) })
 end)
 
@@ -2643,8 +2648,13 @@ addEventingHandler(
 
 addEventingHandler("getPaginatedPrimaryNames", utils.hasMatchingTag("Action", ActionMap.PrimaryNames), function(msg)
 	local page = utils.parsePaginationTags(msg)
-	local result =
-		primaryNames.getPaginatedPrimaryNames(page.cursor, page.limit, page.sortBy or "name", page.sortOrder or "asc")
+	local result = primaryNames.getPaginatedPrimaryNames(
+		page.cursor,
+		page.limit,
+		page.sortBy or "name",
+		page.sortOrder or "asc",
+		page.filters
+	)
 
 	return Send(msg, {
 		Target = msg.From,
