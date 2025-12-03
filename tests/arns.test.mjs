@@ -1977,4 +1977,147 @@ describe('ArNS', async () => {
       assert.equal(totalItems, 1);
     });
   });
+
+  describe('ARNS-Records-Filters', () => {
+    it('should filter records by type (lease vs permabuy)', async () => {
+      // Buy a leased record
+      const { memory: leaseMemory } = await buyRecord({
+        memory: sharedMemory,
+        name: 'filter-leased-name',
+        timestamp: STUB_TIMESTAMP,
+        type: 'lease',
+        years: 1,
+      });
+
+      // Buy a permabuy record
+      const { memory: permabuyMemory } = await buyRecord({
+        memory: leaseMemory,
+        name: 'filter-perma-name',
+        timestamp: STUB_TIMESTAMP,
+        type: 'permabuy',
+      });
+
+      // Filter by type = 'lease'
+      const leaseFilterResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Paginated-Records' },
+            { name: 'Filters', value: JSON.stringify({ type: 'lease' }) },
+          ],
+        },
+        memory: permabuyMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const leaseRecords = JSON.parse(leaseFilterResult.Messages[0].Data);
+      assert.ok(leaseRecords.items.length >= 1);
+      assert.ok(
+        leaseRecords.items.every((r) => r.type === 'lease'),
+        'All filtered records should be lease type',
+      );
+
+      // Filter by type = 'permabuy'
+      const permabuyFilterResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Paginated-Records' },
+            { name: 'Filters', value: JSON.stringify({ type: 'permabuy' }) },
+          ],
+        },
+        memory: permabuyMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const permabuyRecords = JSON.parse(permabuyFilterResult.Messages[0].Data);
+      assert.ok(permabuyRecords.items.length >= 1);
+      assert.ok(
+        permabuyRecords.items.every((r) => r.type === 'permabuy'),
+        'All filtered records should be permabuy type',
+      );
+    });
+
+    it('should filter records by processId', async () => {
+      const processId1 = 'process-id-filter-1-'.padEnd(43, '1');
+      const processId2 = 'process-id-filter-2-'.padEnd(43, '2');
+
+      // Buy records with different processIds
+      const { memory: buyMemory1 } = await buyRecord({
+        memory: sharedMemory,
+        name: 'filter-record-one',
+        timestamp: STUB_TIMESTAMP,
+        type: 'lease',
+        years: 1,
+        processId: processId1,
+      });
+
+      const { memory: buyMemory2 } = await buyRecord({
+        memory: buyMemory1,
+        name: 'filter-record-two',
+        timestamp: STUB_TIMESTAMP,
+        type: 'lease',
+        years: 1,
+        processId: processId2,
+      });
+
+      // Filter by processId1
+      const filteredResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Paginated-Records' },
+            {
+              name: 'Filters',
+              value: JSON.stringify({ processId: processId1 }),
+            },
+          ],
+        },
+        memory: buyMemory2,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const filteredRecords = JSON.parse(filteredResult.Messages[0].Data);
+      assert.strictEqual(filteredRecords.items.length, 1);
+      assert.strictEqual(filteredRecords.items[0].name, 'filter-record-one');
+      assert.strictEqual(filteredRecords.items[0].processId, processId1);
+    });
+
+    it('should filter records by multiple names using array filter', async () => {
+      // Buy three records
+      let memory = sharedMemory;
+      for (const name of [
+        'filter-alpha-name',
+        'filter-beta-name',
+        'filter-gamma-name',
+      ]) {
+        const { memory: buyMemory } = await buyRecord({
+          memory,
+          name,
+          timestamp: STUB_TIMESTAMP,
+          type: 'lease',
+          years: 1,
+        });
+        memory = buyMemory;
+      }
+
+      // Filter to only get alpha-name and gamma-name
+      const filteredResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Paginated-Records' },
+            {
+              name: 'Filters',
+              value: JSON.stringify({
+                name: ['filter-alpha-name', 'filter-gamma-name'],
+              }),
+            },
+          ],
+        },
+        memory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const filteredRecords = JSON.parse(filteredResult.Messages[0].Data);
+      assert.strictEqual(filteredRecords.items.length, 2);
+
+      const names = filteredRecords.items.map((r) => r.name);
+      assert.ok(names.includes('filter-alpha-name'));
+      assert.ok(names.includes('filter-gamma-name'));
+      assert.ok(!names.includes('filter-beta-name'));
+    });
+  });
 });

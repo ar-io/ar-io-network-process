@@ -16,6 +16,7 @@ import {
   getBalance,
   getInfo,
   getVault,
+  transfer,
 } from './helpers.mjs';
 import { assertNoInvariants } from './invariants.mjs';
 
@@ -780,6 +781,120 @@ describe('Vaults', async () => {
           controller: PROCESS_OWNER,
         },
       ]);
+    });
+
+    it('should filter vaults by address', async () => {
+      const address1 = ''.padEnd(43, 'f');
+      const address2 = ''.padEnd(43, 'g');
+      const lockLengthMs = 1209600000;
+      const quantity = 1000000000;
+
+      // Transfer funds to both addresses
+      let memory = await transfer({
+        recipient: address1,
+        quantity: quantity * 2,
+        memory: paginatedVaultMemory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      memory = await transfer({
+        recipient: address2,
+        quantity: quantity * 2,
+        memory,
+        timestamp: STUB_TIMESTAMP,
+      });
+
+      // Create vaults for both addresses
+      const { memory: vault1Memory } = await createVault({
+        quantity,
+        lockLengthMs,
+        from: address1,
+        memory,
+        timestamp: STUB_TIMESTAMP,
+        msgId: 'filter-vault-1-'.padEnd(43, 'a'),
+      });
+
+      const { memory: vault2Memory } = await createVault({
+        quantity,
+        lockLengthMs,
+        from: address2,
+        memory: vault1Memory,
+        timestamp: STUB_TIMESTAMP,
+        msgId: 'filter-vault-2-'.padEnd(43, 'a'),
+      });
+
+      // Filter by address1
+      const filteredResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Paginated-Vaults' },
+            { name: 'Filters', value: JSON.stringify({ address: address1 }) },
+          ],
+        },
+        memory: vault2Memory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const filteredVaults = JSON.parse(filteredResult.Messages[0].Data);
+      assert.strictEqual(filteredVaults.items.length, 1);
+      assert.strictEqual(filteredVaults.items[0].address, address1);
+
+      endingMemory = vault2Memory;
+    });
+
+    it('should filter vaults by multiple addresses using array filter', async () => {
+      const address1 = ''.padEnd(43, 'h');
+      const address2 = ''.padEnd(43, 'i');
+      const address3 = ''.padEnd(43, 'j');
+      const lockLengthMs = 1209600000;
+      const quantity = 1000000000;
+
+      // Transfer funds to all addresses
+      let memory = paginatedVaultMemory;
+      for (const addr of [address1, address2, address3]) {
+        memory = await transfer({
+          recipient: addr,
+          quantity: quantity * 2,
+          memory,
+          timestamp: STUB_TIMESTAMP,
+        });
+      }
+
+      // Create vaults for all addresses
+      let vaultNum = 1;
+      for (const addr of [address1, address2, address3]) {
+        const { memory: vaultMemory } = await createVault({
+          quantity,
+          lockLengthMs,
+          from: addr,
+          memory,
+          timestamp: STUB_TIMESTAMP,
+          msgId: `array-filter-vault-${vaultNum++}-`.padEnd(43, 'a'),
+        });
+        memory = vaultMemory;
+      }
+
+      // Filter to get vaults for address1 and address3 only
+      const filteredResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Paginated-Vaults' },
+            {
+              name: 'Filters',
+              value: JSON.stringify({ address: [address1, address3] }),
+            },
+          ],
+        },
+        memory,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const filteredVaults = JSON.parse(filteredResult.Messages[0].Data);
+      assert.strictEqual(filteredVaults.items.length, 2);
+
+      const addresses = filteredVaults.items.map((v) => v.address);
+      assert.ok(addresses.includes(address1));
+      assert.ok(addresses.includes(address3));
+      assert.ok(!addresses.includes(address2));
+
+      endingMemory = memory;
     });
   });
 });
