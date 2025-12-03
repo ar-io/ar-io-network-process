@@ -380,8 +380,9 @@ end
 --- @param limit number
 --- @param sortBy string
 --- @param sortOrder string
+--- @param filters table|nil
 --- @return PaginatedTable<PrimaryNameWithOwner> paginatedPrimaryNames - the paginated primary names
-function primaryNames.getPaginatedPrimaryNames(cursor, limit, sortBy, sortOrder)
+function primaryNames.getPaginatedPrimaryNames(cursor, limit, sortBy, sortOrder, filters)
 	local primaryNamesArray = {}
 	local cursorField = "name"
 	for owner, primaryName in pairs(primaryNames.getUnsafePrimaryNameOwners()) do
@@ -392,7 +393,7 @@ function primaryNames.getPaginatedPrimaryNames(cursor, limit, sortBy, sortOrder)
 			processId = arns.getProcessIdForRecord(utils.baseNameForName(primaryName.name)),
 		})
 	end
-	return utils.paginateTableWithCursor(primaryNamesArray, cursor, cursorField, limit, sortBy, sortOrder)
+	return utils.paginateTableWithCursor(primaryNamesArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
 end
 
 --- Get paginated primary name requests
