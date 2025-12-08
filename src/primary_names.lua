@@ -402,7 +402,7 @@ end
 --- @param sortBy string
 --- @param sortOrder string
 --- @return PaginatedTable<PrimaryNameRequest> paginatedPrimaryNameRequests - the paginated primary name requests
-function primaryNames.getPaginatedPrimaryNameRequests(cursor, limit, sortBy, sortOrder)
+function primaryNames.getPaginatedPrimaryNameRequests(cursor, limit, sortBy, sortOrder, filters)
 	local primaryNameRequestsArray = {}
 	local cursorField = "initiator"
 	for initiator, request in pairs(primaryNames.getUnsafePrimaryNameRequests()) do
@@ -413,7 +413,7 @@ function primaryNames.getPaginatedPrimaryNameRequests(cursor, limit, sortBy, sor
 			initiator = initiator,
 		})
 	end
-	return utils.paginateTableWithCursor(primaryNameRequestsArray, cursor, cursorField, limit, sortBy, sortOrder)
+	return utils.paginateTableWithCursor(primaryNameRequestsArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
 end
 
 --- Prune expired primary name requests
