@@ -170,8 +170,9 @@ end
 --- @param limit number Max number of results to return
 --- @param sortOrder string "asc" or "desc" sort direction
 --- @param sortBy string|nil "address", "vaultId", "balance", "startTimestamp", "endTimestamp" field to sort by
+--- @param filters table|nil Optional filter criteria
 --- @return WalletVault[] - array of wallet vaults indexed by address and vault id
-function vaults.getPaginatedVaults(cursor, limit, sortOrder, sortBy)
+function vaults.getPaginatedVaults(cursor, limit, sortOrder, sortBy, filters)
 	local allVaults = vaults.getVaultsUnsafe()
 	local cursorField = "vaultId"
 
@@ -189,7 +190,7 @@ function vaults.getPaginatedVaults(cursor, limit, sortOrder, sortBy)
 		return acc
 	end, {})
 
-	return utils.paginateTableWithCursor(vaultsArray, cursor, cursorField, limit, sortBy or "address", sortOrder)
+	return utils.paginateTableWithCursor(vaultsArray, cursor, cursorField, limit, sortBy or "address", sortOrder, filters)
 end
 
 --- Gets a vault

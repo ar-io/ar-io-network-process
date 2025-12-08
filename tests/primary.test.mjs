@@ -11,7 +11,11 @@ import {
 } from './helpers.mjs';
 import assert from 'assert';
 import { describe, it, beforeEach, afterEach } from 'node:test';
-import { STUB_ADDRESS, STUB_TIMESTAMP } from '../tools/constants.mjs';
+import {
+  STUB_ADDRESS,
+  STUB_TIMESTAMP,
+  STUB_PROCESS_ID,
+} from '../tools/constants.mjs';
 import { assertNoInvariants } from './invariants.mjs';
 
 describe('primary names', function () {
@@ -997,6 +1001,168 @@ describe('primary names', function () {
       }
 
       endingMemory = requestPrimaryNameResult.Memory;
+    });
+  });
+
+  describe('Primary-Names-Filters', () => {
+    it('should filter primary names by owner', async () => {
+      const owner1 = ''.padEnd(43, 'x');
+      const owner2 = ''.padEnd(43, 'y');
+
+      // Buy two records (use the same processId for ANT)
+      const { memory: buyMemory1 } = await buyRecord({
+        memory: sharedMemory,
+        name: 'filter-name-one',
+        timestamp: STUB_TIMESTAMP,
+        type: 'lease',
+        years: 1,
+        processId: STUB_PROCESS_ID,
+      });
+
+      const { memory: buyMemory2 } = await buyRecord({
+        memory: buyMemory1,
+        name: 'filter-name-two',
+        timestamp: STUB_TIMESTAMP,
+        type: 'lease',
+        years: 1,
+        processId: STUB_PROCESS_ID,
+      });
+
+      // Request and approve primary names for both owners
+      const { memory: requestMemory1 } = await requestPrimaryName({
+        name: 'filter-name-one',
+        caller: owner1,
+        timestamp: STUB_TIMESTAMP,
+        memory: buyMemory2,
+      });
+
+      // Approve from the ANT process (STUB_PROCESS_ID)
+      const { memory: approveMemory1 } = await approvePrimaryNameRequest({
+        name: 'filter-name-one',
+        caller: STUB_PROCESS_ID,
+        recipient: owner1,
+        timestamp: STUB_TIMESTAMP,
+        memory: requestMemory1,
+      });
+
+      const { memory: requestMemory2 } = await requestPrimaryName({
+        name: 'filter-name-two',
+        caller: owner2,
+        timestamp: STUB_TIMESTAMP,
+        memory: approveMemory1,
+      });
+
+      const { memory: approveMemory2 } = await approvePrimaryNameRequest({
+        name: 'filter-name-two',
+        caller: STUB_PROCESS_ID,
+        recipient: owner2,
+        timestamp: STUB_TIMESTAMP,
+        memory: requestMemory2,
+      });
+
+      // Get all primary names without filter
+      const allNamesResult = await handle({
+        options: {
+          Tags: [{ name: 'Action', value: 'Primary-Names' }],
+        },
+        memory: approveMemory2,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const allNames = JSON.parse(allNamesResult.Messages[0].Data);
+      assert.strictEqual(allNames.items.length, 2);
+
+      // Filter by owner1
+      const filteredResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Primary-Names' },
+            { name: 'Filters', value: JSON.stringify({ owner: owner1 }) },
+          ],
+        },
+        memory: approveMemory2,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const filteredNames = JSON.parse(filteredResult.Messages[0].Data);
+      assert.strictEqual(filteredNames.items.length, 1);
+      assert.strictEqual(filteredNames.items[0].owner, owner1);
+      assert.strictEqual(filteredNames.items[0].name, 'filter-name-one');
+
+      endingMemory = approveMemory2;
+    });
+
+    it('should filter primary names by name', async () => {
+      const owner1 = ''.padEnd(43, 'u');
+      const owner2 = ''.padEnd(43, 'v');
+
+      // Buy two records
+      const { memory: buyMemory1 } = await buyRecord({
+        memory: sharedMemory,
+        name: 'filter-test-alpha',
+        timestamp: STUB_TIMESTAMP,
+        type: 'lease',
+        years: 1,
+        processId: STUB_PROCESS_ID,
+      });
+
+      const { memory: buyMemory2 } = await buyRecord({
+        memory: buyMemory1,
+        name: 'filter-test-beta',
+        timestamp: STUB_TIMESTAMP,
+        type: 'lease',
+        years: 1,
+        processId: STUB_PROCESS_ID,
+      });
+
+      // Request and approve primary names
+      const { memory: requestMemory1 } = await requestPrimaryName({
+        name: 'filter-test-alpha',
+        caller: owner1,
+        timestamp: STUB_TIMESTAMP,
+        memory: buyMemory2,
+      });
+
+      const { memory: approveMemory1 } = await approvePrimaryNameRequest({
+        name: 'filter-test-alpha',
+        caller: STUB_PROCESS_ID,
+        recipient: owner1,
+        timestamp: STUB_TIMESTAMP,
+        memory: requestMemory1,
+      });
+
+      const { memory: requestMemory2 } = await requestPrimaryName({
+        name: 'filter-test-beta',
+        caller: owner2,
+        timestamp: STUB_TIMESTAMP,
+        memory: approveMemory1,
+      });
+
+      const { memory: approveMemory2 } = await approvePrimaryNameRequest({
+        name: 'filter-test-beta',
+        caller: STUB_PROCESS_ID,
+        recipient: owner2,
+        timestamp: STUB_TIMESTAMP,
+        memory: requestMemory2,
+      });
+
+      // Filter by specific name
+      const filteredResult = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Primary-Names' },
+            {
+              name: 'Filters',
+              value: JSON.stringify({ name: 'filter-test-alpha' }),
+            },
+          ],
+        },
+        memory: approveMemory2,
+        timestamp: STUB_TIMESTAMP,
+      });
+      const filteredNames = JSON.parse(filteredResult.Messages[0].Data);
+      assert.strictEqual(filteredNames.items.length, 1);
+      assert.strictEqual(filteredNames.items[0].name, 'filter-test-alpha');
+
+      endingMemory = approveMemory2;
     });
   });
 });
