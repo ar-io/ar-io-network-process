@@ -2121,7 +2121,8 @@ end)
 
 addEventingHandler("paginatedReservedNames", utils.hasMatchingTag("Action", ActionMap.ReservedNames), function(msg)
 	local page = utils.parsePaginationTags(msg)
-	local reservedNames = arns.getPaginatedReservedNames(page.cursor, page.limit, page.sortBy or "name", page.sortOrder)
+	local reservedNames =
+		arns.getPaginatedReservedNames(page.cursor, page.limit, page.sortBy or "name", page.sortOrder, page.filters)
 	Send(msg, { Target = msg.From, Action = "Reserved-Names-Notice", Data = json.encode(reservedNames) })
 end)
 
@@ -2179,7 +2180,7 @@ end)
 addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginated-Balances"), function(msg)
 	local page = utils.parsePaginationTags(msg)
 	local walletBalances =
-		balances.getPaginatedBalances(page.cursor, page.limit, page.sortBy or "balance", page.sortOrder)
+		balances.getPaginatedBalances(page.cursor, page.limit, page.sortBy or "balance", page.sortOrder, page.filters)
 	Send(msg, { Target = msg.From, Action = "Balances-Notice", Data = json.encode(walletBalances) })
 end)
 
@@ -2200,7 +2201,8 @@ end, function(msg)
 		page.cursor,
 		page.limit,
 		page.sortBy or "startTimestamp",
-		page.sortOrder
+		page.sortOrder,
+		page.filters
 	)
 	Send(msg, { Target = msg.From, Action = "Delegates-Notice", Data = json.encode(result) })
 end)
@@ -2210,8 +2212,13 @@ addEventingHandler(
 	utils.hasMatchingTag("Action", "Paginated-Allowed-Delegates"),
 	function(msg)
 		local page = utils.parsePaginationTags(msg)
-		local result =
-			gar.getPaginatedAllowedDelegates(msg.Tags.Address or msg.From, page.cursor, page.limit, page.sortOrder)
+		local result = gar.getPaginatedAllowedDelegates(
+			msg.Tags.Address or msg.From,
+			page.cursor,
+			page.limit,
+			page.sortOrder,
+			page.filters
+		)
 		Send(msg, { Target = msg.From, Action = "Allowed-Delegates-Notice", Data = json.encode(result) })
 	end
 )
@@ -2384,7 +2391,8 @@ addEventingHandler("paginatedDelegations", utils.hasMatchingTag("Action", "Pagin
 
 	assert(utils.isValidAddress(address, true), "Invalid address.")
 
-	local result = gar.getPaginatedDelegations(address, page.cursor, page.limit, page.sortBy, page.sortOrder)
+	local result =
+		gar.getPaginatedDelegations(address, page.cursor, page.limit, page.sortBy, page.sortOrder, page.filters)
 	Send(msg, {
 		Target = msg.From,
 		Tags = { Action = ActionMap.Delegations .. "-Notice" },
@@ -2636,7 +2644,8 @@ addEventingHandler(
 			page.cursor,
 			page.limit,
 			page.sortBy or "startTimestamp",
-			page.sortOrder or "asc"
+			page.sortOrder or "asc",
+			page.filters
 		)
 		return Send(msg, {
 			Target = msg.From,
@@ -2675,7 +2684,8 @@ addEventingHandler(
 			page.cursor,
 			page.limit,
 			page.sortBy or "endTimestamp",
-			page.sortOrder or "desc"
+			page.sortOrder or "desc",
+			page.filters
 		)
 		return Send(msg, {
 			Target = msg.From,
@@ -2703,13 +2713,15 @@ end)
 
 addEventingHandler("allPaginatedDelegates", utils.hasMatchingTag("Action", "All-Paginated-Delegates"), function(msg)
 	local page = utils.parsePaginationTags(msg)
-	local result = gar.getPaginatedDelegatesFromAllGateways(page.cursor, page.limit, page.sortBy, page.sortOrder)
+	local result =
+		gar.getPaginatedDelegatesFromAllGateways(page.cursor, page.limit, page.sortBy, page.sortOrder, page.filters)
 	Send(msg, { Target = msg.From, Action = "All-Delegates-Notice", Data = json.encode(result) })
 end)
 
 addEventingHandler("allPaginatedGatewayVaults", utils.hasMatchingTag("Action", "All-Gateway-Vaults"), function(msg)
 	local page = utils.parsePaginationTags(msg)
-	local result = gar.getPaginatedVaultsFromAllGateways(page.cursor, page.limit, page.sortBy, page.sortOrder)
+	local result =
+		gar.getPaginatedVaultsFromAllGateways(page.cursor, page.limit, page.sortBy, page.sortOrder, page.filters)
 	Send(msg, { Target = msg.From, Action = "All-Gateway-Vaults-Notice", Data = json.encode(result) })
 end)
 

@@ -74,7 +74,7 @@ end
 --- @param sortBy string|nil Field to sort by
 --- @param sortOrder string "asc" or "desc" sort direction
 --- @return table Array of {address, balance} objects
-function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder)
+function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder, filters)
 	local allBalances = balances.getBalances()
 	local balancesArray = {}
 	local cursorField = "address" -- the cursor will be the wallet address
@@ -85,7 +85,7 @@ function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder)
 		})
 	end
 
-	return utils.paginateTableWithCursor(balancesArray, cursor, cursorField, limit, sortBy, sortOrder)
+	return utils.paginateTableWithCursor(balancesArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
 end
 
 --- Checks if a wallet has a sufficient balance

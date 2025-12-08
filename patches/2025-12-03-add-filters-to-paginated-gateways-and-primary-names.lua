@@ -1,8 +1,8 @@
 --[[
-	Adds Filters tag support to Paginated-Gateways, Primary-Names, and Paginated-Vaults handlers.
+	Adds Filters tag support to all paginated handlers.
 
 	This extends the pagination filters feature (added in 2025-06-16-pagination-filters.lua)
-	to also support filtering on gateways, primary names, and vaults endpoints.
+	to support filtering on all paginated endpoints.
 
 	Reviewers: Dylan, Ariel, Atticus
 ]]
@@ -10,6 +10,7 @@
 local gar = require(".src.gar")
 local primaryNames = require(".src.primary_names")
 local vaults = require(".src.vaults")
+local balances = require(".src.balances")
 local arns = require(".src.arns")
 local utils = require(".src.utils")
 local json = require(".src.json")
@@ -73,6 +74,189 @@ function vaults.getPaginatedVaults(cursor, limit, sortOrder, sortBy, filters)
 		limit,
 		sortBy or "address",
 		sortOrder,
+		filters
+	)
+end
+
+-- balances.lua - add filters parameter to getPaginatedBalances
+function balances.getPaginatedBalances(cursor, limit, sortBy, sortOrder, filters)
+	local allBalances = balances.getBalances()
+	local balancesArray = {}
+	local cursorField = "address" -- the cursor will be the wallet address
+	for address, balance in pairs(allBalances) do
+		table.insert(balancesArray, {
+			address = address,
+			balance = balance,
+		})
+	end
+
+	return utils.paginateTableWithCursor(balancesArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
+end
+
+-- arns.lua - add filters parameter to getPaginatedReservedNames
+function arns.getPaginatedReservedNames(cursor, limit, sortBy, sortOrder, filters)
+	--- @type ReservedName[]
+	local reservedArray = {}
+	local cursorField = "name" -- the cursor will be the name
+	for name, reservedName in pairs(arns.getReservedNamesUnsafe()) do
+		local reservedNameCopy = utils.deepCopy(reservedName)
+		reservedNameCopy.name = name
+		table.insert(reservedArray, reservedNameCopy)
+	end
+	return utils.paginateTableWithCursor(reservedArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
+end
+
+-- gar.lua - add filters parameter to getPaginatedDelegates
+function gar.getPaginatedDelegates(address, cursor, limit, sortBy, sortOrder, filters)
+	local gateway = gar.getGateway(address)
+	assert(gateway, "Gateway not found")
+	local delegatesArray = {}
+	local cursorField = "address"
+	for delegateAddress, delegate in pairs(gateway.delegates) do
+		--- @diagnostic disable-next-line: inject-field
+		delegate.address = delegateAddress
+		delegate.vaults = nil -- remove vaults to avoid sending an unbounded array, we can fetch them if needed via getPaginatedDelegations
+		table.insert(delegatesArray, delegate)
+	end
+
+	return utils.paginateTableWithCursor(delegatesArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
+end
+
+-- gar.lua - add filters parameter to getPaginatedAllowedDelegates
+function gar.getPaginatedAllowedDelegates(address, cursor, limit, sortOrder, filters)
+	local gateway = gar.getGateway(address)
+	assert(gateway, "Gateway not found")
+	local allowedDelegatesArray = {}
+
+	if gateway.settings.allowedDelegatesLookup then
+		for delegateAddress, _ in pairs(gateway.settings.allowedDelegatesLookup) do
+			table.insert(allowedDelegatesArray, delegateAddress)
+		end
+		for delegateAddress, delegate in pairs(gateway.delegates) do
+			if delegate.delegatedStake > 0 then
+				table.insert(allowedDelegatesArray, delegateAddress)
+			end
+		end
+	end
+
+	local cursorField = nil
+	local sortBy = nil
+	return utils.paginateTableWithCursor(allowedDelegatesArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
+end
+
+-- gar.lua - add filters parameter to getPaginatedDelegations
+function gar.getPaginatedDelegations(address, cursor, limit, sortBy, sortOrder, filters)
+	local delegationsArray = gar.getFlattenedDelegations(address)
+	return utils.paginateTableWithCursor(
+		delegationsArray,
+		cursor,
+		"delegationId",
+		limit,
+		sortBy or "startTimestamp",
+		sortOrder or "asc",
+		filters
+	)
+end
+
+-- primary_names.lua - add filters parameter to getPaginatedPrimaryNameRequests
+function primaryNames.getPaginatedPrimaryNameRequests(cursor, limit, sortBy, sortOrder, filters)
+	local primaryNameRequestsArray = {}
+	local cursorField = "initiator"
+	for initiator, request in pairs(primaryNames.getUnsafePrimaryNameRequests()) do
+		table.insert(primaryNameRequestsArray, {
+			name = request.name,
+			startTimestamp = request.startTimestamp,
+			endTimestamp = request.endTimestamp,
+			initiator = initiator,
+		})
+	end
+	return utils.paginateTableWithCursor(primaryNameRequestsArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
+end
+
+-- gar.lua - add filters parameter to getPaginatedVaultsForGateway
+function gar.getPaginatedVaultsForGateway(gatewayAddress, cursor, limit, sortBy, sortOrder, filters)
+	local unsafeGateway = gar.getGatewayUnsafe(gatewayAddress)
+	assert(unsafeGateway, "Gateway not found")
+
+	local gatewayVaults = utils.reduce(unsafeGateway.vaults, function(acc, vaultId, vault)
+		table.insert(acc, {
+			vaultId = vaultId,
+			cursorId = vaultId .. "_" .. vault.startTimestamp,
+			balance = vault.balance,
+			startTimestamp = vault.startTimestamp,
+			endTimestamp = vault.endTimestamp,
+		})
+		return acc
+	end, {})
+
+	return utils.paginateTableWithCursor(
+		gatewayVaults,
+		cursor,
+		"cursorId",
+		limit,
+		sortBy or "startTimestamp",
+		sortOrder or "asc",
+		filters
+	)
+end
+
+-- gar.lua - add filters parameter to getPaginatedDelegatesFromAllGateways
+function gar.getPaginatedDelegatesFromAllGateways(cursor, limit, sortBy, sortOrder, filters)
+	--- @type DelegatesFromAllGateways[]
+	local allDelegations = {}
+
+	for gatewayAddress, gateway in pairs(gar.getGatewaysUnsafe()) do
+		for delegateAddress, delegate in pairs(gateway.delegates) do
+			table.insert(allDelegations, {
+				cursorId = delegateAddress .. "_" .. gatewayAddress,
+				address = delegateAddress,
+				gatewayAddress = gatewayAddress,
+				startTimestamp = delegate.startTimestamp,
+				delegatedStake = delegate.delegatedStake,
+				vaultedStake = utils.reduce(delegate.vaults, function(acc, _, vault)
+					return acc + vault.balance
+				end, 0),
+			})
+		end
+	end
+
+	return utils.paginateTableWithCursor(
+		allDelegations,
+		cursor,
+		"cursorId",
+		limit,
+		sortBy or "delegatedStake",
+		sortOrder or "desc",
+		filters
+	)
+end
+
+-- gar.lua - add filters parameter to getPaginatedVaultsFromAllGateways
+function gar.getPaginatedVaultsFromAllGateways(cursor, limit, sortBy, sortOrder, filters)
+	--- @type VaultsFromAllGateways[]
+	local allVaults = {}
+
+	local gateways = gar.getGatewaysUnsafe()
+	for gatewayAddress, gateway in pairs(gateways) do
+		for vaultId, vault in pairs(gateway.vaults) do
+			table.insert(allVaults, {
+				cursorId = gatewayAddress .. "_" .. vaultId,
+				vaultId = vaultId,
+				gatewayAddress = gatewayAddress,
+				balance = vault.balance,
+				startTimestamp = vault.startTimestamp,
+				endTimestamp = vault.endTimestamp,
+			})
+		end
+	end
+
+	return utils.paginateTableWithCursor(
+		allVaults,
+		cursor,
+		"cursorId",
+		limit,
+		sortBy or "startTimestamp",
+		sortOrder or "asc",
 		filters
 	)
 end
@@ -174,4 +358,130 @@ addEventingHandler("getPaginatedPrimaryNames", utils.hasMatchingTag("Action", "P
 		Action = "Primary-Names-Notice",
 		Data = json.encode(result),
 	})
+end)
+
+-- Paginated-Balances handler with filters support
+addEventingHandler("paginatedBalances", utils.hasMatchingTag("Action", "Paginated-Balances"), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local walletBalances =
+		balances.getPaginatedBalances(page.cursor, page.limit, page.sortBy or "balance", page.sortOrder, page.filters)
+	Send(msg, { Target = msg.From, Action = "Balances-Notice", Data = json.encode(walletBalances) })
+end)
+
+-- Paginated-Reserved-Names handler with filters support
+addEventingHandler("paginatedReservedNames", utils.hasMatchingTag("Action", "Reserved-Names"), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local reservedNames =
+		arns.getPaginatedReservedNames(page.cursor, page.limit, page.sortBy or "name", page.sortOrder, page.filters)
+	Send(msg, { Target = msg.From, Action = "Reserved-Names-Notice", Data = json.encode(reservedNames) })
+end)
+
+-- Paginated-Delegates handler with filters support
+addEventingHandler("paginatedDelegates", function(msg)
+	return msg.Action == "Paginated-Delegates" or msg.Action == "Delegates"
+end, function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local result = gar.getPaginatedDelegates(
+		msg.Tags.Address or msg.From,
+		page.cursor,
+		page.limit,
+		page.sortBy or "startTimestamp",
+		page.sortOrder,
+		page.filters
+	)
+	Send(msg, { Target = msg.From, Action = "Delegates-Notice", Data = json.encode(result) })
+end)
+
+-- Paginated-Allowed-Delegates handler with filters support
+addEventingHandler(
+	"paginatedAllowedDelegates",
+	utils.hasMatchingTag("Action", "Paginated-Allowed-Delegates"),
+	function(msg)
+		local page = utils.parsePaginationTags(msg)
+		local result = gar.getPaginatedAllowedDelegates(
+			msg.Tags.Address or msg.From,
+			page.cursor,
+			page.limit,
+			page.sortOrder,
+			page.filters
+		)
+		Send(msg, { Target = msg.From, Action = "Allowed-Delegates-Notice", Data = json.encode(result) })
+	end
+)
+
+-- Paginated-Delegations handler with filters support
+addEventingHandler("paginatedDelegations", utils.hasMatchingTag("Action", "Paginated-Delegations"), function(msg)
+	local address = msg.Tags.Address or msg.From
+	local page = utils.parsePaginationTags(msg)
+
+	assert(utils.isValidAddress(address, true), "Invalid address.")
+
+	local result =
+		gar.getPaginatedDelegations(address, page.cursor, page.limit, page.sortBy, page.sortOrder, page.filters)
+	Send(msg, {
+		Target = msg.From,
+		Tags = { Action = "Delegations-Notice" },
+		Data = json.encode(result),
+	})
+end)
+
+-- Paginated-Primary-Name-Requests handler with filters support
+addEventingHandler(
+	"getPaginatedPrimaryNameRequests",
+	utils.hasMatchingTag("Action", "Primary-Name-Requests"),
+	function(msg)
+		local page = utils.parsePaginationTags(msg)
+		local result = primaryNames.getPaginatedPrimaryNameRequests(
+			page.cursor,
+			page.limit,
+			page.sortBy or "startTimestamp",
+			page.sortOrder or "asc",
+			page.filters
+		)
+		return Send(msg, {
+			Target = msg.From,
+			Action = "Primary-Name-Requests-Notice",
+			Data = json.encode(result),
+		})
+	end
+)
+
+-- Paginated-Gateway-Vaults handler with filters support
+addEventingHandler(
+	"getPaginatedGatewayVaults",
+	utils.hasMatchingTag("Action", "Paginated-Gateway-Vaults"),
+	function(msg)
+		local page = utils.parsePaginationTags(msg)
+		local gatewayAddress = utils.formatAddress(msg.Tags.Address or msg.From)
+		assert(utils.isValidAddress(gatewayAddress, true), "Invalid gateway address")
+		local result = gar.getPaginatedVaultsForGateway(
+			gatewayAddress,
+			page.cursor,
+			page.limit,
+			page.sortBy or "endTimestamp",
+			page.sortOrder or "desc",
+			page.filters
+		)
+		return Send(msg, {
+			Target = msg.From,
+			Action = "Gateway-Vaults-Notice",
+			Data = json.encode(result),
+		})
+	end
+)
+
+-- All-Paginated-Delegates handler with filters support
+addEventingHandler("allPaginatedDelegates", utils.hasMatchingTag("Action", "All-Paginated-Delegates"), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local result =
+		gar.getPaginatedDelegatesFromAllGateways(page.cursor, page.limit, page.sortBy, page.sortOrder, page.filters)
+	Send(msg, { Target = msg.From, Action = "All-Delegates-Notice", Data = json.encode(result) })
+end)
+
+-- All-Paginated-Gateway-Vaults handler with filters support
+addEventingHandler("allPaginatedGatewayVaults", utils.hasMatchingTag("Action", "All-Gateway-Vaults"), function(msg)
+	local page = utils.parsePaginationTags(msg)
+	local result =
+		gar.getPaginatedVaultsFromAllGateways(page.cursor, page.limit, page.sortBy, page.sortOrder, page.filters)
+	Send(msg, { Target = msg.From, Action = "All-Gateway-Vaults-Notice", Data = json.encode(result) })
 end)
