@@ -87,6 +87,22 @@ function utils.parsePaginationTags(msg)
 	}
 end
 
+--- Retrieves a nested field value by dot-notation path
+--- @param tbl table The table to retrieve from
+--- @param fieldPath string The dot-separated field path (e.g., "settings.fqdn")
+--- @return any|nil The value at the path, or nil if not found
+function utils.getNestedValue(tbl, fieldPath)
+	local current = tbl
+	for segment in fieldPath:gmatch("[^.]+") do
+		if type(current) == "table" then
+			current = current[segment]
+		else
+			return nil
+		end
+	end
+	return current
+end
+
 --- Sorts a table by multiple fields with specified orders for each field.
 --- Supports tables of non-table values by using `nil` as a field name.
 --- Each field is provided as a table with 'field' (string|nil) and 'order' ("asc" or "desc").
@@ -134,19 +150,6 @@ function utils.sortTableByFields(prevTable, fields)
 		return tableCopy
 	end
 
-	-- Helper function to retrieve a nested field value by path
-	local function getNestedValue(tbl, fieldPath)
-		local current = tbl
-		for segment in fieldPath:gmatch("[^.]+") do
-			if type(current) == "table" then
-				current = current[segment]
-			else
-				return nil
-			end
-		end
-		return current
-	end
-
 	-- Sort table using table.sort with multiple fields and specified orders
 	table.sort(tableCopy, function(a, b)
 		for _, fieldSpec in ipairs(fields) do
@@ -159,8 +162,8 @@ function utils.sortTableByFields(prevTable, fields)
 				aField = a
 				bField = b
 			else
-				aField = getNestedValue(a, fieldPath)
-				bField = getNestedValue(b, fieldPath)
+				aField = utils.getNestedValue(a, fieldPath)
+				bField = utils.getNestedValue(b, fieldPath)
 			end
 
 			-- Validate order
@@ -651,6 +654,7 @@ end
 --- Creates a predicate function from a table of filters.
 --- Each key/value pair in the filter table must be satisfied for an item to match.
 --- A filter value can be a table of acceptable values or a single value.
+--- Supports nested fields using dot notation (e.g., "settings.fqdn").
 --- @param filters table|nil The filters to convert
 --- @return function|nil predicate - the predicate function or nil if no filters
 function utils.createFilterFunction(filters)
@@ -670,7 +674,7 @@ function utils.createFilterFunction(filters)
 
 	return function(item)
 		for field, expected in pairs(lookups) do
-			local itemValue = type(item) == "table" and item[field] or nil
+			local itemValue = type(item) == "table" and utils.getNestedValue(item, field) or nil
 			if type(expected) == "table" then
 				if not expected[itemValue] then
 					return false
