@@ -1090,8 +1090,9 @@ end
 ---@param limit number # The max number of gateways to fetch
 ---@param sortBy string # The gateway field to sort by. Default is "gatewayAddress" (which is added each time)
 ---@param sortOrder string # The order to sort by, either "asc" or "desc"
+---@param filters table|nil # Optional filter criteria
 ---@return table # A table containing the paginated gateways and pagination metadata
-function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
+function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder, filters)
 	local gateways = gar.getGateways()
 	local gatewaysArray = {}
 	local cursorField = "gatewayAddress" -- the cursor will be the gateway address
@@ -1104,7 +1105,7 @@ function gar.getPaginatedGateways(cursor, limit, sortBy, sortOrder)
 		table.insert(gatewaysArray, gateway)
 	end
 
-	return utils.paginateTableWithCursor(gatewaysArray, cursor, cursorField, limit, sortBy, sortOrder)
+	return utils.paginateTableWithCursor(gatewaysArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
 end
 
 ---@param address string # The address of the gateway
@@ -1113,7 +1114,7 @@ end
 ---@param sortBy string # The delegate field to sort by. Default is "address" (which is added each)
 ---@param sortOrder string # The order to sort by, either "asc" or "desc"
 ---@return table # A table containing the paginated delegates and pagination metadata
-function gar.getPaginatedDelegates(address, cursor, limit, sortBy, sortOrder)
+function gar.getPaginatedDelegates(address, cursor, limit, sortBy, sortOrder, filters)
 	local gateway = gar.getGateway(address)
 	assert(gateway, "Gateway not found")
 	local delegatesArray = {}
@@ -1125,7 +1126,7 @@ function gar.getPaginatedDelegates(address, cursor, limit, sortBy, sortOrder)
 		table.insert(delegatesArray, delegate)
 	end
 
-	return utils.paginateTableWithCursor(delegatesArray, cursor, cursorField, limit, sortBy, sortOrder)
+	return utils.paginateTableWithCursor(delegatesArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
 end
 
 --- Returns all allowed delegates if allowlisting is in use. Empty table otherwise.
@@ -1134,7 +1135,7 @@ end
 ---@param limit number # The max number of delegates to fetch
 ---@param sortOrder string # The order to sort by, either "asc" or "desc"
 ---@return table # A table containing the paginated allowed delegates and pagination metadata
-function gar.getPaginatedAllowedDelegates(address, cursor, limit, sortOrder)
+function gar.getPaginatedAllowedDelegates(address, cursor, limit, sortOrder, filters)
 	local gateway = gar.getGateway(address)
 	assert(gateway, "Gateway not found")
 	local allowedDelegatesArray = {}
@@ -1152,7 +1153,7 @@ function gar.getPaginatedAllowedDelegates(address, cursor, limit, sortOrder)
 
 	local cursorField = nil
 	local sortBy = nil
-	return utils.paginateTableWithCursor(allowedDelegatesArray, cursor, cursorField, limit, sortBy, sortOrder)
+	return utils.paginateTableWithCursor(allowedDelegatesArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
 end
 
 function gar.cancelGatewayWithdrawal(from, gatewayAddress, vaultId)
@@ -1754,7 +1755,7 @@ end
 --- @param sortBy string The field to sort by. Default is "startTimestamp"
 --- @param sortOrder string The order to sort by, either "asc" or "desc". Default is "asc"
 --- @return PaginatedTable # A table containing the paginated stakes and pagination metadata as Delegation objects
-function gar.getPaginatedDelegations(address, cursor, limit, sortBy, sortOrder)
+function gar.getPaginatedDelegations(address, cursor, limit, sortBy, sortOrder, filters)
 	local delegationsArray = gar.getFlattenedDelegations(address)
 	return utils.paginateTableWithCursor(
 		delegationsArray,
@@ -1762,7 +1763,8 @@ function gar.getPaginatedDelegations(address, cursor, limit, sortBy, sortOrder)
 		"delegationId",
 		limit,
 		sortBy or "startTimestamp",
-		sortOrder or "asc"
+		sortOrder or "asc",
+		filters
 	)
 end
 
@@ -2012,7 +2014,7 @@ end
 --- @param sortBy "vaultId"|"startTimestamp"|"endTimestamp"|"balance"|"cursorId"|nil
 --- @param sortOrder "asc"|"desc"|nil
 --- @return PaginatedTable # A table containing the paginated vaults and pagination metadata
-function gar.getPaginatedVaultsForGateway(gatewayAddress, cursor, limit, sortBy, sortOrder)
+function gar.getPaginatedVaultsForGateway(gatewayAddress, cursor, limit, sortBy, sortOrder, filters)
 	local unsafeGateway = gar.getGatewayUnsafe(gatewayAddress)
 	assert(unsafeGateway, "Gateway not found")
 
@@ -2033,7 +2035,8 @@ function gar.getPaginatedVaultsForGateway(gatewayAddress, cursor, limit, sortBy,
 		"cursorId",
 		limit,
 		sortBy or "startTimestamp",
-		sortOrder or "asc"
+		sortOrder or "asc",
+		filters
 	)
 end
 
@@ -2188,7 +2191,7 @@ end
 --- @param sortBy string|nil
 --- @param sortOrder string|nil
 --- @return PaginatedTable<DelegatesFromAllGateways>
-function gar.getPaginatedDelegatesFromAllGateways(cursor, limit, sortBy, sortOrder)
+function gar.getPaginatedDelegatesFromAllGateways(cursor, limit, sortBy, sortOrder, filters)
 	--- @type DelegatesFromAllGateways[]
 	local allDelegations = {}
 
@@ -2213,7 +2216,8 @@ function gar.getPaginatedDelegatesFromAllGateways(cursor, limit, sortBy, sortOrd
 		"cursorId",
 		limit,
 		sortBy or "delegatedStake",
-		sortOrder or "desc"
+		sortOrder or "desc",
+		filters
 	)
 end
 
@@ -2230,7 +2234,7 @@ end
 --- @param sortBy 'cursorId'|'vaultId'|'gatewayAddress'|'balance'|'startTimestamp'|'endTimestamp'|nil
 --- @param sortOrder string|nil
 --- @return PaginatedTable<VaultsFromAllGateways>
-function gar.getPaginatedVaultsFromAllGateways(cursor, limit, sortBy, sortOrder)
+function gar.getPaginatedVaultsFromAllGateways(cursor, limit, sortBy, sortOrder, filters)
 	--- @type VaultsFromAllGateways[]
 	local allVaults = {}
 
@@ -2254,7 +2258,8 @@ function gar.getPaginatedVaultsFromAllGateways(cursor, limit, sortBy, sortOrder)
 		"cursorId",
 		limit,
 		sortBy or "startTimestamp",
-		sortOrder or "asc"
+		sortOrder or "asc",
+		filters
 	)
 end
 
