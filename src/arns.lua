@@ -197,7 +197,7 @@ end
 --- @param sortBy string The field to sort by
 --- @param sortOrder string The order to sort by
 --- @return PaginatedTable<ReservedName> The paginated reserved names
-function arns.getPaginatedReservedNames(cursor, limit, sortBy, sortOrder)
+function arns.getPaginatedReservedNames(cursor, limit, sortBy, sortOrder, filters)
 	--- @type ReservedName[]
 	local reservedArray = {}
 	local cursorField = "name" -- the cursor will be the name
@@ -206,7 +206,7 @@ function arns.getPaginatedReservedNames(cursor, limit, sortBy, sortOrder)
 		reservedNameCopy.name = name
 		table.insert(reservedArray, reservedNameCopy)
 	end
-	return utils.paginateTableWithCursor(reservedArray, cursor, cursorField, limit, sortBy, sortOrder)
+	return utils.paginateTableWithCursor(reservedArray, cursor, cursorField, limit, sortBy, sortOrder, filters)
 end
 
 --- Extends the lease for a record

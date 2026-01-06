@@ -17,6 +17,7 @@
     "monitor:mainnet": "yarn monitor:down && ARIO_NETWORK_PROCESS_ID=qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE node --test tests/monitor/monitor.test.mjs",
     "crank:mainnet": "ARIO_NETWORK_PROCESS_ID=qNvAoz0TgcH7DMg8BCVn8jF32QH5L6T29VjHxhHqqGE node --test tests/monitor/cranking-monitor.test.mjs",
     "tick": "node tools/tick.mjs",
+    "total-supply": "node tools/total-supply.mjs",
     "evolve": "yarn build && node tools/evolve.mjs",
     "prepare": "husky"
   },
