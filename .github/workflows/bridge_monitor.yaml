@@ -1,0 +1,154 @@
+name: Bridge Balance Monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *' # Run every 15 minutes
+
+concurrency:
+  group: bridge-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate required variables
+        run: |
+          if [ -z "${{ vars.BRIDGE_WALLET }}" ]; then
+            echo "::error::BRIDGE_WALLET variable is not set. Please configure it in repository settings."
+            exit 1
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Check Bridge Balance
+        id: check
+        run: |
+          check_balance() {
+            echo "Fetching AO bridge wallet balance..."
+            AO_BALANCE=$(npx --yes @ar.io/sdk balance -a "${{ vars.BRIDGE_WALLET }}" | jq -r '.mARIOBalance')
+            echo "AO Bridge Wallet Balance (mARIO): $AO_BALANCE"
+
+            echo "Fetching Base bridged token supply..."
+            BASE_SUPPLY=$(node ./tools/bridge-info.mjs | jq -r '.totalSupply.mARIO')
+            echo "Base Bridged Token Supply (mARIO): $BASE_SUPPLY"
+
+            if [ "$AO_BALANCE" = "$BASE_SUPPLY" ]; then
+              echo "✅ Balances match: $AO_BALANCE mARIO"
+              return 0
+            else
+              echo "❌ Balance mismatch detected!"
+              echo "   AO Balance:   $AO_BALANCE"
+              echo "   Base Supply:  $BASE_SUPPLY"
+              return 1
+            fi
+          }
+
+          # First attempt
+          if check_balance; then
+            echo "match=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo ""
+          echo "Retrying in 30 seconds to avoid race conditions..."
+          sleep 30
+
+          # Second attempt
+          if check_balance; then
+            echo "match=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Both attempts failed
+          echo "match=false" >> $GITHUB_OUTPUT
+          echo "ao_balance=$AO_BALANCE" >> $GITHUB_OUTPUT
+          echo "base_supply=$BASE_SUPPLY" >> $GITHUB_OUTPUT
+          exit 1
+        shell: bash
+
+      - name: Notify Failure
+        if: failure()
+        uses: rtCamp/action-slack-notify@v2.3.2
+        env:
+          SLACK_COLOR: danger
+          SLACK_TITLE: Bridge Balance Mismatch Detected!
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CUSTOM_PAYLOAD: |
+            {
+              "attachments": [
+                {
+                  "fallback": "Bridge Balance Mismatch Detected",
+                  "color": "danger",
+                  "title": "Bridge Monitor Alert",
+                  "text": "A balance mismatch was detected between the AO bridge wallet and the Base bridged token supply.",
+                  "fields": [
+                    {
+                      "title": "AO Balance (mARIO)",
+                      "value": "${{ steps.check.outputs.ao_balance }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Base Supply (mARIO)",
+                      "value": "${{ steps.check.outputs.base_supply }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Bridge Wallet",
+                      "value": "${{ vars.BRIDGE_WALLET }}",
+                      "short": false
+                    },
+                    {
+                      "title": "GitHub Action",
+                      "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                      "short": false
+                    }
+                  ]
+                }
+              ]
+            }
+
+      - name: Notify Success
+        if: success() && vars.NOTIFY_SUCCESS == 'true'
+        uses: rtCamp/action-slack-notify@v2.3.2
+        env:
+          SLACK_COLOR: good
+          SLACK_TITLE: Bridge Balance Check Passed
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_CUSTOM_PAYLOAD: |
+            {
+              "attachments": [
+                {
+                  "fallback": "Bridge Balance Check Passed",
+                  "color": "good",
+                  "title": "Bridge Monitor",
+                  "text": "The AO bridge wallet balance matches the Base bridged token supply.",
+                  "fields": [
+                    {
+                      "title": "Bridge Wallet",
+                      "value": "${{ vars.BRIDGE_WALLET }}",
+                      "short": false
+                    },
+                    {
+                      "title": "GitHub Action",
+                      "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                      "short": false
+                    }
+                  ]
+                }
+              ]
+            }
