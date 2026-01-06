@@ -101,6 +101,16 @@ jobs:
                   "text": "A balance mismatch was detected between the AO bridge wallet and the Base bridged token supply.",
                   "fields": [
                     {
+                      "title": "AO Balance (mARIO)",
+                      "value": "${{ steps.check.outputs.ao_balance }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Base Supply (mARIO)",
+                      "value": "${{ steps.check.outputs.base_supply }}",
+                      "short": true
+                    },
+                    {
                       "title": "Bridge Wallet",
                       "value": "${{ vars.BRIDGE_WALLET }}",
                       "short": false
