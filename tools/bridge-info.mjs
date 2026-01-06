@@ -75,8 +75,8 @@ async function getTokenHolderCount(tokenAddress) {
 }
 
 /**
-Retrieves the total supply of an ERC20 token on Base
-@param {string} tokenAddress - The contract address of the ERC20 token
+ * Retrieves the total supply of an ERC20 token on Base
+ * @param {string} tokenAddress - The contract address of the ERC20 token
  */
 async function getTotalTokenSupply(tokenAddress) {
   // Create a contract instance
@@ -114,11 +114,19 @@ async function getTotalTokenSupply(tokenAddress) {
     );
   } catch (error) {
     console.error(`Error fetching supply for ${tokenAddress}:`, error.message);
+    process.exit(1);
   }
 }
 
 // --- Example Usage ---
 // Example token address on Base (e.g., WETH on Base mainnet, address: 0x4200000000000000000000000000000000000006)
-const tokenAddress = '0x138746adfA52909E5920def027f5a8dc1C7EfFb6';
+const DEFAULT_TOKEN_ADDRESS = '0x138746adfA52909E5920def027f5a8dc1C7EfFb6';
+
+// Token address resolution order:
+//   1. Environment variable TOKEN_ADDRESS
+//   2. First command-line argument
+//   3. Default example token address (for backwards compatibility)
+const tokenAddress =
+  process.env.TOKEN_ADDRESS || process.argv[2] || DEFAULT_TOKEN_ADDRESS;
 
 getTotalTokenSupply(tokenAddress);

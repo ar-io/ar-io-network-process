@@ -2,6 +2,9 @@ name: Bridge Balance Monitor
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - PE-8804_bridge_monitor # TODO: Remove before merging
   schedule:
     - cron: '*/15 * * * *' # Run every 15 minutes
 
