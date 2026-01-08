@@ -1,37 +1,13 @@
--- hb.lua needs to be in its own file and not in balances.lua to avoid circular dependencies
-local hb = {}
-local primaryNames = require(".src.primary_names")
+--[[
+    Updates the hyperbeam patch message for primary names to use PrimaryNameInfo for the owners mapping
+    to allow for sdk compatible lookups on hyperbeam.
 
----@return table<string, string>|nil affectedBalancesAddresses table of addresses and their balance values as strings
-function hb.createBalancesPatch()
-	local affectedBalancesAddresses = {}
-	for address, _ in pairs(Balances) do
-		if HyperbeamSync.balances[address] ~= Balances[address] then
-			affectedBalancesAddresses[address] = true
-		end
-	end
+	Reviewers: Dylan, Ariel, Atticus
+]]
+--
 
-	for address, _ in pairs(HyperbeamSync.balances) do
-		if Balances[address] ~= HyperbeamSync.balances[address] then
-			affectedBalancesAddresses[address] = true
-		end
-	end
-
-	-- Convert all affected addresses from boolean flags to actual balance values
-	local balancesPatch = {}
-	for address, _ in pairs(affectedBalancesAddresses) do
-		balancesPatch[address] = tostring(Balances[address] or 0)
-	end
-
-	if next(balancesPatch) == nil then
-		return nil
-	end
-
-	return balancesPatch
-end
-
----@return PrimaryNames|nil affectedPrimaryNamesAddresses
-function hb.createPrimaryNamesPatch()
+_G.package.loaded[".src.hb"].createPrimaryNamesPatch = function()
+	local primaryNames = require(".src.primary_names")
 	---@type {names: table<string, string>, owners: table<string, PrimaryNameInfo>, requests: table<string, table<string, string>>}
 	local affectedPrimaryNamesAddresses = {
 		names = {},
@@ -93,36 +69,3 @@ function hb.createPrimaryNamesPatch()
 
 	return affectedPrimaryNamesAddresses
 end
-
-function hb.resetHyperbeamSync()
-	HyperbeamSync = {
-		balances = {},
-		primaryNames = {
-			names = {},
-			owners = {},
-			requests = {},
-		},
-	}
-end
-
---[[
-	1. Create the data patches
-	2. Send the patch message if there are any data patches
-	3. Reset the hyperbeam sync
-]]
-function hb.patchHyperbeamState()
-	-- Only add patches that have data
-	local primaryNamesPatch = hb.createPrimaryNamesPatch()
-	if primaryNamesPatch then
-		ao.send({ device = "patch@1.0", ["primary-names"] = primaryNamesPatch })
-	end
-
-	local balancesPatch = hb.createBalancesPatch()
-	if balancesPatch then
-		ao.send({ device = "patch@1.0", balances = balancesPatch })
-	end
-
-	hb.resetHyperbeamSync()
-end
-
-return hb
