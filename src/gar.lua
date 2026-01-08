@@ -144,7 +144,7 @@ function gar.joinNetwork(from, stake, settings, services, observerAddress, timeS
 			allowedDelegatesLookup = settings.allowedDelegates and utils.createLookupTable(settings.allowedDelegates)
 				or nil,
 			delegateRewardShareRatio = settings.delegateRewardShareRatio or 0,
-			autoStake = settings.autoStake or true,
+			autoStake = settings.autoStake == nil and true or settings.autoStake,
 			minDelegatedStake = settings.minDelegatedStake or gar.getSettings().delegates.minStake,
 			label = settings.label,
 			fqdn = settings.fqdn,

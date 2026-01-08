@@ -3,7 +3,7 @@ name: Bridge Balance Monitor
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/15 * * * *' # Run every 15 minutes
+    - cron: '0 * * * *' # Run every 60 minutes (at the top of each hour)
 
 concurrency:
   group: bridge-monitor
@@ -122,21 +122,34 @@ jobs:
               ]
             }
 
-      - name: Notify Success
-        if: success() && vars.NOTIFY_SUCCESS == 'true'
+      - name: Check previous run status
+        id: previous
+        if: success()
+        run: |
+          # Get the previous completed run of this workflow (excluding current run)
+          PREVIOUS_CONCLUSION=$(gh api \
+            "/repos/${{ github.repository }}/actions/workflows/bridge_monitor.yaml/runs?status=completed&per_page=1&exclude_pull_requests=true" \
+            --jq '.workflow_runs[0].conclusion // "none"')
+          echo "Previous run conclusion: $PREVIOUS_CONCLUSION"
+          echo "conclusion=$PREVIOUS_CONCLUSION" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Notify Recovery
+        if: success() && steps.previous.outputs.conclusion == 'failure'
         uses: rtCamp/action-slack-notify@v2.3.2
         env:
           SLACK_COLOR: good
-          SLACK_TITLE: Bridge Balance Check Passed
+          SLACK_TITLE: Bridge Balance Realigned
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_CUSTOM_PAYLOAD: |
             {
               "attachments": [
                 {
-                  "fallback": "Bridge Balance Check Passed",
+                  "fallback": "Bridge Balance Realigned",
                   "color": "good",
-                  "title": "Bridge Monitor",
-                  "text": "The AO bridge wallet balance matches the Base bridged token supply.",
+                  "title": "Bridge Monitor Realigned",
+                  "text": "The bridge balance mismatch has been resolved. AO bridge wallet now matches the Base bridged token supply.",
                   "fields": [
                     {
                       "title": "Bridge Wallet",
