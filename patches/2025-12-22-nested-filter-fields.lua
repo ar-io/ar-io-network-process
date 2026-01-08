@@ -41,7 +41,10 @@ function utils.createFilterFunction(filters)
 
 	return function(item)
 		for field, expected in pairs(lookups) do
-			local itemValue = type(item) == "table" and utils.getNestedValue(item, field) or nil
+			local itemValue = nil
+			if type(item) == "table" then
+				itemValue = utils.getNestedValue(item, field)
+			end
 			if type(expected) == "table" then
 				if not expected[itemValue] then
 					return false
