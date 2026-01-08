@@ -247,7 +247,6 @@ describe('hyperbeam patch balances', async () => {
         Tags: [{ name: 'Action', value: 'Patch-Hyperbeam-Balances' }],
       },
     });
-    console.dir(result, { depth: null });
     assert.equal(result.Messages.length, 2);
   });
 

@@ -1431,6 +1431,147 @@ describe('GatewayRegistry', async () => {
       );
       sharedMemory = addGatewayMemory2;
     });
+
+    it('should filter gateways by nested field settings.fqdn', async () => {
+      // add a gateway with a different fqdn
+      const thirdGatewayAddress = 'third-gateway-'.padEnd(43, 'b');
+      const customFqdn = 'custom-fqdn.example.com';
+      const customTags = [
+        { name: 'Action', value: 'Join-Network' },
+        { name: 'Label', value: 'test-gateway-3' },
+        { name: 'Note', value: 'test-note' },
+        { name: 'FQDN', value: customFqdn },
+        { name: 'Operator-Stake', value: `${INITIAL_OPERATOR_STAKE}` },
+        { name: 'Port', value: '443' },
+        { name: 'Protocol', value: 'https' },
+        { name: 'Allow-Delegated-Staking', value: 'true' },
+        { name: 'Min-Delegated-Stake', value: `${INITIAL_DELEGATE_STAKE}` },
+        { name: 'Delegate-Reward-Share-Ratio', value: '25' },
+        { name: 'Observer-Address', value: thirdGatewayAddress },
+        {
+          name: 'Properties',
+          value: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
+        },
+        { name: 'Auto-Stake', value: 'true' },
+      ];
+      const { memory: addGatewayMemory3 } = await joinNetwork({
+        address: thirdGatewayAddress,
+        memory: sharedMemory,
+        timestamp: STUB_TIMESTAMP + 2,
+        tags: customTags,
+      });
+
+      // filter by the custom fqdn using nested field notation
+      const paginatedGateways = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Paginated-Gateways' },
+            {
+              name: 'Filters',
+              value: JSON.stringify({ 'settings.fqdn': customFqdn }),
+            },
+          ],
+        },
+        memory: addGatewayMemory3,
+        timestamp: STUB_TIMESTAMP + 2,
+      });
+
+      const { items, totalItems } = JSON.parse(
+        paginatedGateways.Messages?.[0]?.Data,
+      );
+      assert.equal(totalItems, 1);
+      assert.equal(items.length, 1);
+      assert.equal(items[0].gatewayAddress, thirdGatewayAddress);
+      assert.equal(items[0].settings.fqdn, customFqdn);
+
+      sharedMemory = addGatewayMemory3;
+    });
+
+    it('should filter gateways by nested boolean field with false value', async () => {
+      // add a gateway with autoStake set to false
+      const fourthGatewayAddress = 'fourth-gateway-'.padEnd(43, 'c');
+      const noAutoStakeTags = [
+        { name: 'Action', value: 'Join-Network' },
+        { name: 'Label', value: 'test-gateway-4' },
+        { name: 'Note', value: 'test-note' },
+        { name: 'FQDN', value: 'no-autostake.example.com' },
+        { name: 'Operator-Stake', value: `${INITIAL_OPERATOR_STAKE}` },
+        { name: 'Port', value: '443' },
+        { name: 'Protocol', value: 'https' },
+        { name: 'Allow-Delegated-Staking', value: 'true' },
+        { name: 'Min-Delegated-Stake', value: `${INITIAL_DELEGATE_STAKE}` },
+        { name: 'Delegate-Reward-Share-Ratio', value: '30' },
+        { name: 'Observer-Address', value: fourthGatewayAddress },
+        {
+          name: 'Properties',
+          value: 'FH1aVetOoulPGqgYukj0VE0wIhDy90WiQoV3U2PeY44',
+        },
+        { name: 'Auto-Stake', value: 'false' }, // explicitly set to false
+      ];
+      const { memory: addGatewayMemory4 } = await joinNetwork({
+        address: fourthGatewayAddress,
+        memory: sharedMemory,
+        timestamp: STUB_TIMESTAMP + 3,
+        tags: noAutoStakeTags,
+      });
+
+      // Test filtering by autoStake=false
+      const paginatedGatewaysFalse = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Paginated-Gateways' },
+            {
+              name: 'Filters',
+              value: JSON.stringify({ 'settings.autoStake': false }),
+            },
+          ],
+        },
+        memory: addGatewayMemory4,
+        timestamp: STUB_TIMESTAMP + 3,
+      });
+
+      const falseResult = JSON.parse(
+        paginatedGatewaysFalse.Messages?.[0]?.Data,
+      );
+      // should find the gateway with autoStake=false
+      assert.equal(falseResult.totalItems, 1);
+      assert.equal(falseResult.items.length, 1);
+      assert.equal(falseResult.items[0].gatewayAddress, fourthGatewayAddress);
+      assert.equal(falseResult.items[0].settings.autoStake, false);
+
+      // Test filtering by autoStake=true (should exclude the false one)
+      const paginatedGatewaysTrue = await handle({
+        options: {
+          Tags: [
+            { name: 'Action', value: 'Paginated-Gateways' },
+            {
+              name: 'Filters',
+              value: JSON.stringify({ 'settings.autoStake': true }),
+            },
+          ],
+        },
+        memory: addGatewayMemory4,
+        timestamp: STUB_TIMESTAMP + 3,
+      });
+
+      const trueResult = JSON.parse(paginatedGatewaysTrue.Messages?.[0]?.Data);
+      // should find the other gateways with autoStake=true (default)
+      // The exact number depends on test setup, but should be at least 1
+      assert.ok(
+        trueResult.totalItems >= 1,
+        `Should find at least 1 gateway with autoStake=true, got ${trueResult.totalItems}`,
+      );
+      assert.equal(trueResult.items.length, trueResult.totalItems);
+      // verify our gateway with autoStake=false is not in the results
+      assert.ok(
+        trueResult.items.every(
+          (g) => g.gatewayAddress !== fourthGatewayAddress,
+        ),
+        'Gateway with autoStake=false should not appear in autoStake=true filter',
+      );
+
+      sharedMemory = addGatewayMemory4;
+    });
   });
 
   describe('All-Paginated-Delegates', () => {
