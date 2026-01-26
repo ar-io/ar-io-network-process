@@ -5,7 +5,7 @@
 local constants = {}
 
 --- Process constants
-constants.LOGO = "qUjrTmHdVjXX4D6rU6Fik02bUOzWkOR6oOqUg39g4-s"
+constants.LOGO = "WMLnh8pQL-UIXZMpdU2NUIriHfcFB5Bc49V8jTHjsZc"
 constants.TICKER = "ARIO"
 constants.NAME = "ARIO"
 constants.DENOMINATION = 6
