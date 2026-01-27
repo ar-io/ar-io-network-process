@@ -314,7 +314,6 @@ function primaryNames.getPrimaryNameDataWithOwnerFromAddress(address)
 		return nil
 	end
 	return {
-
 		owner = address,
 		name = nameData.name,
 		startTimestamp = nameData.startTimestamp,

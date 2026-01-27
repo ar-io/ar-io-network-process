@@ -1,5 +1,6 @@
 -- hb.lua needs to be in its own file and not in balances.lua to avoid circular dependencies
 local hb = {}
+local primaryNames = require(".src.primary_names")
 
 ---@return table<string, string>|nil affectedBalancesAddresses table of addresses and their balance values as strings
 function hb.createBalancesPatch()
@@ -31,9 +32,10 @@ end
 
 ---@return PrimaryNames|nil affectedPrimaryNamesAddresses
 function hb.createPrimaryNamesPatch()
-	---@type PrimaryNames
+	---@type {names: table<string, string>, owners: table<string, PrimaryNameInfo>, requests: table<string, table<string, string>>}
 	local affectedPrimaryNamesAddresses = {
 		names = {},
+		---@type table<string, PrimaryNameInfo>
 		owners = {},
 		requests = {},
 	}
@@ -54,7 +56,7 @@ function hb.createPrimaryNamesPatch()
 	end
 	for owner, _ in pairs(_G.HyperbeamSync.primaryNames.owners) do
 		-- we need to send an empty table to remove the owner primary name data
-		affectedPrimaryNamesAddresses.owners[owner] = PrimaryNames.owners[owner] or {}
+		affectedPrimaryNamesAddresses.owners[owner] = primaryNames.getPrimaryNameDataWithOwnerFromAddress(owner) or {}
 	end
 	for address, _ in pairs(_G.HyperbeamSync.primaryNames.requests) do
 		-- we need to send an empty table to remove the request
