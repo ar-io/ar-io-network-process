@@ -40,7 +40,7 @@ jobs:
         run: |
           check_balance() {
             echo "Fetching AO bridge wallet balance..."
-            AO_BALANCE=$(npx --yes @ar.io/sdk balance -a "${{ vars.BRIDGE_WALLET }}" | jq -r '.mARIOBalance')
+            AO_BALANCE=$(npx --yes @ar.io/sdk balance -a "${{ vars.BRIDGE_WALLET }}" --cu-url "${{ vars.CU_URL || 'https://cu.ardrive.io' }}" | jq -r '.mARIOBalance')
             echo "AO Bridge Wallet Balance (mARIO): $AO_BALANCE"
 
             echo "Fetching Base bridged token supply..."
