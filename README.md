@@ -1,3 +1,5 @@
+> [!CAUTION] > **This repository has been archived.** The AR.IO smart contracts have migrated from AO to Solana. All smart contract code now lives at [ar-io/ar-io-solana-contracts](https://github.com/ar-io/ar-io-solana-contracts).
+
 # AO/IO Network Process
 
 [![codecov](https://codecov.io/gh/ar-io/ar-io-network-process/graph/badge.svg?token=DMM8LQO8KL)](https://codecov.io/gh/ar-io/ar-io-network-process) [![$ARIO Network Status](https://github.com/ar-io/ar-io-network-process/actions/workflows/monitor.yaml/badge.svg)](https://github.com/ar-io/ar-io-network-process/actions/workflows/monitor.yaml)
@@ -14,6 +16,7 @@ The implementation of the ar.io network contract is written in lua and deployed 
 - [Monitoring](#monitoring)
 - [Tests](#tests)
   - [Unit Tests](#unit-tests)
+    - [Running Unit Tests via Docker](#running-unit-tests-via-docker)
   - [Integration Tests](#integration-tests)
 - [Pagination Filters](#pagination-filters)
 - [Developers](#developers)
