@@ -1,4 +1,6 @@
-> [!CAUTION] > **This repository has been archived.** The AR.IO smart contracts have migrated from AO to Solana. All smart contract code now lives at [ar-io/ar-io-solana-contracts](https://github.com/ar-io/ar-io-solana-contracts).
+<!-- prettier-ignore -->
+> [!CAUTION]
+> **This repository has been archived.** The AR.IO smart contracts have migrated from AO to Solana. All smart contract code now lives at [ar-io/ar-io-solana-contracts](https://github.com/ar-io/ar-io-solana-contracts).
 
 # AO/IO Network Process
 
